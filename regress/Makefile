@@ -71,6 +71,17 @@ CLEANFILES+=	authorized_keys_${USER} known_hosts pidfile \
 # Enable all malloc(3) randomisations and checks
 TEST_ENV=      "MALLOC_OPTIONS=AFGJPRX"
 
+# use in-tree executables
+TEST_ENV+=	"TEST_SSH_SCP=${.CURDIR}/../ssh/scp/obj/scp"
+TEST_ENV+=	"TEST_SSH_SFTP=${.CURDIR}/../ssh/sftp/obj/sftp"
+TEST_ENV+=	"TEST_SSH_SFTPSERVER=${.CURDIR}/../ssh/sftp-server/obj/sftp-server"
+TEST_ENV+=	"TEST_SSH_SSH=${.CURDIR}/../ssh/ssh/obj/ssh"
+TEST_ENV+=	"TEST_SSH_SSHADD=${.CURDIR}/../ssh/ssh-add/obj/ssh-add"
+TEST_ENV+=	"TEST_SSH_SSHAGENT=${.CURDIR}/../ssh/ssh-agent/obj/ssh-agent"
+TEST_ENV+=	"TEST_SSH_SSHD=${.CURDIR}/../ssh/sshd/obj/sshd"
+TEST_ENV+=	"TEST_SSH_SSHKEYGEN=${.CURDIR}/../ssh/ssh-keygen/obj/ssh-keygen"
+TEST_ENV+=	"TEST_SSH_SSHKEYSCAN=${.CURDIR}/../ssh/ssh-keyscan/obj/ssh-keyscan"
+
 t1:
 	ssh-keygen -if ${.CURDIR}/rsa_ssh2.prv | diff - ${.CURDIR}/rsa_openssh.prv
 	tr '\n' '\r' <${.CURDIR}/rsa_ssh2.prv > ${.OBJDIR}/rsa_ssh2_cr.prv
