@@ -174,8 +174,7 @@ int num_listen_socks = 0;
 char *client_version_string = NULL;
 char *server_version_string = NULL;
 
-/* for rekeying XXX fixme */
-Kex *xxx_kex;
+extern struct session_state *active_state;
 
 /*
  * Any really sensitive data in the application is contained in this
@@ -618,7 +617,7 @@ privsep_preauth(Authctxt *authctxt)
 	/* Set up unprivileged child process to deal with network data */
 	pmonitor = monitor_init();
 	/* Store a pointer to the kex for later rekeying */
-	pmonitor->m_pkex = &xxx_kex;
+	pmonitor->m_pkex = &active_state->kex;
 
 	if (use_privsep == PRIVSEP_SANDBOX)
 		box = ssh_sandbox_init();
@@ -801,13 +800,13 @@ get_hostkey_by_type(int type, int need_private)
 }
 
 Key *
-get_hostkey_public_by_type(int type)
+get_hostkey_public_by_type(int type, void *ctxt)
 {
 	return get_hostkey_by_type(type, 0);
 }
 
 Key *
-get_hostkey_private_by_type(int type)
+get_hostkey_private_by_type(int type, void *ctxt)
 {
 	return get_hostkey_by_type(type, 1);
 }
@@ -2187,7 +2186,7 @@ do_ssh2_kex(void)
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = list_hostkey_types();
 
 	/* start key exchange */
-	kex = kex_setup(myproposal);
+	kex = kex_setup(active_state, myproposal);
 	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
 	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
 	kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
@@ -2200,9 +2199,9 @@ do_ssh2_kex(void)
 	kex->load_host_private_key=&get_hostkey_private_by_type;
 	kex->host_key_index=&get_hostkey_index;
 
-	xxx_kex = kex;
+	active_state->kex = kex;
 
-	dispatch_run(DISPATCH_BLOCK, &kex->done, kex);
+	dispatch_run(DISPATCH_BLOCK, &kex->done, active_state);
 
 	session_id2 = kex->session_id;
 	session_id2_len = kex->session_id_len;

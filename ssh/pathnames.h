@@ -12,7 +12,9 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 
+#ifndef ETCDIR
 #define ETCDIR				"/etc"
+#endif
 #define SSHDIR				ETCDIR "/ssh"
 #define _PATH_SSH_PIDDIR		"/var/run"
 

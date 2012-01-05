@@ -41,19 +41,23 @@
 #include "packet.h"
 #include "dh.h"
 #include "ssh2.h"
+#include "dispatch.h"
+
+struct kexecdhc_state {
+	EC_KEY *client_key;
+	const EC_GROUP *group;
+};
+
+static void input_kex_ecdh_reply(int, u_int32_t, void*);
 
 void
-kexecdh_client(Kex *kex)
+kexecdh_client(struct session_state *ssh)
 {
+	Kex *kex = ssh->kex;
 	EC_KEY *client_key;
-	EC_POINT *server_public;
 	const EC_GROUP *group;
-	BIGNUM *shared_secret;
-	Key *server_host_key;
-	u_char *server_host_key_blob = NULL, *signature = NULL;
-	u_char *kbuf, *hash;
-	u_int klen, slen, sbloblen, hashlen;
 	int curve_nid;
+	struct kexecdhc_state *kexecdhc_state;
 
 	if ((curve_nid = kex_ecdh_name_to_nid(kex->name)) == -1)
 		fatal("%s: unsupported ECDH curve \"%s\"", __func__, kex->name);
@@ -63,9 +67,9 @@ kexecdh_client(Kex *kex)
 		fatal("%s: EC_KEY_generate_key failed", __func__);
 	group = EC_KEY_get0_group(client_key);
 
-	packet_start(SSH2_MSG_KEX_ECDH_INIT);
-	packet_put_ecpoint(group, EC_KEY_get0_public_key(client_key));
-	packet_send();
+	ssh_packet_start(ssh, SSH2_MSG_KEX_ECDH_INIT);
+	ssh_packet_put_ecpoint(ssh, group, EC_KEY_get0_public_key(client_key));
+	ssh_packet_send(ssh);
 	debug("sending SSH2_MSG_KEX_ECDH_INIT");
 
 #ifdef DEBUG_KEXECDH
@@ -73,11 +77,35 @@ kexecdh_client(Kex *kex)
 	key_dump_ec_key(client_key);
 #endif
 
+	kexecdhc_state = xcalloc(1, sizeof(*kexecdhc_state));
+	kexecdhc_state->client_key = client_key;
+	kexecdhc_state->group = group;
+	kex->state = kexecdhc_state;
+
 	debug("expecting SSH2_MSG_KEX_ECDH_REPLY");
-	packet_read_expect(SSH2_MSG_KEX_ECDH_REPLY);
+	ssh_dispatch_set(ssh, SSH2_MSG_KEX_ECDH_REPLY, &input_kex_ecdh_reply);
+}
+
+static void
+input_kex_ecdh_reply(int type, u_int32_t seq, void *ctxt)
+{
+	struct session_state *ssh = ctxt;
+	Kex *kex = ssh->kex;
+	struct kexecdhc_state *kexecdhc_state = kex->state;
+	const EC_GROUP *group;
+	EC_POINT *server_public;
+	EC_KEY *client_key;
+	BIGNUM *shared_secret;
+	Key *server_host_key;
+	u_char *server_host_key_blob = NULL, *signature = NULL;
+	u_char *kbuf, *hash;
+	u_int klen, slen, sbloblen, hashlen;
+
+	group = kexecdhc_state->group;
+	client_key = kexecdhc_state->client_key;
 
 	/* hostkey */
-	server_host_key_blob = packet_get_string(&sbloblen);
+	server_host_key_blob = ssh_packet_get_string(ssh, &sbloblen);
 	server_host_key = key_from_blob(server_host_key_blob, sbloblen);
 	if (server_host_key == NULL)
 		fatal("cannot decode server_host_key_blob");
@@ -85,13 +113,13 @@ kexecdh_client(Kex *kex)
 		fatal("type mismatch for decoded server_host_key_blob");
 	if (kex->verify_host_key == NULL)
 		fatal("cannot verify server_host_key");
-	if (kex->verify_host_key(server_host_key) == -1)
+	if (kex->verify_host_key(server_host_key, ctxt) == -1)
 		fatal("server_host_key verification failed");
 
 	/* Q_S, server public key */
 	if ((server_public = EC_POINT_new(group)) == NULL)
 		fatal("%s: EC_POINT_new failed", __func__);
-	packet_get_ecpoint(group, server_public);
+	ssh_packet_get_ecpoint(ssh, group, server_public);
 
 	if (key_ec_validate_public(group, server_public) != 0)
 		fatal("%s: invalid server public key", __func__);
@@ -102,8 +130,8 @@ kexecdh_client(Kex *kex)
 #endif
 
 	/* signed H */
-	signature = packet_get_string(&slen);
-	packet_check_eom();
+	signature = ssh_packet_get_string(ssh, &slen);
+	ssh_packet_check_eom(ssh);
 
 	klen = (EC_GROUP_get_degree(group) + 7) / 8;
 	kbuf = xmalloc(klen);
@@ -151,7 +179,9 @@ kexecdh_client(Kex *kex)
 		memcpy(kex->session_id, hash, kex->session_id_len);
 	}
 
-	kex_derive_keys(kex, hash, hashlen, shared_secret);
+	kex_derive_keys(ssh, hash, hashlen, shared_secret);
 	BN_clear_free(shared_secret);
-	kex_finish(kex);
+	xfree(kex->state);
+	kex->state = NULL;
+	kex_finish(ssh);
 }

@@ -111,6 +111,9 @@ struct Newkeys {
 	Mac	mac;
 	Comp	comp;
 };
+
+struct session_state;
+
 struct Kex {
 	u_char	*session_id;
 	u_int	session_id_len;
@@ -128,30 +131,32 @@ struct Kex {
 	const EVP_MD *evp_md;
 	char	*client_version_string;
 	char	*server_version_string;
-	int	(*verify_host_key)(Key *);
-	Key	*(*load_host_public_key)(int);
-	Key	*(*load_host_private_key)(int);
+	int	(*verify_host_key)(Key *, void *);
+	Key	*(*load_host_public_key)(int, void *);
+	Key	*(*load_host_private_key)(int, void *);
 	int	(*host_key_index)(Key *);
-	void	(*kex[KEX_MAX])(Kex *);
+	void	(*kex[KEX_MAX])(struct session_state *);
+	void	*state;
 };
 
 int	 kex_names_valid(const char *);
 
-Kex	*kex_setup(char *[PROPOSAL_MAX]);
-void	 kex_finish(Kex *);
+Kex	*kex_new(struct session_state *, char *[PROPOSAL_MAX]);
+Kex	*kex_setup(struct session_state *, char *[PROPOSAL_MAX]);
+void	 kex_finish(struct session_state *);
 
-void	 kex_send_kexinit(Kex *);
+void	 kex_send_kexinit(struct session_state *);
 void	 kex_input_kexinit(int, u_int32_t, void *);
-void	 kex_derive_keys(Kex *, u_char *, u_int, BIGNUM *);
+void	 kex_derive_keys(struct session_state *, u_char *, u_int, BIGNUM *);
 
-Newkeys *kex_get_newkeys(int);
+Newkeys *kex_get_newkeys(struct session_state *, int);
 
-void	 kexdh_client(Kex *);
-void	 kexdh_server(Kex *);
-void	 kexgex_client(Kex *);
-void	 kexgex_server(Kex *);
-void	 kexecdh_client(Kex *);
-void	 kexecdh_server(Kex *);
+void	 kexdh_client(struct session_state *);
+void	 kexdh_server(struct session_state *);
+void	 kexgex_client(struct session_state *);
+void	 kexgex_server(struct session_state *);
+void	 kexecdh_client(struct session_state *);
+void	 kexecdh_server(struct session_state *);
 
 void
 kex_dh_hash(char *, char *, char *, int, char *, int, u_char *, int,

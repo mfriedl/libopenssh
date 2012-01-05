@@ -183,8 +183,7 @@ TAILQ_HEAD(global_confirms, global_confirm);
 static struct global_confirms global_confirms =
     TAILQ_HEAD_INITIALIZER(global_confirms);
 
-/*XXX*/
-extern Kex *xxx_kex;
+extern struct session_state *active_state;
 
 void ssh_process_session2_setup(int, int, int, Buffer *);
 
@@ -1327,7 +1326,7 @@ static void
 client_process_buffered_input_packets(void)
 {
 	dispatch_run(DISPATCH_NONBLOCK, &quit_pending,
-	    compat20 ? xxx_kex : NULL);
+	    compat20 ? active_state : NULL);
 }
 
 /* scan buf[] for '~' before sending data to the peer */
@@ -1466,7 +1465,8 @@ client_loop(int have_pty, int escape_char_arg, int ssh2_chan_id)
 		if (compat20 && session_closed && !channel_still_open())
 			break;
 
-		rekeying = (xxx_kex != NULL && !xxx_kex->done);
+		rekeying = (active_state->kex != NULL &&
+		    !active_state->kex->done);
 
 		if (rekeying) {
 			debug("rekeying in progress");
@@ -1510,8 +1510,8 @@ client_loop(int have_pty, int escape_char_arg, int ssh2_chan_id)
 			channel_after_select(readset, writeset);
 			if (need_rekeying || packet_need_rekeying()) {
 				debug("need rekeying");
-				xxx_kex->done = 0;
-				kex_send_kexinit(xxx_kex);
+				active_state->kex->done = 0;
+				kex_send_kexinit(active_state);
 				need_rekeying = 0;
 			}
 		}

@@ -43,10 +43,22 @@
 #include "ssh-gss.h"
 #endif
 #include "monitor_wrap.h"
+#include "dispatch.h"
+
+static void input_kex_ecdh_init(int, u_int32_t, void*);
 
 void
-kexecdh_server(Kex *kex)
+kexecdh_server(struct session_state *ssh)
 {
+	debug("expecting SSH2_MSG_KEX_ECDH_INIT");
+	ssh_dispatch_set(ssh, SSH2_MSG_KEX_ECDH_INIT, &input_kex_ecdh_init);
+}
+
+static void
+input_kex_ecdh_init(int type, u_int32_t seq, void *ctxt)
+{
+	struct session_state *ssh = ctxt;
+	Kex *kex = ssh->kex;
 	EC_POINT *client_public;
 	EC_KEY *server_key;
 	const EC_GROUP *group;
@@ -73,20 +85,18 @@ kexecdh_server(Kex *kex)
 	if (kex->load_host_public_key == NULL ||
 	    kex->load_host_private_key == NULL)
 		fatal("Cannot load hostkey");
-	server_host_public = kex->load_host_public_key(kex->hostkey_type);
+	server_host_public = kex->load_host_public_key(kex->hostkey_type, ctxt);
 	if (server_host_public == NULL)
 		fatal("Unsupported hostkey type %d", kex->hostkey_type);
-	server_host_private = kex->load_host_private_key(kex->hostkey_type);
+	server_host_private = kex->load_host_private_key(kex->hostkey_type, ctxt);
 	if (server_host_private == NULL)
 		fatal("Missing private key for hostkey type %d",
 		    kex->hostkey_type);
 
-	debug("expecting SSH2_MSG_KEX_ECDH_INIT");
-	packet_read_expect(SSH2_MSG_KEX_ECDH_INIT);
 	if ((client_public = EC_POINT_new(group)) == NULL)
 		fatal("%s: EC_POINT_new failed", __func__);
-	packet_get_ecpoint(group, client_public);
-	packet_check_eom();
+	ssh_packet_get_ecpoint(ssh, group, client_public);
+	ssh_packet_check_eom(ssh);
 
 	if (key_ec_validate_public(group, client_public) != 0)
 		fatal("%s: invalid client public key", __func__);
@@ -145,18 +155,18 @@ kexecdh_server(Kex *kex)
 	/* destroy_sensitive_data(); */
 
 	/* send server hostkey, ECDH pubkey 'Q_S' and signed H */
-	packet_start(SSH2_MSG_KEX_ECDH_REPLY);
-	packet_put_string(server_host_key_blob, sbloblen);
-	packet_put_ecpoint(group, EC_KEY_get0_public_key(server_key));
-	packet_put_string(signature, slen);
-	packet_send();
+	ssh_packet_start(ssh, SSH2_MSG_KEX_ECDH_REPLY);
+	ssh_packet_put_string(ssh, server_host_key_blob, sbloblen);
+	ssh_packet_put_ecpoint(ssh, group, EC_KEY_get0_public_key(server_key));
+	ssh_packet_put_string(ssh, signature, slen);
+	ssh_packet_send(ssh);
 
 	xfree(signature);
 	xfree(server_host_key_blob);
 	/* have keys, free server key */
 	EC_KEY_free(server_key);
 
-	kex_derive_keys(kex, hash, hashlen, shared_secret);
+	kex_derive_keys(ssh, hash, hashlen, shared_secret);
 	BN_clear_free(shared_secret);
-	kex_finish(kex);
+	kex_finish(ssh);
 }

@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.116 2012/01/05 00:16:56 djm Exp $ */
+/* $OpenBSD: monitor.c,v 1.115 2011/06/23 23:35:42 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -82,8 +82,8 @@ static Gssctxt *gsscontext = NULL;
 
 /* Imports */
 extern ServerOptions options;
+extern struct session_state *active_state;
 extern u_int utmp_len;
-extern Newkeys *current_keys[];
 extern z_stream incoming_stream;
 extern z_stream outgoing_stream;
 extern u_char session_id[];
@@ -1527,12 +1527,12 @@ mm_get_keystate(struct monitor *pmonitor)
 	}
 
 	blob = buffer_get_string(&m, &bloblen);
-	current_keys[MODE_OUT] = mm_newkeys_from_blob(blob, bloblen);
+	active_state->current_keys[MODE_OUT] = mm_newkeys_from_blob(blob, bloblen);
 	xfree(blob);
 
 	debug3("%s: Waiting for second key", __func__);
 	blob = buffer_get_string(&m, &bloblen);
-	current_keys[MODE_IN] = mm_newkeys_from_blob(blob, bloblen);
+	active_state->current_keys[MODE_IN] = mm_newkeys_from_blob(blob, bloblen);
 	xfree(blob);
 
 	/* Now get sequence numbers for the packets */
