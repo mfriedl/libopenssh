@@ -1,0 +1,7 @@
+obj
+*.core
+*.diff
+*.dif
+*.bak
+*.rej
+*.orig
