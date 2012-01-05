@@ -1,0 +1,26 @@
+1) [DONE] split functions from kex*[cs].c into callbacks similar to kexgexc.c
+   and remove packet_read_expect.
+
+2) [DONE] move to session state
+	struct session_state {
+		Kex			kex;
+		Newkeys			*current_keys; /* cf kex.c */
+		dispatch_fn		dispatch[]
+		int			datafellows
+	}
+
+3) [DONE] Code for parsing the keys
+
+4) [DONE] Implement callback for kex->verify_host_key for checking key
+
+5) [DONE] Implement callbacks for:
+	kex->load_host_public_key
+	kex->load_host_private_key
+
+5) [DONE] figure out how to integrate the banner exchange into ssh_packet_get()
+
+6) [DONE] figure out how integrate kex into ssh_packet_get()
+
+7) [DONE] figure out initial API
+
+8) figure out error-handling and remove fatal()

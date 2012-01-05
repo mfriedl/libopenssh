@@ -35,10 +35,6 @@
 #include "packet.h"
 #include "compat.h"
 
-#define DISPATCH_MAX	255
-
-dispatch_fn *dispatch[DISPATCH_MAX];
-
 void
 dispatch_protocol_error(int type, u_int32_t seq, void *ctxt)
 {
@@ -58,44 +54,69 @@ dispatch_protocol_ignore(int type, u_int32_t seq, void *ctxt)
 void
 dispatch_init(dispatch_fn *dflt)
 {
-	u_int i;
-	for (i = 0; i < DISPATCH_MAX; i++)
-		dispatch[i] = dflt;
+	extern struct session_state *active_state;
+	ssh_dispatch_init(active_state, dflt);
 }
 void
 dispatch_range(u_int from, u_int to, dispatch_fn *fn)
+{
+	extern struct session_state *active_state;
+	ssh_dispatch_range(active_state, from, to, fn);
+}
+void
+dispatch_set(int type, dispatch_fn *fn)
+{
+	extern struct session_state *active_state;
+	ssh_dispatch_set(active_state, type, fn);
+}
+void
+dispatch_run(int mode, volatile sig_atomic_t *done, void *ctxt)
+{
+	extern struct session_state *active_state;
+	ssh_dispatch_run(active_state, mode, done, ctxt);
+}
+
+void
+ssh_dispatch_init(struct session_state *ssh, dispatch_fn *dflt)
+{
+	u_int i;
+	for (i = 0; i < DISPATCH_MAX; i++)
+		ssh->dispatch[i] = dflt;
+}
+void
+ssh_dispatch_range(struct session_state *ssh, u_int from, u_int to, dispatch_fn *fn)
 {
 	u_int i;
 
 	for (i = from; i <= to; i++) {
 		if (i >= DISPATCH_MAX)
 			break;
-		dispatch[i] = fn;
+		ssh->dispatch[i] = fn;
 	}
 }
 void
-dispatch_set(int type, dispatch_fn *fn)
+ssh_dispatch_set(struct session_state *ssh, int type, dispatch_fn *fn)
 {
-	dispatch[type] = fn;
+	ssh->dispatch[type] = fn;
 }
 void
-dispatch_run(int mode, volatile sig_atomic_t *done, void *ctxt)
+ssh_dispatch_run(struct session_state *ssh, int mode, volatile sig_atomic_t *done, void *ctxt)
 {
 	for (;;) {
 		int type;
 		u_int32_t seqnr;
 
 		if (mode == DISPATCH_BLOCK) {
-			type = packet_read_seqnr(&seqnr);
+			type = ssh_packet_read_seqnr(ssh, &seqnr);
 		} else {
-			type = packet_read_poll_seqnr(&seqnr);
+			type = ssh_packet_read_poll_seqnr(ssh, &seqnr);
 			if (type == SSH_MSG_NONE)
 				return;
 		}
-		if (type > 0 && type < DISPATCH_MAX && dispatch[type] != NULL)
-			(*dispatch[type])(type, seqnr, ctxt);
+		if (type > 0 && type < DISPATCH_MAX && ssh->dispatch[type] != NULL)
+			(*ssh->dispatch[type])(type, seqnr, ctxt);
 		else
-			packet_disconnect("protocol error: rcvd type %d", type);
+			ssh_packet_disconnect(ssh, "protocol error: rcvd type %d", type);
 		if (done != NULL && *done)
 			return;
 	}

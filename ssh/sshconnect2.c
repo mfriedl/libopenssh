@@ -86,10 +86,10 @@ u_int session_id2_len = 0;
 char *xxx_host;
 struct sockaddr *xxx_hostaddr;
 
-Kex *xxx_kex = NULL;
+extern struct session_state *active_state;
 
 static int
-verify_host_key_callback(Key *hostkey)
+verify_host_key_callback(Key *hostkey, void *ctxt)
 {
 	if (verify_host_key(xxx_host, xxx_hostaddr, hostkey) == -1)
 		fatal("Host key verification failed.");
@@ -195,7 +195,7 @@ ssh_kex2(char *host, struct sockaddr *hostaddr, u_short port)
 		packet_set_rekey_limit((u_int32_t)options.rekey_limit);
 
 	/* start key exchange */
-	kex = kex_setup(myproposal);
+	kex = kex_setup(active_state, myproposal);
 	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
 	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
 	kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
@@ -205,9 +205,9 @@ ssh_kex2(char *host, struct sockaddr *hostaddr, u_short port)
 	kex->server_version_string=server_version_string;
 	kex->verify_host_key=&verify_host_key_callback;
 
-	xxx_kex = kex;
+	active_state->kex = kex;
 
-	dispatch_run(DISPATCH_BLOCK, &kex->done, kex);
+	dispatch_run(DISPATCH_BLOCK, &kex->done, active_state);
 
 	if (options.use_roaming && !kex->roaming) {
 		debug("Roaming not allowed by server");

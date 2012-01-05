@@ -65,6 +65,7 @@ int maxfd;
 #define MAXCON (maxfd - 10)
 
 extern char *__progname;
+extern struct session_state *active_state;
 fd_set *read_wait;
 size_t read_wait_nfdset;
 int ncon;
@@ -201,7 +202,7 @@ keygrab_ssh1(con *c)
 }
 
 static int
-hostjump(Key *hostkey)
+hostjump(Key *hostkey, void *ctxt)
 {
 	kexjmp_key = hostkey;
 	longjmp(kexjmp, 1);
@@ -233,7 +234,7 @@ keygrab_ssh2(con *c)
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = c->c_keytype == KT_DSA?
 	    "ssh-dss" : (c->c_keytype == KT_RSA ? "ssh-rsa" :
 	    "ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521");
-	c->c_kex = kex_setup(myproposal);
+	c->c_kex = kex_setup(active_state, myproposal);
 	c->c_kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
 	c->c_kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
 	c->c_kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
@@ -243,7 +244,8 @@ keygrab_ssh2(con *c)
 
 	if (!(j = setjmp(kexjmp))) {
 		nonfatal_fatal = 1;
-		dispatch_run(DISPATCH_BLOCK, &c->c_kex->done, c->c_kex);
+		dispatch_run(DISPATCH_BLOCK, &active_state->kex->done,
+		    active_state);
 		fprintf(stderr, "Impossible! dispatch_run() returned!\n");
 		exit(1);
 	}

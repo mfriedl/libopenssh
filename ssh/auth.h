@@ -158,8 +158,8 @@ check_key_in_hostfiles(struct passwd *, Key *, const char *,
 
 /* hostkey handling */
 Key	*get_hostkey_by_index(int);
-Key	*get_hostkey_public_by_type(int);
-Key	*get_hostkey_private_by_type(int);
+Key	*get_hostkey_public_by_type(int, void *);
+Key	*get_hostkey_private_by_type(int, void *);
 int	 get_hostkey_index(Key *);
 int	 ssh1_session_key(BIGNUM *);
 

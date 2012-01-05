@@ -46,37 +46,31 @@
 #include "ssh-gss.h"
 #endif
 #include "monitor_wrap.h"
+#include "dispatch.h"
+
+struct kexgexs_state {
+    int omin, min, omax, max, onbits;
+    DH *dh;
+};
+
+static void input_kex_dh_gex_init(int, u_int32_t, void *);
 
 void
-kexgex_server(Kex *kex)
+kexgex_server(struct session_state *ssh)
 {
-	BIGNUM *shared_secret = NULL, *dh_client_pub = NULL;
-	Key *server_host_public, *server_host_private;
+	Kex *kex = ssh->kex;
 	DH *dh;
-	u_char *kbuf, *hash, *signature = NULL, *server_host_key_blob = NULL;
-	u_int sbloblen, klen, slen, hashlen;
 	int omin = -1, min = -1, omax = -1, max = -1, onbits = -1, nbits = -1;
-	int type, kout;
+	int type;
+	struct kexgexs_state *kexgexs_state;
 
-	if (kex->load_host_public_key == NULL ||
-	    kex->load_host_private_key == NULL)
-		fatal("Cannot load hostkey");
-	server_host_public = kex->load_host_public_key(kex->hostkey_type);
-	if (server_host_public == NULL)
-		fatal("Unsupported hostkey type %d", kex->hostkey_type);
-	server_host_private = kex->load_host_private_key(kex->hostkey_type);
-	if (server_host_private == NULL)
-		fatal("Missing private key for hostkey type %d",
-		    kex->hostkey_type);
-
-
-	type = packet_read();
+	type = ssh_packet_read(ssh);
 	switch (type) {
 	case SSH2_MSG_KEX_DH_GEX_REQUEST:
 		debug("SSH2_MSG_KEX_DH_GEX_REQUEST received");
-		omin = min = packet_get_int();
-		onbits = nbits = packet_get_int();
-		omax = max = packet_get_int();
+		omin = min = ssh_packet_get_int(ssh);
+		onbits = nbits = ssh_packet_get_int(ssh);
+		omax = max = ssh_packet_get_int(ssh);
 		min = MAX(DH_GRP_MIN, min);
 		max = MIN(DH_GRP_MAX, max);
 		nbits = MAX(DH_GRP_MIN, nbits);
@@ -84,7 +78,7 @@ kexgex_server(Kex *kex)
 		break;
 	case SSH2_MSG_KEX_DH_GEX_REQUEST_OLD:
 		debug("SSH2_MSG_KEX_DH_GEX_REQUEST_OLD received");
-		onbits = nbits = packet_get_int();
+		onbits = nbits = ssh_packet_get_int(ssh);
 		/* unused for old GEX */
 		omin = min = DH_GRP_MIN;
 		omax = max = DH_GRP_MAX;
@@ -92,7 +86,7 @@ kexgex_server(Kex *kex)
 	default:
 		fatal("protocol error during kex, no DH_GEX_REQUEST: %d", type);
 	}
-	packet_check_eom();
+	ssh_packet_check_eom(ssh);
 
 	if (omax < omin || onbits < omin || omax < onbits)
 		fatal("DH_GEX_REQUEST, bad parameters: %d !< %d !< %d",
@@ -101,28 +95,71 @@ kexgex_server(Kex *kex)
 	/* Contact privileged parent */
 	dh = PRIVSEP(choose_dh(min, nbits, max));
 	if (dh == NULL)
-		packet_disconnect("Protocol error: no matching DH grp found");
+		ssh_packet_disconnect(ssh,
+		    "Protocol error: no matching DH grp found");
 
 	debug("SSH2_MSG_KEX_DH_GEX_GROUP sent");
-	packet_start(SSH2_MSG_KEX_DH_GEX_GROUP);
-	packet_put_bignum2(dh->p);
-	packet_put_bignum2(dh->g);
-	packet_send();
+	ssh_packet_start(ssh, SSH2_MSG_KEX_DH_GEX_GROUP);
+	ssh_packet_put_bignum2(ssh, dh->p);
+	ssh_packet_put_bignum2(ssh, dh->g);
+	ssh_packet_send(ssh);
 
 	/* flush */
-	packet_write_wait();
+	ssh_packet_write_wait(ssh);
 
 	/* Compute our exchange value in parallel with the client */
 	dh_gen_key(dh, kex->we_need * 8);
 
+	kexgexs_state = xcalloc(1, sizeof(*kexgexs_state));
+	kexgexs_state->omin = omin;
+	kexgexs_state->omax = omax;
+	kexgexs_state->min = min;
+	kexgexs_state->max = max;
+	kexgexs_state->onbits = onbits;
+	kexgexs_state->dh = dh;
+	kex->state = kexgexs_state;
+
 	debug("expecting SSH2_MSG_KEX_DH_GEX_INIT");
-	packet_read_expect(SSH2_MSG_KEX_DH_GEX_INIT);
+	ssh_dispatch_set(ssh, SSH2_MSG_KEX_DH_GEX_INIT, &input_kex_dh_gex_init);
+}
+
+static void
+input_kex_dh_gex_init(int type, u_int32_t seq, void *ctxt)
+{
+	struct session_state *ssh = ctxt;
+	Kex *kex = ssh->kex;
+	struct kexgexs_state *kexgexs_state = kex->state;
+	BIGNUM *shared_secret = NULL, *dh_client_pub = NULL;
+	Key *server_host_public, *server_host_private;
+	DH *dh;
+	u_int sbloblen, klen, slen, hashlen;
+	u_char *kbuf, *hash, *signature = NULL, *server_host_key_blob = NULL;
+	int omin, min, omax, max, onbits;
+	int kout;
+
+	dh = kexgexs_state->dh;
+	omin = kexgexs_state->omin;
+	min = kexgexs_state->min;
+	omax = kexgexs_state->omax;
+	max = kexgexs_state->max;
+	onbits = kexgexs_state->onbits;
+
+	if (kex->load_host_public_key == NULL ||
+	    kex->load_host_private_key == NULL)
+		fatal("Cannot load hostkey");
+	server_host_public = kex->load_host_public_key(kex->hostkey_type, ctxt);
+	if (server_host_public == NULL)
+		fatal("Unsupported hostkey type %d", kex->hostkey_type);
+	server_host_private = kex->load_host_private_key(kex->hostkey_type, ctxt);
+	if (server_host_private == NULL)
+		fatal("Missing private key for hostkey type %d",
+		    kex->hostkey_type);
 
 	/* key, cert */
 	if ((dh_client_pub = BN_new()) == NULL)
 		fatal("dh_client_pub == NULL");
-	packet_get_bignum2(dh_client_pub);
-	packet_check_eom();
+	ssh_packet_get_bignum2(ssh, dh_client_pub);
+	ssh_packet_check_eom(ssh);
 
 #ifdef DEBUG_KEXDH
 	fprintf(stderr, "dh_client_pub= ");
@@ -138,7 +175,8 @@ kexgex_server(Kex *kex)
 	fprintf(stderr, "\n");
 #endif
 	if (!dh_pub_is_valid(dh, dh_client_pub))
-		packet_disconnect("bad client public DH value");
+		ssh_packet_disconnect(ssh,
+		    "bad client public DH value");
 
 	klen = DH_size(dh);
 	kbuf = xmalloc(klen);
@@ -192,19 +230,21 @@ kexgex_server(Kex *kex)
 
 	/* send server hostkey, DH pubkey 'f' and singed H */
 	debug("SSH2_MSG_KEX_DH_GEX_REPLY sent");
-	packet_start(SSH2_MSG_KEX_DH_GEX_REPLY);
-	packet_put_string(server_host_key_blob, sbloblen);
-	packet_put_bignum2(dh->pub_key);	/* f */
-	packet_put_string(signature, slen);
-	packet_send();
+	ssh_packet_start(ssh, SSH2_MSG_KEX_DH_GEX_REPLY);
+	ssh_packet_put_string(ssh, server_host_key_blob, sbloblen);
+	ssh_packet_put_bignum2(ssh, dh->pub_key);	/* f */
+	ssh_packet_put_string(ssh, signature, slen);
+	ssh_packet_send(ssh);
 
 	xfree(signature);
 	xfree(server_host_key_blob);
 	/* have keys, free DH */
 	DH_free(dh);
 
-	kex_derive_keys(kex, hash, hashlen, shared_secret);
+	kex_derive_keys(ssh, hash, hashlen, shared_secret);
 	BN_clear_free(shared_secret);
 
-	kex_finish(kex);
+	xfree(kex->state);
+	kex->state = NULL;
+	kex_finish(ssh);
 }

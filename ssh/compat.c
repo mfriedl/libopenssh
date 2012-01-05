@@ -31,7 +31,6 @@
 
 #include "xmalloc.h"
 #include "buffer.h"
-#include "packet.h"
 #include "compat.h"
 #include "log.h"
 #include "match.h"
@@ -53,7 +52,7 @@ enable_compat13(void)
 	compat13 = 1;
 }
 /* datafellows bug compatibility */
-void
+int
 compat_datafellows(const char *version)
 {
 	int i;
@@ -169,10 +168,11 @@ compat_datafellows(const char *version)
 		    strlen(check[i].pat), 0) == 1) {
 			debug("match: %s pat %s", version, check[i].pat);
 			datafellows = check[i].bugs;
-			return;
+			return (datafellows);
 		}
 	}
 	debug("no match: %s", version);
+	return (0);
 }
 
 #define	SEP	","

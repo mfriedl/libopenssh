@@ -40,17 +40,21 @@
 #include "packet.h"
 #include "dh.h"
 #include "ssh2.h"
+#include "dispatch.h"
+
+struct kexdhc_state {
+	DH *dh;
+};
+
+
+static void input_kex_dh(int, u_int32_t, void *);
 
 void
-kexdh_client(Kex *kex)
+kexdh_client(struct session_state *ssh)
 {
-	BIGNUM *dh_server_pub = NULL, *shared_secret = NULL;
+	Kex *kex = ssh->kex;
+	struct kexdhc_state *kexdhc_state;
 	DH *dh;
-	Key *server_host_key;
-	u_char *server_host_key_blob = NULL, *signature = NULL;
-	u_char *kbuf, *hash;
-	u_int klen, slen, sbloblen, hashlen;
-	int kout;
 
 	/* generate and send 'e', client DH public key */
 	switch (kex->kex_type) {
@@ -64,9 +68,9 @@ kexdh_client(Kex *kex)
 		fatal("%s: Unexpected KEX type %d", __func__, kex->kex_type);
 	}
 	dh_gen_key(dh, kex->we_need * 8);
-	packet_start(SSH2_MSG_KEXDH_INIT);
-	packet_put_bignum2(dh->pub_key);
-	packet_send();
+	ssh_packet_start(ssh, SSH2_MSG_KEXDH_INIT);
+	ssh_packet_put_bignum2(ssh, dh->pub_key);
+	ssh_packet_send(ssh);
 
 	debug("sending SSH2_MSG_KEXDH_INIT");
 #ifdef DEBUG_KEXDH
@@ -77,10 +81,27 @@ kexdh_client(Kex *kex)
 #endif
 
 	debug("expecting SSH2_MSG_KEXDH_REPLY");
-	packet_read_expect(SSH2_MSG_KEXDH_REPLY);
+	kexdhc_state = xcalloc(1, sizeof(*kexdhc_state));
+	kexdhc_state->dh = dh;
+	kex->state = kexdhc_state;
+	ssh_dispatch_set(ssh, SSH2_MSG_KEXDH_REPLY, &input_kex_dh);
+}
+
+static void
+input_kex_dh(int type, u_int32_t seq, void *ctxt)
+{
+	struct session_state *ssh = ctxt;
+	Kex *kex = ssh->kex;
+	struct kexdhc_state *kexdhc_state = kex->state;
+	BIGNUM *dh_server_pub = NULL, *shared_secret = NULL;
+	Key *server_host_key;
+	u_char *server_host_key_blob = NULL, *signature = NULL;
+	u_char *kbuf, *hash;
+	u_int klen, slen, sbloblen, hashlen;
+	int kout;
 
 	/* key, cert */
-	server_host_key_blob = packet_get_string(&sbloblen);
+	server_host_key_blob = ssh_packet_get_string(ssh, &sbloblen);
 	server_host_key = key_from_blob(server_host_key_blob, sbloblen);
 	if (server_host_key == NULL)
 		fatal("cannot decode server_host_key_blob");
@@ -88,13 +109,13 @@ kexdh_client(Kex *kex)
 		fatal("type mismatch for decoded server_host_key_blob");
 	if (kex->verify_host_key == NULL)
 		fatal("cannot verify server_host_key");
-	if (kex->verify_host_key(server_host_key) == -1)
+	if (kex->verify_host_key(server_host_key, ctxt) == -1)
 		fatal("server_host_key verification failed");
 
 	/* DH parameter f, server public DH key */
 	if ((dh_server_pub = BN_new()) == NULL)
 		fatal("dh_server_pub == NULL");
-	packet_get_bignum2(dh_server_pub);
+	ssh_packet_get_bignum2(ssh, dh_server_pub);
 
 #ifdef DEBUG_KEXDH
 	fprintf(stderr, "dh_server_pub= ");
@@ -104,15 +125,16 @@ kexdh_client(Kex *kex)
 #endif
 
 	/* signed H */
-	signature = packet_get_string(&slen);
-	packet_check_eom();
+	signature = ssh_packet_get_string(ssh, &slen);
+	ssh_packet_check_eom(ssh);
 
-	if (!dh_pub_is_valid(dh, dh_server_pub))
-		packet_disconnect("bad server public DH value");
+	if (!dh_pub_is_valid(kexdhc_state->dh, dh_server_pub))
+		ssh_packet_disconnect(ssh,
+		    "bad server public DH value");
 
-	klen = DH_size(dh);
+	klen = DH_size(kexdhc_state->dh);
 	kbuf = xmalloc(klen);
-	if ((kout = DH_compute_key(kbuf, dh_server_pub, dh)) < 0)
+	if ((kout = DH_compute_key(kbuf, dh_server_pub, kexdhc_state->dh)) < 0)
 		fatal("DH_compute_key: failed");
 #ifdef DEBUG_KEXDH
 	dump_digest("shared secret", kbuf, kout);
@@ -131,14 +153,14 @@ kexdh_client(Kex *kex)
 	    buffer_ptr(&kex->my), buffer_len(&kex->my),
 	    buffer_ptr(&kex->peer), buffer_len(&kex->peer),
 	    server_host_key_blob, sbloblen,
-	    dh->pub_key,
+	    kexdhc_state->dh->pub_key,
 	    dh_server_pub,
 	    shared_secret,
 	    &hash, &hashlen
 	);
 	xfree(server_host_key_blob);
 	BN_clear_free(dh_server_pub);
-	DH_free(dh);
+	DH_free(kexdhc_state->dh);
 
 	if (key_verify(server_host_key, signature, slen, hash, hashlen) != 1)
 		fatal("key_verify failed for server_host_key");
@@ -152,7 +174,9 @@ kexdh_client(Kex *kex)
 		memcpy(kex->session_id, hash, kex->session_id_len);
 	}
 
-	kex_derive_keys(kex, hash, hashlen, shared_secret);
+	kex_derive_keys(ssh, hash, hashlen, shared_secret);
 	BN_clear_free(shared_secret);
-	kex_finish(kex);
+	xfree(kex->state);
+	kex->state = NULL;
+	kex_finish(ssh);
 }

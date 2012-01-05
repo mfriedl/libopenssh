@@ -15,6 +15,8 @@ SRCS=	authfd.c authfile.c bufaux.c bufec.c bufbn.c buffer.c canohost.c \
 	kexdhc.c kexgexc.c kexecdhc.c msg.c progressmeter.c dns.c \
 	monitor_fdpass.c umac.c addrmatch.c schnorr.c jpake.c ssh-pkcs11.c
 
+SRCS+=	opacket.c ssh_api.c
+
 DEBUGLIBS= no
 NOPROFILE= yes
 NOPIC=	yes
