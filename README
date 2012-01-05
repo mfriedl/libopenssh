@@ -1,0 +1,9 @@
+libopenssh
+==========
+
+turn openssh into a library
+
+ssh	a copy of openbsd src/usr.bin/ssh
+regress	a copy of openbsd src/regress/usr.bin/ssh
+
+-m
