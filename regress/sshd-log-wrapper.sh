@@ -10,4 +10,4 @@ log=$2
 shift
 shift
 
-exec $sshd $@ -e 2>>$log
+exec ktrace -i $sshd $@ -e 2>>$log
