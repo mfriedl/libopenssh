@@ -13,7 +13,6 @@
 #include "ssh2.h"
 #include "packet.h"
 
-/* TODO: Hier muessen spaeter die Werte fuer den Key-Exchange rein */
 struct kex_params {
 	char *proposal[PROPOSAL_MAX];
 };
