@@ -20,6 +20,12 @@
 struct ssh *active_state, *backup_state;
 
 void    
+packet_set_connection(int fd_in, int fd_out)
+{
+	active_state = ssh_packet_set_connection(active_state, fd_in, fd_out);
+}
+
+void    
 packet_backup_state(void)
 {
 	ssh_packet_backup_state(active_state, backup_state);
