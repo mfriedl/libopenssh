@@ -2,8 +2,11 @@
 
 CFLAGS+=	-I${.CURDIR}/..
 
+# enable warnings
+WARNINGS=Yes
+
 CDIAGFLAGS=	-Wall
-#CDIAGFLAGS+=	-Werror
+CDIAGFLAGS+=	-Werror
 CDIAGFLAGS+=	-Wpointer-arith
 CDIAGFLAGS+=	-Wuninitialized
 CDIAGFLAGS+=	-Wstrict-prototypes
