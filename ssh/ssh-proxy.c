@@ -98,7 +98,7 @@ main(int argc, char **argv)
 	char buf[4*4096];	/* shrink in order to trigger bugs */
 	char keybuf[8*1024];
 	char *obuf, *hostkey_file = NULL;
-	struct session_state *ssh;
+	struct ssh *ssh;
 	struct kex_params kex_params;
 
 	extern char *optarg;

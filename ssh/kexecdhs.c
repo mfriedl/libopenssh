@@ -48,7 +48,7 @@
 static void input_kex_ecdh_init(int, u_int32_t, void*);
 
 void
-kexecdh_server(struct session_state *ssh)
+kexecdh_server(struct ssh *ssh)
 {
 	debug("expecting SSH2_MSG_KEX_ECDH_INIT");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_ECDH_INIT, &input_kex_ecdh_init);
@@ -57,7 +57,7 @@ kexecdh_server(struct session_state *ssh)
 static void
 input_kex_ecdh_init(int type, u_int32_t seq, void *ctxt)
 {
-	struct session_state *ssh = ctxt;
+	struct ssh *ssh = ctxt;
 	Kex *kex = ssh->kex;
 	EC_POINT *client_public;
 	EC_KEY *server_key;

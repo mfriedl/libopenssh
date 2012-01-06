@@ -81,7 +81,7 @@
 #define DBG(x)
 #endif
 
-struct session_state *active_state, *backup_state;
+struct ssh *active_state, *backup_state;
 
 /*
  * Sets the descriptors used for communication.  Disables encryption until

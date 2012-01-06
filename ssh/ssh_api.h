@@ -19,15 +19,15 @@ struct kex_params {
 };
 
 /* API functions */
-struct session_state *ssh_init(int is_server, struct kex_params *kex_params);
-int  ssh_add_hostkey(struct session_state* ssh, char *key);
-int  ssh_packet_get(struct session_state* ssh);
-void *ssh_packet_payload(struct session_state* ssh, u_int *len);
-void ssh_packet_put(struct session_state* ssh, int type, const char *data, u_int len);
-int  ssh_input_space(struct session_state* ssh, u_int len);
-void ssh_input_append(struct session_state* ssh, const char *data, u_int len);
-int  ssh_output_space(struct session_state* ssh, u_int len);
-void *ssh_output_ptr(struct session_state* ssh, u_int *len);
-void ssh_output_consume(struct session_state* ssh, u_int len);
+struct ssh *ssh_init(int is_server, struct kex_params *kex_params);
+int  ssh_add_hostkey(struct ssh* ssh, char *key);
+int  ssh_packet_get(struct ssh* ssh);
+void *ssh_packet_payload(struct ssh* ssh, u_int *len);
+void ssh_packet_put(struct ssh* ssh, int type, const char *data, u_int len);
+int  ssh_input_space(struct ssh* ssh, u_int len);
+void ssh_input_append(struct ssh* ssh, const char *data, u_int len);
+int  ssh_output_space(struct ssh* ssh, u_int len);
+void *ssh_output_ptr(struct ssh* ssh, u_int *len);
+void ssh_output_consume(struct ssh* ssh, u_int len);
 
 #endif

@@ -51,7 +51,7 @@ struct kexecdhc_state {
 static void input_kex_ecdh_reply(int, u_int32_t, void*);
 
 void
-kexecdh_client(struct session_state *ssh)
+kexecdh_client(struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
 	EC_KEY *client_key;
@@ -89,7 +89,7 @@ kexecdh_client(struct session_state *ssh)
 static void
 input_kex_ecdh_reply(int type, u_int32_t seq, void *ctxt)
 {
-	struct session_state *ssh = ctxt;
+	struct ssh *ssh = ctxt;
 	Kex *kex = ssh->kex;
 	struct kexecdhc_state *kexecdhc_state = kex->state;
 	const EC_GROUP *group;

@@ -36,7 +36,7 @@ enum {
 
 typedef void dispatch_fn(int, u_int32_t, void *);
 
-struct session_state;
+struct ssh;
 
 void	dispatch_init(dispatch_fn *);
 void	dispatch_set(int, dispatch_fn *);
@@ -44,9 +44,9 @@ void	dispatch_range(u_int, u_int, dispatch_fn *);
 void	dispatch_run(int, volatile sig_atomic_t *, void *);
 void	dispatch_protocol_error(int, u_int32_t, void *);
 void	dispatch_protocol_ignore(int, u_int32_t, void *);
-void	ssh_dispatch_init(struct session_state *, dispatch_fn *);
-void	ssh_dispatch_set(struct session_state *, int, dispatch_fn *);
-void	ssh_dispatch_range(struct session_state *, u_int, u_int, dispatch_fn *);
-void	ssh_dispatch_run(struct session_state *, int, volatile sig_atomic_t *, void *);
+void	ssh_dispatch_init(struct ssh *, dispatch_fn *);
+void	ssh_dispatch_set(struct ssh *, int, dispatch_fn *);
+void	ssh_dispatch_range(struct ssh *, u_int, u_int, dispatch_fn *);
+void	ssh_dispatch_run(struct ssh *, int, volatile sig_atomic_t *, void *);
 
 #endif

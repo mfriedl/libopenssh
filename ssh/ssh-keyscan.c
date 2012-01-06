@@ -65,7 +65,7 @@ int maxfd;
 #define MAXCON (maxfd - 10)
 
 extern char *__progname;
-extern struct session_state *active_state;
+extern struct ssh *active_state;
 fd_set *read_wait;
 size_t read_wait_nfdset;
 int ncon;
