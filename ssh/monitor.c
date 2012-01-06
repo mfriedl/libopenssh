@@ -82,7 +82,6 @@ static Gssctxt *gsscontext = NULL;
 
 /* Imports */
 extern ServerOptions options;
-extern struct ssh *active_state;
 extern u_int utmp_len;
 extern z_stream incoming_stream;
 extern z_stream outgoing_stream;

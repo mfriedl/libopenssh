@@ -86,8 +86,6 @@ u_int session_id2_len = 0;
 char *xxx_host;
 struct sockaddr *xxx_hostaddr;
 
-extern struct ssh *active_state;
-
 static int
 verify_host_key_callback(Key *hostkey, void *ctxt)
 {
