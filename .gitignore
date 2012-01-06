@@ -1,7 +1,9 @@
-obj
-*.core
-*.diff
-*.dif
 *.bak
-*.rej
+*.core
+*.dif
+*.diff
 *.orig
+*.rej
+ID
+obj
+tags
