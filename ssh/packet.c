@@ -187,20 +187,7 @@ struct session_state {
 	/* Used in packet_set_maxsize */
 	int set_maxsize_called;
 
-	/* Session information for key exchange */
-	Kex *kex;
-
-	/* Dispatcher table */
-	dispatch_fn *dispatch[DISPATCH_MAX];
-
-	/* datafellows */
-	int datafellows;
-
 	TAILQ_HEAD(, packet) outgoing;
-
-	/* Lists for private and public keys */
-	TAILQ_HEAD(, key_entry) private_keys;
-	TAILQ_HEAD(, key_entry) public_keys;
 };
 
 struct ssh *
@@ -246,8 +233,8 @@ ssh_packet_set_connection(struct ssh *ssh, int fd_in, int fd_out)
 		buffer_init(&ssh->state->outgoing_packet);
 		buffer_init(&ssh->state->incoming_packet);
 		TAILQ_INIT(&state->outgoing);
-		TAILQ_INIT(&state->private_keys);
-		TAILQ_INIT(&state->public_keys);
+		TAILQ_INIT(&ssh->private_keys);
+		TAILQ_INIT(&ssh->public_keys);
 		state->p_send.packets = state->p_read.packets = 0;
 	}
 
@@ -971,7 +958,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	if (++state->p_send.seqnr == 0)
 		logit("outgoing seqnr wraps around");
 	if (++state->p_send.packets == 0)
-		if (!(state->datafellows & SSH_BUG_NOREKEY))
+		if (!(ssh->datafellows & SSH_BUG_NOREKEY))
 			fatal("XXX too many packets with same key");
 	state->p_send.blocks += (packet_length + 4) / block_size;
 	state->p_send.bytes += packet_length + 4;
@@ -1362,7 +1349,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 	if (++state->p_read.seqnr == 0)
 		logit("incoming seqnr wraps around");
 	if (++state->p_read.packets == 0)
-		if (!(state->datafellows & SSH_BUG_NOREKEY))
+		if (!(ssh->datafellows & SSH_BUG_NOREKEY))
 			fatal("XXX too many packets with same key");
 	state->p_read.blocks += (state->packlen + 4) / block_size;
 	state->p_read.bytes += state->packlen + 4;
@@ -1615,7 +1602,7 @@ ssh_packet_send_debug(struct ssh *ssh, const char *fmt,...)
 	char buf[1024];
 	va_list args;
 
-	if (compat20 && (ssh->state->datafellows & SSH_BUG_DEBUG))
+	if (compat20 && (ssh->datafellows & SSH_BUG_DEBUG))
 		return;
 
 	va_start(args, fmt);
@@ -1913,7 +1900,7 @@ ssh_packet_need_rekeying(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
 
-	if (state->datafellows & SSH_BUG_NOREKEY)
+	if (ssh->datafellows & SSH_BUG_NOREKEY)
 		return 0;
 	return
 	    (state->p_send.packets > MAX_PACKETS) ||
