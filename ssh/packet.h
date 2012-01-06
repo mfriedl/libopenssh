@@ -174,8 +174,7 @@ u_int	 packet_get_char(void);
 u_int	 packet_get_int(void);
 void	 packet_backup_state(void);
 void	 packet_restore_state(void);
-#define packet_set_connection(fd_in, fd_out) \
-	ssh_packet_set_connection(active_state, (fd_in), (fd_out))
+void     packet_set_connection(int, int);
 #define packet_set_timeout(timeout, count) \
 	ssh_packet_set_timeout(active_state, (timeout), (count))
 #define packet_connection_is_on_socket() \
