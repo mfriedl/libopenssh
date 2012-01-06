@@ -174,7 +174,7 @@ int num_listen_socks = 0;
 char *client_version_string = NULL;
 char *server_version_string = NULL;
 
-extern struct session_state *active_state;
+extern struct ssh *active_state;
 
 /*
  * Any really sensitive data in the application is contained in this

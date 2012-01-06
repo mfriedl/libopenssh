@@ -12,9 +12,9 @@
 
 #include <string.h>
 
-void	_ssh_exchange_banner(struct session_state *);
-char	*_ssh_send_banner(struct session_state *);
-char	*_ssh_read_banner(struct session_state *);
+void	_ssh_exchange_banner(struct ssh *);
+char	*_ssh_send_banner(struct ssh *);
+char	*_ssh_read_banner(struct ssh *);
 Key	*_ssh_host_public_key(int, void *);
 Key	*_ssh_host_private_key(int, void *);
 int	_ssh_verify_host_key(Key *, void *);
@@ -41,10 +41,10 @@ mm_choose_dh(int min, int nbits, int max)
 
 /* API */
 
-struct session_state *
+struct ssh *
 ssh_init(int is_server, struct kex_params *kex_params)
 {
-	struct session_state *ssh;
+	struct ssh *ssh;
 	static int called;
 
 	if (!called) {
@@ -53,7 +53,8 @@ ssh_init(int is_server, struct kex_params *kex_params)
 	}
 
 	ssh = ssh_packet_set_connection(NULL, 0, 0);
-	ssh->server_side = is_server;
+	if (is_server)
+		ssh_packet_set_server(ssh);
 
 	/* Initialize key exchange */
 	ssh->kex = kex_new(ssh, kex_params->proposal);
@@ -79,7 +80,7 @@ ssh_init(int is_server, struct kex_params *kex_params)
 
 /* Returns -1 on error, 0 otherwise */
 int
-ssh_add_hostkey(struct session_state* ssh, char *key)
+ssh_add_hostkey(struct ssh* ssh, char *key)
 {
 	Key *parsed_key;
 	struct key_entry *k;
@@ -122,13 +123,13 @@ ssh_add_hostkey(struct session_state* ssh, char *key)
 }
 
 void
-ssh_input_append(struct session_state* ssh, const char *data, u_int len)
+ssh_input_append(struct ssh* ssh, const char *data, u_int len)
 {
-	buffer_append(&ssh->input, data, len);
+	buffer_append(ssh_packet_get_input(ssh), data, len);
 }
 
 int
-ssh_packet_get(struct session_state *ssh)
+ssh_packet_get(struct ssh *ssh)
 {
 	int type;                                                       
 	u_int32_t seqnr;                                                
@@ -163,54 +164,57 @@ ssh_packet_get(struct session_state *ssh)
 }
 
 void *
-ssh_packet_payload(struct session_state* ssh, u_int *len)
+ssh_packet_payload(struct ssh* ssh, u_int *len)
 {
-	*len = buffer_len(&ssh->incoming_packet);
-	return (buffer_ptr(&ssh->incoming_packet));
+	return (ssh_packet_get_raw(ssh, len));
 }
 
 void
-ssh_packet_put(struct session_state* ssh, int type, const char *data, u_int len)
+ssh_packet_put(struct ssh* ssh, int type, const char *data, u_int len)
 {
 	ssh_packet_start(ssh, type);
-	buffer_append(&ssh->outgoing_packet, data, len);
+	ssh_packet_put_raw(ssh, data, len);
 }
 
 void *
-ssh_output_ptr(struct session_state* ssh, u_int *len)
+ssh_output_ptr(struct ssh* ssh, u_int *len)
 {
-	*len = buffer_len(&ssh->output);
-	return (buffer_ptr(&ssh->output));
+	Buffer *output = ssh_packet_get_output(ssh);
+
+	*len = buffer_len(output);
+	return (buffer_ptr(output));
 }
 
 void
-ssh_output_consume(struct session_state* ssh, u_int len)
+ssh_output_consume(struct ssh* ssh, u_int len)
 {
-	buffer_consume(&ssh->output, len);
+	buffer_consume(ssh_packet_get_output(ssh), len);
 }
 
 int
-ssh_output_space(struct session_state* ssh, u_int len)
+ssh_output_space(struct ssh* ssh, u_int len)
 {
-	return (buffer_check_alloc(&ssh->output, len));
+	return (buffer_check_alloc(ssh_packet_get_output(ssh), len));
 }
 
 int
-ssh_input_space(struct session_state* ssh, u_int len)
+ssh_input_space(struct ssh* ssh, u_int len)
 {
-	return (buffer_check_alloc(&ssh->input, len));
+	return (buffer_check_alloc(ssh_packet_get_input(ssh), len));
 }
 
 /* Read other side's version identification. */
 char *
-_ssh_read_banner(struct session_state *ssh)
+_ssh_read_banner(struct ssh *ssh)
 {
+	Buffer *input;
 	char c, *s, buf[256], remote_version[256];	/* must be same size! */
 	int remote_major, remote_minor;
 	u_int i, n, j, len;
 
-	len = buffer_len(&ssh->input);
-	s = buffer_ptr(&ssh->input);
+	input = ssh_packet_get_input(ssh);
+	len = buffer_len(input);
+	s = buffer_ptr(input);
 	for (j = n = 0;;) {
 		for (i = 0; i < sizeof(buf) - 1; i++) {
 			if (j >= len)
@@ -235,7 +239,7 @@ _ssh_read_banner(struct session_state *ssh)
 			fatal("ssh_exchange_identification: "
 			    "No banner received");
 	}
-	buffer_consume(&ssh->input, j);
+	buffer_consume(input, j);
 
 	/*
 	 * Check that the versions match.  In future this might accept
@@ -262,19 +266,19 @@ _ssh_read_banner(struct session_state *ssh)
 
 /* Send our own protocol version identification. */
 char *
-_ssh_send_banner(struct session_state *ssh)
+_ssh_send_banner(struct ssh *ssh)
 {
 	char buf[256];
 
 	snprintf(buf, sizeof buf, "SSH-2.0-%.100s\r\n", SSH_VERSION);
-	buffer_append(&ssh->output, buf, strlen(buf));
+	buffer_append(ssh_packet_get_output(ssh), buf, strlen(buf));
 	chop(buf);
 	debug("Local version string %.100s", buf);
 	return (xstrdup(buf));
 }
 
 void
-_ssh_exchange_banner(struct session_state *ssh)
+_ssh_exchange_banner(struct ssh *ssh)
 {
 	/*
 	 * if _ssh_read_banner() cannot parse a full version string
@@ -302,7 +306,7 @@ _ssh_exchange_banner(struct session_state *ssh)
 Key *
 _ssh_host_public_key(int type, void *ctxt)
 {
-	struct session_state *ssh = ctxt;
+	struct ssh *ssh = ctxt;
 	struct key_entry *k;
 
 	debug3("%s: need %d", __func__, type);
@@ -317,7 +321,7 @@ _ssh_host_public_key(int type, void *ctxt)
 Key *
 _ssh_host_private_key(int type, void *ctxt)
 {
-	struct session_state *ssh = ctxt;
+	struct ssh *ssh = ctxt;
 	struct key_entry *k;
 
 	datafellows = ssh->datafellows;	/* XXX */
@@ -333,7 +337,7 @@ _ssh_host_private_key(int type, void *ctxt)
 int
 _ssh_verify_host_key(Key *hostkey, void *ctxt)
 {
-	struct session_state *ssh = ctxt;
+	struct ssh *ssh = ctxt;
 	struct key_entry *k;
 
 	debug3("%s: need %s", __func__, key_type(hostkey));

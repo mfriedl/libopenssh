@@ -183,7 +183,7 @@ TAILQ_HEAD(global_confirms, global_confirm);
 static struct global_confirms global_confirms =
     TAILQ_HEAD_INITIALIZER(global_confirms);
 
-extern struct session_state *active_state;
+extern struct ssh *active_state;
 
 void ssh_process_session2_setup(int, int, int, Buffer *);
 

@@ -53,7 +53,7 @@ static void input_kex_dh_gex_group(int, u_int32_t, void *);
 static void input_kex_dh_gex_reply(int, u_int32_t, void *);
 
 void
-kexgex_client(struct session_state *ssh)
+kexgex_client(struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
 	int min, max, nbits;
@@ -99,7 +99,7 @@ kexgex_client(struct session_state *ssh)
 static void
 input_kex_dh_gex_group(int type, u_int32_t seq, void *ctxt)
 {
-	struct session_state *ssh = ctxt;
+	struct ssh *ssh = ctxt;
 	Kex *kex = ssh->kex;
 	struct kexgexc_state *kexgexc_state = kex->state;
 	int min, max, nbits;
@@ -148,7 +148,7 @@ input_kex_dh_gex_group(int type, u_int32_t seq, void *ctxt)
 static void
 input_kex_dh_gex_reply(int type, u_int32_t seq, void *ctxt)
 {
-	struct session_state *ssh = ctxt;
+	struct ssh *ssh = ctxt;
 	Kex *kex = ssh->kex;
 	struct kexgexc_state *kexgexc_state = kex->state;
 	BIGNUM *dh_server_pub = NULL, *shared_secret = NULL;

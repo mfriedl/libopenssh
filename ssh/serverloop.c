@@ -78,7 +78,7 @@
 
 extern ServerOptions options;
 
-extern struct session_state *active_state;
+extern struct ssh *active_state;
 extern Authctxt *the_authctxt;
 extern int use_privsep;
 

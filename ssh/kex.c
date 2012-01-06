@@ -48,8 +48,8 @@
 #include "roaming.h"
 
 /* prototype */
-static void kex_kexinit_finish(struct session_state *);
-static void kex_choose_conf(struct session_state *);
+static void kex_kexinit_finish(struct ssh *);
+static void kex_choose_conf(struct ssh *);
 static void kex_input_newkeys(int, u_int32_t, void *);
 
 /* Validate KEX method name list */
@@ -148,7 +148,7 @@ kex_protocol_error(int type, u_int32_t seq, void *ctxt)
 }
 
 static void
-kex_reset_dispatch(struct session_state *ssh)
+kex_reset_dispatch(struct ssh *ssh)
 {
 	ssh_dispatch_range(ssh, SSH2_MSG_TRANSPORT_MIN,
 	    SSH2_MSG_TRANSPORT_MAX, &kex_protocol_error);
@@ -156,7 +156,7 @@ kex_reset_dispatch(struct session_state *ssh)
 }
 
 void
-kex_finish(struct session_state *ssh)
+kex_finish(struct ssh *ssh)
 {
 	kex_reset_dispatch(ssh);
 
@@ -170,7 +170,7 @@ kex_finish(struct session_state *ssh)
 static void
 kex_input_newkeys(int type, u_int32_t seq, void *ctxt)
 {
-	struct session_state *ssh = ctxt;
+	struct ssh *ssh = ctxt;
 	Kex *kex = ssh->kex;
 
 	debug("SSH2_MSG_NEWKEYS received");
@@ -186,7 +186,7 @@ kex_input_newkeys(int type, u_int32_t seq, void *ctxt)
 }
 
 void
-kex_send_kexinit(struct session_state *ssh)
+kex_send_kexinit(struct ssh *ssh)
 {
 	u_int32_t rnd = 0;
 	u_char *cookie;
@@ -226,7 +226,7 @@ kex_input_kexinit(int type, u_int32_t seq, void *ctxt)
 {
 	char *ptr;
 	u_int i, dlen;
-	struct session_state *ssh = ctxt;
+	struct ssh *ssh = ctxt;
 	Kex *kex = ssh->kex;
 
 	debug("SSH2_MSG_KEXINIT received");
@@ -249,7 +249,7 @@ kex_input_kexinit(int type, u_int32_t seq, void *ctxt)
 }
 
 Kex *
-kex_new(struct session_state *ssh, char *proposal[PROPOSAL_MAX])
+kex_new(struct ssh *ssh, char *proposal[PROPOSAL_MAX])
 {
 	Kex *kex;
 
@@ -264,7 +264,7 @@ kex_new(struct session_state *ssh, char *proposal[PROPOSAL_MAX])
 }
 
 Kex *
-kex_setup(struct session_state *ssh, char *proposal[PROPOSAL_MAX])
+kex_setup(struct ssh *ssh, char *proposal[PROPOSAL_MAX])
 {
 	ssh->kex = kex_new(ssh, proposal);
 	kex_send_kexinit(ssh);				/* we start */
@@ -272,7 +272,7 @@ kex_setup(struct session_state *ssh, char *proposal[PROPOSAL_MAX])
 }
 
 static void
-kex_kexinit_finish(struct session_state *ssh)
+kex_kexinit_finish(struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
 	if (!(kex->flags & KEX_INIT_SENT))
@@ -306,7 +306,7 @@ choose_enc(Enc *enc, char *client, char *server)
 }
 
 static void
-choose_mac(struct session_state *ssh, Mac *mac, char *client, char *server)
+choose_mac(struct ssh *ssh, Mac *mac, char *client, char *server)
 {
 	char *name = match_list(client, server, NULL);
 	if (name == NULL)
@@ -403,7 +403,7 @@ proposals_match(char *my[PROPOSAL_MAX], char *peer[PROPOSAL_MAX])
 }
 
 static void
-kex_choose_conf(struct session_state *ssh)
+kex_choose_conf(struct ssh *ssh)
 {
 	Newkeys *newkeys;
 	char **my, **peer;
@@ -480,7 +480,7 @@ kex_choose_conf(struct session_state *ssh)
 }
 
 static u_char *
-derive_key(struct session_state *ssh, Kex *kex, int id, u_int need, u_char *hash, u_int hashlen,
+derive_key(struct ssh *ssh, Kex *kex, int id, u_int need, u_char *hash, u_int hashlen,
     BIGNUM *shared_secret)
 {
 	Buffer b;
@@ -529,7 +529,7 @@ derive_key(struct session_state *ssh, Kex *kex, int id, u_int need, u_char *hash
 
 #define NKEYS	6
 void
-kex_derive_keys(struct session_state *ssh, u_char *hash, u_int hashlen,
+kex_derive_keys(struct ssh *ssh, u_char *hash, u_int hashlen,
     BIGNUM *shared_secret)
 {
 	Kex *kex = ssh->kex;
@@ -554,7 +554,7 @@ kex_derive_keys(struct session_state *ssh, u_char *hash, u_int hashlen,
 }
 
 Newkeys *
-kex_get_newkeys(struct session_state *ssh, int mode)
+kex_get_newkeys(struct ssh *ssh, int mode)
 {
 	Newkeys *ret;
 

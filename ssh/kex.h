@@ -112,7 +112,7 @@ struct Newkeys {
 	Comp	comp;
 };
 
-struct session_state;
+struct ssh;
 
 struct Kex {
 	u_char	*session_id;
@@ -135,28 +135,28 @@ struct Kex {
 	Key	*(*load_host_public_key)(int, void *);
 	Key	*(*load_host_private_key)(int, void *);
 	int	(*host_key_index)(Key *);
-	void	(*kex[KEX_MAX])(struct session_state *);
+	void	(*kex[KEX_MAX])(struct ssh *);
 	void	*state;
 };
 
 int	 kex_names_valid(const char *);
 
-Kex	*kex_new(struct session_state *, char *[PROPOSAL_MAX]);
-Kex	*kex_setup(struct session_state *, char *[PROPOSAL_MAX]);
-void	 kex_finish(struct session_state *);
+Kex	*kex_new(struct ssh *, char *[PROPOSAL_MAX]);
+Kex	*kex_setup(struct ssh *, char *[PROPOSAL_MAX]);
+void	 kex_finish(struct ssh *);
 
-void	 kex_send_kexinit(struct session_state *);
+void	 kex_send_kexinit(struct ssh *);
 void	 kex_input_kexinit(int, u_int32_t, void *);
-void	 kex_derive_keys(struct session_state *, u_char *, u_int, BIGNUM *);
+void	 kex_derive_keys(struct ssh *, u_char *, u_int, BIGNUM *);
 
-Newkeys *kex_get_newkeys(struct session_state *, int);
+Newkeys *kex_get_newkeys(struct ssh *, int);
 
-void	 kexdh_client(struct session_state *);
-void	 kexdh_server(struct session_state *);
-void	 kexgex_client(struct session_state *);
-void	 kexgex_server(struct session_state *);
-void	 kexecdh_client(struct session_state *);
-void	 kexecdh_server(struct session_state *);
+void	 kexdh_client(struct ssh *);
+void	 kexdh_server(struct ssh *);
+void	 kexgex_client(struct ssh *);
+void	 kexgex_server(struct ssh *);
+void	 kexecdh_client(struct ssh *);
+void	 kexecdh_server(struct ssh *);
 
 void
 kex_dh_hash(char *, char *, char *, int, char *, int, u_char *, int,

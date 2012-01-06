@@ -50,7 +50,7 @@ struct kexdhc_state {
 static void input_kex_dh(int, u_int32_t, void *);
 
 void
-kexdh_client(struct session_state *ssh)
+kexdh_client(struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
 	struct kexdhc_state *kexdhc_state;
@@ -90,7 +90,7 @@ kexdh_client(struct session_state *ssh)
 static void
 input_kex_dh(int type, u_int32_t seq, void *ctxt)
 {
-	struct session_state *ssh = ctxt;
+	struct ssh *ssh = ctxt;
 	Kex *kex = ssh->kex;
 	struct kexdhc_state *kexdhc_state = kex->state;
 	BIGNUM *dh_server_pub = NULL, *shared_secret = NULL;
