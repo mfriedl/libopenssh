@@ -231,20 +231,12 @@ void     packet_set_connection(int, int);
 	ssh_packet_put_bignum(active_state, (value))
 #define packet_put_bignum2(value) \
 	ssh_packet_put_bignum2(active_state, (value))
-#define packet_put_ecpoint(curve, point) \
-	ssh_packet_put_ecpoint(active_state, (curve), (point))
 #define packet_send() \
 	ssh_packet_send(active_state)
-#define packet_read_seqnr(seqnr_p) \
-	ssh_packet_read_seqnr(active_state, (seqnr_p))
 #define packet_read() \
 	ssh_packet_read(active_state)
 #define packet_read_expect(expected_type) \
 	ssh_packet_read_expect(active_state, (expected_type))
-#define packet_read_poll_seqnr(seqnr_p) \
-	ssh_packet_read_poll_seqnr(active_state, (seqnr_p))
-#define packet_read_poll() \
-	ssh_packet_read_poll(active_state)
 #define packet_process_incoming(buf, len) \
 	ssh_packet_process_incoming(active_state, (buf), (len))
 #define packet_get_int64() \
@@ -253,10 +245,6 @@ void     packet_set_connection(int, int);
 	ssh_packet_get_bignum(active_state, (value))
 #define packet_get_bignum2(value) \
 	ssh_packet_get_bignum2(active_state, (value))
-#define packet_get_ecpoint(curve, point) \
-	ssh_packet_get_ecpoint(active_state, (curve), (point))
-#define packet_get_raw(length_ptr) \
-	ssh_packet_get_raw(active_state, (length_ptr))
 #define packet_remaining() \
 	ssh_packet_remaining(active_state)
 #define packet_get_string(length_ptr) \
