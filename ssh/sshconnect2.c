@@ -252,6 +252,7 @@ struct Authctxt {
 	Authmethod *method;
 	sig_atomic_t success;
 	char *authlist;
+	int attempt;
 	/* pubkey */
 	Idlist keys;
 	AuthenticationConnection *agent;
@@ -880,16 +881,15 @@ int
 userauth_passwd(struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
-	static int attempt = 0;	/* XXX move to authctxt */
 	char prompt[150];
 	char *password;
 	const char *host = options.host_key_alias ?  options.host_key_alias :
 	    authctxt->host;
 
-	if (attempt++ >= options.number_of_password_prompts)
+	if (authctxt->attempt++ >= options.number_of_password_prompts)
 		return 0;
 
-	if (attempt != 1)
+	if (authctxt->attempt != 1)
 		error("Permission denied, please try again.");
 
 	snprintf(prompt, sizeof(prompt), "%.30s@%.128s's password: ",
@@ -1518,12 +1518,11 @@ int
 userauth_kbdint(struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
-	static int attempt = 0;
 
-	if (attempt++ >= options.number_of_password_prompts)
+	if (authctxt->attempt++ >= options.number_of_password_prompts)
 		return 0;
 	/* disable if no SSH2_MSG_USERAUTH_INFO_REQUEST has been seen */
-	if (attempt > 1 && !authctxt->info_req_seen) {
+	if (authctxt->attempt > 1 && !authctxt->info_req_seen) {
 		debug3("userauth_kbdint: disable: no info_req_seen");
 		ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_INFO_REQUEST, NULL);
 		return 0;
@@ -1780,11 +1779,10 @@ userauth_jpake(struct ssh *ssh)
 	struct jpake_ctx *pctx;
 	u_char *x1_proof, *x2_proof;
 	u_int x1_proof_len, x2_proof_len;
-	static int attempt = 0; /* XXX share with userauth_password's? */
 
-	if (attempt++ >= options.number_of_password_prompts)
+	if (authctxt->attempt++ >= options.number_of_password_prompts)
 		return 0;
-	if (attempt != 1)
+	if (authctxt->attempt != 1)
 		error("Permission denied, please try again.");
 
 	if (authctxt->methoddata != NULL)
