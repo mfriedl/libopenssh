@@ -40,11 +40,13 @@
 #include <unistd.h>
 #include <vis.h>
 
+#define PACKET_SKIP_COMPAT 1
+#define DISPATCH_SKIP_COMPAT 1
+
 #include "xmalloc.h"
 #include "ssh.h"
 #include "ssh2.h"
 #include "buffer.h"
-#define PACKET_SKIP_COMPAT 1
 #include "packet.h"
 #include "compat.h"
 #include "cipher.h"
