@@ -46,30 +46,11 @@ dispatch_protocol_error(int type, u_int32_t seq, void *ctxt)
 	packet_send();
 	packet_write_wait();
 }
+
 void
 dispatch_protocol_ignore(int type, u_int32_t seq, void *ctxt)
 {
 	logit("dispatch_protocol_ignore: type %d seq %u", type, seq);
-}
-void
-dispatch_init(dispatch_fn *dflt)
-{
-	ssh_dispatch_init(active_state, dflt);
-}
-void
-dispatch_range(u_int from, u_int to, dispatch_fn *fn)
-{
-	ssh_dispatch_range(active_state, from, to, fn);
-}
-void
-dispatch_set(int type, dispatch_fn *fn)
-{
-	ssh_dispatch_set(active_state, type, fn);
-}
-void
-dispatch_run(int mode, volatile sig_atomic_t *done, void *ctxt)
-{
-	ssh_dispatch_run(active_state, mode, done, ctxt);
 }
 
 void
