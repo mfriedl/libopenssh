@@ -42,9 +42,16 @@ struct ssh {
 	/* Session state */
 	struct session_state *state;
 
+	/* Authentication context */
+	void *authctxt;
+
 	/* Key exchange */
 	Kex *kex;
 	Newkeys *current_keys[MODE_MAX];
+
+	/* Host key verification */
+	char *host;
+	struct sockaddr *hostaddr;
 
 	/* Dispatcher table */
 	dispatch_fn *dispatch[DISPATCH_MAX];
@@ -170,6 +177,7 @@ void	*ssh_packet_get_output(struct ssh *);
 
 /* old API */
 extern struct ssh *active_state;
+#ifndef PACKET_SKIP_COMPAT
 u_int	 packet_get_char(void);
 u_int	 packet_get_int(void);
 void	 packet_backup_state(void);
@@ -299,5 +307,6 @@ void     packet_set_connection(int, int);
 	ssh_packet_check_eom(active_state)
 #define set_newkeys(mode) \
 	ssh_set_newkeys(active_state, (mode))
+#endif
 
 #endif				/* PACKET_H */
