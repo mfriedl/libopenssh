@@ -262,6 +262,10 @@ struct Authctxt {
 	int info_req_seen;
 	/* generic */
 	void *methoddata;
+#ifdef GSSAPI
+	gss_OID_set gss_supported;
+	u_int gss_mech;
+#endif
 };
 struct Authmethod {
 	char	*name;		/* string to compare against server's list */
@@ -634,26 +638,25 @@ userauth_gssapi(struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
 	Gssctxt *gssctxt = NULL;
-	static gss_OID_set gss_supported = NULL;
-	static u_int mech = 0;
+	gss_OID oid = NULL;
 	OM_uint32 min;
 	int ok = 0;
 
 	/* Try one GSSAPI method at a time, rather than sending them all at
 	 * once. */
 
-	if (gss_supported == NULL)
-		gss_indicate_mechs(&min, &gss_supported);
+	if (authctxt->gss_supported == NULL)
+		gss_indicate_mechs(&min, &authctxt->gss_supported);
 
 	/* Check to see if the mechanism is usable before we offer it */
-	while (mech < gss_supported->count && !ok) {
+	while (authctxt->gss_mech < authctxt->gss_supported->count && !ok) {
 		/* My DER encoding requires length<128 */
-		if (gss_supported->elements[mech].length < 128 &&
-		    ssh_gssapi_check_mechanism(&gssctxt, 
-		    &gss_supported->elements[mech], authctxt->host)) {
+		oid = &authctxt->gss_supported->elements[authctxt->gss_mech];
+		if (oid->length < 128 &&
+		    ssh_gssapi_check_mechanism(&gssctxt, oid, authctxt->host)) {
 			ok = 1; /* Mechanism works */
 		} else {
-			mech++;
+			authctxt->gss_mech++;
 		}
 	}
 
@@ -669,11 +672,10 @@ userauth_gssapi(struct ssh *ssh)
 
 	ssh_packet_put_int(ssh, 1);
 
-	ssh_packet_put_int(ssh, (gss_supported->elements[mech].length) + 2);
+	ssh_packet_put_int(ssh, oid->length + 2);
 	ssh_packet_put_char(ssh, SSH_GSS_OIDTYPE);
-	ssh_packet_put_char(ssh, gss_supported->elements[mech].length);
-	ssh_packet_put_raw(ssh, gss_supported->elements[mech].elements,
-	    gss_supported->elements[mech].length);
+	ssh_packet_put_char(ssh, oid->length);
+	ssh_packet_put_raw(ssh, oid->elements, oid->length);
 
 	ssh_packet_send(ssh);
 
@@ -682,7 +684,7 @@ userauth_gssapi(struct ssh *ssh)
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_ERROR, &input_gssapi_error);
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_ERRTOK, &input_gssapi_errtok);
 
-	mech++; /* Move along to next candidate */
+	authctxt->gss_mech++; /* Move along to next candidate */
 
 	return 1;
 }
