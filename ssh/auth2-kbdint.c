@@ -43,9 +43,9 @@ userauth_kbdint(struct ssh *ssh)
 	int authenticated = 0;
 	char *lang, *devs;
 
-	lang = packet_get_string(NULL);
-	devs = packet_get_string(NULL);
-	packet_check_eom();
+	lang = ssh_packet_get_string(ssh, NULL);
+	devs = ssh_packet_get_string(ssh, NULL);
+	ssh_packet_check_eom(ssh);
 
 	debug("keyboard-interactive devs %s", devs);
 

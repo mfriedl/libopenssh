@@ -52,15 +52,15 @@ userauth_passwd(struct ssh *ssh)
 	int change;
 	u_int len, newlen;
 
-	change = packet_get_char();
-	password = packet_get_string(&len);
+	change = ssh_packet_get_char(ssh);
+	password = ssh_packet_get_string(ssh, &len);
 	if (change) {
 		/* discard new password from packet */
-		newpass = packet_get_string(&newlen);
+		newpass = ssh_packet_get_string(ssh, &newlen);
 		memset(newpass, 0, newlen);
 		xfree(newpass);
 	}
-	packet_check_eom();
+	ssh_packet_check_eom(ssh);
 
 	if (change)
 		logit("password change not supported");

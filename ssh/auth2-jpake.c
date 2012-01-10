@@ -84,7 +84,7 @@ userauth_jpake(struct ssh *ssh)
 	Authctxt *authctxt = ssh->authctxt;
 	int authenticated = 0;
 
-	packet_check_eom();
+	ssh_packet_check_eom(ssh);
 
 	debug("jpake-01@openssh.com requested");
 
@@ -393,16 +393,16 @@ auth2_jpake_start(struct ssh *ssh)
 	if (!use_privsep)
 		JPAKE_DEBUG_CTX((pctx, "step 1 sending in %s", __func__));
 
-	packet_start(SSH2_MSG_USERAUTH_JPAKE_SERVER_STEP1);
-	packet_put_cstring(hash_scheme);
-	packet_put_cstring(salt);
-	packet_put_string(pctx->server_id, pctx->server_id_len);
-	packet_put_bignum2(pctx->g_x3);
-	packet_put_bignum2(pctx->g_x4);
-	packet_put_string(x3_proof, x3_proof_len);
-	packet_put_string(x4_proof, x4_proof_len);
-	packet_send();
-	packet_write_wait();
+	ssh_packet_start(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_STEP1);
+	ssh_packet_put_cstring(ssh, hash_scheme);
+	ssh_packet_put_cstring(ssh, salt);
+	ssh_packet_put_string(ssh, pctx->server_id, pctx->server_id_len);
+	ssh_packet_put_bignum2(ssh, pctx->g_x3);
+	ssh_packet_put_bignum2(ssh, pctx->g_x4);
+	ssh_packet_put_string(ssh, x3_proof, x3_proof_len);
+	ssh_packet_put_string(ssh, x4_proof, x4_proof_len);
+	ssh_packet_send(ssh);
+	ssh_packet_write_wait(ssh);
 
 	bzero(hash_scheme, strlen(hash_scheme));
 	bzero(salt, strlen(salt));
@@ -437,12 +437,12 @@ input_userauth_jpake_client_step1(int type, u_int32_t seq, struct ssh *ssh)
 	if ((pctx->g_x1 = BN_new()) == NULL ||
 	    (pctx->g_x2 = BN_new()) == NULL)
 		fatal("%s: BN_new", __func__);
-	pctx->client_id = packet_get_string(&pctx->client_id_len);
-	packet_get_bignum2(pctx->g_x1);
-	packet_get_bignum2(pctx->g_x2);
-	x1_proof = packet_get_string(&x1_proof_len);
-	x2_proof = packet_get_string(&x2_proof_len);
-	packet_check_eom();
+	pctx->client_id = ssh_packet_get_string(ssh, &pctx->client_id_len);
+	ssh_packet_get_bignum2(ssh, pctx->g_x1);
+	ssh_packet_get_bignum2(ssh, pctx->g_x2);
+	x1_proof = ssh_packet_get_string(ssh, &x1_proof_len);
+	x2_proof = ssh_packet_get_string(ssh, &x2_proof_len);
+	ssh_packet_check_eom(ssh);
 
 	if (!use_privsep)
 		JPAKE_DEBUG_CTX((pctx, "step 1 received in %s", __func__));
@@ -465,11 +465,11 @@ input_userauth_jpake_client_step1(int type, u_int32_t seq, struct ssh *ssh)
 		JPAKE_DEBUG_CTX((pctx, "step 2 sending in %s", __func__));
 
 	/* Send values for step 2 */
-	packet_start(SSH2_MSG_USERAUTH_JPAKE_SERVER_STEP2);
-	packet_put_bignum2(pctx->b);
-	packet_put_string(x4_s_proof, x4_s_proof_len);
-	packet_send();
-	packet_write_wait();
+	ssh_packet_start(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_STEP2);
+	ssh_packet_put_bignum2(ssh, pctx->b);
+	ssh_packet_put_string(ssh, x4_s_proof, x4_s_proof_len);
+	ssh_packet_send(ssh);
+	ssh_packet_write_wait(ssh);
 
 	bzero(x4_s_proof, x4_s_proof_len);
 	xfree(x4_s_proof);
@@ -495,9 +495,9 @@ input_userauth_jpake_client_step2(int type, u_int32_t seq, struct ssh *ssh)
 		fatal("%s: BN_new", __func__);
 
 	/* Fetch step 2 values */
-	packet_get_bignum2(pctx->a);
-	x2_s_proof = packet_get_string(&x2_s_proof_len);
-	packet_check_eom();
+	ssh_packet_get_bignum2(ssh, pctx->a);
+	x2_s_proof = ssh_packet_get_string(ssh, &x2_s_proof_len);
+	ssh_packet_check_eom(ssh);
 
 	if (!use_privsep)
 		JPAKE_DEBUG_CTX((pctx, "step 2 received in %s", __func__));
@@ -519,10 +519,10 @@ input_userauth_jpake_client_step2(int type, u_int32_t seq, struct ssh *ssh)
 		JPAKE_DEBUG_CTX((pctx, "confirm sending in %s", __func__));
 
 	/* Send key confirmation proof */
-	packet_start(SSH2_MSG_USERAUTH_JPAKE_SERVER_CONFIRM);
-	packet_put_string(pctx->h_k_sid_sessid, pctx->h_k_sid_sessid_len);
-	packet_send();
-	packet_write_wait();
+	ssh_packet_start(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_CONFIRM);
+	ssh_packet_put_string(ssh, pctx->h_k_sid_sessid, pctx->h_k_sid_sessid_len);
+	ssh_packet_send(ssh);
+	ssh_packet_write_wait(ssh);
 
 	/* Expect confirmation from peer */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_CONFIRM,
@@ -540,8 +540,8 @@ input_userauth_jpake_client_confirm(int type, u_int32_t seq, struct ssh *ssh)
 	/* Disable this message */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_CONFIRM, NULL);
 
-	pctx->h_k_cid_sessid = packet_get_string(&pctx->h_k_cid_sessid_len);
-	packet_check_eom();
+	pctx->h_k_cid_sessid = ssh_packet_get_string(ssh, &pctx->h_k_cid_sessid_len);
+	ssh_packet_check_eom(ssh);
 
 	if (!use_privsep)
 		JPAKE_DEBUG_CTX((pctx, "confirm received in %s", __func__));

@@ -50,7 +50,7 @@ static int
 userauth_none(struct ssh *ssh)
 {
 	none_enabled = 0;
-	packet_check_eom();
+	ssh_packet_check_eom(ssh);
 	if (options.permit_empty_passwd && options.password_authentication)
 		return (PRIVSEP(auth_password(ssh->authctxt, "")));
 	return (0);

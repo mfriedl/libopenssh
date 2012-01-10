@@ -68,11 +68,11 @@ userauth_hostbased(struct ssh *ssh)
 		debug2("userauth_hostbased: disabled because of invalid user");
 		return 0;
 	}
-	pkalg = packet_get_string(&alen);
-	pkblob = packet_get_string(&blen);
-	chost = packet_get_string(NULL);
-	cuser = packet_get_string(NULL);
-	sig = packet_get_string(&slen);
+	pkalg = ssh_packet_get_string(ssh, &alen);
+	pkblob = ssh_packet_get_string(ssh, &blen);
+	chost = ssh_packet_get_string(ssh, NULL);
+	cuser = ssh_packet_get_string(ssh, NULL);
+	sig = ssh_packet_get_string(ssh, &slen);
 
 	debug("userauth_hostbased: cuser %s chost %s pkalg %s slen %d",
 	    cuser, chost, pkalg, slen);
