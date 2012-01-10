@@ -36,7 +36,7 @@
 #include "compat.h"
 
 void
-dispatch_protocol_error(int type, u_int32_t seq, void *ctxt)
+dispatch_protocol_error(int type, u_int32_t seq, struct ssh *ssh)
 {
 	logit("dispatch_protocol_error: type %d seq %u", type, seq);
 	if (!compat20)
@@ -48,7 +48,7 @@ dispatch_protocol_error(int type, u_int32_t seq, void *ctxt)
 }
 
 void
-dispatch_protocol_ignore(int type, u_int32_t seq, void *ctxt)
+dispatch_protocol_ignore(int type, u_int32_t seq, struct ssh *ssh)
 {
 	logit("dispatch_protocol_ignore: type %d seq %u", type, seq);
 }

@@ -47,7 +47,7 @@ struct kexdhc_state {
 };
 
 
-static void input_kex_dh(int, u_int32_t, void *);
+static void input_kex_dh(int, u_int32_t, struct ssh *);
 
 void
 kexdh_client(struct ssh *ssh)
@@ -88,9 +88,8 @@ kexdh_client(struct ssh *ssh)
 }
 
 static void
-input_kex_dh(int type, u_int32_t seq, void *ctxt)
+input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 {
-	struct ssh *ssh = ctxt;
 	Kex *kex = ssh->kex;
 	struct kexdhc_state *kexdhc_state = kex->state;
 	BIGNUM *dh_server_pub = NULL, *shared_secret = NULL;
@@ -109,7 +108,7 @@ input_kex_dh(int type, u_int32_t seq, void *ctxt)
 		fatal("type mismatch for decoded server_host_key_blob");
 	if (kex->verify_host_key == NULL)
 		fatal("cannot verify server_host_key");
-	if (kex->verify_host_key(server_host_key, ctxt) == -1)
+	if (kex->verify_host_key(server_host_key, ssh) == -1)
 		fatal("server_host_key verification failed");
 
 	/* DH parameter f, server public DH key */

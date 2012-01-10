@@ -510,7 +510,7 @@ client_check_window_change(void)
 }
 
 static void
-client_global_request_reply(int type, u_int32_t seq, void *ctxt)
+client_global_request_reply(int type, u_int32_t seq, struct ssh *ssh)
 {
 	struct global_confirm *gc;
 
@@ -1655,7 +1655,7 @@ client_loop(int have_pty, int escape_char_arg, int ssh2_chan_id)
 /*********/
 
 static void
-client_input_stdout_data(int type, u_int32_t seq, void *ctxt)
+client_input_stdout_data(int type, u_int32_t seq, struct ssh *ssh)
 {
 	u_int data_len;
 	char *data = packet_get_string(&data_len);
@@ -1665,7 +1665,7 @@ client_input_stdout_data(int type, u_int32_t seq, void *ctxt)
 	xfree(data);
 }
 static void
-client_input_stderr_data(int type, u_int32_t seq, void *ctxt)
+client_input_stderr_data(int type, u_int32_t seq, struct ssh *ssh)
 {
 	u_int data_len;
 	char *data = packet_get_string(&data_len);
@@ -1675,7 +1675,7 @@ client_input_stderr_data(int type, u_int32_t seq, void *ctxt)
 	xfree(data);
 }
 static void
-client_input_exit_status(int type, u_int32_t seq, void *ctxt)
+client_input_exit_status(int type, u_int32_t seq, struct ssh *ssh)
 {
 	exit_status = packet_get_int();
 	packet_check_eom();
@@ -1691,7 +1691,7 @@ client_input_exit_status(int type, u_int32_t seq, void *ctxt)
 	quit_pending = 1;
 }
 static void
-client_input_agent_open(int type, u_int32_t seq, void *ctxt)
+client_input_agent_open(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
 	int remote_id, sock;
@@ -1861,7 +1861,7 @@ client_request_tun_fwd(int tun_mode, int local_tun, int remote_tun)
 
 /* XXXX move to generic input handler */
 static void
-client_input_channel_open(int type, u_int32_t seq, void *ctxt)
+client_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
 	char *ctype;
@@ -1911,7 +1911,7 @@ client_input_channel_open(int type, u_int32_t seq, void *ctxt)
 	xfree(ctype);
 }
 static void
-client_input_channel_req(int type, u_int32_t seq, void *ctxt)
+client_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
 	int exitval, id, reply, success = 0;
@@ -1957,7 +1957,7 @@ client_input_channel_req(int type, u_int32_t seq, void *ctxt)
 	xfree(rtype);
 }
 static void
-client_input_global_request(int type, u_int32_t seq, void *ctxt)
+client_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 {
 	char *rtype;
 	int want_reply;

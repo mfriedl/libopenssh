@@ -854,7 +854,7 @@ server_loop2(Authctxt *authctxt)
 }
 
 static void
-server_input_keep_alive(int type, u_int32_t seq, void *ctxt)
+server_input_keep_alive(int type, u_int32_t seq, struct ssh *ssh)
 {
 	debug("Got %d/%u for keepalive", type, seq);
 	/*
@@ -866,7 +866,7 @@ server_input_keep_alive(int type, u_int32_t seq, void *ctxt)
 }
 
 static void
-server_input_stdin_data(int type, u_int32_t seq, void *ctxt)
+server_input_stdin_data(int type, u_int32_t seq, struct ssh *ssh)
 {
 	char *data;
 	u_int data_len;
@@ -883,7 +883,7 @@ server_input_stdin_data(int type, u_int32_t seq, void *ctxt)
 }
 
 static void
-server_input_eof(int type, u_int32_t seq, void *ctxt)
+server_input_eof(int type, u_int32_t seq, struct ssh *ssh)
 {
 	/*
 	 * Eof from the client.  The stdin descriptor to the
@@ -896,7 +896,7 @@ server_input_eof(int type, u_int32_t seq, void *ctxt)
 }
 
 static void
-server_input_window_size(int type, u_int32_t seq, void *ctxt)
+server_input_window_size(int type, u_int32_t seq, struct ssh *ssh)
 {
 	u_int row = packet_get_int();
 	u_int col = packet_get_int();
@@ -1008,7 +1008,7 @@ server_request_session(void)
 }
 
 static void
-server_input_channel_open(int type, u_int32_t seq, void *ctxt)
+server_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
 	char *ctype;
@@ -1058,7 +1058,7 @@ server_input_channel_open(int type, u_int32_t seq, void *ctxt)
 }
 
 static void
-server_input_global_request(int type, u_int32_t seq, void *ctxt)
+server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 {
 	char *rtype;
 	int want_reply;
@@ -1125,7 +1125,7 @@ server_input_global_request(int type, u_int32_t seq, void *ctxt)
 }
 
 static void
-server_input_channel_req(int type, u_int32_t seq, void *ctxt)
+server_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c;
 	int id, reply, success = 0;
