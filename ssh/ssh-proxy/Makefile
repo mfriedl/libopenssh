@@ -7,11 +7,11 @@ PROG=	ssh-proxy
 BINDIR=	/usr/sbin
 NOMAN=	yes
 
-SRCS=	ssh-proxy.c \
+SRCS=	ssh-proxy.c readconf.c \
 	kexdhs.c kexgexs.c kexecdhs.c \
 	roaming_dummy.c
 
 .include <bsd.prog.mk>
 
-DPADD+=	${LIBCRYPTO} ${LIBZ}
-LDADD+=	-lcrypto -lz
+DPADD+=	${LIBCRYPTO} ${LIBZ} ${LIBEVENT}
+LDADD+=	-lcrypto -lz -levent

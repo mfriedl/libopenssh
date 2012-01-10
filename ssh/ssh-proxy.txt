@@ -1,12 +1,4 @@
-debugging client:
- % ./ssh-proxy/obj/ssh-proxy  nc -vvv 127.0.0.1 22
-
- % ssh-keyscan -t ecdsa 127.0.0.1 | sed 's/^[^ ]* //'  > /tmp/hk.pub
- % ./ssh-proxy/obj/ssh-proxy  -h /tmp/hk.pub nc -vvv 127.0.0.1 22
-
-debugging server:
- % ./ssh/obj/ssh -o 'proxycommand ./ssh-proxy/obj/ssh-proxy -s' ignore 
-
-with hostkey:
- % ssh-keygen -t ecdsa -f  /tmp/hk2
- % ./ssh/obj/ssh  -o hostkeyalgorithms=ecdsa-sha2-nistp256 -o hostkeyalias=foo1234 -o 'proxycommand ./ssh-proxy/obj/ssh-proxy -h /tmp/hk2 -s' ignore
+% test -f /tmp/hk2 || ssh-keygen -N '' -t ecdsa -f  /tmp/hk2
+% ssh-keyscan -t ecdsa 127.0.0.1 | sed 's/^[^ ]* //'  > /tmp/hk.pub
+% ./ssh-proxy/obj/ssh-proxy -f -S /tmp/hk2 -C /tmp/hk.pub -L 127.0.0.1:12345:127.0.0.1:22 -d
+% ssh -o hostkeyalgorithms'='ecdsa-sha2-nistp256 -o hostkeyalias'='egal2 -v 127.0.0.1 -p 12345
