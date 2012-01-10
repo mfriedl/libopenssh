@@ -45,7 +45,7 @@
 extern ServerOptions options;
 
 static int
-userauth_passwd(Authctxt *authctxt)
+userauth_passwd(struct ssh *ssh)
 {
 	char *password, *newpass;
 	int authenticated = 0;
@@ -64,7 +64,7 @@ userauth_passwd(Authctxt *authctxt)
 
 	if (change)
 		logit("password change not supported");
-	else if (PRIVSEP(auth_password(authctxt, password)) == 1)
+	else if (PRIVSEP(auth_password(ssh->authctxt, password)) == 1)
 		authenticated = 1;
 	memset(password, 0, len);
 	xfree(password);

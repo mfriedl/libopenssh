@@ -64,8 +64,9 @@ extern u_char *session_id2;
 extern u_int session_id2_len;
 
 static int
-userauth_pubkey(Authctxt *authctxt)
+userauth_pubkey(struct ssh *ssh)
 {
+	Authctxt *authctxt = ssh->authctxt;
 	Buffer b;
 	Key *key = NULL;
 	char *pkalg;
