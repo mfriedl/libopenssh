@@ -982,8 +982,10 @@ ssh_packet_send2(struct ssh *ssh)
 
 	/* during rekeying we can only send key exchange messages */
 	if (state->rekeying) {
-		if (!((type >= SSH2_MSG_TRANSPORT_MIN) &&
-		    (type <= SSH2_MSG_TRANSPORT_MAX))) {
+		if ((type < SSH2_MSG_TRANSPORT_MIN) ||
+		    (type > SSH2_MSG_TRANSPORT_MAX) ||
+		    (type == SSH2_MSG_SERVICE_REQUEST) ||
+		    (type == SSH2_MSG_SERVICE_ACCEPT)) {
 			debug("enqueue packet: %u", type);
 			p = xmalloc(sizeof(*p));
 			p->type = type;
