@@ -68,7 +68,7 @@ static void input_userauth_jpake_client_step1(int, u_int32_t, struct ssh *);
 static void input_userauth_jpake_client_step2(int, u_int32_t, struct ssh *);
 static void input_userauth_jpake_client_confirm(int, u_int32_t, struct ssh *);
 
-static int auth2_jpake_start(Authctxt *);
+static int auth2_jpake_start(struct ssh *);
 
 /* import */
 extern ServerOptions options;
@@ -79,8 +79,9 @@ extern u_int session_id2_len;
  * Attempt J-PAKE authentication.
  */
 static int
-userauth_jpake(Authctxt *authctxt)
+userauth_jpake(struct ssh *ssh)
 {
+	Authctxt *authctxt = ssh->authctxt;
 	int authenticated = 0;
 
 	packet_check_eom();
@@ -91,7 +92,7 @@ userauth_jpake(Authctxt *authctxt)
 		if (authctxt->jpake_ctx == NULL)
 			authctxt->jpake_ctx = jpake_new();
 		if (options.zero_knowledge_password_authentication)
-			authenticated = auth2_jpake_start(authctxt);
+			authenticated = auth2_jpake_start(ssh);
 	}
 
 	return authenticated;
@@ -105,12 +106,13 @@ Authmethod method_jpake = {
 
 /* Clear context and callbacks */
 void
-auth2_jpake_stop(Authctxt *authctxt)
+auth2_jpake_stop(struct ssh *ssh)
 {
+	Authctxt *authctxt = ssh->authctxt;
 	/* unregister callbacks */
-	dispatch_set(SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP1, NULL);
-	dispatch_set(SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP2, NULL);
-	dispatch_set(SSH2_MSG_USERAUTH_JPAKE_CLIENT_CONFIRM, NULL);
+	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP1, NULL);
+	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP2, NULL);
+	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_CONFIRM, NULL);
 	if (authctxt->jpake_ctx != NULL) {
 		jpake_free(authctxt->jpake_ctx);
 		authctxt->jpake_ctx = NULL;
@@ -369,8 +371,9 @@ auth2_jpake_get_pwdata(Authctxt *authctxt, BIGNUM **s,
  * Note, sets authctxt->postponed while in subprotocol
  */
 static int
-auth2_jpake_start(Authctxt *authctxt)
+auth2_jpake_start(struct ssh *ssh)
 {
+	Authctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	u_char *x3_proof, *x4_proof;
 	u_int x3_proof_len, x4_proof_len;
@@ -411,7 +414,7 @@ auth2_jpake_start(Authctxt *authctxt)
 	xfree(x4_proof);
 
 	/* Expect step 1 packet from peer */
-	dispatch_set(SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP1,
+	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP1,
 	    input_userauth_jpake_client_step1);
 
 	authctxt->postponed = 1;
@@ -428,7 +431,7 @@ input_userauth_jpake_client_step1(int type, u_int32_t seq, struct ssh *ssh)
 	u_int x1_proof_len, x2_proof_len, x4_s_proof_len;
 
 	/* Disable this message */
-	dispatch_set(SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP1, NULL);
+	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP1, NULL);
 
 	/* Fetch step 1 values */
 	if ((pctx->g_x1 = BN_new()) == NULL ||
@@ -472,7 +475,7 @@ input_userauth_jpake_client_step1(int type, u_int32_t seq, struct ssh *ssh)
 	xfree(x4_s_proof);
 
 	/* Expect step 2 packet from peer */
-	dispatch_set(SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP2,
+	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP2,
 	    input_userauth_jpake_client_step2);
 }
 
@@ -486,7 +489,7 @@ input_userauth_jpake_client_step2(int type, u_int32_t seq, struct ssh *ssh)
 	u_int x2_s_proof_len;
 
 	/* Disable this message */
-	dispatch_set(SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP2, NULL);
+	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP2, NULL);
 
 	if ((pctx->a = BN_new()) == NULL)
 		fatal("%s: BN_new", __func__);
@@ -522,7 +525,7 @@ input_userauth_jpake_client_step2(int type, u_int32_t seq, struct ssh *ssh)
 	packet_write_wait();
 
 	/* Expect confirmation from peer */
-	dispatch_set(SSH2_MSG_USERAUTH_JPAKE_CLIENT_CONFIRM,
+	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_CONFIRM,
 	    input_userauth_jpake_client_confirm);
 }
 
@@ -535,7 +538,7 @@ input_userauth_jpake_client_confirm(int type, u_int32_t seq, struct ssh *ssh)
 	int authenticated = 0;
 
 	/* Disable this message */
-	dispatch_set(SSH2_MSG_USERAUTH_JPAKE_CLIENT_CONFIRM, NULL);
+	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_CONFIRM, NULL);
 
 	pctx->h_k_cid_sessid = packet_get_string(&pctx->h_k_cid_sessid_len);
 	packet_check_eom();
@@ -556,7 +559,7 @@ input_userauth_jpake_client_confirm(int type, u_int32_t seq, struct ssh *ssh)
 	authctxt->postponed = 0;
 	jpake_free(authctxt->jpake_ctx);
 	authctxt->jpake_ctx = NULL;
-	userauth_finish(authctxt, authenticated, method_jpake.name);
+	userauth_finish(ssh, authenticated, method_jpake.name);
 }
 
 #endif /* JPAKE */

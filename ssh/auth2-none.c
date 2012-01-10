@@ -47,12 +47,12 @@ extern ServerOptions options;
 static int none_enabled = 1;
 
 static int
-userauth_none(Authctxt *authctxt)
+userauth_none(struct ssh *ssh)
 {
 	none_enabled = 0;
 	packet_check_eom();
 	if (options.permit_empty_passwd && options.password_authentication)
-		return (PRIVSEP(auth_password(authctxt, "")));
+		return (PRIVSEP(auth_password(ssh->authctxt, "")));
 	return (0);
 }
 

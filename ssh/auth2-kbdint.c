@@ -38,7 +38,7 @@
 extern ServerOptions options;
 
 static int
-userauth_kbdint(Authctxt *authctxt)
+userauth_kbdint(struct ssh *ssh)
 {
 	int authenticated = 0;
 	char *lang, *devs;
@@ -50,7 +50,7 @@ userauth_kbdint(Authctxt *authctxt)
 	debug("keyboard-interactive devs %s", devs);
 
 	if (options.challenge_response_authentication)
-		authenticated = auth2_challenge(authctxt, devs);
+		authenticated = auth2_challenge(ssh, devs);
 
 	xfree(devs);
 	xfree(lang);

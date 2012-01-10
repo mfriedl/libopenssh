@@ -75,7 +75,7 @@ struct Authctxt {
 
 struct Authmethod {
 	char	*name;
-	int	(*userauth)(Authctxt *authctxt);
+	int	(*userauth)(struct ssh *);
 	int	*enabled;
 };
 
@@ -123,22 +123,22 @@ void	do_authentication(Authctxt *);
 void	do_authentication2(Authctxt *);
 
 void	auth_log(Authctxt *, int, char *, char *);
-void	userauth_finish(Authctxt *, int, char *);
+void	userauth_finish(struct ssh *, int, char *);
 int	auth_root_allowed(char *);
 
 char	*auth2_read_banner(void);
 
 void	privsep_challenge_enable(void);
 
-int	auth2_challenge(Authctxt *, char *);
-void	auth2_challenge_stop(Authctxt *);
+int	auth2_challenge(struct ssh *, char *);
+void	auth2_challenge_stop(struct ssh *);
 int	bsdauth_query(void *, char **, char **, u_int *, char ***, u_int **);
 int	bsdauth_respond(void *, u_int, char **);
 int	skey_query(void *, char **, char **, u_int *, char ***, u_int **);
 int	skey_respond(void *, u_int, char **);
 
 void	auth2_jpake_get_pwdata(Authctxt *, BIGNUM **, char **, char **);
-void	auth2_jpake_stop(Authctxt *);
+void	auth2_jpake_stop(struct ssh *);
 
 int	allowed_user(struct passwd *);
 struct passwd * getpwnamallow(const char *user);
