@@ -1325,8 +1325,7 @@ client_process_output(fd_set *writeset)
 static void
 client_process_buffered_input_packets(void)
 {
-	dispatch_run(DISPATCH_NONBLOCK, &quit_pending,
-	    compat20 ? active_state : NULL);
+	dispatch_run(DISPATCH_NONBLOCK, &quit_pending);
 }
 
 /* scan buf[] for '~' before sending data to the peer */
