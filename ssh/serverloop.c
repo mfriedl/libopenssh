@@ -53,6 +53,8 @@
 #include <unistd.h>
 #include <stdarg.h>
 
+#define DISPATCH_COMPAT 1
+
 #include "xmalloc.h"
 #include "packet.h"
 #include "buffer.h"

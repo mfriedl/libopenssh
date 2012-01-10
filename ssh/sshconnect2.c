@@ -41,7 +41,6 @@
 #include <vis.h>
 
 #define PACKET_SKIP_COMPAT 1
-#define DISPATCH_SKIP_COMPAT 1
 
 #include "xmalloc.h"
 #include "ssh.h"
