@@ -79,19 +79,19 @@ userauth_pubkey(struct ssh *ssh)
 		debug2("userauth_pubkey: disabled because of invalid user");
 		return 0;
 	}
-	have_sig = packet_get_char();
+	have_sig = ssh_packet_get_char(ssh);
 	if (datafellows & SSH_BUG_PKAUTH) {
 		debug2("userauth_pubkey: SSH_BUG_PKAUTH");
 		/* no explicit pkalg given */
-		pkblob = packet_get_string(&blen);
+		pkblob = ssh_packet_get_string(ssh, &blen);
 		buffer_init(&b);
 		buffer_append(&b, pkblob, blen);
 		/* so we have to extract the pkalg from the pkblob */
 		pkalg = buffer_get_string(&b, &alen);
 		buffer_free(&b);
 	} else {
-		pkalg = packet_get_string(&alen);
-		pkblob = packet_get_string(&blen);
+		pkalg = ssh_packet_get_string(ssh, &alen);
+		pkblob = ssh_packet_get_string(ssh, &blen);
 	}
 	pktype = key_type_from_name(pkalg);
 	if (pktype == KEY_UNSPEC) {
@@ -111,8 +111,8 @@ userauth_pubkey(struct ssh *ssh)
 		goto done;
 	}
 	if (have_sig) {
-		sig = packet_get_string(&slen);
-		packet_check_eom();
+		sig = ssh_packet_get_string(ssh, &slen);
+		ssh_packet_check_eom(ssh);
 		buffer_init(&b);
 		if (datafellows & SSH_OLD_SESSIONID) {
 			buffer_append(&b, session_id2, session_id2_len);
@@ -147,7 +147,7 @@ userauth_pubkey(struct ssh *ssh)
 		xfree(sig);
 	} else {
 		debug("test whether pkalg/pkblob are acceptable");
-		packet_check_eom();
+		ssh_packet_check_eom(ssh);
 
 		/* XXX fake reply and always send PK_OK ? */
 		/*
@@ -158,11 +158,11 @@ userauth_pubkey(struct ssh *ssh)
 		 * issue? -markus
 		 */
 		if (PRIVSEP(user_key_allowed(authctxt->pw, key))) {
-			packet_start(SSH2_MSG_USERAUTH_PK_OK);
-			packet_put_string(pkalg, alen);
-			packet_put_string(pkblob, blen);
-			packet_send();
-			packet_write_wait();
+			ssh_packet_start(ssh, SSH2_MSG_USERAUTH_PK_OK);
+			ssh_packet_put_string(ssh, pkalg, alen);
+			ssh_packet_put_string(ssh, pkblob, blen);
+			ssh_packet_send(ssh);
+			ssh_packet_write_wait(ssh);
 			authctxt->postponed = 1;
 		}
 	}

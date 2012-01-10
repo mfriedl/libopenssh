@@ -129,7 +129,7 @@ auth2_read_banner(void)
 }
 
 static void
-userauth_banner(void)
+userauth_banner(struct ssh *ssh)
 {
 	char *banner = NULL;
 
@@ -141,10 +141,10 @@ userauth_banner(void)
 	if ((banner = PRIVSEP(auth2_read_banner())) == NULL)
 		goto done;
 
-	packet_start(SSH2_MSG_USERAUTH_BANNER);
-	packet_put_cstring(banner);
-	packet_put_cstring("");		/* language, unused */
-	packet_send();
+	ssh_packet_start(ssh, SSH2_MSG_USERAUTH_BANNER);
+	ssh_packet_put_cstring(ssh, banner);
+	ssh_packet_put_cstring(ssh, "");		/* language, unused */
+	ssh_packet_send(ssh);
 	debug("userauth_banner: sent");
 done:
 	if (banner)
@@ -172,8 +172,8 @@ input_service_request(int type, u_int32_t seq, struct ssh *ssh)
 	Authctxt *authctxt = ssh->authctxt;
 	u_int len;
 	int acceptit = 0;
-	char *service = packet_get_cstring(&len);
-	packet_check_eom();
+	char *service = ssh_packet_get_cstring(ssh, &len);
+	ssh_packet_check_eom(ssh);
 
 	if (authctxt == NULL)
 		fatal("input_service_request: no authctxt");
@@ -188,13 +188,13 @@ input_service_request(int type, u_int32_t seq, struct ssh *ssh)
 	/* XXX all other service requests are denied */
 
 	if (acceptit) {
-		packet_start(SSH2_MSG_SERVICE_ACCEPT);
-		packet_put_cstring(service);
-		packet_send();
-		packet_write_wait();
+		ssh_packet_start(ssh, SSH2_MSG_SERVICE_ACCEPT);
+		ssh_packet_put_cstring(ssh, service);
+		ssh_packet_send(ssh);
+		ssh_packet_write_wait(ssh);
 	} else {
 		debug("bad service request %s", service);
-		packet_disconnect("bad service request %s", service);
+		ssh_packet_disconnect(ssh, "bad service request %s", service);
 	}
 	xfree(service);
 }
@@ -211,9 +211,9 @@ input_userauth_request(int type, u_int32_t seq, struct ssh *ssh)
 	if (authctxt == NULL)
 		fatal("input_userauth_request: no authctxt");
 
-	user = packet_get_cstring(NULL);
-	service = packet_get_cstring(NULL);
-	method = packet_get_cstring(NULL);
+	user = ssh_packet_get_cstring(ssh, NULL);
+	service = ssh_packet_get_cstring(ssh, NULL);
+	method = ssh_packet_get_cstring(ssh, NULL);
 	debug("userauth-request for user %s service %s method %s", user, service, method);
 	debug("attempt %d failures %d", authctxt->attempt, authctxt->failures);
 
@@ -237,10 +237,10 @@ input_userauth_request(int type, u_int32_t seq, struct ssh *ssh)
 		authctxt->style = style ? xstrdup(style) : NULL;
 		if (use_privsep)
 			mm_inform_authserv(service, style);
-		userauth_banner();
+		userauth_banner(ssh);
 	} else if (strcmp(user, authctxt->user) != 0 ||
 	    strcmp(service, authctxt->service) != 0) {
-		packet_disconnect("Change of username or service not allowed: "
+		ssh_packet_disconnect(ssh, "Change of username or service not allowed: "
 		    "(%s,%s) -> (%s,%s)",
 		    authctxt->user, authctxt->service, user, service);
 	}
@@ -297,9 +297,9 @@ userauth_finish(struct ssh *ssh, int authenticated, char *method)
 	if (authenticated == 1) {
 		/* turn off userauth */
 		ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_REQUEST, &dispatch_protocol_ignore);
-		packet_start(SSH2_MSG_USERAUTH_SUCCESS);
-		packet_send();
-		packet_write_wait();
+		ssh_packet_start(ssh, SSH2_MSG_USERAUTH_SUCCESS);
+		ssh_packet_send(ssh);
+		ssh_packet_write_wait(ssh);
 		/* now we can break out */
 		authctxt->success = 1;
 	} else {
@@ -308,13 +308,13 @@ userauth_finish(struct ssh *ssh, int authenticated, char *method)
 		    (authctxt->attempt > 1 || strcmp(method, "none") != 0))
 			authctxt->failures++;
 		if (authctxt->failures >= options.max_authtries)
-			packet_disconnect(AUTH_FAIL_MSG, authctxt->user);
+			ssh_packet_disconnect(ssh, AUTH_FAIL_MSG, authctxt->user);
 		methods = authmethods_get();
-		packet_start(SSH2_MSG_USERAUTH_FAILURE);
-		packet_put_cstring(methods);
-		packet_put_char(0);	/* XXX partial success, unused */
-		packet_send();
-		packet_write_wait();
+		ssh_packet_start(ssh, SSH2_MSG_USERAUTH_FAILURE);
+		ssh_packet_put_cstring(ssh, methods);
+		ssh_packet_put_char(ssh, 0);	/* XXX partial success, unused */
+		ssh_packet_send(ssh);
+		ssh_packet_write_wait(ssh);
 		xfree(methods);
 	}
 }

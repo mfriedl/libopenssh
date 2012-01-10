@@ -40,7 +40,7 @@
 #include "log.h"
 
 static int auth2_challenge_start(struct ssh *);
-static int send_userauth_info_request(Authctxt *);
+static int send_userauth_info_request(struct ssh *);
 static void input_userauth_info_response(int, u_int32_t, struct ssh *);
 
 extern KbdintDevice bsdauth_device;
@@ -190,7 +190,7 @@ auth2_challenge_start(struct ssh *ssh)
 		auth2_challenge_stop(ssh);
 		return 0;
 	}
-	if (send_userauth_info_request(authctxt) == 0) {
+	if (send_userauth_info_request(ssh) == 0) {
 		auth2_challenge_stop(ssh);
 		return 0;
 	}
@@ -202,28 +202,28 @@ auth2_challenge_start(struct ssh *ssh)
 }
 
 static int
-send_userauth_info_request(Authctxt *authctxt)
+send_userauth_info_request(struct ssh *ssh)
 {
-	KbdintAuthctxt *kbdintctxt;
+	Authctxt *authctxt = ssh->authctxt;
+	KbdintAuthctxt *kbdintctxt = authctxt->kbdintctxt;
 	char *name, *instr, **prompts;
 	u_int i, *echo_on;
 
-	kbdintctxt = authctxt->kbdintctxt;
 	if (kbdintctxt->device->query(kbdintctxt->ctxt,
 	    &name, &instr, &kbdintctxt->nreq, &prompts, &echo_on))
 		return 0;
 
-	packet_start(SSH2_MSG_USERAUTH_INFO_REQUEST);
-	packet_put_cstring(name);
-	packet_put_cstring(instr);
-	packet_put_cstring("");		/* language not used */
-	packet_put_int(kbdintctxt->nreq);
+	ssh_packet_start(ssh, SSH2_MSG_USERAUTH_INFO_REQUEST);
+	ssh_packet_put_cstring(ssh, name);
+	ssh_packet_put_cstring(ssh, instr);
+	ssh_packet_put_cstring(ssh, "");		/* language not used */
+	ssh_packet_put_int(ssh, kbdintctxt->nreq);
 	for (i = 0; i < kbdintctxt->nreq; i++) {
-		packet_put_cstring(prompts[i]);
-		packet_put_char(echo_on[i]);
+		ssh_packet_put_cstring(ssh, prompts[i]);
+		ssh_packet_put_char(ssh, echo_on[i]);
 	}
-	packet_send();
-	packet_write_wait();
+	ssh_packet_send(ssh);
+	ssh_packet_write_wait(ssh);
 
 	for (i = 0; i < kbdintctxt->nreq; i++)
 		xfree(prompts[i]);
@@ -252,7 +252,7 @@ input_userauth_info_response(int type, u_int32_t seq, struct ssh *ssh)
 		fatal("input_userauth_info_response: no device");
 
 	authctxt->postponed = 0;	/* reset */
-	nresp = packet_get_int();
+	nresp = ssh_packet_get_int(ssh);
 	if (nresp != kbdintctxt->nreq)
 		fatal("input_userauth_info_response: wrong number of replies");
 	if (nresp > 100)
@@ -260,9 +260,9 @@ input_userauth_info_response(int type, u_int32_t seq, struct ssh *ssh)
 	if (nresp > 0) {
 		response = xcalloc(nresp, sizeof(char *));
 		for (i = 0; i < nresp; i++)
-			response[i] = packet_get_string(NULL);
+			response[i] = ssh_packet_get_string(ssh, NULL);
 	}
-	packet_check_eom();
+	ssh_packet_check_eom(ssh);
 
 	res = kbdintctxt->device->respond(kbdintctxt->ctxt, nresp, response);
 
@@ -280,7 +280,7 @@ input_userauth_info_response(int type, u_int32_t seq, struct ssh *ssh)
 		break;
 	case 1:
 		/* Authentication needs further interaction */
-		if (send_userauth_info_request(authctxt) == 1)
+		if (send_userauth_info_request(ssh) == 1)
 			authctxt->postponed = 1;
 		break;
 	default:
