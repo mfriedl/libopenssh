@@ -37,6 +37,7 @@
 #include <krb5.h>
 #endif
 
+struct ssh;
 typedef struct Authctxt Authctxt;
 typedef struct Authmethod Authmethod;
 typedef struct KbdintDevice KbdintDevice;
@@ -158,8 +159,8 @@ check_key_in_hostfiles(struct passwd *, Key *, const char *,
 
 /* hostkey handling */
 Key	*get_hostkey_by_index(int);
-Key	*get_hostkey_public_by_type(int, void *);
-Key	*get_hostkey_private_by_type(int, void *);
+Key	*get_hostkey_public_by_type(int, struct ssh *);
+Key	*get_hostkey_private_by_type(int, struct ssh *);
 int	 get_hostkey_index(Key *);
 int	 ssh1_session_key(BIGNUM *);
 

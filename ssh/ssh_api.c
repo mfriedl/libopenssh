@@ -15,9 +15,9 @@
 void	_ssh_exchange_banner(struct ssh *);
 char	*_ssh_send_banner(struct ssh *);
 char	*_ssh_read_banner(struct ssh *);
-Key	*_ssh_host_public_key(int, void *);
-Key	*_ssh_host_private_key(int, void *);
-int	_ssh_verify_host_key(Key *, void *);
+Key	*_ssh_host_public_key(int, struct ssh *);
+Key	*_ssh_host_private_key(int, struct ssh *);
+int	_ssh_verify_host_key(Key *, struct ssh *);
 
 /*
  * stubs for the server side implementation of kex.
@@ -304,9 +304,8 @@ _ssh_exchange_banner(struct ssh *ssh)
 }
 
 Key *
-_ssh_host_public_key(int type, void *ctxt)
+_ssh_host_public_key(int type, struct ssh *ssh)
 {
-	struct ssh *ssh = ctxt;
 	struct key_entry *k;
 
 	debug3("%s: need %d", __func__, type);
@@ -319,9 +318,8 @@ _ssh_host_public_key(int type, void *ctxt)
 }
 
 Key *
-_ssh_host_private_key(int type, void *ctxt)
+_ssh_host_private_key(int type, struct ssh *ssh)
 {
-	struct ssh *ssh = ctxt;
 	struct key_entry *k;
 
 	datafellows = ssh->datafellows;	/* XXX */
@@ -335,9 +333,8 @@ _ssh_host_private_key(int type, void *ctxt)
 }
 
 int
-_ssh_verify_host_key(Key *hostkey, void *ctxt)
+_ssh_verify_host_key(Key *hostkey, struct ssh *ssh)
 {
-	struct ssh *ssh = ctxt;
 	struct key_entry *k;
 
 	debug3("%s: need %s", __func__, key_type(hostkey));

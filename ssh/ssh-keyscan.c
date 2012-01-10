@@ -201,7 +201,7 @@ keygrab_ssh1(con *c)
 }
 
 static int
-hostjump(Key *hostkey, void *ctxt)
+hostjump(Key *hostkey, struct ssh *ssh)
 {
 	kexjmp_key = hostkey;
 	longjmp(kexjmp, 1);

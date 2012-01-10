@@ -87,10 +87,8 @@ u_char *session_id2 = NULL;
 u_int session_id2_len = 0;
 
 static int
-verify_host_key_callback(Key *hostkey, void *ctxt)
+verify_host_key_callback(Key *hostkey, struct ssh *ssh)
 {
-	struct ssh * ssh = ctxt;
-
 	if (verify_host_key(ssh->host, ssh->hostaddr, hostkey) == -1)
 		fatal("Host key verification failed.");
 	return 0;
