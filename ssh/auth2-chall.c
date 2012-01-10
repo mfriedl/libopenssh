@@ -234,7 +234,8 @@ send_userauth_info_request(Authctxt *authctxt)
 static void
 input_userauth_info_response(int type, u_int32_t seq, void *ctxt)
 {
-	Authctxt *authctxt = ctxt;
+	struct ssh *ssh = ctxt;
+	Authctxt *authctxt = ssh->authctxt;
 	KbdintAuthctxt *kbdintctxt;
 	int authenticated = 0, res;
 	u_int i, nresp;

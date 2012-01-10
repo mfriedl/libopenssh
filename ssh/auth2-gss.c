@@ -130,7 +130,8 @@ userauth_gssapi(Authctxt *authctxt)
 static void
 input_gssapi_token(int type, u_int32_t plen, void *ctxt)
 {
-	Authctxt *authctxt = ctxt;
+	struct ssh *ssh = ctxt;
+	Authctxt *authctxt = ssh->authctxt;
 	Gssctxt *gssctxt;
 	gss_buffer_desc send_tok = GSS_C_EMPTY_BUFFER;
 	gss_buffer_desc recv_tok;
@@ -184,7 +185,8 @@ input_gssapi_token(int type, u_int32_t plen, void *ctxt)
 static void
 input_gssapi_errtok(int type, u_int32_t plen, void *ctxt)
 {
-	Authctxt *authctxt = ctxt;
+	struct ssh *ssh = ctxt;
+	Authctxt *authctxt = ssh->authctxt;
 	Gssctxt *gssctxt;
 	gss_buffer_desc send_tok = GSS_C_EMPTY_BUFFER;
 	gss_buffer_desc recv_tok;
@@ -224,7 +226,8 @@ input_gssapi_errtok(int type, u_int32_t plen, void *ctxt)
 static void
 input_gssapi_exchange_complete(int type, u_int32_t plen, void *ctxt)
 {
-	Authctxt *authctxt = ctxt;
+	struct ssh *ssh = ctxt;
+	Authctxt *authctxt = ssh->authctxt;
 	Gssctxt *gssctxt;
 	int authenticated;
 
@@ -253,7 +256,8 @@ input_gssapi_exchange_complete(int type, u_int32_t plen, void *ctxt)
 static void
 input_gssapi_mic(int type, u_int32_t plen, void *ctxt)
 {
-	Authctxt *authctxt = ctxt;
+	struct ssh *ssh = ctxt;
+	Authctxt *authctxt = ssh->authctxt;
 	Gssctxt *gssctxt;
 	int authenticated = 0;
 	Buffer b;

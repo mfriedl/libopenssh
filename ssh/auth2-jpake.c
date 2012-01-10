@@ -422,7 +422,8 @@ auth2_jpake_start(Authctxt *authctxt)
 static void
 input_userauth_jpake_client_step1(int type, u_int32_t seq, void *ctxt)
 {
-	Authctxt *authctxt = ctxt;
+	struct ssh *ssh = ctxt;
+	Authctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	u_char *x1_proof, *x2_proof, *x4_s_proof;
 	u_int x1_proof_len, x2_proof_len, x4_s_proof_len;
@@ -480,7 +481,8 @@ input_userauth_jpake_client_step1(int type, u_int32_t seq, void *ctxt)
 static void
 input_userauth_jpake_client_step2(int type, u_int32_t seq, void *ctxt)
 {
-	Authctxt *authctxt = ctxt;
+	struct ssh *ssh = ctxt;
+	Authctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	u_char *x2_s_proof;
 	u_int x2_s_proof_len;
@@ -530,7 +532,8 @@ input_userauth_jpake_client_step2(int type, u_int32_t seq, void *ctxt)
 static void
 input_userauth_jpake_client_confirm(int type, u_int32_t seq, void *ctxt)
 {
-	Authctxt *authctxt = ctxt;
+	struct ssh *ssh = ctxt;
+	Authctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	int authenticated = 0;
 
