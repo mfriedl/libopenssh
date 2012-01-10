@@ -146,7 +146,7 @@ Kex	*kex_setup(struct ssh *, char *[PROPOSAL_MAX]);
 void	 kex_finish(struct ssh *);
 
 void	 kex_send_kexinit(struct ssh *);
-void	 kex_input_kexinit(int, u_int32_t, void *);
+void	 kex_input_kexinit(int, u_int32_t, struct ssh *);
 void	 kex_derive_keys(struct ssh *, u_char *, u_int, BIGNUM *);
 
 Newkeys *kex_get_newkeys(struct ssh *, int);

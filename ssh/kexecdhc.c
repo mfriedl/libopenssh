@@ -48,7 +48,7 @@ struct kexecdhc_state {
 	const EC_GROUP *group;
 };
 
-static void input_kex_ecdh_reply(int, u_int32_t, void*);
+static void input_kex_ecdh_reply(int, u_int32_t, struct ssh *);
 
 void
 kexecdh_client(struct ssh *ssh)
@@ -87,9 +87,8 @@ kexecdh_client(struct ssh *ssh)
 }
 
 static void
-input_kex_ecdh_reply(int type, u_int32_t seq, void *ctxt)
+input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 {
-	struct ssh *ssh = ctxt;
 	Kex *kex = ssh->kex;
 	struct kexecdhc_state *kexecdhc_state = kex->state;
 	const EC_GROUP *group;
@@ -113,7 +112,7 @@ input_kex_ecdh_reply(int type, u_int32_t seq, void *ctxt)
 		fatal("type mismatch for decoded server_host_key_blob");
 	if (kex->verify_host_key == NULL)
 		fatal("cannot verify server_host_key");
-	if (kex->verify_host_key(server_host_key, ctxt) == -1)
+	if (kex->verify_host_key(server_host_key, ssh) == -1)
 		fatal("server_host_key verification failed");
 
 	/* Q_S, server public key */

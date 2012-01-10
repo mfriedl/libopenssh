@@ -53,7 +53,7 @@ struct kexgexs_state {
     DH *dh;
 };
 
-static void input_kex_dh_gex_init(int, u_int32_t, void *);
+static void input_kex_dh_gex_init(int, u_int32_t, struct ssh *);
 
 void
 kexgex_server(struct ssh *ssh)
@@ -124,9 +124,8 @@ kexgex_server(struct ssh *ssh)
 }
 
 static void
-input_kex_dh_gex_init(int type, u_int32_t seq, void *ctxt)
+input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 {
-	struct ssh *ssh = ctxt;
 	Kex *kex = ssh->kex;
 	struct kexgexs_state *kexgexs_state = kex->state;
 	BIGNUM *shared_secret = NULL, *dh_client_pub = NULL;
@@ -147,10 +146,10 @@ input_kex_dh_gex_init(int type, u_int32_t seq, void *ctxt)
 	if (kex->load_host_public_key == NULL ||
 	    kex->load_host_private_key == NULL)
 		fatal("Cannot load hostkey");
-	server_host_public = kex->load_host_public_key(kex->hostkey_type, ctxt);
+	server_host_public = kex->load_host_public_key(kex->hostkey_type, ssh);
 	if (server_host_public == NULL)
 		fatal("Unsupported hostkey type %d", kex->hostkey_type);
-	server_host_private = kex->load_host_private_key(kex->hostkey_type, ctxt);
+	server_host_private = kex->load_host_private_key(kex->hostkey_type, ssh);
 	if (server_host_private == NULL)
 		fatal("Missing private key for hostkey type %d",
 		    kex->hostkey_type);
