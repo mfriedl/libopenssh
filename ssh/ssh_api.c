@@ -52,7 +52,7 @@ ssh_init(int is_server, struct kex_params *kex_params)
 		called = 1;
 	}
 
-	ssh = ssh_packet_set_connection(NULL, 0, 0);
+	ssh = ssh_packet_set_connection(NULL, -1, -1);
 	if (is_server)
 		ssh_packet_set_server(ssh);
 
@@ -76,6 +76,15 @@ ssh_init(int is_server, struct kex_params *kex_params)
 		ssh->kex->verify_host_key =&_ssh_verify_host_key;
 	}
 	return (ssh);
+}
+
+void
+ssh_free(struct ssh *ssh)
+{
+	ssh_packet_close(ssh);
+	if (ssh->kex)
+		xfree(ssh->kex);
+	xfree(ssh);
 }
 
 /* Returns -1 on error, 0 otherwise */
