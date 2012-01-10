@@ -798,13 +798,13 @@ get_hostkey_by_type(int type, int need_private)
 }
 
 Key *
-get_hostkey_public_by_type(int type, void *ctxt)
+get_hostkey_public_by_type(int type, struct ssh *ssh)
 {
 	return get_hostkey_by_type(type, 0);
 }
 
 Key *
-get_hostkey_private_by_type(int type, void *ctxt)
+get_hostkey_private_by_type(int type, struct ssh *ssh)
 {
 	return get_hostkey_by_type(type, 1);
 }
