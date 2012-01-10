@@ -168,11 +168,11 @@ session_close(struct session *s)
 		event_del(&s->server.input);
 		event_del(&s->server.output);
 		if (s->client.ssh) {
-			/* XXX free */
+			ssh_free(s->client.ssh);
 			s->client.ssh = NULL;
 		}
 		if (s->server.ssh) {
-			/* XXX free */
+			ssh_free(s->server.ssh);
 			s->server.ssh = NULL;
 		}
 		TAILQ_REMOVE(&sessions, s, next);

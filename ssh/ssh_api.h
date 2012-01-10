@@ -19,6 +19,7 @@ struct kex_params {
 
 /* API functions */
 struct ssh *ssh_init(int is_server, struct kex_params *kex_params);
+void ssh_free(struct ssh *);
 int  ssh_add_hostkey(struct ssh* ssh, char *key);
 int  ssh_packet_get(struct ssh* ssh);
 void *ssh_packet_payload(struct ssh* ssh, u_int *len);
