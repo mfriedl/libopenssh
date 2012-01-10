@@ -41,10 +41,10 @@ dispatch_protocol_error(int type, u_int32_t seq, struct ssh *ssh)
 	logit("dispatch_protocol_error: type %d seq %u", type, seq);
 	if (!compat20)
 		fatal("protocol error");
-	packet_start(SSH2_MSG_UNIMPLEMENTED);
-	packet_put_int(seq);
-	packet_send();
-	packet_write_wait();
+	ssh_packet_start(ssh, SSH2_MSG_UNIMPLEMENTED);
+	ssh_packet_put_int(ssh, seq);
+	ssh_packet_send(ssh);
+	ssh_packet_write_wait(ssh);
 }
 
 void
