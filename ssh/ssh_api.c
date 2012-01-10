@@ -174,6 +174,7 @@ ssh_packet_put(struct ssh* ssh, int type, const char *data, u_int len)
 {
 	ssh_packet_start(ssh, type);
 	ssh_packet_put_raw(ssh, data, len);
+	ssh_packet_send(ssh);
 }
 
 void *
