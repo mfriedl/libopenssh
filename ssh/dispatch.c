@@ -77,7 +77,7 @@ ssh_dispatch_set(struct ssh *ssh, int type, dispatch_fn *fn)
 	ssh->dispatch[type] = fn;
 }
 void
-ssh_dispatch_run(struct ssh *ssh, int mode, volatile sig_atomic_t *done, void *ctxt)
+ssh_dispatch_run(struct ssh *ssh, int mode, volatile sig_atomic_t *done)
 {
 	for (;;) {
 		int type;
@@ -91,7 +91,7 @@ ssh_dispatch_run(struct ssh *ssh, int mode, volatile sig_atomic_t *done, void *c
 				return;
 		}
 		if (type > 0 && type < DISPATCH_MAX && ssh->dispatch[type] != NULL)
-			(*ssh->dispatch[type])(type, seqnr, ctxt);
+			(*ssh->dispatch[type])(type, seqnr, ssh);
 		else
 			ssh_packet_disconnect(ssh, "protocol error: rcvd type %d", type);
 		if (done != NULL && *done)

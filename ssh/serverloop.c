@@ -506,8 +506,7 @@ drain_output(void)
 static void
 process_buffered_input_packets(void)
 {
-	dispatch_run(DISPATCH_NONBLOCK, NULL, compat20 ? active_state :
-	    NULL);
+	dispatch_run(DISPATCH_NONBLOCK, NULL);
 }
 
 /*

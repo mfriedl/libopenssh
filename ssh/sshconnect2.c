@@ -205,7 +205,7 @@ ssh_kex2(char *host, struct sockaddr *hostaddr, u_short port)
 
 	ssh->kex = kex;
 
-	ssh_dispatch_run(ssh, DISPATCH_BLOCK, &kex->done, ssh);
+	ssh_dispatch_run(ssh, DISPATCH_BLOCK, &kex->done);
 
 	if (options.use_roaming && !kex->roaming) {
 		debug("Roaming not allowed by server");
@@ -396,7 +396,7 @@ ssh_userauth2(const char *local_user, const char *server_user, char *host,
 
 	ssh_dispatch_init(ssh, &input_userauth_error);
 	ssh_dispatch_set(ssh, SSH2_MSG_SERVICE_ACCEPT, &input_userauth_service_accept);
-	ssh_dispatch_run(ssh, DISPATCH_BLOCK, &authctxt->success, ssh);	/* loop until success */
+	ssh_dispatch_run(ssh, DISPATCH_BLOCK, &authctxt->success);	/* loop until success */
 
 	pubkey_cleanup(ssh);
 	ssh_dispatch_range(ssh, SSH2_MSG_USERAUTH_MIN, SSH2_MSG_USERAUTH_MAX, NULL);

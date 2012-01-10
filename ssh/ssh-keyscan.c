@@ -244,7 +244,7 @@ keygrab_ssh2(con *c)
 	if (!(j = setjmp(kexjmp))) {
 		nonfatal_fatal = 1;
 		ssh_dispatch_run(active_state, DISPATCH_BLOCK,
-		    &active_state->kex->done, active_state);
+		    &active_state->kex->done);
 		fprintf(stderr, "Impossible! dispatch_run() returned!\n");
 		exit(1);
 	}

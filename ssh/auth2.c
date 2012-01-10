@@ -161,7 +161,7 @@ do_authentication2(Authctxt *authctxt)
 	ssh->authctxt = authctxt;		/* XXX move to caller */
 	ssh_dispatch_init(ssh, &dispatch_protocol_error);
 	ssh_dispatch_set(ssh, SSH2_MSG_SERVICE_REQUEST, &input_service_request);
-	ssh_dispatch_run(ssh, DISPATCH_BLOCK, &authctxt->success, ssh);
+	ssh_dispatch_run(ssh, DISPATCH_BLOCK, &authctxt->success);
 	ssh->authctxt = NULL;
 }
 
