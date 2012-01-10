@@ -2199,7 +2199,7 @@ do_ssh2_kex(void)
 
 	active_state->kex = kex;
 
-	dispatch_run(DISPATCH_BLOCK, &kex->done, active_state);
+	ssh_dispatch_run(active_state, DISPATCH_BLOCK, &kex->done, active_state);
 
 	session_id2 = kex->session_id;
 	session_id2_len = kex->session_id_len;

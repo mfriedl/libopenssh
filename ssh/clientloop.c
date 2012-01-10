@@ -79,6 +79,8 @@
 #include <pwd.h>
 #include <unistd.h>
 
+#define DISPATCH_COMPAT 1
+
 #include "xmalloc.h"
 #include "ssh.h"
 #include "ssh1.h"
