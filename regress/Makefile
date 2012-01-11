@@ -74,15 +74,21 @@ CLEANFILES+=	authorized_keys_${USER} known_hosts pidfile \
 TEST_ENV=      "MALLOC_OPTIONS=AFGJPRX"
 
 # use in-tree executables
-TEST_ENV+=	"TEST_SSH_SCP=${.CURDIR}/../ssh/scp/obj/scp"
-TEST_ENV+=	"TEST_SSH_SFTP=${.CURDIR}/../ssh/sftp/obj/sftp"
-TEST_ENV+=	"TEST_SSH_SFTPSERVER=${.CURDIR}/../ssh/sftp-server/obj/sftp-server"
-TEST_ENV+=	"TEST_SSH_SSH=${.CURDIR}/../ssh/ssh/obj/ssh"
-TEST_ENV+=	"TEST_SSH_SSHADD=${.CURDIR}/../ssh/ssh-add/obj/ssh-add"
-TEST_ENV+=	"TEST_SSH_SSHAGENT=${.CURDIR}/../ssh/ssh-agent/obj/ssh-agent"
-TEST_ENV+=	"TEST_SSH_SSHD=${.CURDIR}/../ssh/sshd/obj/sshd"
-TEST_ENV+=	"TEST_SSH_SSHKEYGEN=${.CURDIR}/../ssh/ssh-keygen/obj/ssh-keygen"
-TEST_ENV+=	"TEST_SSH_SSHKEYSCAN=${.CURDIR}/../ssh/ssh-keyscan/obj/ssh-keyscan"
+.include <bsd.obj.mk>
+.if exists(${.CURDIR}/../ssh/ssh/${__objdir}/)
+ODIR="/obj"
+.else
+ODIR=""
+.endif
+TEST_ENV+=	"TEST_SSH_SCP=${.CURDIR}/../ssh/scp${ODIR}/scp"
+TEST_ENV+=	"TEST_SSH_SFTP=${.CURDIR}/../ssh/sftp${ODIR}/sftp"
+TEST_ENV+=	"TEST_SSH_SFTPSERVER=${.CURDIR}/../ssh/sftp-server${ODIR}/sftp-server"
+TEST_ENV+=	"TEST_SSH_SSH=${.CURDIR}/../ssh/ssh${ODIR}/ssh"
+TEST_ENV+=	"TEST_SSH_SSHADD=${.CURDIR}/../ssh/ssh-add${ODIR}/ssh-add"
+TEST_ENV+=	"TEST_SSH_SSHAGENT=${.CURDIR}/../ssh/ssh-agent${ODIR}/ssh-agent"
+TEST_ENV+=	"TEST_SSH_SSHD=${.CURDIR}/../ssh/sshd${ODIR}/sshd"
+TEST_ENV+=	"TEST_SSH_SSHKEYGEN=${.CURDIR}/../ssh/ssh-keygen${ODIR}/ssh-keygen"
+TEST_ENV+=	"TEST_SSH_SSHKEYSCAN=${.CURDIR}/../ssh/ssh-keyscan${ODIR}/ssh-keyscan"
 
 t1:
 	ssh-keygen -if ${.CURDIR}/rsa_ssh2.prv | diff - ${.CURDIR}/rsa_openssh.prv
