@@ -78,7 +78,7 @@ ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, u_int *lenp,
 	    (ret = sshbuf_put_bignum2(bb, sig->s)) != 0)
 		goto out;
 	if ((ret = sshbuf_put_cstring(b, sshkey_ssh_name_plain(key))) != 0 ||
-	    (ret = sshbuf_putb(b, bb)) != 0)
+	    (ret = sshbuf_put_stringb(b, bb)) != 0)
 		goto out;
 	len = sshbuf_len(b);
 	if (lenp != NULL)
