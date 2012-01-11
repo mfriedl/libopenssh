@@ -149,13 +149,9 @@ order_hostkeyalgs(char *host, struct sockaddr *hostaddr, u_short port)
 }
 
 void
-ssh_kex2(char *host, struct sockaddr *hostaddr, u_short port)
+ssh_kex2(struct ssh *ssh, u_short port)
 {
-	struct ssh * ssh = active_state; /* XXX */
 	int r;
-
-	ssh->host = host;
-	ssh->hostaddr = hostaddr;
 
 	if (options.ciphers == (char *)-1) {
 		logit("No valid ciphers for protocol version 2 given, using defaults.");
@@ -189,7 +185,7 @@ ssh_kex2(char *host, struct sockaddr *hostaddr, u_short port)
 	else {
 		/* Prefer algorithms that we already have keys for */
 		myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] =
-		    order_hostkeyalgs(host, hostaddr, port);
+		    order_hostkeyalgs(ssh->host, ssh->hostaddr, port);
 	}
 	if (options.kex_algorithms != NULL)
 		myproposal[PROPOSAL_KEX_ALGS] = options.kex_algorithms;
@@ -365,10 +361,9 @@ Authmethod authmethods[] = {
 };
 
 void
-ssh_userauth2(const char *local_user, const char *server_user, char *host,
+ssh_userauth2(struct ssh *ssh, const char *local_user, const char *server_user,
     Sensitive *sensitive)
 {
-	struct ssh * ssh = active_state; /* XXX */
 	Authctxt *authctxt;
 
 	if (options.challenge_response_authentication)
@@ -383,7 +378,7 @@ ssh_userauth2(const char *local_user, const char *server_user, char *host,
 	pubkey_prepare(ssh);
 	authctxt->server_user = server_user;
 	authctxt->local_user = local_user;
-	authctxt->host = host;
+	authctxt->host = ssh->host;
 	authctxt->service = "ssh-connection";		/* service name */
 	authctxt->success = 0;
 	authctxt->method = authmethod_lookup("none");

@@ -24,6 +24,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+struct ssh;
 typedef struct Sensitive Sensitive;
 struct Sensitive {
 	struct sshkey **keys;
@@ -31,15 +32,15 @@ struct Sensitive {
 	int	external_keysign;
 };
 
-int
+struct ssh *
 ssh_connect(const char *, struct sockaddr_storage *, u_short, int, int,
     int *, int, int, const char *);
 void	 ssh_kill_proxy_command(void);
 
-void	 ssh_login(Sensitive *, const char *, struct sockaddr *, u_short,
-    struct passwd *, int);
+void	 ssh_login(struct ssh *, Sensitive *, const char *, struct sockaddr *,
+    u_short, struct passwd *, int);
 
-void	 ssh_exchange_identification(int);
+void	 ssh_exchange_identification(struct ssh *, int);
 
 int	 verify_host_key(char *, struct sockaddr *, struct sshkey *);
 
@@ -47,10 +48,10 @@ void	 get_hostfile_hostname_ipaddr(char *, struct sockaddr *, u_short,
     char **, char **);
 
 void	 ssh_kex(char *, struct sockaddr *);
-void	 ssh_kex2(char *, struct sockaddr *, u_short);
+void	 ssh_kex2(struct ssh *, u_short);
 
 void	 ssh_userauth1(const char *, const char *, char *, Sensitive *);
-void	 ssh_userauth2(const char *, const char *, char *, Sensitive *);
+void	 ssh_userauth2(struct ssh *, const char *, const char *, Sensitive *);
 
 void	 ssh_put_password(char *);
 int	 ssh_local_cmd(const char *);

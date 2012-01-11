@@ -2426,7 +2426,7 @@ ssh_packet_get_newkeys(struct ssh *ssh, int mode)
 	return (void *)ssh->state->newkeys[mode];
 }
 
-/* TODO Hier brauchen wir noch eine Loesung! */
+/* XXX FIXME FIXME FIXME */
 /*
  * Save the state for the real connection, and use a separate state when
  * resuming a suspended connection.
@@ -2449,7 +2449,7 @@ ssh_packet_backup_state(struct ssh *ssh,
 	ssh = tmp;
 }
 
-/* TODO Hier brauchen wir noch eine Loesung! */
+/* XXX FIXME FIXME FIXME */
 /*
  * Swap in the old state when resuming a connecion.
  */

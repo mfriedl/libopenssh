@@ -72,9 +72,10 @@ static void warn_changed_key(struct sshkey *);
 /*
  * Connect to the given ssh server using a proxy command.
  */
-static int
+static struct ssh *
 ssh_proxy_connect(const char *host, u_short port, const char *proxy_command)
 {
+	struct ssh *ssh;
 	char *command_string, *tmp;
 	int pin[2], pout[2];
 	pid_t pid;
@@ -153,12 +154,12 @@ ssh_proxy_connect(const char *host, u_short port, const char *proxy_command)
 	xfree(command_string);
 
 	/* Set the connection file descriptors. */
-	packet_set_connection(pout[0], pin[1]);
-	packet_set_timeout(options.server_alive_interval,
+	ssh = ssh_packet_set_connection(NULL, pout[0], pin[1]);
+	ssh_packet_set_timeout(ssh, options.server_alive_interval,
 	    options.server_alive_count_max);
 
 	/* Indicate OK return */
-	return 0;
+	return (ssh);
 }
 
 void
@@ -324,11 +325,12 @@ timeout_connect(int sockfd, const struct sockaddr *serv_addr,
  * and %p substituted for host and port, respectively) to use to contact
  * the daemon.
  */
-int
+struct ssh *
 ssh_connect(const char *host, struct sockaddr_storage * hostaddr,
     u_short port, int family, int connection_attempts, int *timeout_ms,
     int want_keepalive, int needpriv, const char *proxy_command)
 {
+	struct ssh *ssh;
 	int gaierr;
 	int on = 1;
 	int sock = -1, attempt;
@@ -401,7 +403,7 @@ ssh_connect(const char *host, struct sockaddr_storage * hostaddr,
 	if (sock == -1) {
 		error("ssh: connect to host %s port %s: %s",
 		    host, strport, strerror(errno));
-		return (-1);
+		return (NULL);
 	}
 
 	debug("Connection established.");
@@ -413,11 +415,11 @@ ssh_connect(const char *host, struct sockaddr_storage * hostaddr,
 		error("setsockopt SO_KEEPALIVE: %.100s", strerror(errno));
 
 	/* Set the connection. */
-	packet_set_connection(sock, sock);
-	packet_set_timeout(options.server_alive_interval,
+	ssh = ssh_packet_set_connection(NULL, sock, sock);
+	ssh_packet_set_timeout(ssh, options.server_alive_interval,
 	    options.server_alive_count_max);
 
-	return 0;
+	return (ssh);
 }
 
 /*
@@ -425,12 +427,12 @@ ssh_connect(const char *host, struct sockaddr_storage * hostaddr,
  * identification string.
  */
 void
-ssh_exchange_identification(int timeout_ms)
+ssh_exchange_identification(struct ssh *ssh, int timeout_ms)
 {
 	char buf[256], remote_version[256];	/* must be same size! */
 	int remote_major, remote_minor, mismatch;
-	int connection_in = packet_get_connection_in();
-	int connection_out = packet_get_connection_out();
+	int connection_in = ssh_packet_get_connection_in(ssh);
+	int connection_out = ssh_packet_get_connection_out(ssh);
 	int minor1 = PROTOCOL_MINOR_1;
 	u_int i, n;
 	size_t len;
@@ -1128,7 +1130,7 @@ verify_host_key(char *host, struct sockaddr *hostaddr, struct sshkey *host_key)
  * This function does not require super-user privileges.
  */
 void
-ssh_login(Sensitive *sensitive, const char *orighost,
+ssh_login(struct ssh *ssh, Sensitive *sensitive, const char *orighost,
     struct sockaddr *hostaddr, u_short port, struct passwd *pw, int timeout_ms)
 {
 	char *host, *cp;
@@ -1144,16 +1146,19 @@ ssh_login(Sensitive *sensitive, const char *orighost,
 			*cp = (char)tolower(*cp);
 
 	/* Exchange protocol version identification strings with the server. */
-	ssh_exchange_identification(timeout_ms);
+	ssh_exchange_identification(ssh, timeout_ms);
 
 	/* Put the connection into non-blocking mode. */
-	packet_set_nonblocking();
+	ssh_packet_set_nonblocking(ssh);
 
 	/* key exchange */
 	/* authenticate user */
+	ssh->host = host;
+	ssh->hostaddr = hostaddr;
+
 	if (compat20) {
-		ssh_kex2(host, hostaddr, port);
-		ssh_userauth2(local_user, server_user, host, sensitive);
+		ssh_kex2(ssh, port);
+		ssh_userauth2(ssh, local_user, server_user, sensitive);
 	} else {
 		ssh_kex(host, hostaddr);
 		ssh_userauth1(local_user, server_user, host, sensitive);

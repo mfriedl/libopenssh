@@ -225,6 +225,7 @@ tilde_expand_paths(char **paths, u_int num_paths)
 int
 main(int ac, char **av)
 {
+	struct ssh *ssh;
 	int i, r, opt, exit_status, use_syslog;
 	char *p, *cp, *line, *argv0, buf[MAXPATHLEN], *host_arg;
 	char thishost[NI_MAXHOST], shorthost[NI_MAXHOST], portstr[NI_MAXSERV];
@@ -762,12 +763,14 @@ main(int ac, char **av)
 	timeout_ms = options.connection_timeout * 1000;
 
 	/* Open a connection to the remote host. */
-	if (ssh_connect(host, &hostaddr, options.port,
+	ssh = ssh_connect(host, &hostaddr, options.port,
 	    options.address_family, options.connection_attempts, &timeout_ms,
 	    options.tcp_keep_alive, 
 	    original_effective_uid == 0 && options.use_privileged_port,
-	    options.proxy_command) != 0)
+	    options.proxy_command);
+	if (!ssh)
 		exit(255);
+	active_state = ssh; /* XXX */
 
 	if (timeout_ms > 0)
 		debug3("timeout: %d ms remain after connect", timeout_ms);
@@ -863,10 +866,10 @@ main(int ac, char **av)
 	signal(SIGCHLD, main_sigchld_handler);
 
 	/* Log into the remote system.  Never returns if the login fails. */
-	ssh_login(&sensitive_data, host, (struct sockaddr *)&hostaddr,
+	ssh_login(ssh, &sensitive_data, host, (struct sockaddr *)&hostaddr,
 	    options.port, pw, timeout_ms);
 
-	if (packet_connection_is_on_socket()) {
+	if (ssh_packet_connection_is_on_socket(ssh)) {
 		verbose("Authenticated to %s ([%s]:%d).", host,
 		    get_remote_ipaddr(), get_remote_port());
 	} else {
@@ -897,7 +900,7 @@ main(int ac, char **av)
 	}
 
 	exit_status = compat20 ? ssh_session2() : ssh_session();
-	packet_close();
+	ssh_packet_close(ssh);
 
 	if (options.control_path != NULL && muxserver_sock != -1)
 		unlink(options.control_path);

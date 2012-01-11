@@ -135,6 +135,7 @@ resume_kex(void)
 static int
 roaming_resume(void)
 {
+	struct ssh *ssh = active_state;	/* XXX */
 	u_int64_t recv_bytes;
 	char *str = NULL, *kexlist = NULL, *c;
 	int i, type;
@@ -145,8 +146,8 @@ roaming_resume(void)
 	resume_in_progress = 1;
 
 	/* Exchange banners */
-	ssh_exchange_identification(timeout_ms);
-	packet_set_nonblocking();
+	ssh_exchange_identification(ssh, timeout_ms);
+	ssh_packet_set_nonblocking(ssh);
 
 	/* Send a kexinit message with resume@appgate.com as only kex algo */
 	packet_start(SSH2_MSG_KEXINIT);
@@ -237,6 +238,7 @@ int
 wait_for_roaming_reconnect(void)
 {
 	static int reenter_guard = 0;
+	struct ssh *nssh;
 	int timeout_ms = options.connection_timeout * 1000;
 	int c;
 
@@ -256,11 +258,13 @@ wait_for_roaming_reconnect(void)
 		if (c != '\n' && c != '\r')
 			continue;
 
-		if (ssh_connect(host, &hostaddr, options.port,
+		nssh = ssh_connect(host, &hostaddr, options.port,
 		    options.address_family, 1, &timeout_ms,
 		    options.tcp_keep_alive, options.use_privileged_port,
-		    options.proxy_command) == 0 && roaming_resume() == 0) {
-			packet_restore_state();
+		    options.proxy_command);
+		if (nssh && roaming_resume()) {
+			packet_restore_state();	/* XXX FIXME */
+
 			reenter_guard = 0;
 			fprintf(stderr, "[connection resumed]\n");
 			fflush(stderr);
