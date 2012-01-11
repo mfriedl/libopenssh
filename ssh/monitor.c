@@ -75,6 +75,7 @@
 #include "ssh2.h"
 #include "jpake.h"
 #include "roaming.h"
+#include "err.h"
 
 #ifdef GSSAPI
 static Gssctxt *gsscontext = NULL;
@@ -584,11 +585,11 @@ mm_answer_moduli(int sock, Buffer *m)
 int
 mm_answer_sign(int sock, Buffer *m)
 {
-	Key *key;
+	struct sshkey *key;
 	u_char *p;
 	u_char *signature;
 	u_int siglen, datlen;
-	int keyid;
+	int keyid, r;
 
 	debug3("%s", __func__);
 
@@ -611,8 +612,9 @@ mm_answer_sign(int sock, Buffer *m)
 
 	if ((key = get_hostkey_by_index(keyid)) == NULL)
 		fatal("%s: no hostkey from index %d", __func__, keyid);
-	if (key_sign(key, &signature, &siglen, p, datlen) < 0)
-		fatal("%s: key_sign failed", __func__);
+	if ((r = sshkey_sign(key, &signature, &siglen, p, datlen,
+	    datafellows)) != 0)
+		fatal("%s: sshkey_sign failed: %s", __func__, ssh_err(r));
 
 	debug3("%s: signature %p(%u)", __func__, signature, siglen);
 
@@ -829,12 +831,12 @@ mm_answer_bsdauthrespond(int sock, Buffer *m)
 int
 mm_answer_keyallowed(int sock, Buffer *m)
 {
-	Key *key;
+	struct sshkey *key;
 	char *cuser, *chost;
 	u_char *blob;
 	u_int bloblen;
 	enum mm_keytype type = 0;
-	int allowed = 0;
+	int r, allowed = 0;
 
 	debug3("%s entering", __func__);
 
@@ -843,13 +845,12 @@ mm_answer_keyallowed(int sock, Buffer *m)
 	chost = buffer_get_string(m, NULL);
 	blob = buffer_get_string(m, &bloblen);
 
-	key = key_from_blob(blob, bloblen);
+	if ((r = sshkey_from_blob(blob, bloblen, &key)) != 0)
+		fatal("%s: cannot parse key: %s", __func__, ssh_err(r));
 
 	if ((compat20 && type == MM_RSAHOSTKEY) ||
 	    (!compat20 && type != MM_RSAHOSTKEY))
 		fatal("%s: key type and protocol mismatch", __func__);
-
-	debug3("%s: key_from_blob: %p", __func__, key);
 
 	if (key != NULL && authctxt->valid) {
 		switch (type) {
@@ -881,7 +882,7 @@ mm_answer_keyallowed(int sock, Buffer *m)
 		}
 	}
 	if (key != NULL)
-		key_free(key);
+		sshkey_free(key);
 
 	/* clear temporarily storage (used by verify) */
 	monitor_reset_key_state();
@@ -1031,11 +1032,10 @@ monitor_valid_hostbasedblob(u_char *data, u_int datalen, char *cuser,
 int
 mm_answer_keyverify(int sock, Buffer *m)
 {
-	Key *key;
+	struct sshkey *key;
 	u_char *signature, *data, *blob;
 	u_int signaturelen, datalen, bloblen;
-	int verified = 0;
-	int valid_data = 0;
+	int r, verified = 0, valid_data = 0;
 
 	blob = buffer_get_string(m, &bloblen);
 	signature = buffer_get_string(m, &signaturelen);
@@ -1045,9 +1045,8 @@ mm_answer_keyverify(int sock, Buffer *m)
 	  !monitor_allowed_key(blob, bloblen))
 		fatal("%s: bad key, not previously allowed", __func__);
 
-	key = key_from_blob(blob, bloblen);
-	if (key == NULL)
-		fatal("%s: bad public key blob", __func__);
+	if ((r = sshkey_from_blob(blob, bloblen, &key)) != 0)
+		fatal("%s: bad public key blob: %s", __func__, ssh_err(r));
 
 	switch (key_blobtype) {
 	case MM_USERKEY:
@@ -1064,11 +1063,12 @@ mm_answer_keyverify(int sock, Buffer *m)
 	if (!valid_data)
 		fatal("%s: bad signature data blob", __func__);
 
-	verified = key_verify(key, signature, signaturelen, data, datalen);
+	verified = sshkey_verify(key, signature, signaturelen, data, datalen,
+	    datafellows);
 	debug3("%s: key %p signature %s",
 	    __func__, key, (verified == 1) ? "verified" : "unverified");
 
-	key_free(key);
+	sshkey_free(key);
 	xfree(blob);
 	xfree(signature);
 	xfree(data);
@@ -1255,10 +1255,10 @@ int
 mm_answer_rsa_keyallowed(int sock, Buffer *m)
 {
 	BIGNUM *client_n;
-	Key *key = NULL;
+	struct sshkey *key = NULL;
 	u_char *blob = NULL;
 	u_int blen = 0;
-	int allowed = 0;
+	int r, allowed = 0;
 
 	debug3("%s entering", __func__);
 
@@ -1279,8 +1279,9 @@ mm_answer_rsa_keyallowed(int sock, Buffer *m)
 
 	if (allowed && key != NULL) {
 		key->type = KEY_RSA;	/* cheat for key_to_blob */
-		if (key_to_blob(key, &blob, &blen) == 0)
-			fatal("%s: key_to_blob failed", __func__);
+		if ((r = sshkey_to_blob(key, &blob, &blen)) != 0)
+			fatal("%s: key_to_blob failed: %s",
+			    __func__, ssh_err(r));
 		buffer_put_string(m, blob, blen);
 
 		/* Save temporarily for comparison in verify */
@@ -1289,7 +1290,7 @@ mm_answer_rsa_keyallowed(int sock, Buffer *m)
 		key_blobtype = MM_RSAUSERKEY;
 	}
 	if (key != NULL)
-		key_free(key);
+		sshkey_free(key);
 
 	mm_request_send(sock, MONITOR_ANS_RSAKEYALLOWED, m);
 
@@ -1301,9 +1302,10 @@ mm_answer_rsa_keyallowed(int sock, Buffer *m)
 int
 mm_answer_rsa_challenge(int sock, Buffer *m)
 {
-	Key *key = NULL;
+	struct sshkey *key = NULL;
 	u_char *blob;
 	u_int blen;
+	int r;
 
 	debug3("%s entering", __func__);
 
@@ -1314,8 +1316,8 @@ mm_answer_rsa_challenge(int sock, Buffer *m)
 		fatal("%s: bad key, not previously allowed", __func__);
 	if (key_blobtype != MM_RSAUSERKEY && key_blobtype != MM_RSAHOSTKEY)
 		fatal("%s: key type mismatch", __func__);
-	if ((key = key_from_blob(blob, blen)) == NULL)
-		fatal("%s: received bad key", __func__);
+	if ((r = sshkey_from_blob(blob, blen, &key)) != 0)
+		fatal("%s: received bad key: %s", __func__, ssh_err(r));
 	if (key->type != KEY_RSA)
 		fatal("%s: received bad key type %d", __func__, key->type);
 	key->type = KEY_RSA1;
@@ -1332,17 +1334,17 @@ mm_answer_rsa_challenge(int sock, Buffer *m)
 	monitor_permit(mon_dispatch, MONITOR_REQ_RSARESPONSE, 1);
 
 	xfree(blob);
-	key_free(key);
+	sshkey_free(key);
 	return (0);
 }
 
 int
 mm_answer_rsa_response(int sock, Buffer *m)
 {
-	Key *key = NULL;
+	struct sshkey *key = NULL;
 	u_char *blob, *response;
 	u_int blen, len;
-	int success;
+	int r, success;
 
 	debug3("%s entering", __func__);
 
@@ -1356,15 +1358,15 @@ mm_answer_rsa_response(int sock, Buffer *m)
 		fatal("%s: bad key, not previously allowed", __func__);
 	if (key_blobtype != MM_RSAUSERKEY && key_blobtype != MM_RSAHOSTKEY)
 		fatal("%s: key type mismatch: %d", __func__, key_blobtype);
-	if ((key = key_from_blob(blob, blen)) == NULL)
-		fatal("%s: received bad key", __func__);
+	if ((r = sshkey_from_blob(blob, blen, &key)) != 0)
+		fatal("%s: received bad key: %s", __func__, ssh_err(r));
 	response = buffer_get_string(m, &len);
 	if (len != 16)
 		fatal("%s: received bad response to challenge", __func__);
 	success = auth_rsa_verify_response(key, ssh1_challenge, response);
 
 	xfree(blob);
-	key_free(key);
+	sshkey_free(key);
 	xfree(response);
 
 	auth_method = key_blobtype == MM_RSAUSERKEY ? "rsa" : "rhosts-rsa";

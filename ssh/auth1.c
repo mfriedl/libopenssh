@@ -153,7 +153,7 @@ auth1_process_rhosts_rsa(Authctxt *authctxt, char *info, size_t infolen)
 	int keybits, authenticated = 0;
 	u_int bits;
 	char *client_user;
-	Key *client_host_key;
+	struct sshkey *client_host_key;
 	u_int ulen;
 
 	/*
@@ -164,7 +164,7 @@ auth1_process_rhosts_rsa(Authctxt *authctxt, char *info, size_t infolen)
 	client_user = packet_get_cstring(&ulen);
 
 	/* Get the client host key. */
-	client_host_key = key_new(KEY_RSA1);
+	client_host_key = sshkey_new(KEY_RSA1);
 	bits = packet_get_int();
 	packet_get_bignum(client_host_key->rsa->e);
 	packet_get_bignum(client_host_key->rsa->n);
@@ -179,7 +179,7 @@ auth1_process_rhosts_rsa(Authctxt *authctxt, char *info, size_t infolen)
 
 	authenticated = auth_rhosts_rsa(authctxt, client_user,
 	    client_host_key);
-	key_free(client_host_key);
+	sshkey_free(client_host_key);
 
 	snprintf(info, infolen, " ruser %.100s", client_user);
 	xfree(client_user);

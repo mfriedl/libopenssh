@@ -40,6 +40,7 @@
 #include "atomicio.h"
 #include "misc.h"
 #include "hostfile.h"
+#include "err.h"
 
 /* Flag indicating whether IPv4 or IPv6.  This can be set on the command line.
    Default value is AF_UNSPEC means both IPv4 and IPv6. */
@@ -70,7 +71,7 @@ size_t read_wait_nfdset;
 int ncon;
 int nonfatal_fatal = 0;
 jmp_buf kexjmp;
-Key *kexjmp_key;
+struct sshkey *kexjmp_key;
 
 /*
  * Keep a connection structure for each file descriptor.  The state
@@ -166,15 +167,18 @@ strnnsep(char **stringp, char *delim)
 	return (tok);
 }
 
-static Key *
+static struct sshkey *
 keygrab_ssh1(con *c)
 {
-	static Key *rsa;
+	static struct sshkey *rsa;
 	static Buffer msg;
 
 	if (rsa == NULL) {
+		if ((rsa = sshkey_new(KEY_RSA1)) == NULL) {
+			error("%s: sshkey_new failed", __func__);
+			return NULL;
+		}
 		buffer_init(&msg);
-		rsa = key_new(KEY_RSA1);
 	}
 	buffer_append(&msg, c->c_data, c->c_plen);
 	buffer_consume(&msg, 8 - (c->c_plen & 7));	/* padding */
@@ -201,7 +205,7 @@ keygrab_ssh1(con *c)
 }
 
 static int
-hostjump(Key *hostkey, struct ssh *ssh)
+hostjump(struct sshkey *hostkey, struct ssh *ssh)
 {
 	kexjmp_key = hostkey;
 	longjmp(kexjmp, 1);
@@ -223,7 +227,7 @@ ssh2_capable(int remote_major, int remote_minor)
 	return 0;
 }
 
-static Key *
+static struct sshkey *
 keygrab_ssh2(con *c)
 {
 	int j;
@@ -257,7 +261,7 @@ keygrab_ssh2(con *c)
 }
 
 static void
-keyprint(con *c, Key *key)
+keyprint(con *c, struct sshkey *key)
 {
 	char *host = c->c_output_name ? c->c_output_name : c->c_name;
 
@@ -267,7 +271,7 @@ keyprint(con *c, Key *key)
 		fatal("host_hash failed");
 
 	fprintf(stdout, "%s ", host);
-	key_write(key, stdout);
+	sshkey_write(key, stdout);
 	fputs("\n", stdout);
 }
 
@@ -651,7 +655,7 @@ main(int argc, char **argv)
 			get_keytypes = 0;
 			tname = strtok(optarg, ",");
 			while (tname) {
-				int type = key_type_from_name(tname);
+				int type = sshkey_type_from_name(tname);
 				switch (type) {
 				case KEY_RSA1:
 					get_keytypes |= KT_RSA1;

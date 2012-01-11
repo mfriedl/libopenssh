@@ -375,10 +375,10 @@ pkcs11_open_session(struct pkcs11_provider *p, CK_ULONG slotidx, char *pin)
  * keysp points to an (possibly empty) array with *nkeys keys.
  */
 static int
-pkcs11_fetch_keys(struct pkcs11_provider *p, CK_ULONG slotidx, Key ***keysp,
-    int *nkeys)
+pkcs11_fetch_keys(struct pkcs11_provider *p, CK_ULONG slotidx,
+   struct sshkey ***keysp, int *nkeys)
 {
-	Key			*key;
+	struct sshkey		*key;
 	RSA			*rsa;
 	int			i;
 	CK_RV			rv;
@@ -439,14 +439,15 @@ pkcs11_fetch_keys(struct pkcs11_provider *p, CK_ULONG slotidx, Key ***keysp,
 			rsa->e = BN_bin2bn(attribs[2].pValue,
 			    attribs[2].ulValueLen, NULL);
 			if (rsa->n && rsa->e &&
-			    pkcs11_rsa_wrap(p, slotidx, &attribs[0], rsa) == 0) {
-				key = key_new(KEY_UNSPEC);
+			    pkcs11_rsa_wrap(p, slotidx, &attribs[0],
+			    rsa) == 0 &&
+			    (key = sshkey_new(KEY_UNSPEC)) != NULL) {
 				key->rsa = rsa;
 				key->type = KEY_RSA;
-				key->flags |= KEY_FLAG_EXT;
+				key->flags |= SSHKEY_FLAG_EXT;
 				/* expand key array and add key */
 				*keysp = xrealloc(*keysp, *nkeys + 1,
-				    sizeof(Key *));
+				    sizeof(struct sshkey *));
 				(*keysp)[*nkeys] = key;
 				*nkeys = *nkeys + 1;
 				debug("have %d keys", *nkeys);
@@ -465,7 +466,7 @@ pkcs11_fetch_keys(struct pkcs11_provider *p, CK_ULONG slotidx, Key ***keysp,
 #ifdef HAVE_DLOPEN
 /* register a new provider, fails if provider already exists */
 int
-pkcs11_add_provider(char *provider_id, char *pin, Key ***keyp)
+pkcs11_add_provider(char *provider_id, char *pin, struct sshkey ***keyp)
 {
 	int nkeys, need_finalize = 0;
 	struct pkcs11_provider *p = NULL;
@@ -577,7 +578,7 @@ fail:
 }
 #else
 int
-pkcs11_add_provider(char *provider_id, char *pin, Key ***keyp)
+pkcs11_add_provider(char *provider_id, char *pin, struct sshkey ***keyp)
 {
 	error("dlopen() not supported");
 	return (-1);

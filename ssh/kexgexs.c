@@ -47,6 +47,7 @@
 #endif
 #include "monitor_wrap.h"
 #include "dispatch.h"
+#include "err.h"
 
 struct kexgexs_state {
     int omin, min, omax, max, onbits;
@@ -129,12 +130,11 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	Kex *kex = ssh->kex;
 	struct kexgexs_state *kexgexs_state = kex->state;
 	BIGNUM *shared_secret = NULL, *dh_client_pub = NULL;
-	Key *server_host_public, *server_host_private;
+	struct sshkey *server_host_public, *server_host_private;
 	DH *dh;
 	u_int sbloblen, klen, slen, hashlen;
 	u_char *kbuf, *hash, *signature = NULL, *server_host_key_blob = NULL;
-	int omin, min, omax, max, onbits;
-	int kout;
+	int omin, min, omax, max, onbits, kout, r;
 
 	dh = kexgexs_state->dh;
 	omin = kexgexs_state->omin;
@@ -191,7 +191,9 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	memset(kbuf, 0, klen);
 	xfree(kbuf);
 
-	key_to_blob(server_host_public, &server_host_key_blob, &sbloblen);
+	if ((r = sshkey_to_blob(server_host_public, &server_host_key_blob,
+	    &sbloblen)) != 0)
+		fatal("%s: sshkey_to_blob failed: %s", __func__, ssh_err(r));
 
 	if (type == SSH2_MSG_KEX_DH_GEX_REQUEST_OLD)
 		omin = min = omax = max = -1;
@@ -221,9 +223,9 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	}
 
 	/* sign H */
-	if (PRIVSEP(key_sign(server_host_private, &signature, &slen, hash,
-	    hashlen)) < 0)
-		fatal("kexgex_server: key_sign failed");
+	if (PRIVSEP(sshkey_sign(server_host_private, &signature, &slen, hash,
+	    hashlen, datafellows)) < 0)
+		fatal("kexgex_server: sshkey_sign failed");
 
 	/* destroy_sensitive_data(); */
 

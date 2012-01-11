@@ -38,7 +38,7 @@ extern ServerOptions options;
 
 int
 auth_rhosts_rsa_key_allowed(struct passwd *pw, char *cuser, char *chost,
-    Key *client_host_key)
+    struct sshkey *client_host_key)
 {
 	HostStatus host_status;
 
@@ -61,7 +61,8 @@ auth_rhosts_rsa_key_allowed(struct passwd *pw, char *cuser, char *chost,
  * its host key.  Returns true if authentication succeeds.
  */
 int
-auth_rhosts_rsa(Authctxt *authctxt, char *cuser, Key *client_host_key)
+auth_rhosts_rsa(Authctxt *authctxt, char *cuser,
+    struct sshkey *client_host_key)
 {
 	char *chost;
 	struct passwd *pw = authctxt->pw;

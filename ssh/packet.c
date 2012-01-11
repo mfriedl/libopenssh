@@ -1576,7 +1576,7 @@ ssh_packet_get_string(struct ssh *ssh, u_int *length_ptr)
 	return buffer_get_string(&ssh->state->incoming_packet, length_ptr);
 }
 
-void *
+const void *
 ssh_packet_get_string_ptr(struct ssh *ssh, u_int *length_ptr)
 {
 	return buffer_get_string_ptr(&ssh->state->incoming_packet, length_ptr);

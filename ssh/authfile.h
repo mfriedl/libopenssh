@@ -15,17 +15,23 @@
 #ifndef AUTHFILE_H
 #define AUTHFILE_H
 
-int	 key_save_private(Key *, const char *, const char *, const char *);
-int	 key_load_file(int, const char *, Buffer *);
-Key	*key_load_cert(const char *);
-Key	*key_load_public(const char *, char **);
-Key	*key_load_public_type(int, const char *, char **);
-Key	*key_parse_private(Buffer *, const char *, const char *, char **);
-Key	*key_load_private(const char *, const char *, char **);
-Key	*key_load_private_cert(int, const char *, const char *, int *);
-Key	*key_load_private_type(int, const char *, const char *, char **, int *);
-Key	*key_load_private_pem(int, int, const char *, char **);
-int	 key_perm_ok(int, const char *);
-int	 key_in_file(Key *, const char *, int);
+struct sshbuf;
+struct sshkey;
+
+int		 key_save_private(struct sshkey *, const char *,
+    const char *, const char *);
+int		 key_load_file(int, const char *, struct sshbuf *);
+struct sshkey	*key_load_cert(const char *);
+struct sshkey	*key_load_public(const char *, char **);
+struct sshkey	*key_load_public_type(int, const char *, char **);
+struct sshkey	*key_parse_private(struct sshbuf *, const char *, const char *,
+    char **);
+struct sshkey	*key_load_private(const char *, const char *, char **);
+struct sshkey	*key_load_private_cert(int, const char *, const char *, int *);
+struct sshkey	*key_load_private_type(int, const char *, const char *,
+    char **, int *);
+struct sshkey	*key_load_private_pem(int, int, const char *, char **);
+int		 key_perm_ok(int, const char *);
+int		 key_in_file(struct sshkey *, const char *, int);
 
 #endif

@@ -100,17 +100,19 @@ int      auth_rhosts(struct passwd *, const char *);
 int
 auth_rhosts2(struct passwd *, const char *, const char *, const char *);
 
-int	 auth_rhosts_rsa(Authctxt *, char *, Key *);
+int	 auth_rhosts_rsa(Authctxt *, char *, struct sshkey *);
 int      auth_password(Authctxt *, const char *);
 int      auth_rsa(Authctxt *, BIGNUM *);
-int      auth_rsa_challenge_dialog(Key *);
-BIGNUM	*auth_rsa_generate_challenge(Key *);
-int	 auth_rsa_verify_response(Key *, BIGNUM *, u_char[]);
-int	 auth_rsa_key_allowed(struct passwd *, BIGNUM *, Key **);
+int      auth_rsa_challenge_dialog(struct sshkey *);
+BIGNUM	*auth_rsa_generate_challenge(struct sshkey *);
+int	 auth_rsa_verify_response(struct sshkey *, BIGNUM *, u_char[]);
+int	 auth_rsa_key_allowed(struct passwd *, BIGNUM *, struct sshkey **);
 
-int	 auth_rhosts_rsa_key_allowed(struct passwd *, char *, char *, Key *);
-int	 hostbased_key_allowed(struct passwd *, const char *, char *, Key *);
-int	 user_key_allowed(struct passwd *, Key *);
+int	 auth_rhosts_rsa_key_allowed(struct passwd *, char *, char *,
+    struct sshkey *);
+int	 hostbased_key_allowed(struct passwd *, const char *, char *,
+    struct sshkey *);
+int	 user_key_allowed(struct passwd *, struct sshkey *);
 
 #ifdef KRB5
 int	auth_krb5(Authctxt *authctxt, krb5_data *auth, char **client, krb5_data *);
@@ -151,17 +153,17 @@ char	*authorized_principals_file(struct passwd *);
 
 FILE	*auth_openkeyfile(const char *, struct passwd *, int);
 FILE	*auth_openprincipals(const char *, struct passwd *, int);
-int	 auth_key_is_revoked(Key *);
+int	 auth_key_is_revoked(struct sshkey *);
 
 HostStatus
-check_key_in_hostfiles(struct passwd *, Key *, const char *,
+check_key_in_hostfiles(struct passwd *, struct sshkey *, const char *,
     const char *, const char *);
 
 /* hostkey handling */
-Key	*get_hostkey_by_index(int);
-Key	*get_hostkey_public_by_type(int, struct ssh *);
-Key	*get_hostkey_private_by_type(int, struct ssh *);
-int	 get_hostkey_index(Key *);
+struct sshkey	*get_hostkey_by_index(int);
+struct sshkey	*get_hostkey_public_by_type(int, struct ssh *);
+struct sshkey	*get_hostkey_private_by_type(int, struct ssh *);
+int	 get_hostkey_index(struct sshkey *);
 int	 ssh1_session_key(BIGNUM *);
 
 /* debug messages during authentication */

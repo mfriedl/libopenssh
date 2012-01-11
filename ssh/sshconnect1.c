@@ -64,7 +64,7 @@ try_agent_authentication(void)
 	AuthenticationConnection *auth;
 	u_char response[16];
 	u_int i;
-	Key *key;
+	struct sshkey *key;
 	BIGNUM *challenge;
 
 	/* Get connection to the agent. */
@@ -96,13 +96,13 @@ try_agent_authentication(void)
 		   does not support RSA authentication. */
 		if (type == SSH_SMSG_FAILURE) {
 			debug("Server refused our key.");
-			key_free(key);
+			sshkey_free(key);
 			continue;
 		}
 		/* Otherwise it should have sent a challenge. */
 		if (type != SSH_SMSG_AUTH_RSA_CHALLENGE)
-			packet_disconnect("Protocol error during RSA authentication: %d",
-					  type);
+			packet_disconnect("Protocol error during RSA "
+			    "authentication: %d", type);
 
 		packet_get_bignum(challenge);
 		packet_check_eom();
@@ -119,7 +119,7 @@ try_agent_authentication(void)
 			logit("Authentication agent failed to decrypt challenge.");
 			memset(response, 0, sizeof(response));
 		}
-		key_free(key);
+		sshkey_free(key);
 		debug("Sending response to RSA challenge.");
 
 		/* Send the decrypted challenge back to the server. */
@@ -203,7 +203,7 @@ static int
 try_rsa_authentication(int idx)
 {
 	BIGNUM *challenge;
-	Key *public, *private;
+	struct sshkey *public, *private;
 	char buf[300], *passphrase, *comment, *authfile;
 	int i, perm_ok = 1, type, quit;
 
@@ -248,7 +248,7 @@ try_rsa_authentication(int idx)
 	 * load the private key.  Try first with empty passphrase; if it
 	 * fails, ask for a passphrase.
 	 */
-	if (public->flags & KEY_FLAG_EXT)
+	if (public->flags & SSHKEY_FLAG_EXT)
 		private = public;
 	else
 		private = key_load_private_type(KEY_RSA1, authfile, "", NULL,
@@ -297,8 +297,8 @@ try_rsa_authentication(int idx)
 	respond_to_rsa_challenge(challenge, private->rsa);
 
 	/* Destroy the private key unless it in external hardware. */
-	if (!(private->flags & KEY_FLAG_EXT))
-		key_free(private);
+	if (!(private->flags & SSHKEY_FLAG_EXT))
+		sshkey_free(private);
 
 	/* We no longer need the challenge. */
 	BN_clear_free(challenge);
@@ -320,7 +320,7 @@ try_rsa_authentication(int idx)
  * authentication and RSA host authentication.
  */
 static int
-try_rhosts_rsa_authentication(const char *local_user, Key * host_key)
+try_rhosts_rsa_authentication(const char *local_user, struct sshkey * host_key)
 {
 	int type;
 	BIGNUM *challenge;
@@ -478,7 +478,7 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 {
 	int i;
 	BIGNUM *key;
-	Key *host_key, *server_key;
+	struct sshkey *host_key, *server_key;
 	int bits, rbits;
 	int ssh_cipher_default = SSH_CIPHER_3DES;
 	u_char session_key[SSH_SESSION_KEY_LENGTH];
@@ -497,7 +497,8 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 		cookie[i] = packet_get_char();
 
 	/* Get the public key. */
-	server_key = key_new(KEY_RSA1);
+	if ((server_key = sshkey_new(KEY_RSA1)) == NULL)
+		fatal("%s: sshkey_new failed", __func__);
 	bits = packet_get_int();
 	packet_get_bignum(server_key->rsa->e);
 	packet_get_bignum(server_key->rsa->n);
@@ -509,7 +510,8 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 		logit("Warning: This may be due to an old implementation of ssh.");
 	}
 	/* Get the host key. */
-	host_key = key_new(KEY_RSA1);
+	if ((host_key = sshkey_new(KEY_RSA1)) == NULL)
+		fatal("%s: sshkey_new failed", __func__);
 	bits = packet_get_int();
 	packet_get_bignum(host_key->rsa->e);
 	packet_get_bignum(host_key->rsa->n);
@@ -607,8 +609,8 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 	}
 
 	/* Destroy the public keys since we no longer need them. */
-	key_free(server_key);
-	key_free(host_key);
+	sshkey_free(server_key);
+	sshkey_free(host_key);
 
 	if (options.cipher == SSH_CIPHER_NOT_SET) {
 		if (cipher_mask_ssh1(1) & supported_ciphers & (1 << ssh_cipher_default))

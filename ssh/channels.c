@@ -2248,7 +2248,7 @@ void
 channel_input_data(int type, u_int32_t seq, struct ssh *ssh)
 {
 	int id;
-	char *data;
+	const char *data;
 	u_int data_len, win_len;
 	Channel *c;
 

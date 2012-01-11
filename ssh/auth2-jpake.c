@@ -144,7 +144,7 @@ derive_rawsalt(const char *username, u_char *rawsalt, u_int len)
 	u_char *digest;
 	u_int digest_len;
 	Buffer b;
-	Key *k;
+	struct sshkey *k;
 
 	buffer_init(&b);
 	buffer_put_cstring(&b, username);

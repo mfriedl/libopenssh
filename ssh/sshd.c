@@ -104,6 +104,7 @@
 #include "roaming.h"
 #include "ssh-sandbox.h"
 #include "version.h"
+#include "err.h"
 
 #ifdef LIBWRAP
 #include <tcpd.h>
@@ -183,10 +184,10 @@ char *server_version_string = NULL;
  * not very useful.  Currently, memory locking is not implemented.
  */
 struct {
-	Key	*server_key;		/* ephemeral server key */
-	Key	*ssh1_host_key;		/* ssh1 host key */
-	Key	**host_keys;		/* all private host keys */
-	Key	**host_certificates;	/* all public host certificates */
+	struct sshkey *server_key;		/* ephemeral server key */
+	struct sshkey *ssh1_host_key;		/* ssh1 host key */
+	struct sshkey **host_keys;		/* all private host keys */
+	struct sshkey **host_certificates;	/* all public host certs */
 	int	have_ssh1_key;
 	int	have_ssh2_key;
 	u_char	ssh1_cookie[SSH_SESSION_KEY_LENGTH];
@@ -350,12 +351,16 @@ grace_alarm_handler(int sig)
 static void
 generate_ephemeral_server_key(void)
 {
+	int r;
+
 	verbose("Generating %s%d bit RSA key.",
 	    sensitive_data.server_key ? "new " : "", options.server_key_bits);
 	if (sensitive_data.server_key != NULL)
-		key_free(sensitive_data.server_key);
-	sensitive_data.server_key = key_generate(KEY_RSA1,
-	    options.server_key_bits);
+		sshkey_free(sensitive_data.server_key);
+	if ((r = sshkey_generate(KEY_RSA1, options.server_key_bits,
+	    &sensitive_data.server_key)) != 0)
+		fatal("RSA1 key ephemeral key generation failed: %s",
+		    ssh_err(r));
 	verbose("RSA key generation complete.");
 
 	arc4random_buf(sensitive_data.ssh1_cookie, SSH_SESSION_KEY_LENGTH);
@@ -517,16 +522,16 @@ destroy_sensitive_data(void)
 	int i;
 
 	if (sensitive_data.server_key) {
-		key_free(sensitive_data.server_key);
+		sshkey_free(sensitive_data.server_key);
 		sensitive_data.server_key = NULL;
 	}
 	for (i = 0; i < options.num_host_key_files; i++) {
 		if (sensitive_data.host_keys[i]) {
-			key_free(sensitive_data.host_keys[i]);
+			sshkey_free(sensitive_data.host_keys[i]);
 			sensitive_data.host_keys[i] = NULL;
 		}
 		if (sensitive_data.host_certificates[i]) {
-			key_free(sensitive_data.host_certificates[i]);
+			sshkey_free(sensitive_data.host_certificates[i]);
 			sensitive_data.host_certificates[i] = NULL;
 		}
 	}
@@ -538,19 +543,24 @@ destroy_sensitive_data(void)
 void
 demote_sensitive_data(void)
 {
-	Key *tmp;
-	int i;
+	struct sshkey *tmp;
+	int i, r;
 
 	if (sensitive_data.server_key) {
-		tmp = key_demote(sensitive_data.server_key);
-		key_free(sensitive_data.server_key);
+		if ((r = sshkey_demote(sensitive_data.server_key, &tmp)) != 0)
+			fatal("could not demote server key: %s", ssh_err(r));
+		sshkey_free(sensitive_data.server_key);
 		sensitive_data.server_key = tmp;
 	}
 
 	for (i = 0; i < options.num_host_key_files; i++) {
 		if (sensitive_data.host_keys[i]) {
-			tmp = key_demote(sensitive_data.host_keys[i]);
-			key_free(sensitive_data.host_keys[i]);
+			if ((r = sshkey_demote(sensitive_data.host_keys[i],
+			    &tmp)) != 0)
+				fatal("could not demote host %s key: %s",
+				    sshkey_type(sensitive_data.host_keys[i]),
+				    ssh_err(r));
+			sshkey_free(sensitive_data.host_keys[i]);
 			sensitive_data.host_keys[i] = tmp;
 			if (tmp->type == KEY_RSA1)
 				sensitive_data.ssh1_host_key = tmp;
@@ -730,7 +740,7 @@ list_hostkey_types(void)
 	const char *p;
 	char *ret;
 	int i;
-	Key *key;
+	struct sshkey *key;
 
 	buffer_init(&b);
 	for (i = 0; i < options.num_host_key_files; i++) {
@@ -743,7 +753,7 @@ list_hostkey_types(void)
 		case KEY_ECDSA:
 			if (buffer_len(&b) > 0)
 				buffer_append(&b, ",", 1);
-			p = key_ssh_name(key);
+			p = sshkey_ssh_name(key);
 			buffer_append(&b, p, strlen(p));
 			break;
 		}
@@ -759,7 +769,7 @@ list_hostkey_types(void)
 		case KEY_ECDSA_CERT:
 			if (buffer_len(&b) > 0)
 				buffer_append(&b, ",", 1);
-			p = key_ssh_name(key);
+			p = sshkey_ssh_name(key);
 			buffer_append(&b, p, strlen(p));
 			break;
 		}
@@ -771,11 +781,11 @@ list_hostkey_types(void)
 	return ret;
 }
 
-static Key *
+static struct sshkey *
 get_hostkey_by_type(int type, int need_private)
 {
 	int i;
-	Key *key;
+	struct sshkey *key;
 
 	for (i = 0; i < options.num_host_key_files; i++) {
 		switch (type) {
@@ -797,19 +807,19 @@ get_hostkey_by_type(int type, int need_private)
 	return NULL;
 }
 
-Key *
+struct sshkey *
 get_hostkey_public_by_type(int type, struct ssh *ssh)
 {
 	return get_hostkey_by_type(type, 0);
 }
 
-Key *
+struct sshkey *
 get_hostkey_private_by_type(int type, struct ssh *ssh)
 {
 	return get_hostkey_by_type(type, 1);
 }
 
-Key *
+struct sshkey *
 get_hostkey_by_index(int ind)
 {
 	if (ind < 0 || ind >= options.num_host_key_files)
@@ -818,12 +828,12 @@ get_hostkey_by_index(int ind)
 }
 
 int
-get_hostkey_index(Key *key)
+get_hostkey_index(struct sshkey *key)
 {
 	int i;
 
 	for (i = 0; i < options.num_host_key_files; i++) {
-		if (key_is_cert(key)) {
+		if (sshkey_is_cert(key)) {
 			if (key == sensitive_data.host_certificates[i])
 				return (i);
 		} else {
@@ -940,8 +950,10 @@ recv_rexec_state(int fd, Buffer *conf)
 
 	if (buffer_get_int(&m)) {
 		if (sensitive_data.server_key != NULL)
-			key_free(sensitive_data.server_key);
-		sensitive_data.server_key = key_new_private(KEY_RSA1);
+			sshkey_free(sensitive_data.server_key);
+		sensitive_data.server_key = sshkey_new_private(KEY_RSA1);
+		if (sensitive_data.server_key == NULL)
+			fatal("%s: sshkey_new_private failed", __func__);
 		buffer_get_bignum(&m, sensitive_data.server_key->rsa->e);
 		buffer_get_bignum(&m, sensitive_data.server_key->rsa->n);
 		buffer_get_bignum(&m, sensitive_data.server_key->rsa->d);
@@ -1288,7 +1300,7 @@ main(int ac, char **av)
 	int config_s[2] = { -1 , -1 };
 	u_int64_t ibytes, obytes;
 	mode_t new_umask;
-	Key *key;
+	struct sshkey *key;
 	Authctxt *authctxt;
 
 	/* Save argv. */
@@ -1500,7 +1512,7 @@ main(int ac, char **av)
 
 	/* load private host keys */
 	sensitive_data.host_keys = xcalloc(options.num_host_key_files,
-	    sizeof(Key *));
+	    sizeof(struct sshkey *));
 	for (i = 0; i < options.num_host_key_files; i++)
 		sensitive_data.host_keys[i] = NULL;
 
@@ -1525,7 +1537,7 @@ main(int ac, char **av)
 			break;
 		}
 		debug("private host key: #%d type %d %s", i, key->type,
-		    key_type(key));
+		    sshkey_type(key));
 	}
 	if ((options.protocol & SSH_PROTO_1) && !sensitive_data.have_ssh1_key) {
 		logit("Disabling protocol version 1. Could not load host key");
@@ -1545,7 +1557,7 @@ main(int ac, char **av)
 	 * indices to the public keys that they relate to.
 	 */
 	sensitive_data.host_certificates = xcalloc(options.num_host_key_files,
-	    sizeof(Key *));
+	    sizeof(struct sshkey *));
 	for (i = 0; i < options.num_host_key_files; i++)
 		sensitive_data.host_certificates[i] = NULL;
 
@@ -1556,15 +1568,15 @@ main(int ac, char **av)
 			    options.host_cert_files[i]);
 			continue;
 		}
-		if (!key_is_cert(key)) {
+		if (!sshkey_is_cert(key)) {
 			error("Certificate file is not a certificate: %s",
 			    options.host_cert_files[i]);
-			key_free(key);
+			sshkey_free(key);
 			continue;
 		}
 		/* Find matching private key */
 		for (j = 0; j < options.num_host_key_files; j++) {
-			if (key_equal_public(key,
+			if (sshkey_equal_public(key,
 			    sensitive_data.host_keys[j])) {
 				sensitive_data.host_certificates[j] = key;
 				break;
@@ -1573,12 +1585,12 @@ main(int ac, char **av)
 		if (j >= options.num_host_key_files) {
 			error("No matching private key for certificate: %s",
 			    options.host_cert_files[i]);
-			key_free(key);
+			sshkey_free(key);
 			continue;
 		}
 		sensitive_data.host_certificates[j] = key;
 		debug("host certificate: #%d type %d %s", j, key->type,
-		    key_type(key));
+		    sshkey_type(key));
 	}
 	/* Check certain values for sanity. */
 	if (options.protocol & SSH_PROTO_1) {

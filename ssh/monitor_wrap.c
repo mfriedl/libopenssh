@@ -70,6 +70,7 @@
 #include "session.h"
 #include "servconf.h"
 #include "roaming.h"
+#include "err.h"
 
 /* Imports */
 extern int compat20;
@@ -202,7 +203,8 @@ mm_choose_dh(int min, int nbits, int max)
 }
 
 int
-mm_key_sign(Key *key, u_char **sigp, u_int *lenp, u_char *data, u_int datalen)
+mm_sshkey_sign(struct sshkey *key, u_char **sigp, u_int *lenp,
+    u_char *data, u_int datalen, u_int compat)
 {
 	Kex *kex = *pmonitor->m_pkex;
 	Buffer m;
@@ -351,21 +353,21 @@ mm_auth_password(Authctxt *authctxt, char *password)
 }
 
 int
-mm_user_key_allowed(struct passwd *pw, Key *key)
+mm_user_key_allowed(struct passwd *pw, struct sshkey *key)
 {
 	return (mm_key_allowed(MM_USERKEY, NULL, NULL, key));
 }
 
 int
 mm_hostbased_key_allowed(struct passwd *pw, char *user, char *host,
-    Key *key)
+    struct sshkey *key)
 {
 	return (mm_key_allowed(MM_HOSTKEY, user, host, key));
 }
 
 int
 mm_auth_rhosts_rsa_key_allowed(struct passwd *pw, char *user,
-    char *host, Key *key)
+    char *host, struct sshkey *key)
 {
 	int ret;
 
@@ -376,18 +378,21 @@ mm_auth_rhosts_rsa_key_allowed(struct passwd *pw, char *user,
 }
 
 int
-mm_key_allowed(enum mm_keytype type, char *user, char *host, Key *key)
+mm_key_allowed(enum mm_keytype type, char *user, char *host,
+    struct sshkey *key)
 {
 	Buffer m;
 	u_char *blob;
 	u_int len;
-	int allowed = 0, have_forced = 0;
+	int r, allowed = 0, have_forced = 0;
 
 	debug3("%s entering", __func__);
 
 	/* Convert the key to a blob and the pass it over */
-	if (!key_to_blob(key, &blob, &len))
+	if ((r = sshkey_to_blob(key, &blob, &len)) != 0) {
+		error("%s: key_to_blob: %s", __func__, ssh_err(r));
 		return (0);
+	}
 
 	buffer_init(&m);
 	buffer_put_int(&m, type);
@@ -420,18 +425,21 @@ mm_key_allowed(enum mm_keytype type, char *user, char *host, Key *key)
  */
 
 int
-mm_key_verify(Key *key, u_char *sig, u_int siglen, u_char *data, u_int datalen)
+mm_sshkey_verify(struct sshkey *key, u_char *sig, u_int siglen,
+    u_char *data, u_int datalen, u_int compat)
 {
 	Buffer m;
 	u_char *blob;
 	u_int len;
-	int verified = 0;
+	int r, verified = 0;
 
 	debug3("%s entering", __func__);
 
 	/* Convert the key to a blob and the pass it over */
-	if (!key_to_blob(key, &blob, &len))
+	if ((r = sshkey_to_blob(key, &blob, &len)) != 0) {
+		error("%s: sshkey_to_blob failed: %s", __func__, ssh_err(r));
 		return (0);
+	}
 
 	buffer_init(&m);
 	buffer_put_string(&m, blob, len);
@@ -875,13 +883,14 @@ mm_ssh1_session_id(u_char session_id[16])
 }
 
 int
-mm_auth_rsa_key_allowed(struct passwd *pw, BIGNUM *client_n, Key **rkey)
+mm_auth_rsa_key_allowed(struct passwd *pw, BIGNUM *client_n,
+    struct sshkey **rkey)
 {
 	Buffer m;
-	Key *key;
+	struct sshkey *key;
 	u_char *blob;
 	u_int blen;
-	int allowed = 0, have_forced = 0;
+	int r, allowed = 0, have_forced = 0;
 
 	debug3("%s entering", __func__);
 
@@ -900,8 +909,9 @@ mm_auth_rsa_key_allowed(struct passwd *pw, BIGNUM *client_n, Key **rkey)
 
 	if (allowed && rkey != NULL) {
 		blob = buffer_get_string(&m, &blen);
-		if ((key = key_from_blob(blob, blen)) == NULL)
-			fatal("%s: key_from_blob failed", __func__);
+		if ((r = sshkey_from_blob(blob, blen, &key)) != 0)
+			fatal("%s: key_from_blob failed: %s",
+			    __func__, ssh_err(r));
 		*rkey = key;
 		xfree(blob);
 	}
@@ -911,12 +921,13 @@ mm_auth_rsa_key_allowed(struct passwd *pw, BIGNUM *client_n, Key **rkey)
 }
 
 BIGNUM *
-mm_auth_rsa_generate_challenge(Key *key)
+mm_auth_rsa_generate_challenge(struct sshkey *key)
 {
 	Buffer m;
 	BIGNUM *challenge;
 	u_char *blob;
 	u_int blen;
+	int r;
 
 	debug3("%s entering", __func__);
 
@@ -924,8 +935,8 @@ mm_auth_rsa_generate_challenge(Key *key)
 		fatal("%s: BN_new failed", __func__);
 
 	key->type = KEY_RSA;    /* XXX cheat for key_to_blob */
-	if (key_to_blob(key, &blob, &blen) == 0)
-		fatal("%s: key_to_blob failed", __func__);
+	if ((r = sshkey_to_blob(key, &blob, &blen)) != 0)
+		fatal("%s: key_to_blob failed: %s", __func__, ssh_err(r));
 	key->type = KEY_RSA1;
 
 	buffer_init(&m);
@@ -942,18 +953,18 @@ mm_auth_rsa_generate_challenge(Key *key)
 }
 
 int
-mm_auth_rsa_verify_response(Key *key, BIGNUM *p, u_char response[16])
+mm_auth_rsa_verify_response(struct sshkey *key, BIGNUM *p, u_char response[16])
 {
 	Buffer m;
 	u_char *blob;
 	u_int blen;
-	int success = 0;
+	int r, success = 0;
 
 	debug3("%s entering", __func__);
 
 	key->type = KEY_RSA;    /* XXX cheat for key_to_blob */
-	if (key_to_blob(key, &blob, &blen) == 0)
-		fatal("%s: key_to_blob failed", __func__);
+	if ((r = sshkey_to_blob(key, &blob, &blen)) != 0)
+		fatal("%s: key_to_blob failed: %s", __func__, ssh_err(r));
 	key->type = KEY_RSA1;
 
 	buffer_init(&m);

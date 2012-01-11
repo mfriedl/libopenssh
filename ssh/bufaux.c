@@ -48,20 +48,22 @@
 #include "buffer.h"
 #include "log.h"
 #include "misc.h"
+#include "err.h"
 
 /*
  * Returns integers from the buffer (msb first).
  */
 
 int
-buffer_get_short_ret(u_short *ret, Buffer *buffer)
+buffer_get_short_ret(u_short *v, Buffer *buffer)
 {
-	u_char buf[2];
+	int ret;
 
-	if (buffer_get_ret(buffer, (char *) buf, 2) == -1)
-		return (-1);
-	*ret = get_u16(buf);
-	return (0);
+	if ((ret = sshbuf_get_u16(buffer, v)) != 0) {
+		error("%s: %s", __func__, ssh_err(ret));
+		return -1;
+	}
+	return 0;
 }
 
 u_short
@@ -76,15 +78,15 @@ buffer_get_short(Buffer *buffer)
 }
 
 int
-buffer_get_int_ret(u_int *ret, Buffer *buffer)
+buffer_get_int_ret(u_int *v, Buffer *buffer)
 {
-	u_char buf[4];
+	int ret;
 
-	if (buffer_get_ret(buffer, (char *) buf, 4) == -1)
-		return (-1);
-	if (ret != NULL)
-		*ret = get_u32(buf);
-	return (0);
+	if ((ret = sshbuf_get_u32(buffer, v)) != 0) {
+		error("%s: %s", __func__, ssh_err(ret));
+		return -1;
+	}
+	return 0;
 }
 
 u_int
@@ -99,15 +101,15 @@ buffer_get_int(Buffer *buffer)
 }
 
 int
-buffer_get_int64_ret(u_int64_t *ret, Buffer *buffer)
+buffer_get_int64_ret(u_int64_t *v, Buffer *buffer)
 {
-	u_char buf[8];
+	int ret;
 
-	if (buffer_get_ret(buffer, (char *) buf, 8) == -1)
-		return (-1);
-	if (ret != NULL)
-		*ret = get_u64(buf);
-	return (0);
+	if ((ret = sshbuf_get_u64(buffer, v)) != 0) {
+		error("%s: %s", __func__, ssh_err(ret));
+		return -1;
+	}
+	return 0;
 }
 
 u_int64_t
@@ -127,28 +129,28 @@ buffer_get_int64(Buffer *buffer)
 void
 buffer_put_short(Buffer *buffer, u_short value)
 {
-	char buf[2];
+	int ret;
 
-	put_u16(buf, value);
-	buffer_append(buffer, buf, 2);
+	if ((ret = sshbuf_put_u16(buffer, value)) != 0)
+		fatal("%s: %s", __func__, ssh_err(ret));
 }
 
 void
 buffer_put_int(Buffer *buffer, u_int value)
 {
-	char buf[4];
+	int ret;
 
-	put_u32(buf, value);
-	buffer_append(buffer, buf, 4);
+	if ((ret = sshbuf_put_u32(buffer, value)) != 0)
+		fatal("%s: %s", __func__, ssh_err(ret));
 }
 
 void
 buffer_put_int64(Buffer *buffer, u_int64_t value)
 {
-	char buf[8];
+	int ret;
 
-	put_u64(buf, value);
-	buffer_append(buffer, buf, 8);
+	if ((ret = sshbuf_put_u64(buffer, value)) != 0)
+		fatal("%s: %s", __func__, ssh_err(ret));
 }
 
 /*
@@ -162,32 +164,17 @@ buffer_put_int64(Buffer *buffer, u_int64_t value)
 void *
 buffer_get_string_ret(Buffer *buffer, u_int *length_ptr)
 {
+	size_t len;
+	int ret;
 	u_char *value;
-	u_int len;
 
-	/* Get the length. */
-	if (buffer_get_int_ret(&len, buffer) != 0) {
-		error("buffer_get_string_ret: cannot extract length");
-		return (NULL);
+	if ((ret = sshbuf_get_string(buffer, &value, &len)) != 0) {
+		error("%s: %s", __func__, ssh_err(ret));
+		return NULL;
 	}
-	if (len > 256 * 1024) {
-		error("buffer_get_string_ret: bad string length %u", len);
-		return (NULL);
-	}
-	/* Allocate space for the string.  Add one byte for a null character. */
-	value = xmalloc(len + 1);
-	/* Get the string. */
-	if (buffer_get_ret(buffer, value, len) == -1) {
-		error("buffer_get_string_ret: buffer_get failed");
-		xfree(value);
-		return (NULL);
-	}
-	/* Append a null character to make processing easier. */
-	value[len] = '\0';
-	/* Optionally return the length of the string. */
-	if (length_ptr)
-		*length_ptr = len;
-	return (value);
+	if (length_ptr != NULL)
+		*length_ptr = len;  /* Safe: sshbuf never store len > 2^31 */
+	return value;
 }
 
 void *
@@ -203,24 +190,17 @@ buffer_get_string(Buffer *buffer, u_int *length_ptr)
 char *
 buffer_get_cstring_ret(Buffer *buffer, u_int *length_ptr)
 {
-	u_int length;
-	char *cp, *ret = buffer_get_string_ret(buffer, &length);
+	size_t len;
+	int ret;
+	char *value;
 
-	if (ret == NULL)
+	if ((ret = sshbuf_get_cstring(buffer, &value, &len)) != 0) {
+		error("%s: %s", __func__, ssh_err(ret));
 		return NULL;
-	if ((cp = memchr(ret, '\0', length)) != NULL) {
-		/* XXX allow \0 at end-of-string for a while, remove later */
-		if (cp == ret + length - 1)
-			error("buffer_get_cstring_ret: string contains \\0");
-		else {
-			bzero(ret, length);
-			xfree(ret);
-			return NULL;
-		}
 	}
 	if (length_ptr != NULL)
-		*length_ptr = length;
-	return ret;
+		*length_ptr = len;  /* Safe: sshbuf never store len > 2^31 */
+	return value;
 }
 
 char *
@@ -233,29 +213,26 @@ buffer_get_cstring(Buffer *buffer, u_int *length_ptr)
 	return ret;
 }
 
-void *
+const void *
 buffer_get_string_ptr_ret(Buffer *buffer, u_int *length_ptr)
 {
-	void *ptr;
-	u_int len;
+	size_t len;
+	int ret;
+	const u_char *value;
 
-	if (buffer_get_int_ret(&len, buffer) != 0)
-		return NULL;
-	if (len > 256 * 1024) {
-		error("buffer_get_string_ptr: bad string length %u", len);
+	if ((ret = sshbuf_get_string_direct(buffer, &value, &len)) != 0) {
+		error("%s: %s", __func__, ssh_err(ret));
 		return NULL;
 	}
-	ptr = buffer_ptr(buffer);
-	buffer_consume(buffer, len);
-	if (length_ptr)
-		*length_ptr = len;
-	return (ptr);
+	if (length_ptr != NULL)
+		*length_ptr = len;  /* Safe: sshbuf never store len > 2^31 */
+	return value;
 }
 
-void *
+const void *
 buffer_get_string_ptr(Buffer *buffer, u_int *length_ptr)
 {
-	void *ret;
+	const void *ret;
 
 	if ((ret = buffer_get_string_ptr_ret(buffer, length_ptr)) == NULL)
 		fatal("buffer_get_string_ptr: buffer error");
@@ -268,28 +245,34 @@ buffer_get_string_ptr(Buffer *buffer, u_int *length_ptr)
 void
 buffer_put_string(Buffer *buffer, const void *buf, u_int len)
 {
-	buffer_put_int(buffer, len);
-	buffer_append(buffer, buf, len);
+	int ret;
+
+	if ((ret = sshbuf_put_string(buffer, buf, len)) != 0)
+		fatal("%s: %s", __func__, ssh_err(ret));
 }
+
 void
 buffer_put_cstring(Buffer *buffer, const char *s)
 {
-	if (s == NULL)
-		fatal("buffer_put_cstring: s == NULL");
-	buffer_put_string(buffer, s, strlen(s));
+	int ret;
+
+	if ((ret = sshbuf_put_cstring(buffer, s)) != 0)
+		fatal("%s: %s", __func__, ssh_err(ret));
 }
 
 /*
  * Returns a character from the buffer (0 - 255).
  */
 int
-buffer_get_char_ret(char *ret, Buffer *buffer)
+buffer_get_char_ret(char *v, Buffer *buffer)
 {
-	if (buffer_get_ret(buffer, ret, 1) == -1) {
-		error("buffer_get_char_ret: buffer_get_ret failed");
-		return (-1);
+	int ret;
+
+	if ((ret = sshbuf_get_u8(buffer, (u_char *)v)) != 0) {
+		error("%s: %s", __func__, ssh_err(ret));
+		return -1;
 	}
-	return (0);
+	return 0;
 }
 
 int
@@ -308,7 +291,8 @@ buffer_get_char(Buffer *buffer)
 void
 buffer_put_char(Buffer *buffer, int value)
 {
-	char ch = value;
+	int ret;
 
-	buffer_append(buffer, &ch, 1);
+	if ((ret = sshbuf_put_u8(buffer, value)) != 0)
+		fatal("%s: %s", __func__, ssh_err(ret));
 }

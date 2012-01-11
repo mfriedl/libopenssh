@@ -26,7 +26,7 @@
 
 typedef struct Sensitive Sensitive;
 struct Sensitive {
-	Key	**keys;
+	struct sshkey **keys;
 	int	nkeys;
 	int	external_keysign;
 };
@@ -41,7 +41,7 @@ void	 ssh_login(Sensitive *, const char *, struct sockaddr *, u_short,
 
 void	 ssh_exchange_identification(int);
 
-int	 verify_host_key(char *, struct sockaddr *, Key *);
+int	 verify_host_key(char *, struct sockaddr *, struct sshkey *);
 
 void	 get_hostfile_hostname_ipaddr(char *, struct sockaddr *, u_short,
     char **, char **);
