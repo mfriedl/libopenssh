@@ -274,7 +274,7 @@ authorized_principals_file(struct passwd *pw)
 
 /* return ok if key exists in sysfile or userfile */
 HostStatus
-check_key_in_hostfiles(struct passwd *pw, Key *key, const char *host,
+check_key_in_hostfiles(struct passwd *pw, struct sshkey *key, const char *host,
     const char *sysfile, const char *userfile)
 {
 	char *user_hostfile;
@@ -480,7 +480,7 @@ getpwnamallow(const char *user)
 
 /* Returns 1 if key is revoked by revoked_keys_file, 0 otherwise */
 int
-auth_key_is_revoked(Key *key)
+auth_key_is_revoked(struct sshkey *key)
 {
 	char *key_fp;
 
@@ -498,9 +498,9 @@ auth_key_is_revoked(Key *key)
 		return 1;
 	case 1:
 		/* Key revoked */
-		key_fp = key_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
+		key_fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
 		error("WARNING: authentication attempt with a revoked "
-		    "%s key %s ", key_type(key), key_fp);
+		    "%s key %s ", sshkey_type(key), key_fp);
 		xfree(key_fp);
 		return 1;
 	}

@@ -44,6 +44,8 @@
 #endif
 #include "monitor_wrap.h"
 #include "dispatch.h"
+#include "compat.h"
+#include "err.h"
 
 struct kexdhs_state {
 	DH *dh;
@@ -86,10 +88,10 @@ input_kex_dh_init(int type, u_int32_t seq, struct ssh *ssh)
 	struct kexdhs_state *kexdhs_state = kex->state;
 	BIGNUM *shared_secret = NULL, *dh_client_pub = NULL;
 	DH *dh;
-	Key *server_host_public, *server_host_private;
+	struct sshkey *server_host_public, *server_host_private;
 	u_char *kbuf, *hash, *signature = NULL, *server_host_key_blob = NULL;
 	u_int sbloblen, klen, hashlen, slen;
-	int kout;
+	int kout, r;
 
 	dh = kexdhs_state->dh;
 
@@ -141,7 +143,9 @@ input_kex_dh_init(int type, u_int32_t seq, struct ssh *ssh)
 	memset(kbuf, 0, klen);
 	xfree(kbuf);
 
-	key_to_blob(server_host_public, &server_host_key_blob, &sbloblen);
+	if ((r = sshkey_to_blob(server_host_public, &server_host_key_blob,
+	    &sbloblen)) != 0)
+		fatal("%s: sshkey_to_blob: %s", __func__, ssh_err(r));
 
 	/* calc H */
 	kex_dh_hash(
@@ -165,9 +169,9 @@ input_kex_dh_init(int type, u_int32_t seq, struct ssh *ssh)
 	}
 
 	/* sign H */
-	if (PRIVSEP(key_sign(server_host_private, &signature, &slen, hash,
-	    hashlen)) < 0)
-		fatal("kexdh_server: key_sign failed");
+	if (PRIVSEP(sshkey_sign(server_host_private, &signature, &slen, hash,
+	    hashlen, datafellows)) < 0)
+		fatal("kexdh_server: sshkey_sign failed");
 
 	/* destroy_sensitive_data(); */
 

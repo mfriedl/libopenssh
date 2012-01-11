@@ -16,5 +16,5 @@
  */
 int	pkcs11_init(int);
 void	pkcs11_terminate(void);
-int	pkcs11_add_provider(char *, char *, Key ***);
+int	pkcs11_add_provider(char *, char *, struct sshkey ***);
 int	pkcs11_del_provider(char *);

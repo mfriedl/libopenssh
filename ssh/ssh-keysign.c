@@ -49,20 +49,21 @@
 #include "pathnames.h"
 #include "readconf.h"
 #include "uidswap.h"
+#include "err.h"
 
 /* XXX readconf.c needs these */
 uid_t original_real_uid;
 
 static int
-valid_request(struct passwd *pw, char *host, Key **ret, u_char *data,
+valid_request(struct passwd *pw, char *host, struct sshkey **ret, u_char *data,
     u_int datalen)
 {
 	Buffer b;
-	Key *key = NULL;
+	struct sshkey *key = NULL;
 	u_char *pkblob;
 	u_int blen, len;
 	char *pkalg, *p;
-	int pktype, fail;
+	int r, pktype, fail;
 
 	fail = 0;
 
@@ -97,12 +98,13 @@ valid_request(struct passwd *pw, char *host, Key **ret, u_char *data,
 	pkalg = buffer_get_string(&b, NULL);
 	pkblob = buffer_get_string(&b, &blen);
 
-	pktype = key_type_from_name(pkalg);
+	pktype = sshkey_type_from_name(pkalg);
 	if (pktype == KEY_UNSPEC)
 		fail++;
-	else if ((key = key_from_blob(pkblob, blen)) == NULL)
+	else if ((r = sshkey_from_blob(pkblob, blen, &key)) != 0) {
+		error("%s: bad key blob: %s", __func__, ssh_err(r));
 		fail++;
-	else if (key->type != pktype)
+	} else if (key->type != pktype)
 		fail++;
 	xfree(pkalg);
 	xfree(pkblob);
@@ -133,7 +135,7 @@ valid_request(struct passwd *pw, char *host, Key **ret, u_char *data,
 	debug3("valid_request: fail %d", fail);
 
 	if (fail && key != NULL)
-		key_free(key);
+		sshkey_free(key);
 	else
 		*ret = key;
 
@@ -146,9 +148,9 @@ main(int argc, char **argv)
 	Buffer b;
 	Options options;
 #define NUM_KEYTYPES 3
-	Key *keys[NUM_KEYTYPES], *key = NULL;
+	struct sshkey *keys[NUM_KEYTYPES], *key = NULL;
 	struct passwd *pw;
-	int key_fd[NUM_KEYTYPES], i, found, version = 2, fd;
+	int r, key_fd[NUM_KEYTYPES], i, found, version = 2, fd;
 	u_char *signature, *data;
 	char *host;
 	u_int slen, dlen;
@@ -230,7 +232,7 @@ main(int argc, char **argv)
 	found = 0;
 	for (i = 0; i < NUM_KEYTYPES; i++) {
 		if (keys[i] != NULL &&
-		    key_equal_public(key, keys[i])) {
+		    sshkey_equal_public(key, keys[i])) {
 			found = 1;
 			break;
 		}
@@ -238,8 +240,8 @@ main(int argc, char **argv)
 	if (!found)
 		fatal("no matching hostkey found");
 
-	if (key_sign(keys[i], &signature, &slen, data, dlen) != 0)
-		fatal("key_sign failed");
+	if ((r = sshkey_sign(keys[i], &signature, &slen, data, dlen, 0)) != 0)
+		fatal("sshkey_sign failed: %s", ssh_err(r));
 	xfree(data);
 
 	/* send reply */

@@ -57,6 +57,7 @@
 #include "misc.h"
 #include "authfile.h"
 #include "match.h"
+#include "err.h"
 
 /* import */
 extern ServerOptions options;
@@ -68,20 +69,20 @@ userauth_pubkey(struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
 	Buffer b;
-	Key *key = NULL;
+	struct sshkey *key = NULL;
 	char *pkalg;
 	u_char *pkblob, *sig;
 	u_int alen, blen, slen;
-	int have_sig, pktype;
+	int r, have_sig, pktype;
 	int authenticated = 0;
 
 	if (!authctxt->valid) {
-		debug2("userauth_pubkey: disabled because of invalid user");
+		debug2("%s: disabled because of invalid user", __func__);
 		return 0;
 	}
 	have_sig = ssh_packet_get_char(ssh);
 	if (datafellows & SSH_BUG_PKAUTH) {
-		debug2("userauth_pubkey: SSH_BUG_PKAUTH");
+		debug2("%s: SSH_BUG_PKAUTH", __func__);
 		/* no explicit pkalg given */
 		pkblob = ssh_packet_get_string(ssh, &blen);
 		buffer_init(&b);
@@ -93,21 +94,24 @@ userauth_pubkey(struct ssh *ssh)
 		pkalg = ssh_packet_get_string(ssh, &alen);
 		pkblob = ssh_packet_get_string(ssh, &blen);
 	}
-	pktype = key_type_from_name(pkalg);
+	pktype = sshkey_type_from_name(pkalg);
 	if (pktype == KEY_UNSPEC) {
 		/* this is perfectly legal */
-		logit("userauth_pubkey: unsupported public key algorithm: %s",
+		logit("%s: unsupported public key algorithm: %s", __func__,
 		    pkalg);
 		goto done;
 	}
-	key = key_from_blob(pkblob, blen);
+	if ((r = sshkey_from_blob(pkblob, blen, &key)) != 0) {
+		error("%s: could not parse key: %s", __func__, ssh_err(r));
+		goto done;
+	}
 	if (key == NULL) {
-		error("userauth_pubkey: cannot decode key: %s", pkalg);
+		error("%s: cannot decode key: %s", __func__, pkalg);
 		goto done;
 	}
 	if (key->type != pktype) {
-		error("userauth_pubkey: type mismatch for decoded key "
-		    "(received %d, expected %d)", key->type, pktype);
+		error("%s: type mismatch for decoded key "
+		    "(received %d, expected %d)", __func__, key->type, pktype);
 		goto done;
 	}
 	if (have_sig) {
@@ -140,8 +144,8 @@ userauth_pubkey(struct ssh *ssh)
 		/* test for correct signature */
 		authenticated = 0;
 		if (PRIVSEP(user_key_allowed(authctxt->pw, key)) &&
-		    PRIVSEP(key_verify(key, sig, slen, buffer_ptr(&b),
-		    buffer_len(&b))) == 1)
+		    PRIVSEP(sshkey_verify(key, sig, slen, buffer_ptr(&b),
+		    buffer_len(&b), datafellows)) == 1)
 			authenticated = 1;
 		buffer_free(&b);
 		xfree(sig);
@@ -169,16 +173,16 @@ userauth_pubkey(struct ssh *ssh)
 	if (authenticated != 1)
 		auth_clear_options();
 done:
-	debug2("userauth_pubkey: authenticated %d pkalg %s", authenticated, pkalg);
+	debug2("%s: authenticated %d pkalg %s", __func__, authenticated, pkalg);
 	if (key != NULL)
-		key_free(key);
+		sshkey_free(key);
 	xfree(pkalg);
 	xfree(pkblob);
 	return authenticated;
 }
 
 static int
-match_principals_option(const char *principal_list, struct KeyCert *cert)
+match_principals_option(const char *principal_list, struct sshkey_cert *cert)
 {
 	char *result;
 	u_int i;
@@ -198,7 +202,7 @@ match_principals_option(const char *principal_list, struct KeyCert *cert)
 }
 
 static int
-match_principals_file(char *file, struct passwd *pw, struct KeyCert *cert)
+match_principals_file(char *file, struct passwd *pw, struct sshkey_cert *cert)
 {
 	FILE *f;
 	char line[SSH_MAX_PUBKEY_BYTES], *cp, *ep, *line_opts;
@@ -257,14 +261,14 @@ match_principals_file(char *file, struct passwd *pw, struct KeyCert *cert)
 
 /* return 1 if user allows given key */
 static int
-user_key_allowed2(struct passwd *pw, Key *key, char *file)
+user_key_allowed2(struct passwd *pw, struct sshkey *key, char *file)
 {
 	char line[SSH_MAX_PUBKEY_BYTES];
 	const char *reason;
 	int found_key = 0;
 	FILE *f;
 	u_long linenum = 0;
-	Key *found;
+	struct sshkey *found = NULL;
 	char *fp;
 
 	/* Temporarily use the user's uid. */
@@ -279,7 +283,9 @@ user_key_allowed2(struct passwd *pw, Key *key, char *file)
 	}
 
 	found_key = 0;
-	found = key_new(key_is_cert(key) ? KEY_UNSPEC : key->type);
+	found = sshkey_new(sshkey_is_cert(key) ? KEY_UNSPEC : key->type);
+	if (found == NULL)
+		goto done;
 
 	while (read_keyfile_line(f, file, line, sizeof(line), &linenum) != -1) {
 		char *cp, *key_options = NULL;
@@ -292,7 +298,7 @@ user_key_allowed2(struct passwd *pw, Key *key, char *file)
 		if (!*cp || *cp == '\n' || *cp == '#')
 			continue;
 
-		if (key_read(found, &cp) != 1) {
+		if (sshkey_read(found, &cp) != 0) {
 			/* no key?  check if there are options for this key */
 			int quoted = 0;
 			debug2("user_key_allowed: check options: '%s'", cp);
@@ -306,24 +312,24 @@ user_key_allowed2(struct passwd *pw, Key *key, char *file)
 			/* Skip remaining whitespace. */
 			for (; *cp == ' ' || *cp == '\t'; cp++)
 				;
-			if (key_read(found, &cp) != 1) {
+			if (sshkey_read(found, &cp) != 0) {
 				debug2("user_key_allowed: advance: '%s'", cp);
 				/* still no key?  advance to next line*/
 				continue;
 			}
 		}
-		if (key_is_cert(key)) {
-			if (!key_equal(found, key->cert->signature_key))
+		if (sshkey_is_cert(key)) {
+			if (!sshkey_equal(found, key->cert->signature_key))
 				continue;
 			if (auth_parse_options(pw, key_options, file,
 			    linenum) != 1)
 				continue;
 			if (!key_is_cert_authority)
 				continue;
-			fp = key_fingerprint(found, SSH_FP_MD5,
+			fp = sshkey_fingerprint(found, SSH_FP_MD5,
 			    SSH_FP_HEX);
 			debug("matching CA found: file %s, line %lu, %s %s",
-			    file, linenum, key_type(found), fp);
+			    file, linenum, sshkey_type(found), fp);
 			/*
 			 * If the user has specified a list of principals as
 			 * a key option, then prefer that list to matching
@@ -340,7 +346,7 @@ user_key_allowed2(struct passwd *pw, Key *key, char *file)
 				auth_debug_add("%s", reason);
 				continue;
 			}
-			if (key_cert_check_authority(key, 0, 0,
+			if (sshkey_cert_check_authority(key, 0, 0,
 			    authorized_principals == NULL ? pw->pw_name : NULL,
 			    &reason) != 0)
 				goto fail_reason;
@@ -350,11 +356,11 @@ user_key_allowed2(struct passwd *pw, Key *key, char *file)
 			}
 			verbose("Accepted certificate ID \"%s\" "
 			    "signed by %s CA %s via %s", key->cert->key_id,
-			    key_type(found), fp, file);
+			    sshkey_type(found), fp, file);
 			xfree(fp);
 			found_key = 1;
 			break;
-		} else if (key_equal(found, key)) {
+		} else if (sshkey_equal(found, key)) {
 			if (auth_parse_options(pw, key_options, file,
 			    linenum) != 1)
 				continue;
@@ -363,16 +369,18 @@ user_key_allowed2(struct passwd *pw, Key *key, char *file)
 			found_key = 1;
 			debug("matching key found: file %s, line %lu",
 			    file, linenum);
-			fp = key_fingerprint(found, SSH_FP_MD5, SSH_FP_HEX);
+			fp = sshkey_fingerprint(found, SSH_FP_MD5, SSH_FP_HEX);
 			verbose("Found matching %s key: %s",
-			    key_type(found), fp);
+			    sshkey_type(found), fp);
 			xfree(fp);
 			break;
 		}
 	}
+ done:
 	restore_uid();
 	fclose(f);
-	key_free(found);
+	if (found != NULL)
+		sshkey_free(found);
 	if (!found_key)
 		debug2("key not found");
 	return found_key;
@@ -380,22 +388,22 @@ user_key_allowed2(struct passwd *pw, Key *key, char *file)
 
 /* Authenticate a certificate key against TrustedUserCAKeys */
 static int
-user_cert_trusted_ca(struct passwd *pw, Key *key)
+user_cert_trusted_ca(struct passwd *pw, struct sshkey *key)
 {
 	char *ca_fp, *principals_file = NULL;
 	const char *reason;
 	int ret = 0;
 
-	if (!key_is_cert(key) || options.trusted_user_ca_keys == NULL)
+	if (!sshkey_is_cert(key) || options.trusted_user_ca_keys == NULL)
 		return 0;
 
-	ca_fp = key_fingerprint(key->cert->signature_key,
+	ca_fp = sshkey_fingerprint(key->cert->signature_key,
 	    SSH_FP_MD5, SSH_FP_HEX);
 
 	if (key_in_file(key->cert->signature_key,
 	    options.trusted_user_ca_keys, 1) != 1) {
 		debug2("%s: CA %s %s is not listed in %s", __func__,
-		    key_type(key->cert->signature_key), ca_fp,
+		    sshkey_type(key->cert->signature_key), ca_fp,
 		    options.trusted_user_ca_keys);
 		goto out;
 	}
@@ -414,14 +422,14 @@ user_cert_trusted_ca(struct passwd *pw, Key *key)
 			goto out;
 		}
 	}
-	if (key_cert_check_authority(key, 0, 1,
+	if (sshkey_cert_check_authority(key, 0, 1,
 	    principals_file == NULL ? pw->pw_name : NULL, &reason) != 0)
 		goto fail_reason;
 	if (auth_cert_options(key, pw) != 0)
 		goto out;
 
 	verbose("Accepted certificate ID \"%s\" signed by %s CA %s via %s",
-	    key->cert->key_id, key_type(key->cert->signature_key), ca_fp,
+	    key->cert->key_id, sshkey_type(key->cert->signature_key), ca_fp,
 	    options.trusted_user_ca_keys);
 	ret = 1;
 
@@ -435,14 +443,15 @@ user_cert_trusted_ca(struct passwd *pw, Key *key)
 
 /* check whether given key is in .ssh/authorized_keys* */
 int
-user_key_allowed(struct passwd *pw, Key *key)
+user_key_allowed(struct passwd *pw, struct sshkey *key)
 {
 	u_int success, i;
 	char *file;
 
 	if (auth_key_is_revoked(key))
 		return 0;
-	if (key_is_cert(key) && auth_key_is_revoked(key->cert->signature_key))
+	if (sshkey_is_cert(key) &&
+	    auth_key_is_revoked(key->cert->signature_key))
 		return 0;
 
 	success = user_cert_trusted_ca(pw, key);

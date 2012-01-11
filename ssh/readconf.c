@@ -727,7 +727,7 @@ parse_int:
 		arg = strdelim(&s);
 		if (!arg || *arg == '\0')
 			fatal("%.200s line %d: Missing argument.", filename, linenum);
-		if (!key_names_valid2(arg))
+		if (!sshkey_names_valid2(arg))
 			fatal("%.200s line %d: Bad protocol 2 host key algorithms '%s'.",
 			    filename, linenum, arg ? arg : "<NONE>");
 		if (*activep && options->hostkeyalgorithms == NULL)

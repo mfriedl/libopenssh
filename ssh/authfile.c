@@ -63,6 +63,7 @@
 #include "rsa.h"
 #include "misc.h"
 #include "atomicio.h"
+#include "err.h"
 
 #define MAX_KEY_FILE_SIZE	(1024 * 1024)
 
@@ -77,8 +78,8 @@ static const char authfile_id_string[] =
  * passphrase.
  */
 static int
-key_private_rsa1_to_blob(Key *key, Buffer *blob, const char *passphrase,
-    const char *comment)
+key_private_rsa1_to_blob(struct sshkey *key, Buffer *blob,
+    const char *passphrase, const char *comment)
 {
 	Buffer buffer, encrypted;
 	u_char buf[100], *cp;
@@ -161,8 +162,8 @@ key_private_rsa1_to_blob(Key *key, Buffer *blob, const char *passphrase,
 
 /* convert SSH v2 key in OpenSSL PEM format */
 static int
-key_private_pem_to_blob(Key *key, Buffer *blob, const char *_passphrase,
-    const char *comment)
+key_private_pem_to_blob(struct sshkey *key, Buffer *blob,
+    const char *_passphrase, const char *comment)
 {
 	int success = 0;
 	int blen, len = strlen(_passphrase);
@@ -227,7 +228,7 @@ key_save_private_blob(Buffer *keybuf, const char *filename)
 
 /* Serialise "key" to buffer "blob" */
 static int
-key_private_to_blob(Key *key, Buffer *blob, const char *passphrase,
+key_private_to_blob(struct sshkey *key, Buffer *blob, const char *passphrase,
     const char *comment)
 {
 	switch (key->type) {
@@ -244,8 +245,8 @@ key_private_to_blob(Key *key, Buffer *blob, const char *passphrase,
 }
 
 int
-key_save_private(Key *key, const char *filename, const char *passphrase,
-    const char *comment)
+key_save_private(struct sshkey *key, const char *filename,
+    const char *passphrase, const char *comment)
 {
 	Buffer keyblob;
 	int success = 0;
@@ -264,10 +265,10 @@ key_save_private(Key *key, const char *filename, const char *passphrase,
 /*
  * Parse the public, unencrypted portion of a RSA1 key.
  */
-static Key *
+static struct sshkey *
 key_parse_public_rsa1(Buffer *blob, char **commentp)
 {
-	Key *pub;
+	struct sshkey *pub;
 	Buffer copy;
 
 	/* Check that it is at least big enough to contain the ID string. */
@@ -295,11 +296,14 @@ key_parse_public_rsa1(Buffer *blob, char **commentp)
 
 	/* Read the public key from the buffer. */
 	(void) buffer_get_int(&copy);
-	pub = key_new(KEY_RSA1);
+	if ((pub = sshkey_new(KEY_RSA1)) == NULL)
+		goto out;
 	buffer_get_bignum(&copy, pub->rsa->n);
 	buffer_get_bignum(&copy, pub->rsa->e);
 	if (commentp)
 		*commentp = buffer_get_string(&copy, NULL);
+
+ out:
 	/* The encrypted private part is not parsed by this function. */
 	buffer_free(&copy);
 
@@ -366,11 +370,11 @@ key_load_file(int fd, const char *filename, Buffer *blob)
  * encountered (the file does not exist or is not readable), and the key
  * otherwise.
  */
-static Key *
+static struct sshkey *
 key_load_public_rsa1(int fd, const char *filename, char **commentp)
 {
 	Buffer buffer;
-	Key *pub;
+	struct sshkey *pub;
 
 	buffer_init(&buffer);
 	if (!key_load_file(fd, filename, &buffer)) {
@@ -386,10 +390,10 @@ key_load_public_rsa1(int fd, const char *filename, char **commentp)
 }
 
 /* load public key from private-key file, works only for SSH v1 */
-Key *
+struct sshkey *
 key_load_public_type(int type, const char *filename, char **commentp)
 {
-	Key *pub;
+	struct sshkey *pub;
 	int fd;
 
 	if (type == KEY_RSA1) {
@@ -403,7 +407,7 @@ key_load_public_type(int type, const char *filename, char **commentp)
 	return NULL;
 }
 
-static Key *
+static struct sshkey *
 key_parse_private_rsa1(Buffer *blob, const char *passphrase, char **commentp)
 {
 	int check1, check2, cipher_type;
@@ -411,7 +415,7 @@ key_parse_private_rsa1(Buffer *blob, const char *passphrase, char **commentp)
 	u_char *cp;
 	CipherContext ciphercontext;
 	Cipher *cipher;
-	Key *prv = NULL;
+	struct sshkey *prv = NULL;
 	Buffer copy;
 
 	/* Check that it is at least big enough to contain the ID string. */
@@ -439,7 +443,10 @@ key_parse_private_rsa1(Buffer *blob, const char *passphrase, char **commentp)
 
 	/* Read the public key from the buffer. */
 	(void) buffer_get_int(&copy);
-	prv = key_new_private(KEY_RSA1);
+	if ((prv = sshkey_new_private(KEY_RSA1)) == NULL) {
+		buffer_free(&copy);
+		return NULL;
+	}
 
 	buffer_get_bignum(&copy, prv->rsa->n);
 	buffer_get_bignum(&copy, prv->rsa->e);
@@ -500,16 +507,16 @@ key_parse_private_rsa1(Buffer *blob, const char *passphrase, char **commentp)
 fail:
 	if (commentp)
 		xfree(*commentp);
-	key_free(prv);
+	sshkey_free(prv);
 	return NULL;
 }
 
-static Key *
+static struct sshkey *
 key_parse_private_pem(Buffer *blob, int type, const char *passphrase,
     char **commentp)
 {
 	EVP_PKEY *pk = NULL;
-	Key *prv = NULL;
+	struct sshkey *prv = NULL;
 	char *name = "<no key>";
 	BIO *bio;
 
@@ -526,7 +533,10 @@ key_parse_private_pem(Buffer *blob, int type, const char *passphrase,
 		(void)ERR_get_error();
 	} else if (pk->type == EVP_PKEY_RSA &&
 	    (type == KEY_UNSPEC||type==KEY_RSA)) {
-		prv = key_new(KEY_UNSPEC);
+		if ((prv = sshkey_new(KEY_UNSPEC)) == NULL) {
+			error("%s: sshkey_new failed", __func__);
+			return NULL;
+		}
 		prv->rsa = EVP_PKEY_get1_RSA(pk);
 		prv->type = KEY_RSA;
 		name = "rsa w/o comment";
@@ -535,12 +545,12 @@ key_parse_private_pem(Buffer *blob, int type, const char *passphrase,
 #endif
 		if (RSA_blinding_on(prv->rsa, NULL) != 1) {
 			error("%s: RSA_blinding_on failed", __func__);
-			key_free(prv);
+			sshkey_free(prv);
 			prv = NULL;
 		}
 	} else if (pk->type == EVP_PKEY_DSA &&
 	    (type == KEY_UNSPEC||type==KEY_DSA)) {
-		prv = key_new(KEY_UNSPEC);
+		prv = sshkey_new(KEY_UNSPEC);
 		prv->dsa = EVP_PKEY_get1_DSA(pk);
 		prv->type = KEY_DSA;
 		name = "dsa w/o comment";
@@ -549,22 +559,23 @@ key_parse_private_pem(Buffer *blob, int type, const char *passphrase,
 #endif
 	} else if (pk->type == EVP_PKEY_EC &&
 	    (type == KEY_UNSPEC||type==KEY_ECDSA)) {
-		prv = key_new(KEY_UNSPEC);
+		prv = sshkey_new(KEY_UNSPEC);
 		prv->ecdsa = EVP_PKEY_get1_EC_KEY(pk);
 		prv->type = KEY_ECDSA;
-		if ((prv->ecdsa_nid = key_ecdsa_key_to_nid(prv->ecdsa)) == -1 ||
-		    key_curve_nid_to_name(prv->ecdsa_nid) == NULL ||
-		    key_ec_validate_public(EC_KEY_get0_group(prv->ecdsa),
+		prv->ecdsa_nid = sshkey_ecdsa_key_to_nid(prv->ecdsa);
+		if (prv->ecdsa_nid == -1 ||
+		    sshkey_curve_nid_to_name(prv->ecdsa_nid) == NULL ||
+		    sshkey_ec_validate_public(EC_KEY_get0_group(prv->ecdsa),
 		    EC_KEY_get0_public_key(prv->ecdsa)) != 0 ||
-		    key_ec_validate_private(prv->ecdsa) != 0) {
+		    sshkey_ec_validate_private(prv->ecdsa) != 0) {
 			error("%s: bad ECDSA key", __func__);
-			key_free(prv);
+			sshkey_free(prv);
 			prv = NULL;
 		}
 		name = "ecdsa w/o comment";
 #ifdef DEBUG_PK
 		if (prv != NULL && prv->ecdsa != NULL)
-			key_dump_ec_key(prv->ecdsa);
+			sshkey_dump_ec_key(prv->ecdsa);
 #endif
 	} else {
 		error("%s: PEM_read_PrivateKey: mismatch or "
@@ -575,16 +586,16 @@ key_parse_private_pem(Buffer *blob, int type, const char *passphrase,
 	if (prv != NULL && commentp)
 		*commentp = xstrdup(name);
 	debug("read PEM private key done: type %s",
-	    prv ? key_type(prv) : "<unknown>");
+	    prv ? sshkey_type(prv) : "<unknown>");
 	return prv;
 }
 
-Key *
+struct sshkey *
 key_load_private_pem(int fd, int type, const char *passphrase,
     char **commentp)
 {
 	Buffer buffer;
-	Key *prv;
+	struct sshkey *prv;
 
 	buffer_init(&buffer);
 	if (!key_load_file(fd, NULL, &buffer)) {
@@ -621,7 +632,7 @@ key_perm_ok(int fd, const char *filename)
 	return 1;
 }
 
-static Key *
+static struct sshkey *
 key_parse_private_type(Buffer *blob, int type, const char *passphrase,
     char **commentp)
 {
@@ -640,12 +651,12 @@ key_parse_private_type(Buffer *blob, int type, const char *passphrase,
 	return NULL;
 }
 
-Key *
+struct sshkey *
 key_load_private_type(int type, const char *filename, const char *passphrase,
     char **commentp, int *perm_ok)
 {
 	int fd;
-	Key *ret;
+	struct sshkey *ret;
 	Buffer buffer;
 
 	fd = open(filename, O_RDONLY);
@@ -678,11 +689,11 @@ key_load_private_type(int type, const char *filename, const char *passphrase,
 	return ret;
 }
 
-Key *
+struct sshkey *
 key_parse_private(Buffer *buffer, const char *filename,
     const char *passphrase, char **commentp)
 {
-	Key *pub, *prv;
+	struct sshkey *pub, *prv;
 
 	/* it's a SSH v1 key if the public key part is readable */
 	pub = key_parse_public_rsa1(buffer, commentp);
@@ -693,7 +704,7 @@ key_parse_private(Buffer *buffer, const char *filename,
 		if (commentp && prv)
 			*commentp = xstrdup(filename);
 	} else {
-		key_free(pub);
+		sshkey_free(pub);
 		/* key_parse_public_rsa1() has already loaded the comment */
 		prv = key_parse_private_type(buffer, KEY_RSA1, passphrase,
 		    NULL);
@@ -701,11 +712,11 @@ key_parse_private(Buffer *buffer, const char *filename,
 	return prv;
 }
 
-Key *
+struct sshkey *
 key_load_private(const char *filename, const char *passphrase,
     char **commentp)
 {
-	Key *prv;
+	struct sshkey *prv;
 	Buffer buffer;
 	int fd;
 
@@ -735,7 +746,7 @@ key_load_private(const char *filename, const char *passphrase,
 }
 
 static int
-key_try_load_public(Key *k, const char *filename, char **commentp)
+key_try_load_public(struct sshkey *k, const char *filename, char **commentp)
 {
 	FILE *f;
 	char line[SSH_MAX_PUBKEY_BYTES];
@@ -760,7 +771,7 @@ key_try_load_public(Key *k, const char *filename, char **commentp)
 			for (; *cp && (*cp == ' ' || *cp == '\t'); cp++)
 				;
 			if (*cp) {
-				if (key_read(k, &cp) == 1) {
+				if (sshkey_read(k, &cp) == 0) {
 					cp[strcspn(cp, "\r\n")] = '\0';
 					if (commentp) {
 						*commentp = xstrdup(*cp ?
@@ -777,10 +788,10 @@ key_try_load_public(Key *k, const char *filename, char **commentp)
 }
 
 /* load public key from ssh v1 private or any pubkey file */
-Key *
+struct sshkey *
 key_load_public(const char *filename, char **commentp)
 {
-	Key *pub;
+	struct sshkey *pub;
 	char file[MAXPATHLEN];
 
 	/* try rsa1 private key */
@@ -789,47 +800,51 @@ key_load_public(const char *filename, char **commentp)
 		return pub;
 
 	/* try rsa1 public key */
-	pub = key_new(KEY_RSA1);
+	if ((pub = sshkey_new(KEY_RSA1)) == NULL)
+		return NULL;
 	if (key_try_load_public(pub, filename, commentp) == 1)
 		return pub;
-	key_free(pub);
+	sshkey_free(pub);
 
 	/* try ssh2 public key */
-	pub = key_new(KEY_UNSPEC);
+	if ((pub = sshkey_new(KEY_UNSPEC)) == NULL)
+		return NULL;
 	if (key_try_load_public(pub, filename, commentp) == 1)
 		return pub;
 	if ((strlcpy(file, filename, sizeof file) < sizeof(file)) &&
 	    (strlcat(file, ".pub", sizeof file) < sizeof(file)) &&
 	    (key_try_load_public(pub, file, commentp) == 1))
 		return pub;
-	key_free(pub);
+	sshkey_free(pub);
 	return NULL;
 }
 
 /* Load the certificate associated with the named private key */
-Key *
+struct sshkey *
 key_load_cert(const char *filename)
 {
-	Key *pub;
+	struct sshkey *pub;
 	char *file;
 
-	pub = key_new(KEY_UNSPEC);
+	if ((pub = sshkey_new(KEY_UNSPEC)) == NULL)
+		return NULL;
 	xasprintf(&file, "%s-cert.pub", filename);
 	if (key_try_load_public(pub, file, NULL) == 1) {
 		xfree(file);
 		return pub;
 	}
 	xfree(file);
-	key_free(pub);
+	sshkey_free(pub);
 	return NULL;
 }
 
 /* Load private key and certificate */
-Key *
+struct sshkey *
 key_load_private_cert(int type, const char *filename, const char *passphrase,
     int *perm_ok)
 {
-	Key *key, *pub;
+	struct sshkey *key, *pub;
+	int ret;
 
 	switch (type) {
 	case KEY_RSA:
@@ -846,24 +861,30 @@ key_load_private_cert(int type, const char *filename, const char *passphrase,
 		return NULL;
 
 	if ((pub = key_load_cert(filename)) == NULL) {
-		key_free(key);
+		sshkey_free(key);
 		return NULL;
 	}
 
 	/* Make sure the private key matches the certificate */
-	if (key_equal_public(key, pub) == 0) {
+	if (sshkey_equal_public(key, pub) == 0) {
 		error("%s: certificate does not match private key %s",
 		    __func__, filename);
-	} else if (key_to_certified(key, key_cert_is_legacy(pub)) != 0) {
-		error("%s: key_to_certified failed", __func__);
+	} else if ((ret = sshkey_to_certified(key,
+	    sshkey_cert_is_legacy(pub))) != 0) {
+		error("%s: key_to_certified failed: %s",
+		    __func__, ssh_err(ret));
 	} else {
-		key_cert_copy(pub, key);
-		key_free(pub);
-		return key;
+		if ((ret = sshkey_cert_copy(pub, key)) != 0)
+			error("%s: sshkey_cert_copy failed: %s",
+			    __func__, ssh_err(ret));
+		else {
+			sshkey_free(pub);
+			return key;
+		}
 	}
 
-	key_free(key);
-	key_free(pub);
+	sshkey_free(key);
+	sshkey_free(pub);
 	return NULL;
 }
 
@@ -874,16 +895,16 @@ key_load_private_cert(int type, const char *filename, const char *passphrase,
  * otherwise a comparison that ignores certficiate data is performed.
  */
 int
-key_in_file(Key *key, const char *filename, int strict_type)
+key_in_file(struct sshkey *key, const char *filename, int strict_type)
 {
 	FILE *f;
 	char line[SSH_MAX_PUBKEY_BYTES];
 	char *cp;
 	u_long linenum = 0;
 	int ret = 0;
-	Key *pub;
-	int (*key_compare)(const Key *, const Key *) = strict_type ?
-	    key_equal : key_equal_public;
+	struct sshkey *pub;
+	int (*key_compare)(const struct sshkey *, const struct sshkey *) =
+	    strict_type ?  sshkey_equal : sshkey_equal_public;
 
 	if ((f = fopen(filename, "r")) == NULL) {
 		if (errno == ENOENT) {
@@ -912,17 +933,21 @@ key_in_file(Key *key, const char *filename, int strict_type)
 			continue;
 		}
 
-		pub = key_new(KEY_UNSPEC);
-		if (key_read(pub, &cp) != 1) {
-			key_free(pub);
+		if ((pub = sshkey_new(KEY_UNSPEC)) == NULL) {
+			error("%s: sshkey_new failed", __func__);
+			fclose(f);
+			return -1;
+		}
+		if (sshkey_read(pub, &cp) != 0) {
+			sshkey_free(pub);
 			continue;
 		}
 		if (key_compare(key, pub)) {
 			ret = 1;
-			key_free(pub);
+			sshkey_free(pub);
 			break;
 		}
-		key_free(pub);
+		sshkey_free(pub);
 	}
 	fclose(f);
 	return ret;
