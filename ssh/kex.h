@@ -117,6 +117,7 @@ struct ssh;
 struct Kex {
 	u_char	*session_id;
 	u_int	session_id_len;
+	char	**proposal;
 	Newkeys	*newkeys[MODE_MAX];
 	u_int	we_need;
 	int	server;
