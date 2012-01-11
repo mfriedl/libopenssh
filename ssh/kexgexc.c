@@ -236,7 +236,7 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 	BN_clear_free(dh_server_pub);
 
 	if (sshkey_verify(server_host_key, signature, slen, hash,
-	    hashlen, datafellows) != 1)
+	    hashlen, datafellows) != 0)
 		fatal("key_verify failed for server_host_key");
 	sshkey_free(server_host_key);
 	xfree(signature);

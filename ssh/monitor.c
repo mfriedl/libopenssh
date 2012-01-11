@@ -1035,7 +1035,7 @@ mm_answer_keyverify(int sock, Buffer *m)
 	struct sshkey *key;
 	u_char *signature, *data, *blob;
 	u_int signaturelen, datalen, bloblen;
-	int r, verified = 0, valid_data = 0;
+	int r, valid_data = 0;
 
 	blob = buffer_get_string(m, &bloblen);
 	signature = buffer_get_string(m, &signaturelen);
@@ -1063,10 +1063,10 @@ mm_answer_keyverify(int sock, Buffer *m)
 	if (!valid_data)
 		fatal("%s: bad signature data blob", __func__);
 
-	verified = sshkey_verify(key, signature, signaturelen, data, datalen,
+	r = sshkey_verify(key, signature, signaturelen, data, datalen,
 	    datafellows);
 	debug3("%s: key %p signature %s",
-	    __func__, key, (verified == 1) ? "verified" : "unverified");
+	    __func__, key, (r == 0) ? "verified" : "unverified");
 
 	sshkey_free(key);
 	xfree(blob);
@@ -1078,10 +1078,10 @@ mm_answer_keyverify(int sock, Buffer *m)
 	monitor_reset_key_state();
 
 	buffer_clear(m);
-	buffer_put_int(m, verified);
+	buffer_put_int(m, r);
 	mm_request_send(sock, MONITOR_ANS_KEYVERIFY, m);
 
-	return (verified == 1);
+	return (r==0);
 }
 
 static void

@@ -145,7 +145,7 @@ userauth_pubkey(struct ssh *ssh)
 		authenticated = 0;
 		if (PRIVSEP(user_key_allowed(authctxt->pw, key)) &&
 		    PRIVSEP(sshkey_verify(key, sig, slen, buffer_ptr(&b),
-		    buffer_len(&b), datafellows)) == 1)
+		    buffer_len(&b), datafellows)) == 0)
 			authenticated = 1;
 		buffer_free(&b);
 		xfree(sig);
