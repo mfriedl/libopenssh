@@ -806,6 +806,7 @@ read_decimal_bignum(char **cpp, BIGNUM *v)
 {
 	char *cp;
 	size_t e;
+	int skip = 1;	/* skip white space */
 
 	cp = *cpp;
 	while (*cp == ' ' || *cp == '\t')
@@ -815,16 +816,18 @@ read_decimal_bignum(char **cpp, BIGNUM *v)
 		return SSH_ERR_INVALID_FORMAT;
 	if (e > SSHBUF_MAX_BIGNUM * 3)
 		return SSH_ERR_BIGNUM_TOO_LARGE;
-	if (cp[e] != '\0' && index(" \t\r\n", cp[e]) != NULL)
+	if (cp[e] == '\0')
+		skip = 0;
+	else if (index(" \t\r\n", cp[e]) == NULL)
 		return SSH_ERR_INVALID_FORMAT;
 	cp[e] = '\0';
 	if (BN_dec2bn(&v, cp) <= 0)
 		return SSH_ERR_INVALID_FORMAT;
-	*cpp = cp + e;
+	*cpp = cp + e + skip;
 	return 0;
 }
 
-/* returns 1 ok, -1 error */
+/* returns 0 ok, and < 0 error */
 int
 sshkey_read(struct sshkey *ret, char **cpp)
 {
@@ -841,7 +844,7 @@ sshkey_read(struct sshkey *ret, char **cpp)
 	case KEY_RSA1:
 		/* Get number of bits. */
 		bits = strtoul(cp, &ep, 10);
-		if (*cp == '\0' || index(" \t\r\n", *ep) != NULL ||
+		if (*cp == '\0' || index(" \t\r\n", *ep) == NULL ||
 		    bits == 0 || bits > SSHBUF_MAX_BIGNUM * 8)
 			return SSH_ERR_INVALID_FORMAT;	/* Bad bit count... */
 		/* Get public exponent, public modulus. */
@@ -884,8 +887,14 @@ sshkey_read(struct sshkey *ret, char **cpp)
 			return SSH_ERR_KEY_TYPE_MISMATCH;
 		if ((blob = sshbuf_new()) == NULL)
 			return SSH_ERR_ALLOC_FAIL;
-		if ((r = sshbuf_b64tod(blob, cp)) != 0)
+		/* trim comment */
+		space = strchr(cp, ' ');
+		if (space) 
+			*space = '\0';
+		if ((r = sshbuf_b64tod(blob, cp)) != 0) {
+			sshbuf_free(blob);
 			return r;
+		}
 		if ((r = sshkey_from_blob(sshbuf_ptr(blob),
 		    sshbuf_len(blob), &k)) != 0) {
 			sshbuf_free(blob);
@@ -1009,7 +1018,7 @@ sshkey_write(const struct sshkey *key, FILE *f)
 		}
 		if ((ret = sshkey_to_blob_buf(key, bb)) != 0)
 			goto out;
-		if ((uu = sshbuf_dtob16(bb)) == NULL) {
+		if ((uu = sshbuf_dtob64(bb)) == NULL) {
 			ret = SSH_ERR_ALLOC_FAIL;
 			goto out;
 		}
