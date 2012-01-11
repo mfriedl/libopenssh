@@ -1748,8 +1748,7 @@ sshkey_sign(const struct sshkey *key,
 }
 
 /*
- * key_verify returns 1 for a correct signature, 0 for an incorrect signature
- * and -1 on error.
+ * ssh_key_verify returns 0 for a correct signature  and < 0 on error.
  */
 int
 sshkey_verify(const struct sshkey *key,
