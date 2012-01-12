@@ -1000,7 +1000,7 @@ mux_master_read_cb(Channel *c)
 {
 	struct mux_master_state *state = (struct mux_master_state *)c->mux_ctx;
 	Buffer in, out;
-	void *ptr;
+	const void *ptr;
 	u_int type, rid, have, i;
 	int ret = -1;
 
@@ -1412,7 +1412,7 @@ mux_client_read_packet(int fd, Buffer *m)
 {
 	Buffer queue;
 	u_int need, have;
-	void *ptr;
+	const void *ptr;
 	int oerrno;
 
 	buffer_init(&queue);

@@ -72,7 +72,7 @@ dns_result_totext(unsigned int res)
  */
 static int
 dns_read_key(u_int8_t *algorithm, u_int8_t *digest_type,
-    u_char **digest, u_int *digest_len, Key *key)
+    u_char **digest, u_int *digest_len, struct sshkey *key)
 {
 	int success = 0;
 
@@ -90,9 +90,9 @@ dns_read_key(u_int8_t *algorithm, u_int8_t *digest_type,
 
 	if (*algorithm) {
 		*digest_type = SSHFP_HASH_SHA1;
-		*digest = key_fingerprint_raw(key, SSH_FP_SHA1, digest_len);
+		*digest = sshkey_fingerprint_raw(key, SSH_FP_SHA1, digest_len);
 		if (*digest == NULL)
-			fatal("dns_read_key: null from key_fingerprint_raw()");
+			fatal("%s: null from sshkey_fingerprint_raw", __func__);
 		success = 1;
 	} else {
 		*digest_type = SSHFP_HASH_RESERVED;
@@ -170,7 +170,7 @@ is_numeric_hostname(const char *hostname)
  */
 int
 verify_host_key_dns(const char *hostname, struct sockaddr *address,
-    Key *hostkey, int *flags)
+    struct sshkey *hostkey, int *flags)
 {
 	u_int counter;
 	int result;
@@ -269,7 +269,7 @@ verify_host_key_dns(const char *hostname, struct sockaddr *address,
  * Export the fingerprint of a key as a DNS resource record
  */
 int
-export_dns_rr(const char *hostname, Key *key, FILE *f, int generic)
+export_dns_rr(const char *hostname, struct sshkey *key, FILE *f, int generic)
 {
 	u_int8_t rdata_pubkey_algorithm = 0;
 	u_int8_t rdata_digest_type = SSHFP_HASH_SHA1;

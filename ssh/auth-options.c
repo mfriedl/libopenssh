@@ -574,7 +574,7 @@ parse_option_list(u_char *optblob, size_t optblob_len, struct passwd *pw,
  * options so this must be called after auth_parse_options().
  */
 int
-auth_cert_options(Key *k, struct passwd *pw)
+auth_cert_options(struct sshkey *k, struct passwd *pw)
 {
 	int cert_no_port_forwarding_flag = 1;
 	int cert_no_agent_forwarding_flag = 1;
@@ -584,10 +584,10 @@ auth_cert_options(Key *k, struct passwd *pw)
 	char *cert_forced_command = NULL;
 	int cert_source_address_done = 0;
 
-	if (key_cert_is_legacy(k)) {
+	if (sshkey_cert_is_legacy(k)) {
 		/* All options are in the one field for v00 certs */
-		if (parse_option_list(buffer_ptr(&k->cert->critical),
-		    buffer_len(&k->cert->critical), pw,
+		if (parse_option_list(buffer_ptr(k->cert->critical),
+		    buffer_len(k->cert->critical), pw,
 		    OPTIONS_CRITICAL|OPTIONS_EXTENSIONS, 1,
 		    &cert_no_port_forwarding_flag,
 		    &cert_no_agent_forwarding_flag,
@@ -599,14 +599,14 @@ auth_cert_options(Key *k, struct passwd *pw)
 			return -1;
 	} else {
 		/* Separate options and extensions for v01 certs */
-		if (parse_option_list(buffer_ptr(&k->cert->critical),
-		    buffer_len(&k->cert->critical), pw,
+		if (parse_option_list(buffer_ptr(k->cert->critical),
+		    buffer_len(k->cert->critical), pw,
 		    OPTIONS_CRITICAL, 1, NULL, NULL, NULL, NULL, NULL,
 		    &cert_forced_command,
 		    &cert_source_address_done) == -1)
 			return -1;
-		if (parse_option_list(buffer_ptr(&k->cert->extensions),
-		    buffer_len(&k->cert->extensions), pw,
+		if (parse_option_list(buffer_ptr(k->cert->extensions),
+		    buffer_len(k->cert->extensions), pw,
 		    OPTIONS_EXTENSIONS, 1,
 		    &cert_no_port_forwarding_flag,
 		    &cert_no_agent_forwarding_flag,

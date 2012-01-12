@@ -43,6 +43,7 @@
 #include "ssh2.h"
 #include "compat.h"
 #include "dispatch.h"
+#include "err.h"
 
 struct kexgexc_state {
 	int min, max, nbits;
@@ -150,10 +151,10 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 	Kex *kex = ssh->kex;
 	struct kexgexc_state *kexgexc_state = kex->state;
 	BIGNUM *dh_server_pub = NULL, *shared_secret = NULL;
-	Key *server_host_key;
+	struct sshkey *server_host_key;
 	u_char *kbuf, *hash, *signature = NULL, *server_host_key_blob = NULL;
 	u_int klen, slen, sbloblen, hashlen;
-	int kout, min, max, nbits;
+	int kout, min, max, nbits, r;
 	DH *dh;
 
 	debug("%s %p %p", __func__, kex, kexgexc_state);
@@ -166,9 +167,9 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 
 	/* key, cert */
 	server_host_key_blob = ssh_packet_get_string(ssh, &sbloblen);
-	server_host_key = key_from_blob(server_host_key_blob, sbloblen);
-	if (server_host_key == NULL)
-		fatal("cannot decode server_host_key_blob");
+	if ((r = sshkey_from_blob(server_host_key_blob, sbloblen,
+	    &server_host_key)) != 0)
+		fatal("cannot decode server_host_key_blob: %s", ssh_err(r));
 	if (server_host_key->type != kex->hostkey_type)
 		fatal("type mismatch for decoded server_host_key_blob");
 	if (kex->verify_host_key == NULL)
@@ -234,9 +235,10 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 	xfree(server_host_key_blob);
 	BN_clear_free(dh_server_pub);
 
-	if (key_verify(server_host_key, signature, slen, hash, hashlen) != 1)
+	if (sshkey_verify(server_host_key, signature, slen, hash,
+	    hashlen, datafellows) != 0)
 		fatal("key_verify failed for server_host_key");
-	key_free(server_host_key);
+	sshkey_free(server_host_key);
 	xfree(signature);
 
 	/* save session id */

@@ -46,7 +46,8 @@ kex_ecdh_name_to_nid(const char *kexname)
 {
 	if (strlen(kexname) < sizeof(KEX_ECDH_SHA2_STEM) - 1)
 		fatal("%s: kexname too short \"%s\"", __func__, kexname);
-	return key_curve_name_to_nid(kexname + sizeof(KEX_ECDH_SHA2_STEM) - 1);
+	return sshkey_curve_name_to_nid(kexname +
+	    sizeof(KEX_ECDH_SHA2_STEM) - 1);
 }
 
 const EVP_MD *
@@ -56,7 +57,7 @@ kex_ecdh_name_to_evpmd(const char *kexname)
 
 	if (nid == -1)
 		fatal("%s: unsupported ECDH curve \"%s\"", __func__, kexname);
-	return key_ec_nid_to_evpmd(nid);
+	return sshkey_ec_nid_to_evpmd(nid);
 }
 
 void

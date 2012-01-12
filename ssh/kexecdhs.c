@@ -44,6 +44,8 @@
 #endif
 #include "monitor_wrap.h"
 #include "dispatch.h"
+#include "compat.h"
+#include "err.h"
 
 static void input_kex_ecdh_init(int, u_int32_t, struct ssh *);
 
@@ -62,11 +64,11 @@ input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 	EC_KEY *server_key;
 	const EC_GROUP *group;
 	BIGNUM *shared_secret;
-	Key *server_host_private, *server_host_public;
+	struct sshkey *server_host_private, *server_host_public;
 	u_char *server_host_key_blob = NULL, *signature = NULL;
 	u_char *kbuf, *hash;
 	u_int klen, slen, sbloblen, hashlen;
-	int curve_nid;
+	int curve_nid, r;
 
 	if ((curve_nid = kex_ecdh_name_to_nid(kex->name)) == -1)
 		fatal("%s: unsupported ECDH curve \"%s\"", __func__, kex->name);
@@ -78,7 +80,7 @@ input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 
 #ifdef DEBUG_KEXECDH
 	fputs("server private key:\n", stderr);
-	key_dump_ec_key(server_key);
+	sshkey_dump_ec_key(server_key);
 #endif
 
 	if (kex->load_host_public_key == NULL ||
@@ -97,12 +99,12 @@ input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 	ssh_packet_get_ecpoint(ssh, group, client_public);
 	ssh_packet_check_eom(ssh);
 
-	if (key_ec_validate_public(group, client_public) != 0)
+	if (sshkey_ec_validate_public(group, client_public) != 0)
 		fatal("%s: invalid client public key", __func__);
 
 #ifdef DEBUG_KEXECDH
 	fputs("client public key:\n", stderr);
-	key_dump_ec_point(group, client_public);
+	sshkey_dump_ec_point(group, client_public);
 #endif
 
 	/* Calculate shared_secret */
@@ -123,7 +125,9 @@ input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 	xfree(kbuf);
 
 	/* calc H */
-	key_to_blob(server_host_public, &server_host_key_blob, &sbloblen);
+	if ((r = sshkey_to_blob(server_host_public, &server_host_key_blob,
+	    &sbloblen)) != 0)
+		fatal("%s: sshkey_to_blob: %s", __func__, ssh_err(r));
 	kex_ecdh_hash(
 	    kex->evp_md,
 	    group,
@@ -147,9 +151,9 @@ input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 	}
 
 	/* sign H */
-	if (PRIVSEP(key_sign(server_host_private, &signature, &slen,
-	    hash, hashlen)) < 0)
-		fatal("kexdh_server: key_sign failed");
+	if (PRIVSEP(sshkey_sign(server_host_private, &signature, &slen,
+	    hash, hashlen, datafellows)) < 0)
+		fatal("kexdh_server: sshkey_sign failed");
 
 	/* destroy_sensitive_data(); */
 

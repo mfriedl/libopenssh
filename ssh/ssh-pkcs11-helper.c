@@ -31,11 +31,12 @@
 #include "key.h"
 #include "authfd.h"
 #include "ssh-pkcs11.h"
+#include "err.h"
 
 /* borrows code from sftp-server and ssh-agent */
 
 struct pkcs11_keyinfo {
-	Key		*key;
+	struct sshkey		*key;
 	char		*providername;
 	TAILQ_ENTRY(pkcs11_keyinfo) next;
 };
@@ -53,7 +54,7 @@ Buffer iqueue;
 Buffer oqueue;
 
 static void
-add_key(Key *k, char *name)
+add_key(struct sshkey *k, char *name)
 {
 	struct pkcs11_keyinfo *ki;
 
@@ -73,21 +74,21 @@ del_keys_by_name(char *name)
 		if (!strcmp(ki->providername, name)) {
 			TAILQ_REMOVE(&pkcs11_keylist, ki, next);
 			xfree(ki->providername);
-			key_free(ki->key);
+			sshkey_free(ki->key);
 			free(ki);
 		}
 	}
 }
 
 /* lookup matching 'private' key */
-static Key *
-lookup_key(Key *k)
+static struct sshkey *
+lookup_key(struct sshkey *k)
 {
 	struct pkcs11_keyinfo *ki;
 
 	TAILQ_FOREACH(ki, &pkcs11_keylist, next) {
 		debug("check %p %s", ki, ki->providername);
-		if (key_equal(k, ki->key))
+		if (sshkey_equal(k, ki->key))
 			return (ki->key);
 	}
 	return (NULL);
@@ -107,8 +108,8 @@ static void
 process_add(void)
 {
 	char *name, *pin;
-	Key **keys;
-	int i, nkeys;
+	struct sshkey **keys;
+	int r, i, nkeys;
 	u_char *blob;
 	u_int blen;
 	Buffer msg;
@@ -120,7 +121,9 @@ process_add(void)
 		buffer_put_char(&msg, SSH2_AGENT_IDENTITIES_ANSWER);
 		buffer_put_int(&msg, nkeys);
 		for (i = 0; i < nkeys; i++) {
-			key_to_blob(keys[i], &blob, &blen);
+			if ((r = sshkey_to_blob(keys[i], &blob, &blen)) != 0)
+				fatal("%s: sshkey_to_blob: %s",
+				    __func__, ssh_err(r));
 			buffer_put_string(&msg, blob, blen);
 			buffer_put_cstring(&msg, name);
 			xfree(blob);
@@ -161,15 +164,17 @@ process_sign(void)
 {
 	u_char *blob, *data, *signature = NULL;
 	u_int blen, dlen, slen = 0;
-	int ok = -1, flags, ret;
-	Key *key, *found;
+	int r, ok = -1, flags, ret;
+	struct sshkey *key, *found;
 	Buffer msg;
 
 	blob = get_string(&blen);
 	data = get_string(&dlen);
 	flags = get_int(); /* XXX ignore */
 
-	if ((key = key_from_blob(blob, blen)) != NULL) {
+	if ((r = sshkey_from_blob(blob, blen, &key)) != 0)
+		error("%s: sshkey_from_blob: %s", __func__, ssh_err(r));
+	else {
 		if ((found = lookup_key(key)) != NULL) {
 			slen = RSA_size(key->rsa);
 			signature = xmalloc(slen);
@@ -179,7 +184,7 @@ process_sign(void)
 				ok = 0;
 			}
 		}
-		key_free(key);
+		sshkey_free(key);
 	}
 	buffer_init(&msg);
 	if (ok == 0) {

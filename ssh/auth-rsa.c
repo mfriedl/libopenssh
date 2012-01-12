@@ -65,7 +65,7 @@ extern u_char session_id[16];
  */
 
 BIGNUM *
-auth_rsa_generate_challenge(Key *key)
+auth_rsa_generate_challenge(struct sshkey *key)
 {
 	BIGNUM *challenge;
 	BN_CTX *ctx;
@@ -85,7 +85,8 @@ auth_rsa_generate_challenge(Key *key)
 }
 
 int
-auth_rsa_verify_response(Key *key, BIGNUM *challenge, u_char response[16])
+auth_rsa_verify_response(struct sshkey *key, BIGNUM *challenge,
+    u_char response[16])
 {
 	u_char buf[32], mdbuf[16];
 	MD5_CTX md;
@@ -125,7 +126,7 @@ auth_rsa_verify_response(Key *key, BIGNUM *challenge, u_char response[16])
  */
 
 int
-auth_rsa_challenge_dialog(Key *key)
+auth_rsa_challenge_dialog(struct sshkey *key)
 {
 	BIGNUM *challenge, *encrypted_challenge;
 	u_char response[16];
@@ -159,14 +160,14 @@ auth_rsa_challenge_dialog(Key *key)
 
 static int
 rsa_key_allowed_in_file(struct passwd *pw, char *file,
-    const BIGNUM *client_n, Key **rkey)
+    const BIGNUM *client_n, struct sshkey **rkey)
 {
 	char line[SSH_MAX_PUBKEY_BYTES];
 	int allowed = 0;
 	u_int bits;
 	FILE *f;
 	u_long linenum = 0;
-	Key *key;
+	struct sshkey *key;
 
 	debug("trying public RSA key file %s", file);
 	if ((f = auth_openkeyfile(file, pw, options.strict_modes)) == NULL)
@@ -177,7 +178,8 @@ rsa_key_allowed_in_file(struct passwd *pw, char *file,
 	 * found, perform a challenge-response dialog to verify that the
 	 * user really has the corresponding private key.
 	 */
-	key = key_new(KEY_RSA1);
+	if ((key = sshkey_new(KEY_RSA1)) == NULL)
+		fatal("%s: sshkey_new failed", __func__);
 	while (read_keyfile_line(f, file, line, sizeof(line), &linenum) != -1) {
 		char *cp;
 		char *key_options;
@@ -254,7 +256,7 @@ rsa_key_allowed_in_file(struct passwd *pw, char *file,
 	if (allowed && rkey != NULL)
 		*rkey = key;
 	else
-		key_free(key);
+		sshkey_free(key);
 
 	return allowed;
 }
@@ -265,7 +267,8 @@ rsa_key_allowed_in_file(struct passwd *pw, char *file,
  */
 
 int
-auth_rsa_key_allowed(struct passwd *pw, BIGNUM *client_n, Key **rkey)
+auth_rsa_key_allowed(struct passwd *pw, BIGNUM *client_n,
+    struct sshkey **rkey)
 {
 	char *file;
 	u_int i, allowed = 0;
@@ -292,7 +295,7 @@ auth_rsa_key_allowed(struct passwd *pw, BIGNUM *client_n, Key **rkey)
 int
 auth_rsa(Authctxt *authctxt, BIGNUM *client_n)
 {
-	Key *key;
+	struct sshkey *key;
 	char *fp;
 	struct passwd *pw = authctxt->pw;
 
@@ -314,7 +317,7 @@ auth_rsa(Authctxt *authctxt, BIGNUM *client_n)
 		 * Break out of the loop. Otherwise we might send
 		 * another challenge and break the protocol.
 		 */
-		key_free(key);
+		sshkey_free(key);
 		return (0);
 	}
 	/*
@@ -323,11 +326,11 @@ auth_rsa(Authctxt *authctxt, BIGNUM *client_n)
 	 * options; this will be reset if the options cause the
 	 * authentication to be rejected.
 	 */
-	fp = key_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
+	fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
 	verbose("Found matching %s key: %s",
-	    key_type(key), fp);
+	    sshkey_type(key), fp);
 	xfree(fp);
-	key_free(key);
+	sshkey_free(key);
 
 	packet_send_debug("RSA authentication accepted.");
 	return (1);

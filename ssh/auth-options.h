@@ -35,6 +35,6 @@ extern char *authorized_principals;
 
 int	auth_parse_options(struct passwd *, char *, char *, u_long);
 void	auth_clear_options(void);
-int	auth_cert_options(Key *, struct passwd *);
+int	auth_cert_options(struct sshkey *, struct passwd *);
 
 #endif

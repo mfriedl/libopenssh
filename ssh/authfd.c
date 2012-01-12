@@ -61,6 +61,7 @@
 #include "log.h"
 #include "atomicio.h"
 #include "misc.h"
+#include "err.h"
 
 static int agent_present = 0;
 
@@ -299,7 +300,7 @@ ssh_get_num_identities(AuthenticationConnection *auth, int version)
 	return auth->howmany;
 }
 
-Key *
+struct sshkey *
 ssh_get_first_identity(AuthenticationConnection *auth, char **comment, int version)
 {
 	/* get number of identities and return the first entry (if any). */
@@ -308,14 +309,14 @@ ssh_get_first_identity(AuthenticationConnection *auth, char **comment, int versi
 	return NULL;
 }
 
-Key *
+struct sshkey *
 ssh_get_next_identity(AuthenticationConnection *auth, char **comment, int version)
 {
-	int keybits;
+	int keybits, ret;
 	u_int bits;
 	u_char *blob;
 	u_int blen;
-	Key *key = NULL;
+	struct sshkey *key = NULL;
 
 	/* Return failure if no more entries. */
 	if (auth->howmany <= 0)
@@ -327,7 +328,8 @@ ssh_get_next_identity(AuthenticationConnection *auth, char **comment, int versio
 	 */
 	switch (version) {
 	case 1:
-		key = key_new(KEY_RSA1);
+		if ((key = sshkey_new(KEY_RSA1)) == NULL)
+			fatal("%s: sshkey_new failed", __func__);
 		bits = buffer_get_int(&auth->identities);
 		buffer_get_bignum(&auth->identities, key->rsa->e);
 		buffer_get_bignum(&auth->identities, key->rsa->n);
@@ -340,7 +342,9 @@ ssh_get_next_identity(AuthenticationConnection *auth, char **comment, int versio
 	case 2:
 		blob = buffer_get_string(&auth->identities, &blen);
 		*comment = buffer_get_string(&auth->identities, NULL);
-		key = key_from_blob(blob, blen);
+		if ((ret = sshkey_from_blob(blob, blen, &key)) != 0)
+			fatal("%s: sshkey_from_blob: %s",
+			    __func__, ssh_err(ret));
 		xfree(blob);
 		break;
 	default:
@@ -361,7 +365,7 @@ ssh_get_next_identity(AuthenticationConnection *auth, char **comment, int versio
 
 int
 ssh_decrypt_challenge(AuthenticationConnection *auth,
-    Key* key, BIGNUM *challenge,
+    struct sshkey* key, BIGNUM *challenge,
     u_char session_id[16],
     u_int response_type,
     u_char response[16])
@@ -409,10 +413,10 @@ ssh_decrypt_challenge(AuthenticationConnection *auth,
 	return success;
 }
 
-/* ask agent to sign data, returns -1 on error, 0 on success */
+/* ask agent to sign data, returns err.h code on error, 0 on success */
 int
 ssh_agent_sign(AuthenticationConnection *auth,
-    Key *key,
+    struct sshkey *key,
     u_char **sigp, u_int *lenp,
     u_char *data, u_int datalen)
 {
@@ -421,10 +425,12 @@ ssh_agent_sign(AuthenticationConnection *auth,
 	u_char *blob;
 	u_int blen;
 	int type, flags = 0;
-	int ret = -1;
+	int r, ret = SSH_ERR_AGENT_FAILURE;
 
-	if (key_to_blob(key, &blob, &blen) == 0)
-		return -1;
+	if ((r = sshkey_to_blob(key, &blob, &blen)) != 0) {
+		error("%s: sshkey_to_blob: %s", __func__, ssh_err(r));
+		return SSH_ERR_INVALID_ARGUMENT;
+	}
 
 	if (datafellows & SSH_BUG_SIGBLOB)
 		flags = SSH_AGENT_OLD_SIGNATURE;
@@ -438,7 +444,7 @@ ssh_agent_sign(AuthenticationConnection *auth,
 
 	if (ssh_request_reply(auth, &msg, &msg) == 0) {
 		buffer_free(&msg);
-		return -1;
+		return SSH_ERR_AGENT_COMMUNICATION;
 	}
 	type = buffer_get_char(&msg);
 	if (agent_failed(type)) {
@@ -470,9 +476,9 @@ ssh_encode_identity_rsa1(Buffer *b, RSA *key, const char *comment)
 }
 
 static void
-ssh_encode_identity_ssh2(Buffer *b, Key *key, const char *comment)
+ssh_encode_identity_ssh2(Buffer *b, struct sshkey *key, const char *comment)
 {
-	buffer_put_cstring(b, key_ssh_name(key));
+	buffer_put_cstring(b, sshkey_ssh_name(key));
 	switch (key->type) {
 	case KEY_RSA:
 		buffer_put_bignum2(b, key->rsa->n);
@@ -484,10 +490,10 @@ ssh_encode_identity_ssh2(Buffer *b, Key *key, const char *comment)
 		break;
 	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
-		if (key->cert == NULL || buffer_len(&key->cert->certblob) == 0)
+		if (key->cert == NULL || buffer_len(key->cert->certblob) == 0)
 			fatal("%s: no cert/certblob", __func__);
-		buffer_put_string(b, buffer_ptr(&key->cert->certblob),
-		    buffer_len(&key->cert->certblob));
+		buffer_put_string(b, buffer_ptr(key->cert->certblob),
+		    buffer_len(key->cert->certblob));
 		buffer_put_bignum2(b, key->rsa->d);
 		buffer_put_bignum2(b, key->rsa->iqmp);
 		buffer_put_bignum2(b, key->rsa->p);
@@ -502,23 +508,23 @@ ssh_encode_identity_ssh2(Buffer *b, Key *key, const char *comment)
 		break;
 	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
-		if (key->cert == NULL || buffer_len(&key->cert->certblob) == 0)
+		if (key->cert == NULL || buffer_len(key->cert->certblob) == 0)
 			fatal("%s: no cert/certblob", __func__);
-		buffer_put_string(b, buffer_ptr(&key->cert->certblob),
-		    buffer_len(&key->cert->certblob));
+		buffer_put_string(b, buffer_ptr(key->cert->certblob),
+		    buffer_len(key->cert->certblob));
 		buffer_put_bignum2(b, key->dsa->priv_key);
 		break;
 	case KEY_ECDSA:
-		buffer_put_cstring(b, key_curve_nid_to_name(key->ecdsa_nid));
+		buffer_put_cstring(b, sshkey_curve_nid_to_name(key->ecdsa_nid));
 		buffer_put_ecpoint(b, EC_KEY_get0_group(key->ecdsa),
 		    EC_KEY_get0_public_key(key->ecdsa));
 		buffer_put_bignum2(b, EC_KEY_get0_private_key(key->ecdsa));
 		break;
 	case KEY_ECDSA_CERT:
-		if (key->cert == NULL || buffer_len(&key->cert->certblob) == 0)
+		if (key->cert == NULL || buffer_len(key->cert->certblob) == 0)
 			fatal("%s: no cert/certblob", __func__);
-		buffer_put_string(b, buffer_ptr(&key->cert->certblob),
-		    buffer_len(&key->cert->certblob));
+		buffer_put_string(b, buffer_ptr(key->cert->certblob),
+		    buffer_len(key->cert->certblob));
 		buffer_put_bignum2(b, EC_KEY_get0_private_key(key->ecdsa));
 		break;
 	}
@@ -531,7 +537,7 @@ ssh_encode_identity_ssh2(Buffer *b, Key *key, const char *comment)
  */
 
 int
-ssh_add_identity_constrained(AuthenticationConnection *auth, Key *key,
+ssh_add_identity_constrained(AuthenticationConnection *auth, struct sshkey *key,
     const char *comment, u_int life, u_int confirm)
 {
 	Buffer msg;
@@ -588,10 +594,10 @@ ssh_add_identity_constrained(AuthenticationConnection *auth, Key *key,
  */
 
 int
-ssh_remove_identity(AuthenticationConnection *auth, Key *key)
+ssh_remove_identity(AuthenticationConnection *auth, struct sshkey *key)
 {
 	Buffer msg;
-	int type;
+	int r, type;
 	u_char *blob;
 	u_int blen;
 
@@ -602,10 +608,13 @@ ssh_remove_identity(AuthenticationConnection *auth, Key *key)
 		buffer_put_int(&msg, BN_num_bits(key->rsa->n));
 		buffer_put_bignum(&msg, key->rsa->e);
 		buffer_put_bignum(&msg, key->rsa->n);
-	} else if (key_type_plain(key->type) == KEY_DSA ||
-	    key_type_plain(key->type) == KEY_RSA ||
-	    key_type_plain(key->type) == KEY_ECDSA) {
-		key_to_blob(key, &blob, &blen);
+	} else if (sshkey_type_plain(key->type) == KEY_DSA ||
+	    sshkey_type_plain(key->type) == KEY_RSA ||
+	    sshkey_type_plain(key->type) == KEY_ECDSA) {
+		if ((r = sshkey_to_blob(key, &blob, &blen)) != 0) {
+			error("%s: sshkey_to_blob: %s", __func__, ssh_err(r));
+			return 0;
+		}
 		buffer_put_char(&msg, SSH2_AGENTC_REMOVE_IDENTITY);
 		buffer_put_string(&msg, blob, blen);
 		xfree(blob);
