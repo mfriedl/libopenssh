@@ -49,8 +49,7 @@ struct ssh *
 ssh_init(int is_server, struct kex_params *kex_params)
 {
 	struct ssh *ssh;
-	char **proposal, **given;
-	int i;
+	char **proposal;
 	static int called;
 
 	if (!called) {
@@ -62,12 +61,8 @@ ssh_init(int is_server, struct kex_params *kex_params)
 	if (is_server)
 		ssh_packet_set_server(ssh);
 
-	given = kex_params ? kex_params->proposal : myproposal;
-	proposal = xcalloc(PROPOSAL_MAX, sizeof(char *));
-	for (i = 0; i < PROPOSAL_MAX; i++)
-		proposal[i] = xstrdup(given[i]);
-
 	/* Initialize key exchange */
+	proposal = kex_params ? kex_params->proposal : myproposal;
 	ssh->kex = kex_new(ssh, proposal);
 	ssh->kex->server = is_server;
 	if (is_server) {
@@ -93,11 +88,8 @@ void
 ssh_free(struct ssh *ssh)
 {
 	ssh_packet_close(ssh);
-	if (ssh->kex) {
-		if (ssh->kex->proposal)
-			xfree(ssh->kex->proposal);
-		xfree(ssh->kex);
-	}
+	if (ssh->kex);
+		kex_free(ssh->kex);
 	xfree(ssh);
 }
 
@@ -383,10 +375,13 @@ _ssh_order_hostkeyalgs(struct ssh *ssh)
 {
 	struct key_entry *k;
 	char *orig, *avail, *oavail,*alg, *replace;
+	char **proposal;
 	size_t maxlen;
 	int ktype;
 
-	orig = ssh->kex->proposal[PROPOSAL_SERVER_HOST_KEY_ALGS];
+	/* XXX we de-serialize ssh->kex->my, modify it, and change it */
+	proposal = kex_buf2prop(&ssh->kex->my, NULL);
+	orig = proposal[PROPOSAL_SERVER_HOST_KEY_ALGS];
 	oavail = avail = xstrdup(orig);
 	maxlen = strlen(avail) + 1;
 	replace = xmalloc(maxlen);
@@ -410,8 +405,10 @@ _ssh_order_hostkeyalgs(struct ssh *ssh)
 		debug2("%s: orig/%d    %s", __func__, ssh->kex->server, orig);
 		debug2("%s: replace/%d %s", __func__, ssh->kex->server, replace);
 		xfree(orig);
-		ssh->kex->proposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = replace;
+		proposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = replace;
+		kex_prop2buf(&ssh->kex->my, proposal);
 	} else {
 		xfree(replace);
 	}
+	kex_prop_free(proposal);
 }
