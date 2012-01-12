@@ -164,7 +164,7 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 	DH_free(kexdhc_state->dh);
 
 	if (sshkey_verify(server_host_key, signature, slen, hash, hashlen,
-	    datafellows) != 1)
+	    datafellows) != 0)
 		fatal("key_verify failed for server_host_key");
 	sshkey_free(server_host_key);
 	xfree(signature);
