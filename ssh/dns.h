@@ -46,7 +46,8 @@ enum sshfp_hashes {
 #define DNS_VERIFY_MATCH	0x00000002
 #define DNS_VERIFY_SECURE	0x00000004
 
-int	verify_host_key_dns(const char *, struct sockaddr *, Key *, int *);
-int	export_dns_rr(const char *, Key *, FILE *, int);
+int	verify_host_key_dns(const char *, struct sockaddr *,
+    struct sshkey *, int *);
+int	export_dns_rr(const char *, struct sshkey *, FILE *, int);
 
 #endif /* DNS_H */

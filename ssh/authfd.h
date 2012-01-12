@@ -73,22 +73,21 @@ void	ssh_close_authentication_socket(int);
 AuthenticationConnection *ssh_get_authentication_connection(void);
 void	ssh_close_authentication_connection(AuthenticationConnection *);
 int	 ssh_get_num_identities(AuthenticationConnection *, int);
-Key	*ssh_get_first_identity(AuthenticationConnection *, char **, int);
-Key	*ssh_get_next_identity(AuthenticationConnection *, char **, int);
-int	 ssh_add_identity_constrained(AuthenticationConnection *, Key *,
-    const char *, u_int, u_int);
-int	 ssh_remove_identity(AuthenticationConnection *, Key *);
+struct sshkey *ssh_get_first_identity(AuthenticationConnection *, char **, int);
+struct sshkey *ssh_get_next_identity(AuthenticationConnection *, char **, int);
+int	 ssh_add_identity_constrained(AuthenticationConnection *,
+    struct sshkey *, const char *, u_int, u_int);
+int	 ssh_remove_identity(AuthenticationConnection *, struct sshkey *);
 int	 ssh_remove_all_identities(AuthenticationConnection *, int);
 int	 ssh_lock_agent(AuthenticationConnection *, int, const char *);
 int	 ssh_update_card(AuthenticationConnection *, int, const char *,
     const char *, u_int, u_int);
 
-int
-ssh_decrypt_challenge(AuthenticationConnection *, Key *, BIGNUM *, u_char[16],
-    u_int, u_char[16]);
+int	 ssh_decrypt_challenge(AuthenticationConnection *, struct sshkey *,
+    BIGNUM *, u_char[16], u_int, u_char[16]);
 
 int
-ssh_agent_sign(AuthenticationConnection *, Key *, u_char **, u_int *, u_char *,
-    u_int);
+ssh_agent_sign(AuthenticationConnection *, struct sshkey *,
+    u_char **, u_int *, u_char *, u_int);
 
 #endif				/* AUTHFD_H */

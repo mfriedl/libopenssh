@@ -786,7 +786,7 @@ main(int ac, char **av)
 	    options.hostbased_authentication) {
 		sensitive_data.nkeys = 7;
 		sensitive_data.keys = xcalloc(sensitive_data.nkeys,
-		    sizeof(Key));
+		    sizeof(struct sshkey));
 
 		PRIV_START;
 		sensitive_data.keys[0] = key_load_private_type(KEY_RSA1,
@@ -878,7 +878,7 @@ main(int ac, char **av)
 			if (sensitive_data.keys[i] != NULL) {
 				/* Destroys contents safely */
 				debug3("clear hostkey %d", i);
-				key_free(sensitive_data.keys[i]);
+				sshkey_free(sensitive_data.keys[i]);
 				sensitive_data.keys[i] = NULL;
 			}
 		}
@@ -890,7 +890,7 @@ main(int ac, char **av)
 			options.identity_files[i] = NULL;
 		}
 		if (options.identity_keys[i]) {
-			key_free(options.identity_keys[i]);
+			sshkey_free(options.identity_keys[i]);
 			options.identity_keys[i] = NULL;
 		}
 	}
@@ -1444,13 +1444,13 @@ load_public_identity_files(void)
 	char *filename, *cp, thishost[NI_MAXHOST];
 	char *pwdir = NULL, *pwname = NULL;
 	int i = 0;
-	Key *public;
+	struct sshkey *public;
 	struct passwd *pw;
 	u_int n_ids;
 	char *identity_files[SSH_MAX_IDENTITY_FILES];
-	Key *identity_keys[SSH_MAX_IDENTITY_FILES];
+	struct sshkey *identity_keys[SSH_MAX_IDENTITY_FILES];
 #ifdef ENABLE_PKCS11
-	Key **keys;
+	struct sshkey **keys;
 	int nkeys;
 #endif /* PKCS11 */
 
@@ -1466,7 +1466,7 @@ load_public_identity_files(void)
 	    &keys)) > 0) {
 		for (i = 0; i < nkeys; i++) {
 			if (n_ids >= SSH_MAX_IDENTITY_FILES) {
-				key_free(keys[i]);
+				sshkey_free(keys[i]);
 				continue;
 			}
 			identity_keys[n_ids] = keys[i];
@@ -1514,10 +1514,10 @@ load_public_identity_files(void)
 			xfree(cp);
 			continue;
 		}
-		if (!key_is_cert(public)) {
+		if (!sshkey_is_cert(public)) {
 			debug("%s: key %s type %s is not a certificate",
-			    __func__, cp, key_type(public));
-			key_free(public);
+			    __func__, cp, sshkey_type(public));
+			sshkey_free(public);
 			xfree(cp);
 			continue;
 		}

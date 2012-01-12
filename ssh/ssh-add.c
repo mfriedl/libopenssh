@@ -58,6 +58,7 @@
 #include "authfile.h"
 #include "pathnames.h"
 #include "misc.h"
+#include "err.h"
 
 /* argv0 */
 extern char *__progname;
@@ -92,7 +93,7 @@ clear_pass(void)
 static int
 delete_file(AuthenticationConnection *ac, const char *filename)
 {
-	Key *public;
+	struct sshkey *public;
 	char *comment = NULL;
 	int ret = -1;
 
@@ -107,7 +108,7 @@ delete_file(AuthenticationConnection *ac, const char *filename)
 	} else
 		fprintf(stderr, "Could not remove identity: %s\n", filename);
 
-	key_free(public);
+	sshkey_free(public);
 	xfree(comment);
 
 	return ret;
@@ -135,10 +136,10 @@ delete_all(AuthenticationConnection *ac)
 static int
 add_file(AuthenticationConnection *ac, const char *filename, int key_only)
 {
-	Key *private, *cert;
+	struct sshkey *private, *cert;
 	char *comment = NULL;
 	char msg[1024], *certpath = NULL;
-	int fd, perms_ok, ret = -1;
+	int r, fd, perms_ok, ret = -1;
 	Buffer keyblob;
 
 	if (strcmp(filename, "-") == 0) {
@@ -222,21 +223,26 @@ add_file(AuthenticationConnection *ac, const char *filename, int key_only)
 	if ((cert = key_load_public(certpath, NULL)) == NULL)
 		goto out;
 
-	if (!key_equal_public(cert, private)) {
+	if (!sshkey_equal_public(cert, private)) {
 		error("Certificate %s does not match private key %s",
 		    certpath, filename);
-		key_free(cert);
+		sshkey_free(cert);
 		goto out;
 	} 
 
 	/* Graft with private bits */
-	if (key_to_certified(private, key_cert_is_legacy(cert)) != 0) {
-		error("%s: key_to_certified failed", __func__);
-		key_free(cert);
+	if ((r = sshkey_to_certified(private,
+	    sshkey_cert_is_legacy(cert))) != 0) {
+		error("%s: sshkey_to_certified: %s", __func__, ssh_err(r));
+		sshkey_free(cert);
 		goto out;
 	}
-	key_cert_copy(cert, private);
-	key_free(cert);
+	if ((r = sshkey_cert_copy(cert, private)) != 0) {
+		error("%s: key_cert_copy: %s", __func__, ssh_err(r));
+		sshkey_free(cert);
+		goto out;
+	}
+	sshkey_free(cert);
 
 	if (!ssh_add_identity_constrained(ac, private, comment,
 	    lifetime, confirm)) {
@@ -253,7 +259,7 @@ add_file(AuthenticationConnection *ac, const char *filename, int key_only)
 	if (certpath != NULL)
 		xfree(certpath);
 	xfree(comment);
-	key_free(private);
+	sshkey_free(private);
 
 	return ret;
 }
@@ -284,10 +290,9 @@ update_card(AuthenticationConnection *ac, int add, const char *id)
 static int
 list_identities(AuthenticationConnection *ac, int do_fp)
 {
-	Key *key;
+	struct sshkey *key;
 	char *comment, *fp;
-	int had_identities = 0;
-	int version;
+	int version, r, had_identities = 0;
 
 	for (version = 1; version <= 2; version++) {
 		for (key = ssh_get_first_identity(ac, &comment, version);
@@ -295,17 +300,19 @@ list_identities(AuthenticationConnection *ac, int do_fp)
 		    key = ssh_get_next_identity(ac, &comment, version)) {
 			had_identities = 1;
 			if (do_fp) {
-				fp = key_fingerprint(key, SSH_FP_MD5,
+				fp = sshkey_fingerprint(key, SSH_FP_MD5,
 				    SSH_FP_HEX);
 				printf("%d %s %s (%s)\n",
-				    key_size(key), fp, comment, key_type(key));
+				    sshkey_size(key), fp, comment,
+				    sshkey_type(key));
 				xfree(fp);
 			} else {
-				if (!key_write(key, stdout))
-					fprintf(stderr, "key_write failed");
+				if ((r = sshkey_write(key, stdout)) != 0)
+					fprintf(stderr, "sshkey_write: %s",
+					    ssh_err(r));
 				fprintf(stdout, " %s\n", comment);
 			}
-			key_free(key);
+			sshkey_free(key);
 			xfree(comment);
 		}
 	}

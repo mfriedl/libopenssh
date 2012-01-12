@@ -51,6 +51,7 @@
 #include "roaming.h"
 #include "ssh2.h"
 #include "version.h"
+#include "err.h"
 
 char *client_version_string = NULL;
 char *server_version_string = NULL;
@@ -65,8 +66,8 @@ extern char *__progname;
 extern uid_t original_real_uid;
 extern uid_t original_effective_uid;
 
-static int show_other_keys(struct hostkeys *, Key *);
-static void warn_changed_key(Key *);
+static int show_other_keys(struct hostkeys *, struct sshkey *);
+static void warn_changed_key(struct sshkey *);
 
 /*
  * Connect to the given ssh server using a proxy command.
@@ -582,15 +583,15 @@ confirm(const char *prompt)
 }
 
 static int
-check_host_cert(const char *host, const Key *host_key)
+check_host_cert(const char *host, const struct sshkey *host_key)
 {
 	const char *reason;
 
-	if (key_cert_check_authority(host_key, 1, 0, host, &reason) != 0) {
+	if (sshkey_cert_check_authority(host_key, 1, 0, host, &reason) != 0) {
 		error("%s", reason);
 		return 0;
 	}
-	if (buffer_len(&host_key->cert->critical) != 0) {
+	if (buffer_len(host_key->cert->critical) != 0) {
 		error("Certificate for %s contains unsupported "
 		    "critical options(s)", host);
 		return 0;
@@ -664,13 +665,13 @@ get_hostfile_hostname_ipaddr(char *hostname, struct sockaddr *hostaddr,
 #define ROQUIET	2
 static int
 check_host_key(char *hostname, struct sockaddr *hostaddr, u_short port,
-    Key *host_key, int readonly,
+    struct sshkey *host_key, int readonly,
     char **user_hostfiles, u_int num_user_hostfiles,
     char **system_hostfiles, u_int num_system_hostfiles)
 {
 	HostStatus host_status;
 	HostStatus ip_status;
-	Key *raw_key = NULL;
+	struct sshkey *raw_key = NULL;
 	char *ip = NULL, *host = NULL;
 	char hostline[1000], *hostp, *fp, *ra;
 	char msg[1024];
@@ -678,7 +679,7 @@ check_host_key(char *hostname, struct sockaddr *hostaddr, u_short port,
 	const struct hostkey_entry *host_found, *ip_found;
 	int len, cancelled_forwarding = 0;
 	int local = sockaddr_is_local(hostaddr);
-	int r, want_cert = key_is_cert(host_key), host_ip_differ = 0;
+	int r, want_cert = sshkey_is_cert(host_key), host_ip_differ = 0;
 	struct hostkeys *host_hostkeys, *ip_hostkeys;
 	u_int i;
 
@@ -728,8 +729,8 @@ check_host_key(char *hostname, struct sockaddr *hostaddr, u_short port,
 
  retry:
 	/* Reload these as they may have changed on cert->key downgrade */
-	want_cert = key_is_cert(host_key);
-	type = key_type(host_key);
+	want_cert = sshkey_is_cert(host_key);
+	type = sshkey_type(host_key);
 
 	/*
 	 * Check if the host key is present in the user's list of known
@@ -749,7 +750,7 @@ check_host_key(char *hostname, struct sockaddr *hostaddr, u_short port,
 		if (host_status == HOST_CHANGED &&
 		    (ip_status != HOST_CHANGED || 
 		    (ip_found != NULL &&
-		    !key_equal(ip_found->key, host_found->key))))
+		    !sshkey_equal(ip_found->key, host_found->key))))
 			host_ip_differ = 1;
 	} else
 		ip_status = host_status;
@@ -779,8 +780,9 @@ check_host_key(char *hostname, struct sockaddr *hostaddr, u_short port,
 				    "key for IP address '%.128s' to the list "
 				    "of known hosts.", type, ip);
 		} else if (options.visual_host_key) {
-			fp = key_fingerprint(host_key, SSH_FP_MD5, SSH_FP_HEX);
-			ra = key_fingerprint(host_key, SSH_FP_MD5,
+			fp = sshkey_fingerprint(host_key, SSH_FP_MD5,
+			    SSH_FP_HEX);
+			ra = sshkey_fingerprint(host_key, SSH_FP_MD5,
 			    SSH_FP_RANDOMART);
 			logit("Host key fingerprint is %s\n%s\n", fp, ra);
 			xfree(ra);
@@ -820,8 +822,9 @@ check_host_key(char *hostname, struct sockaddr *hostaddr, u_short port,
 			else
 				snprintf(msg1, sizeof(msg1), ".");
 			/* The default */
-			fp = key_fingerprint(host_key, SSH_FP_MD5, SSH_FP_HEX);
-			ra = key_fingerprint(host_key, SSH_FP_MD5,
+			fp = sshkey_fingerprint(host_key, SSH_FP_MD5,
+			    SSH_FP_HEX);
+			ra = sshkey_fingerprint(host_key, SSH_FP_MD5,
 			    SSH_FP_RANDOMART);
 			msg2[0] = '\0';
 			if (options.verify_host_key_dns) {
@@ -938,7 +941,8 @@ check_host_key(char *hostname, struct sockaddr *hostaddr, u_short port,
 		warn_changed_key(host_key);
 		error("Add correct host key in %.100s to get rid of this message.",
 		    user_hostfiles[0]);
-		error("Offending %s key in %s:%lu", key_type(host_found->key),
+		error("Offending %s key in %s:%lu",
+		    sshkey_type(host_found->key),
 		    host_found->file, host_found->line);
 
 		/*
@@ -1061,14 +1065,16 @@ fail:
 		 * search normally.
 		 */
 		debug("No matching CA found. Retry with plain key");
-		raw_key = key_from_private(host_key);
-		if (key_drop_cert(raw_key) != 0)
-			fatal("Couldn't drop certificate");
+		if ((r = sshkey_from_private(host_key, &raw_key)) != 0)
+			fatal("%s: sshkey_from_private: %s",
+			    __func__, ssh_err(r));
+		if ((r = sshkey_drop_cert(raw_key)) != 0)
+			fatal("Couldn't drop certificate: %s", ssh_err(r));
 		host_key = raw_key;
 		goto retry;
 	}
 	if (raw_key != NULL)
-		key_free(raw_key);
+		sshkey_free(raw_key);
 	xfree(ip);
 	xfree(host);
 	if (host_hostkeys != NULL)
@@ -1080,17 +1086,17 @@ fail:
 
 /* returns 0 if key verifies or -1 if key does NOT verify */
 int
-verify_host_key(char *host, struct sockaddr *hostaddr, Key *host_key)
+verify_host_key(char *host, struct sockaddr *hostaddr, struct sshkey *host_key)
 {
 	int flags = 0;
 	char *fp;
 
-	fp = key_fingerprint(host_key, SSH_FP_MD5, SSH_FP_HEX);
-	debug("Server host key: %s %s", key_type(host_key), fp);
+	fp = sshkey_fingerprint(host_key, SSH_FP_MD5, SSH_FP_HEX);
+	debug("Server host key: %s %s", sshkey_type(host_key), fp);
 	xfree(fp);
 
 	/* XXX certs are not yet supported for DNS */
-	if (!key_is_cert(host_key) && options.verify_host_key_dns &&
+	if (!sshkey_is_cert(host_key) && options.verify_host_key_dns &&
 	    verify_host_key_dns(host, hostaddr, host_key, &flags) == 0) {
 		if (flags & DNS_VERIFY_FOUND) {
 
@@ -1175,7 +1181,7 @@ ssh_put_password(char *password)
 
 /* print all known host keys for a given host, but skip keys of given type */
 static int
-show_other_keys(struct hostkeys *hostkeys, Key *key)
+show_other_keys(struct hostkeys *hostkeys, struct sshkey *key)
 {
 	int type[] = { KEY_RSA1, KEY_RSA, KEY_DSA, KEY_ECDSA, -1};
 	int i, ret = 0;
@@ -1187,14 +1193,15 @@ show_other_keys(struct hostkeys *hostkeys, Key *key)
 			continue;
 		if (!lookup_key_in_hostkeys_by_type(hostkeys, type[i], &found))
 			continue;
-		fp = key_fingerprint(found->key, SSH_FP_MD5, SSH_FP_HEX);
-		ra = key_fingerprint(found->key, SSH_FP_MD5, SSH_FP_RANDOMART);
+		fp = sshkey_fingerprint(found->key, SSH_FP_MD5, SSH_FP_HEX);
+		ra = sshkey_fingerprint(found->key, SSH_FP_MD5,
+		    SSH_FP_RANDOMART);
 		logit("WARNING: %s key found for host %s\n"
 		    "in %s:%lu\n"
 		    "%s key fingerprint %s.",
-		    key_type(found->key),
+		    sshkey_type(found->key),
 		    found->host, found->file, found->line,
-		    key_type(found->key), fp);
+		    sshkey_type(found->key), fp);
 		if (options.visual_host_key)
 			logit("%s", ra);
 		xfree(ra);
@@ -1205,11 +1212,11 @@ show_other_keys(struct hostkeys *hostkeys, Key *key)
 }
 
 static void
-warn_changed_key(Key *host_key)
+warn_changed_key(struct sshkey *host_key)
 {
 	char *fp;
 
-	fp = key_fingerprint(host_key, SSH_FP_MD5, SSH_FP_HEX);
+	fp = sshkey_fingerprint(host_key, SSH_FP_MD5, SSH_FP_HEX);
 
 	error("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 	error("@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @");
@@ -1218,7 +1225,7 @@ warn_changed_key(Key *host_key)
 	error("Someone could be eavesdropping on you right now (man-in-the-middle attack)!");
 	error("It is also possible that a host key has just been changed.");
 	error("The fingerprint for the %s key sent by the remote host is\n%s.",
-	    key_type(host_key), fp);
+	    sshkey_type(host_key), fp);
 	error("Please contact your system administrator.");
 
 	xfree(fp);

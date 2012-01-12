@@ -42,6 +42,8 @@
 #include "dh.h"
 #include "ssh2.h"
 #include "dispatch.h"
+#include "compat.h"
+#include "err.h"
 
 struct kexecdhc_state {
 	EC_KEY *client_key;
@@ -74,7 +76,7 @@ kexecdh_client(struct ssh *ssh)
 
 #ifdef DEBUG_KEXECDH
 	fputs("client private key:\n", stderr);
-	key_dump_ec_key(client_key);
+	sshkey_dump_ec_key(client_key);
 #endif
 
 	kexecdhc_state = xcalloc(1, sizeof(*kexecdhc_state));
@@ -95,17 +97,21 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 	EC_POINT *server_public;
 	EC_KEY *client_key;
 	BIGNUM *shared_secret;
-	Key *server_host_key;
+	struct sshkey *server_host_key;
 	u_char *server_host_key_blob = NULL, *signature = NULL;
 	u_char *kbuf, *hash;
 	u_int klen, slen, sbloblen, hashlen;
+	int r;
 
 	group = kexecdhc_state->group;
 	client_key = kexecdhc_state->client_key;
 
 	/* hostkey */
 	server_host_key_blob = ssh_packet_get_string(ssh, &sbloblen);
-	server_host_key = key_from_blob(server_host_key_blob, sbloblen);
+	if ((r = sshkey_from_blob(server_host_key_blob, sbloblen,
+	    &server_host_key)) != 0)
+		fatal("%s: could not parse server host key: %s",
+		    __func__, ssh_err(r));
 	if (server_host_key == NULL)
 		fatal("cannot decode server_host_key_blob");
 	if (server_host_key->type != kex->hostkey_type)
@@ -120,12 +126,12 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 		fatal("%s: EC_POINT_new failed", __func__);
 	ssh_packet_get_ecpoint(ssh, group, server_public);
 
-	if (key_ec_validate_public(group, server_public) != 0)
+	if (sshkey_ec_validate_public(group, server_public) != 0)
 		fatal("%s: invalid server public key", __func__);
 
 #ifdef DEBUG_KEXECDH
 	fputs("server public key:\n", stderr);
-	key_dump_ec_point(group, server_public);
+	sshkey_dump_ec_point(group, server_public);
 #endif
 
 	/* signed H */
@@ -166,9 +172,10 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 	EC_POINT_clear_free(server_public);
 	EC_KEY_free(client_key);
 
-	if (key_verify(server_host_key, signature, slen, hash, hashlen) != 1)
-		fatal("key_verify failed for server_host_key");
-	key_free(server_host_key);
+	if ((r = sshkey_verify(server_host_key, signature, slen, hash,
+	    hashlen, datafellows)) != 0)
+		fatal("key_verify failed for server_host_key: %s", ssh_err(r));
+	sshkey_free(server_host_key);
 	xfree(signature);
 
 	/* save session id */

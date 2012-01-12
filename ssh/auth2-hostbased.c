@@ -46,6 +46,7 @@
 #endif
 #include "monitor_wrap.h"
 #include "pathnames.h"
+#include "err.h"
 
 /* import */
 extern ServerOptions options;
@@ -57,15 +58,14 @@ userauth_hostbased(struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
 	Buffer b;
-	Key *key = NULL;
+	struct sshkey *key = NULL;
 	char *pkalg, *cuser, *chost, *service;
 	u_char *pkblob, *sig;
 	u_int alen, blen, slen;
-	int pktype;
-	int authenticated = 0;
+	int r, pktype, authenticated = 0;
 
 	if (!authctxt->valid) {
-		debug2("userauth_hostbased: disabled because of invalid user");
+		debug2("%s: disabled because of invalid user", __func__);
 		return 0;
 	}
 	pkalg = ssh_packet_get_string(ssh, &alen);
@@ -74,7 +74,7 @@ userauth_hostbased(struct ssh *ssh)
 	cuser = ssh_packet_get_string(ssh, NULL);
 	sig = ssh_packet_get_string(ssh, &slen);
 
-	debug("userauth_hostbased: cuser %s chost %s pkalg %s slen %d",
+	debug("%s: cuser %s chost %s pkalg %s slen %d", __func__,
 	    cuser, chost, pkalg, slen);
 #ifdef DEBUG_PK
 	debug("signature:");
@@ -83,21 +83,24 @@ userauth_hostbased(struct ssh *ssh)
 	buffer_dump(&b);
 	buffer_free(&b);
 #endif
-	pktype = key_type_from_name(pkalg);
+	pktype = sshkey_type_from_name(pkalg);
 	if (pktype == KEY_UNSPEC) {
 		/* this is perfectly legal */
-		logit("userauth_hostbased: unsupported "
-		    "public key algorithm: %s", pkalg);
+		logit("%s: unsupported public key algorithm: %s",
+		    __func__, pkalg);
 		goto done;
 	}
-	key = key_from_blob(pkblob, blen);
+	if ((r = sshkey_from_blob(pkblob, blen, &key)) != 0) {
+		error("%s: key_from_blob: %s", __func__, ssh_err(r));
+		goto done;
+	}
 	if (key == NULL) {
-		error("userauth_hostbased: cannot decode key: %s", pkalg);
+		error("%s: cannot decode key: %s", __func__, pkalg);
 		goto done;
 	}
 	if (key->type != pktype) {
-		error("userauth_hostbased: type mismatch for decoded key "
-		    "(received %d, expected %d)", key->type, pktype);
+		error("%s: type mismatch for decoded key "
+		    "(received %d, expected %d)", __func__, key->type, pktype);
 		goto done;
 	}
 	service = datafellows & SSH_BUG_HBSERVICE ? "ssh-userauth" :
@@ -119,15 +122,15 @@ userauth_hostbased(struct ssh *ssh)
 	/* test for allowed key and correct signature */
 	authenticated = 0;
 	if (PRIVSEP(hostbased_key_allowed(authctxt->pw, cuser, chost, key)) &&
-	    PRIVSEP(key_verify(key, sig, slen, buffer_ptr(&b),
-			buffer_len(&b))) == 1)
+	    PRIVSEP(sshkey_verify(key, sig, slen,
+	    buffer_ptr(&b), buffer_len(&b), datafellows)) == 0)
 		authenticated = 1;
 
 	buffer_free(&b);
 done:
-	debug2("userauth_hostbased: authenticated %d", authenticated);
+	debug2("%s: authenticated %d", __func__, authenticated);
 	if (key != NULL)
-		key_free(key);
+		sshkey_free(key);
 	xfree(pkalg);
 	xfree(pkblob);
 	xfree(cuser);
@@ -139,7 +142,7 @@ done:
 /* return 1 if given hostkey is allowed */
 int
 hostbased_key_allowed(struct passwd *pw, const char *cuser, char *chost,
-    Key *key)
+    struct sshkey *key)
 {
 	const char *resolvedname, *ipaddr, *lookup, *reason;
 	HostStatus host_status;
@@ -175,8 +178,8 @@ hostbased_key_allowed(struct passwd *pw, const char *cuser, char *chost,
 	}
 	debug2("userauth_hostbased: access allowed by auth_rhosts2");
 
-	if (key_is_cert(key) && 
-	    key_cert_check_authority(key, 1, 0, lookup, &reason)) {
+	if (sshkey_is_cert(key) && 
+	    sshkey_cert_check_authority(key, 1, 0, lookup, &reason)) {
 		error("%s", reason);
 		auth_debug_add("%s", reason);
 		return 0;
@@ -195,17 +198,17 @@ hostbased_key_allowed(struct passwd *pw, const char *cuser, char *chost,
 	}
 
 	if (host_status == HOST_OK) {
-		if (key_is_cert(key)) {
-			fp = key_fingerprint(key->cert->signature_key,
+		if (sshkey_is_cert(key)) {
+			fp = sshkey_fingerprint(key->cert->signature_key,
 			    SSH_FP_MD5, SSH_FP_HEX);
 			verbose("Accepted certificate ID \"%s\" signed by "
 			    "%s CA %s from %s@%s", key->cert->key_id,
-			    key_type(key->cert->signature_key), fp,
+			    sshkey_type(key->cert->signature_key), fp,
 			    cuser, lookup);
 		} else {
-			fp = key_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
+			fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
 			verbose("Accepted %s public key %s from %s@%s",
-			    key_type(key), fp, cuser, lookup);
+			    sshkey_type(key), fp, cuser, lookup);
 		}
 		xfree(fp);
 	}

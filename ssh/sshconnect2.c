@@ -68,6 +68,8 @@
 #include "hostfile.h"
 #include "schnorr.h"
 #include "jpake.h"
+#include "compat.h"
+#include "err.h"
 
 #ifdef GSSAPI
 #include "ssh-gss.h"
@@ -86,7 +88,7 @@ u_char *session_id2 = NULL;
 u_int session_id2_len = 0;
 
 static int
-verify_host_key_callback(Key *hostkey, struct ssh *ssh)
+verify_host_key_callback(struct sshkey *hostkey, struct ssh *ssh)
 {
 	if (verify_host_key(ssh->host, ssh->hostaddr, hostkey) == -1)
 		fatal("Host key verification failed.");
@@ -124,10 +126,10 @@ order_hostkeyalgs(char *host, struct sockaddr *hostaddr, u_short port)
 	} while (0)
 
 	while ((alg = strsep(&avail, ",")) && *alg != '\0') {
-		if ((ktype = key_type_from_name(alg)) == KEY_UNSPEC)
+		if ((ktype = sshkey_type_from_name(alg)) == KEY_UNSPEC)
 			fatal("%s: unknown alg %s", __func__, alg);
 		if (lookup_key_in_hostkeys_by_type(hostkeys,
-		    key_type_plain(ktype), NULL))
+		    sshkey_type_plain(ktype), NULL))
 			ALG_APPEND(first, alg);
 		else
 			ALG_APPEND(last, alg);
@@ -236,7 +238,7 @@ typedef struct idlist Idlist;
 struct identity {
 	TAILQ_ENTRY(identity) next;
 	AuthenticationConnection *ac;	/* set if agent supports key */
-	Key	*key;			/* public/private key */
+	struct sshkey	*key;		/* public/private key */
 	char	*filename;		/* comment for agent-only keys */
 	int	tried;
 	int	isprivate;		/* key points to the private key */
@@ -310,7 +312,7 @@ void	userauth(struct ssh *, char *);
 static int sign_and_send_pubkey(struct ssh *, Identity *);
 static void pubkey_prepare(struct ssh *);
 static void pubkey_cleanup(struct ssh *);
-static Key *load_identity_file(char *);
+static struct sshkey *load_identity_file(char *);
 
 static Authmethod *authmethod_get(char *authlist);
 static Authmethod *authmethod_lookup(const char *name);
@@ -559,13 +561,14 @@ void
 input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
-	Key *key = NULL;
+	struct sshkey *key = NULL;
 	Identity *id = NULL;
 	Buffer b;
 	int pktype, sent = 0;
 	u_int alen, blen;
 	char *pkalg, *fp;
 	u_char *pkblob;
+	int r;
 
 	if (authctxt == NULL)
 		fatal("input_userauth_pk_ok: no authentication context");
@@ -585,12 +588,12 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 
 	debug("Server accepts key: pkalg %s blen %u", pkalg, blen);
 
-	if ((pktype = key_type_from_name(pkalg)) == KEY_UNSPEC) {
+	if ((pktype = sshkey_type_from_name(pkalg)) == KEY_UNSPEC) {
 		debug("unknown pkalg %s", pkalg);
 		goto done;
 	}
-	if ((key = key_from_blob(pkblob, blen)) == NULL) {
-		debug("no key from blob. pkalg %s", pkalg);
+	if ((r = sshkey_from_blob(pkblob, blen, &key)) != 0) {
+		debug("no key from blob. pkalg %s: %s", pkalg, ssh_err(r));
 		goto done;
 	}
 	if (key->type != pktype) {
@@ -599,7 +602,7 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 		    key->type, pktype);
 		goto done;
 	}
-	fp = key_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
+	fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
 	debug2("input_userauth_pk_ok: fp %s", fp);
 	xfree(fp);
 
@@ -609,14 +612,14 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 	 * duplicate keys
 	 */
 	TAILQ_FOREACH_REVERSE(id, &authctxt->keys, idlist, next) {
-		if (key_equal(key, id->key)) {
+		if (sshkey_equal(key, id->key)) {
 			sent = sign_and_send_pubkey(ssh, id);
 			break;
 		}
 	}
 done:
 	if (key != NULL)
-		key_free(key);
+		sshkey_free(key);
 	xfree(pkalg);
 	xfree(pkblob);
 
@@ -1180,7 +1183,7 @@ static int
 identity_sign(Identity *id, u_char **sigp, u_int *lenp,
     u_char *data, u_int datalen)
 {
-	Key *prv;
+	struct sshkey *prv;
 	int ret;
 
 	/* the agent supports this key */
@@ -1191,13 +1194,14 @@ identity_sign(Identity *id, u_char **sigp, u_int *lenp,
 	 * we have already loaded the private key or
 	 * the private key is stored in external hardware
 	 */
-	if (id->isprivate || (id->key->flags & KEY_FLAG_EXT))
-		return (key_sign(id->key, sigp, lenp, data, datalen));
+	if (id->isprivate || (id->key->flags & SSHKEY_FLAG_EXT))
+		return (sshkey_sign(id->key, sigp, lenp, data, datalen,
+		    datafellows));
 	/* load the private key from the file */
 	if ((prv = load_identity_file(id->filename)) == NULL)
 		return (-1);
-	ret = key_sign(prv, sigp, lenp, data, datalen);
-	key_free(prv);
+	ret = sshkey_sign(prv, sigp, lenp, data, datalen, datafellows);
+	sshkey_free(prv);
 	return (ret);
 }
 
@@ -1209,17 +1213,17 @@ sign_and_send_pubkey(struct ssh *ssh, Identity *id)
 	u_char *blob, *signature;
 	u_int bloblen, slen;
 	u_int skip = 0;
-	int ret = -1;
+	int r, ret = -1;
 	int have_sig = 1;
 	char *fp;
 
-	fp = key_fingerprint(id->key, SSH_FP_MD5, SSH_FP_HEX);
-	debug3("sign_and_send_pubkey: %s %s", key_type(id->key), fp);
+	fp = sshkey_fingerprint(id->key, SSH_FP_MD5, SSH_FP_HEX);
+	debug3("%s: %s %s", __func__, sshkey_type(id->key), fp);
 	xfree(fp);
 
-	if (key_to_blob(id->key, &blob, &bloblen) == 0) {
+	if ((r = sshkey_to_blob(id->key, &blob, &bloblen)) != 0) {
 		/* we cannot handle this key */
-		debug3("sign_and_send_pubkey: cannot handle key");
+		debug3("%s: cannot handle key: %s", __func__, ssh_err(r));
 		return 0;
 	}
 	/* data to be signed */
@@ -1244,14 +1248,14 @@ sign_and_send_pubkey(struct ssh *ssh, Identity *id)
 	} else {
 		buffer_put_cstring(&b, authctxt->method->name);
 		buffer_put_char(&b, have_sig);
-		buffer_put_cstring(&b, key_ssh_name(id->key));
+		buffer_put_cstring(&b, sshkey_ssh_name(id->key));
 	}
 	buffer_put_string(&b, blob, bloblen);
 
 	/* generate signature */
-	ret = identity_sign(id, &signature, &slen,
-	    buffer_ptr(&b), buffer_len(&b));
-	if (ret == -1) {
+	if ((ret = identity_sign(id, &signature, &slen,
+	    buffer_ptr(&b), buffer_len(&b))) != 0) {
+		error("signature failed: %s", ssh_err(ret));
 		xfree(blob);
 		buffer_free(&b);
 		return 0;
@@ -1270,7 +1274,7 @@ sign_and_send_pubkey(struct ssh *ssh, Identity *id)
 		buffer_put_cstring(&b, authctxt->method->name);
 		buffer_put_char(&b, have_sig);
 		if (!(datafellows & SSH_BUG_PKAUTH))
-			buffer_put_cstring(&b, key_ssh_name(id->key));
+			buffer_put_cstring(&b, sshkey_ssh_name(id->key));
 		buffer_put_string(&b, blob, bloblen);
 	}
 	xfree(blob);
@@ -1299,12 +1303,13 @@ send_pubkey_test(struct ssh *ssh, Identity *id)
 	Authctxt *authctxt = ssh->authctxt;
 	u_char *blob;
 	u_int bloblen, have_sig = 0;
+	int r;
 
 	debug3("send_pubkey_test");
 
-	if (key_to_blob(id->key, &blob, &bloblen) == 0) {
+	if ((r = sshkey_to_blob(id->key, &blob, &bloblen)) != 0) {
 		/* we cannot handle this key */
-		debug3("send_pubkey_test: cannot handle key");
+		debug3("%s: cannot handle key: %s", __func__, ssh_err(r));
 		return 0;
 	}
 	/* register callback for USERAUTH_PK_OK message */
@@ -1316,17 +1321,17 @@ send_pubkey_test(struct ssh *ssh, Identity *id)
 	ssh_packet_put_cstring(ssh, authctxt->method->name);
 	ssh_packet_put_char(ssh, have_sig);
 	if (!(datafellows & SSH_BUG_PKAUTH))
-		ssh_packet_put_cstring(ssh, key_ssh_name(id->key));
+		ssh_packet_put_cstring(ssh, sshkey_ssh_name(id->key));
 	ssh_packet_put_string(ssh, blob, bloblen);
 	xfree(blob);
 	ssh_packet_send(ssh);
 	return 1;
 }
 
-static Key *
+static struct sshkey *
 load_identity_file(char *filename)
 {
-	Key *private;
+	struct sshkey *private;
 	char prompt[300], *passphrase;
 	int perm_ok = 0, quit, i;
 	struct stat st;
@@ -1375,7 +1380,7 @@ pubkey_prepare(struct ssh *ssh)
 	Authctxt *authctxt = ssh->authctxt;
 	Identity *id;
 	Idlist agent, files, *preferred;
-	Key *key;
+	struct sshkey *key;
 	AuthenticationConnection *ac;
 	char *comment;
 	int i, found;
@@ -1406,8 +1411,8 @@ pubkey_prepare(struct ssh *ssh)
 			found = 0;
 			TAILQ_FOREACH(id, &files, next) {
 				/* agent keys from the config file are preferred */
-				if (key_equal(key, id->key)) {
-					key_free(key);
+				if (sshkey_equal(key, id->key)) {
+					sshkey_free(key);
 					xfree(comment);
 					TAILQ_REMOVE(&files, id, next);
 					TAILQ_INSERT_TAIL(preferred, id, next);
@@ -1453,7 +1458,7 @@ pubkey_cleanup(struct ssh *ssh)
 	    id = TAILQ_FIRST(&authctxt->keys)) {
 		TAILQ_REMOVE(&authctxt->keys, id, next);
 		if (id->key)
-			key_free(id->key);
+			sshkey_free(id->key);
 		if (id->filename)
 			xfree(id->filename);
 		xfree(id);
@@ -1479,8 +1484,8 @@ userauth_pubkey(struct ssh *ssh)
 		 * private key instead
 		 */
 		if (id->key && id->key->type != KEY_RSA1) {
-			debug("Offering %s public key: %s", key_type(id->key),
-			    id->filename);
+			debug("Offering %s public key: %s",
+			    sshkey_type(id->key), id->filename);
 			sent = send_pubkey_test(ssh, id);
 		} else if (id->key == NULL) {
 			debug("Trying private key: %s", id->filename);
@@ -1488,7 +1493,7 @@ userauth_pubkey(struct ssh *ssh)
 			if (id->key != NULL) {
 				id->isprivate = 1;
 				sent = sign_and_send_pubkey(ssh, id);
-				key_free(id->key);
+				sshkey_free(id->key);
 				id->key = NULL;
 			}
 		}
@@ -1587,7 +1592,7 @@ input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 }
 
 static int
-ssh_keysign(struct ssh *ssh, Key *key, u_char **sigp, u_int *lenp,
+ssh_keysign(struct ssh *ssh, struct sshkey *key, u_char **sigp, u_int *lenp,
     u_char *data, u_int datalen)
 {
 	Buffer b;
@@ -1667,7 +1672,7 @@ int
 userauth_hostbased(struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
-	Key *private = NULL;
+	struct sshkey *private = NULL;
 	Sensitive *sensitive = authctxt->sensitive;
 	Buffer b;
 	u_char *signature, *blob;
@@ -1690,15 +1695,16 @@ userauth_hostbased(struct ssh *ssh)
 		debug("No more client hostkeys for hostbased authentication.");
 		return 0;
 	}
-	if (key_to_blob(private, &blob, &blen) == 0) {
-		key_free(private);
+	if ((ok = sshkey_to_blob(private, &blob, &blen)) != 0) {
+		error("%s: sshkey_to_blob failed: %s", __func__, ssh_err(ok));
+		sshkey_free(private);
 		return 0;
 	}
 	/* figure out a name for the client host */
 	p = get_local_name(ssh_packet_get_connection_in(ssh));
 	if (p == NULL) {
 		error("userauth_hostbased: cannot get local ipaddr/name");
-		key_free(private);
+		sshkey_free(private);
 		xfree(blob);
 		return 0;
 	}
@@ -1708,7 +1714,7 @@ userauth_hostbased(struct ssh *ssh)
 
 	service = datafellows & SSH_BUG_HBSERVICE ? "ssh-userauth" :
 	    authctxt->service;
-	pkalg = xstrdup(key_ssh_name(private));
+	pkalg = xstrdup(sshkey_ssh_name(private));
 	buffer_init(&b);
 	/* construct data */
 	buffer_put_string(&b, ssh->kex->session_id, ssh->kex->session_id_len);
@@ -1727,12 +1733,12 @@ userauth_hostbased(struct ssh *ssh)
 		ok = ssh_keysign(ssh, private, &signature, &slen,
 		    buffer_ptr(&b), buffer_len(&b));
 	else
-		ok = key_sign(private, &signature, &slen,
-		    buffer_ptr(&b), buffer_len(&b));
-	key_free(private);
+		ok = sshkey_sign(private, &signature, &slen,
+		    buffer_ptr(&b), buffer_len(&b), datafellows);
+	sshkey_free(private);
 	buffer_free(&b);
 	if (ok != 0) {
-		error("key_sign failed");
+		error("sshkey_sign failed");
 		xfree(chost);
 		xfree(pkalg);
 		xfree(blob);

@@ -26,7 +26,7 @@ struct hostkey_entry {
 	char *host;
 	char *file;
 	u_long line;
-	Key *key;
+	struct sshkey *key;
 	HostkeyMarker marker;
 };
 struct hostkeys;
@@ -35,13 +35,14 @@ struct hostkeys *init_hostkeys(void);
 void	 load_hostkeys(struct hostkeys *, const char *, const char *);
 void	 free_hostkeys(struct hostkeys *);
 
-HostStatus check_key_in_hostkeys(struct hostkeys *, Key *,
+HostStatus check_key_in_hostkeys(struct hostkeys *, struct sshkey *,
     const struct hostkey_entry **);
 int	 lookup_key_in_hostkeys_by_type(struct hostkeys *, int,
     const struct hostkey_entry **);
 
-int	 hostfile_read_key(char **, u_int *, Key *);
-int	 add_host_to_hostfile(const char *, const char *, const Key *, int);
+int	 hostfile_read_key(char **, u_int *, struct sshkey *);
+int	 add_host_to_hostfile(const char *, const char *,
+    const struct sshkey *, int);
 
 #define HASH_MAGIC	"|1|"
 #define HASH_DELIM	'|'

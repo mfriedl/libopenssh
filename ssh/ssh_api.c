@@ -16,21 +16,23 @@
 void	_ssh_exchange_banner(struct ssh *);
 char	*_ssh_send_banner(struct ssh *);
 char	*_ssh_read_banner(struct ssh *);
-Key	*_ssh_host_public_key(int, struct ssh *);
-Key	*_ssh_host_private_key(int, struct ssh *);
-int	_ssh_verify_host_key(Key *, struct ssh *);
 void	_ssh_order_hostkeyalgs(struct ssh *);
+int	_ssh_verify_host_key(struct sshkey *, struct ssh *);
+struct sshkey *_ssh_host_public_key(int, struct ssh *);
+struct sshkey *_ssh_host_private_key(int, struct ssh *);
 
 /*
  * stubs for the server side implementation of kex.
  * disable privsep so our stubs will never be called.
  */
 int	use_privsep = 0;
-int	mm_key_sign(Key *, u_char **, u_int *, u_char *, u_int);
+int	mm_sshkey_sign(struct sshkey *, u_char **, u_int *,
+    u_char *, u_int, u_int);
 DH	*mm_choose_dh(int, int, int);
 
 int
-mm_key_sign(Key *key, u_char **sigp, u_int *lenp, u_char *data, u_int datalen)
+mm_sshkey_sign(struct sshkey *key, u_char **sigp, u_int *lenp,
+    u_char *data, u_int datalen, u_int compat)
 {
 	return (-1);
 }
@@ -103,7 +105,7 @@ ssh_free(struct ssh *ssh)
 int
 ssh_add_hostkey(struct ssh* ssh, char *key)
 {
-	Key *parsed_key;
+	struct sshkey *parsed_key, *pubkey;
 	struct key_entry *k;
 	Buffer key_buf;
 
@@ -115,28 +117,33 @@ ssh_add_hostkey(struct ssh* ssh, char *key)
 		buffer_free(&key_buf);
 
 		if (parsed_key != NULL) {
+			if (sshkey_from_private(parsed_key, &pubkey) != 0) {
+				sshkey_free(parsed_key);
+				return (-1);
+			}
 			k = xmalloc(sizeof(*k));
 			k->key = parsed_key;
 			TAILQ_INSERT_TAIL(&ssh->private_keys, k, next);
 
 			/* add the public key, too */
 			k = xmalloc(sizeof(*k));
-			k->key = key_from_private(parsed_key);
+			k->key = pubkey;
 			TAILQ_INSERT_TAIL(&ssh->public_keys, k, next);
 
 			return (0);
 		}
 	} else {
 		/* Parse public key */
-		parsed_key = key_new(KEY_UNSPEC);
-		if (key_read(parsed_key, &key) == 1) {
+		if ((parsed_key = sshkey_new(KEY_UNSPEC)) == NULL)
+			return -1;
+		if (sshkey_read(parsed_key, &key) != 0) {
 			k = xmalloc(sizeof(*k));
 			k->key = parsed_key;
 			TAILQ_INSERT_TAIL(&ssh->public_keys, k, next);
 
 			return (0);
 		} else {
-			key_free(parsed_key);
+			sshkey_free(parsed_key);
 		}
 	}
 
@@ -327,21 +334,21 @@ _ssh_exchange_banner(struct ssh *ssh)
 	}
 }
 
-Key *
+struct sshkey *
 _ssh_host_public_key(int type, struct ssh *ssh)
 {
 	struct key_entry *k;
 
 	debug3("%s: need %d", __func__, type);
 	TAILQ_FOREACH(k, &ssh->public_keys, next) {
-		debug3("%s: check %s", __func__, key_type(k->key));
-		if (k->key->type == type)
-			return (k->key);
+		debug3("%s: check %s", __func__, sshkey_type(k->key));
+                if (k->key->type == type)
+                        return (k->key);
 	}
 	return (NULL);
 }
 
-Key *
+struct sshkey *
 _ssh_host_private_key(int type, struct ssh *ssh)
 {
 	struct key_entry *k;
@@ -349,23 +356,23 @@ _ssh_host_private_key(int type, struct ssh *ssh)
 	datafellows = ssh->datafellows;	/* XXX */
 	debug3("%s: need %d", __func__, type);
 	TAILQ_FOREACH(k, &ssh->private_keys, next) {
-		debug3("%s: check %s", __func__, key_type(k->key));
-		if (k->key->type == type)
-			return (k->key);
+		debug3("%s: check %s", __func__, sshkey_type(k->key));
+                if (k->key->type == type)
+                        return (k->key);
 	}
 	return (NULL);
 }
 
 int
-_ssh_verify_host_key(Key *hostkey, struct ssh *ssh)
+_ssh_verify_host_key(struct sshkey *hostkey, struct ssh *ssh)
 {
 	struct key_entry *k;
 
-	debug3("%s: need %s", __func__, key_type(hostkey));
+	debug3("%s: need %s", __func__, sshkey_type(hostkey));
 	TAILQ_FOREACH(k, &ssh->public_keys, next) {
-		debug3("%s: check %s", __func__, key_type(k->key));
-		if (key_equal_public(hostkey, k->key))
-			return (0);	/* ok */
+		debug3("%s: check %s", __func__, sshkey_type(k->key));
+                if (sshkey_equal_public(hostkey, k->key))
+                        return (0);	/* ok */
 	}
 	return (-1);	/* failed */
 }
@@ -385,12 +392,12 @@ _ssh_order_hostkeyalgs(struct ssh *ssh)
 	replace = xmalloc(maxlen);
 	*replace = '\0';
 	while ((alg = strsep(&avail, ",")) && *alg != '\0') {
-		if ((ktype = key_type_from_name(alg)) == KEY_UNSPEC)
+		if ((ktype = sshkey_type_from_name(alg)) == KEY_UNSPEC)
 			fatal("%s: unknown alg %s", __func__, alg);
 		TAILQ_FOREACH(k, &ssh->public_keys, next) {
 			if (k->key->type == ktype ||
-                            (key_is_cert(k->key) && k->key->type ==
-			    key_type_plain(ktype))) {
+                            (sshkey_is_cert(k->key) && k->key->type ==
+			    sshkey_type_plain(ktype))) {
 				if (*replace != '\0')
 					strlcat(replace, ",", maxlen);
 				strlcat(replace, alg, maxlen);

@@ -33,6 +33,7 @@
 #include "authfd.h"
 #include "atomicio.h"
 #include "ssh-pkcs11.h"
+#include "err.h"
 
 /* borrows code from sftp-server and ssh-agent */
 
@@ -98,18 +99,20 @@ static int
 pkcs11_rsa_private_encrypt(int flen, const u_char *from, u_char *to, RSA *rsa,
     int padding)
 {
-	Key key;
+	struct sshkey key;
 	u_char *blob, *signature = NULL;
 	u_int blen, slen = 0;
-	int ret = -1;
+	int r, ret = -1;
 	Buffer msg;
 
 	if (padding != RSA_PKCS1_PADDING)
 		return (-1);
 	key.type = KEY_RSA;
 	key.rsa = rsa;
-	if (key_to_blob(&key, &blob, &blen) == 0)
+	if ((r = sshkey_to_blob(&key, &blob, &blen)) != 0) {
+		error("%s: sshkey_to_blob: %s", __func__, ssh_err(r));
 		return -1;
+	}
 	buffer_init(&msg);
 	buffer_put_char(&msg, SSH2_AGENTC_SIGN_REQUEST);
 	buffer_put_string(&msg, blob, blen);
@@ -174,10 +177,10 @@ pkcs11_start_helper(void)
 }
 
 int
-pkcs11_add_provider(char *name, char *pin, Key ***keysp)
+pkcs11_add_provider(char *name, char *pin, struct sshkey ***keysp)
 {
-	Key *k;
-	int i, nkeys;
+	struct sshkey *k;
+	int i, nkeys, r;
 	u_char *blob;
 	u_int blen;
 	Buffer msg;
@@ -194,11 +197,13 @@ pkcs11_add_provider(char *name, char *pin, Key ***keysp)
 
 	if (recv_msg(&msg) == SSH2_AGENT_IDENTITIES_ANSWER) {
 		nkeys = buffer_get_int(&msg);
-		*keysp = xcalloc(nkeys, sizeof(Key *));
+		*keysp = xcalloc(nkeys, sizeof(struct sshkey *));
 		for (i = 0; i < nkeys; i++) {
 			blob = buffer_get_string(&msg, &blen);
 			xfree(buffer_get_string(&msg, NULL));
-			k = key_from_blob(blob, blen);
+			/* XXX clean up properly instead of fatal() */
+			if ((r = sshkey_from_blob(blob, blen, &k)) != 0)
+				fatal("%s: bad key: %s", __func__, ssh_err(r));
 			wrap_key(k->rsa);
 			(*keysp)[i] = k;
 			xfree(blob);

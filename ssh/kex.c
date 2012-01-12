@@ -46,6 +46,7 @@
 #include "dispatch.h"
 #include "monitor.h"
 #include "roaming.h"
+#include "err.h"
 
 /* prototype */
 static void kex_kexinit_finish(struct ssh *);
@@ -356,7 +357,7 @@ choose_hostkeyalg(Kex *k, char *client, char *server)
 	char *hostkeyalg = match_list(client, server, NULL);
 	if (hostkeyalg == NULL)
 		fatal("no hostkey alg");
-	k->hostkey_type = key_type_from_name(hostkeyalg);
+	k->hostkey_type = sshkey_type_from_name(hostkeyalg);
 	if (k->hostkey_type == KEY_UNSPEC)
 		fatal("bad hostkey alg '%s'", hostkeyalg);
 	xfree(hostkeyalg);

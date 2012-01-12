@@ -132,10 +132,10 @@ struct Kex {
 	const EVP_MD *evp_md;
 	char	*client_version_string;
 	char	*server_version_string;
-	int	(*verify_host_key)(Key *, struct ssh *);
-	Key	*(*load_host_public_key)(int, struct ssh *);
-	Key	*(*load_host_private_key)(int, struct ssh *);
-	int	(*host_key_index)(Key *);
+	int	(*verify_host_key)(struct sshkey *, struct ssh *);
+	struct sshkey *(*load_host_public_key)(int, struct ssh *);
+	struct sshkey *(*load_host_private_key)(int, struct ssh *);
+	int	(*host_key_index)(struct sshkey *);
 	void	(*kex[KEX_MAX])(struct ssh *);
 	void	*state;
 };
