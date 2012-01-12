@@ -1,5 +1,5 @@
 #	$OpenBSD:$
 
-SUBDIR=	ssh regress regress-libopenssh
+SUBDIR=	ssh regress unittests
 
 .include <bsd.subdir.mk>
