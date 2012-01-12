@@ -72,7 +72,7 @@ cd testdata
 rm -f rsa1_1 rsa_1 dsa_1 ecdsa_1
 rm -f rsa1_2 rsa_2 dsa_2 ecdsa_2
 rm -f rsa1_1_pw rsa_1_pw dsa_1_pw ecdsa_1_pw
-rm -f pw *.pub *.bn.* *.param.*
+rm -f pw *.pub *.bn.* *.param.* *.fp *.fp.bb
 
 ssh-keygen -t rsa1 -b 768 -C "RSA1 test key #1" -N "" -f rsa1_1
 ssh-keygen -t rsa -b 768 -C "RSA test key #1" -N "" -f rsa_1
@@ -117,5 +117,23 @@ ssh-keygen -s ecdsa_1 -I julius -n host1,host2 -h \
     -V 19990101:20110101 -z 5 dsa_1.pub
 ssh-keygen -s ecdsa_1 -I julius -n host1,host2 -h \
     -V 19990101:20110101 -z 6 ecdsa_1.pub
+
+ssh-keygen -lf rsa1_1 | awk '{print $2}' > rsa1_1.fp
+ssh-keygen -lf rsa_1 | awk '{print $2}' > rsa_1.fp
+ssh-keygen -lf dsa_1 | awk '{print $2}' > dsa_1.fp
+ssh-keygen -lf ecdsa_1 | awk '{print $2}' > ecdsa_1.fp
+ssh-keygen -lf rsa1_2 | awk '{print $2}' > rsa1_2.fp
+ssh-keygen -lf rsa_2 | awk '{print $2}' > rsa_2.fp
+ssh-keygen -lf dsa_2 | awk '{print $2}' > dsa_2.fp
+ssh-keygen -lf ecdsa_2 | awk '{print $2}' > ecdsa_2.fp
+
+ssh-keygen -Bf rsa1_1 | awk '{print $2}' > rsa1_1.fp.bb
+ssh-keygen -Bf rsa_1 | awk '{print $2}' > rsa_1.fp.bb
+ssh-keygen -Bf dsa_1 | awk '{print $2}' > dsa_1.fp.bb
+ssh-keygen -Bf ecdsa_1 | awk '{print $2}' > ecdsa_1.fp.bb
+ssh-keygen -Bf rsa1_2 | awk '{print $2}' > rsa1_2.fp.bb
+ssh-keygen -Bf rsa_2 | awk '{print $2}' > rsa_2.fp.bb
+ssh-keygen -Bf dsa_2 | awk '{print $2}' > dsa_2.fp.bb
+ssh-keygen -Bf ecdsa_2 | awk '{print $2}' > ecdsa_2.fp.bb
 
 echo "$PW" > pw
