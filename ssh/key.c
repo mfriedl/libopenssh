@@ -115,13 +115,12 @@ sshkey_cert_type(const struct sshkey *k)
 }
 
 static const char *
-sshkey_ssh_name_from_type_nid(int type, int nid, int plain)
+sshkey_ssh_name_from_type_nid(int type, int nid)
 {
 	const struct keytype *kt;
 
 	for (kt = key_types; kt->name != NULL; kt++) {
-		if (type == (plain ? kt->plain_type : kt->type) &&
-		    (kt->nid == -1 || kt->nid == nid))
+		if (type == kt->type && (kt->nid == -1 || kt->nid == nid))
 			return kt->ssh2name;
 	}
 	return "ssh-unknown";
@@ -130,13 +129,14 @@ sshkey_ssh_name_from_type_nid(int type, int nid, int plain)
 const char *
 sshkey_ssh_name(const struct sshkey *k)
 {
-	return sshkey_ssh_name_from_type_nid(k->type, k->ecdsa_nid, 0);
+	return sshkey_ssh_name_from_type_nid(k->type, k->ecdsa_nid);
 }
 
 const char *
 sshkey_ssh_name_plain(const struct sshkey *k)
 {
-	return sshkey_ssh_name_from_type_nid(k->type, k->ecdsa_nid, 1);
+	return sshkey_ssh_name_from_type_nid(sshkey_type_plain(k->type),
+	    k->ecdsa_nid);
 }
 
 int
