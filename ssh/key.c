@@ -1079,7 +1079,9 @@ rsa_generate_private_key(u_int bits, RSA **rsap)
 	BIGNUM *f4 = NULL;
 	int ret = SSH_ERR_INTERNAL_ERROR;
 
-	if (rsap == NULL || bits == 0 || bits > SSHBUF_MAX_BIGNUM * 8)
+	if (rsap == NULL ||
+	    bits < SSH_RSA_MINIMUM_MODULUS_SIZE ||
+	    bits > SSHBUF_MAX_BIGNUM * 8)
 		return SSH_ERR_INVALID_ARGUMENT;
 	if ((private = RSA_new()) == NULL || (f4 = BN_new()) == NULL) {
 		ret = SSH_ERR_ALLOC_FAIL;
@@ -1210,6 +1212,7 @@ sshkey_generate(int type, u_int bits, struct sshkey **keyp)
 
 	if (keyp == NULL)
 		return SSH_ERR_INVALID_ARGUMENT;
+	*keyp = NULL;
 	if ((k = sshkey_new(KEY_UNSPEC)) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	switch (type) {
