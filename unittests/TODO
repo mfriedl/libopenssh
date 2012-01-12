@@ -1,3 +1,5 @@
 figure out how to hook up gcov to generate coverage reports
 
 get tests to run under valgrind (where supported)
+
+ditto clang-analyzer
