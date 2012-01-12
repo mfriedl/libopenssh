@@ -9,7 +9,6 @@
 #include "ssh2.h"
 #include "version.h"
 #include "xmalloc.h"
-#include "myproposal.h"
 
 #include <string.h>
 
@@ -19,7 +18,6 @@ char	*_ssh_read_banner(struct ssh *);
 struct sshkey *_ssh_host_public_key(int, struct ssh *);
 struct sshkey *_ssh_host_private_key(int, struct ssh *);
 int	_ssh_verify_host_key(struct sshkey *, struct ssh *);
-void	_ssh_order_hostkeyalgs(struct ssh *);
 
 /*
  * stubs for the server side implementation of kex.
@@ -49,8 +47,6 @@ struct ssh *
 ssh_init(int is_server, struct kex_params *kex_params)
 {
 	struct ssh *ssh;
-	char **proposal, **given;
-	int i;
 	static int called;
 
 	if (!called) {
@@ -62,13 +58,8 @@ ssh_init(int is_server, struct kex_params *kex_params)
 	if (is_server)
 		ssh_packet_set_server(ssh);
 
-	given = kex_params ? kex_params->proposal : myproposal;
-	proposal = xcalloc(PROPOSAL_MAX, sizeof(char *));
-	for (i = 0; i < PROPOSAL_MAX; i++)
-		proposal[i] = xstrdup(given[i]);
-
 	/* Initialize key exchange */
-	ssh->kex = kex_new(ssh, proposal);
+	ssh->kex = kex_new(ssh, kex_params->proposal);
 	ssh->kex->server = is_server;
 	if (is_server) {
 		ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
@@ -93,11 +84,8 @@ void
 ssh_free(struct ssh *ssh)
 {
 	ssh_packet_close(ssh);
-	if (ssh->kex) {
-		if (ssh->kex->proposal)
-			xfree(ssh->kex->proposal);
+	if (ssh->kex)
 		xfree(ssh->kex);
-	}
 	xfree(ssh);
 }
 
@@ -328,10 +316,8 @@ _ssh_exchange_banner(struct ssh *ssh)
 	}
 	/* start initial kex as soon as we have exchanged the banners */
 	if (ssh->kex->server_version_string != NULL &&
-	    ssh->kex->client_version_string != NULL) {
-		_ssh_order_hostkeyalgs(ssh);
+	    ssh->kex->client_version_string != NULL)
 		kex_send_kexinit(ssh);
-	}
 }
 
 struct sshkey *
@@ -371,47 +357,8 @@ _ssh_verify_host_key(struct sshkey *hostkey, struct ssh *ssh)
 	debug3("%s: need %s", __func__, sshkey_type(hostkey));
 	TAILQ_FOREACH(k, &ssh->public_keys, next) {
 		debug3("%s: check %s", __func__, sshkey_type(k->key));
-		if (sshkey_equal_public(hostkey, k->key))
-			return (0);	/* ok */
+                if (sshkey_equal_public(hostkey, k->key))
+                        return (0);	/* ok */
 	}
 	return (-1);	/* failed */
-}
-
-/* offer hostkey algorithms in kexinit depending on registered keys */
-void
-_ssh_order_hostkeyalgs(struct ssh *ssh)
-{
-	struct key_entry *k;
-	char *orig, *avail, *oavail,*alg, *replace;
-	size_t maxlen;
-	int ktype;
-
-	orig = ssh->kex->proposal[PROPOSAL_SERVER_HOST_KEY_ALGS];
-	oavail = avail = xstrdup(orig);
-	maxlen = strlen(avail) + 1;
-	replace = xmalloc(maxlen);
-	*replace = '\0';
-	while ((alg = strsep(&avail, ",")) && *alg != '\0') {
-		if ((ktype = sshkey_type_from_name(alg)) == KEY_UNSPEC)
-			fatal("%s: unknown alg %s", __func__, alg);
-		TAILQ_FOREACH(k, &ssh->public_keys, next) {
-			if (k->key->type == ktype ||
-                            (sshkey_is_cert(k->key) && k->key->type ==
-			    sshkey_type_plain(ktype))) {
-				if (*replace != '\0')
-					strlcat(replace, ",", maxlen);
-				strlcat(replace, alg, maxlen);
-				break;
-			}
-		}
-	}
-	xfree(oavail);
-	if (*replace != '\0') {
-		debug2("%s: orig/%d    %s", __func__, ssh->kex->server, orig);
-		debug2("%s: replace/%d %s", __func__, ssh->kex->server, replace);
-		xfree(orig);
-		ssh->kex->proposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = replace;
-	} else {
-		xfree(replace);
-	}
 }
