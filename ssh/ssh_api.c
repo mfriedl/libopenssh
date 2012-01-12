@@ -16,10 +16,10 @@
 void	_ssh_exchange_banner(struct ssh *);
 char	*_ssh_send_banner(struct ssh *);
 char	*_ssh_read_banner(struct ssh *);
+void	_ssh_order_hostkeyalgs(struct ssh *);
+int	_ssh_verify_host_key(struct sshkey *, struct ssh *);
 struct sshkey *_ssh_host_public_key(int, struct ssh *);
 struct sshkey *_ssh_host_private_key(int, struct ssh *);
-int	_ssh_verify_host_key(struct sshkey *, struct ssh *);
-void	_ssh_order_hostkeyalgs(struct ssh *);
 
 /*
  * stubs for the server side implementation of kex.
@@ -334,8 +334,8 @@ _ssh_host_public_key(int type, struct ssh *ssh)
 	debug3("%s: need %d", __func__, type);
 	TAILQ_FOREACH(k, &ssh->public_keys, next) {
 		debug3("%s: check %s", __func__, sshkey_type(k->key));
-		if (k->key->type == type)
-			return (k->key);
+                if (k->key->type == type)
+                        return (k->key);
 	}
 	return (NULL);
 }
@@ -349,8 +349,8 @@ _ssh_host_private_key(int type, struct ssh *ssh)
 	debug3("%s: need %d", __func__, type);
 	TAILQ_FOREACH(k, &ssh->private_keys, next) {
 		debug3("%s: check %s", __func__, sshkey_type(k->key));
-		if (k->key->type == type)
-			return (k->key);
+                if (k->key->type == type)
+                        return (k->key);
 	}
 	return (NULL);
 }
