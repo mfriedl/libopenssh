@@ -83,21 +83,19 @@ kex_names_valid(const char *names)
 
 /* put algorithm proposal into buffer */
 static void
-kex_prop2buf(Buffer *b, char *proposal[PROPOSAL_MAX])
+kex_prop2buf(Kex *kex)
 {
 	u_int i;
+	u_char *cp;
 
-	buffer_clear(b);
-	/*
-	 * add a dummy cookie, the cookie will be overwritten by
-	 * kex_send_kexinit(), each time a kexinit is set
-	 */
-	for (i = 0; i < KEX_COOKIE_LEN; i++)
-		buffer_put_char(b, 0);
+	buffer_clear(&kex->my);
+	/* generate a random cookie */
+	cp = buffer_append_space(&kex->my, KEX_COOKIE_LEN);
+	arc4random_buf(cp, KEX_COOKIE_LEN);
 	for (i = 0; i < PROPOSAL_MAX; i++)
-		buffer_put_cstring(b, proposal[i]);
-	buffer_put_char(b, 0);			/* first_kex_packet_follows */
-	buffer_put_int(b, 0);			/* uint32 reserved */
+		buffer_put_cstring(&kex->my, kex->proposal[i]);
+	buffer_put_char(&kex->my, 0);			/* first_kex_packet_follows */
+	buffer_put_int(&kex->my, 0);			/* uint32 reserved */
 }
 
 /* parse buffer and return algorithm proposal */
@@ -188,9 +186,6 @@ kex_input_newkeys(int type, u_int32_t seq, struct ssh *ssh)
 void
 kex_send_kexinit(struct ssh *ssh)
 {
-	u_int32_t rnd = 0;
-	u_char *cookie;
-	u_int i;
 	Kex *kex = ssh->kex;
 
 	if (kex == NULL) {
@@ -203,16 +198,7 @@ kex_send_kexinit(struct ssh *ssh)
 	}
 	kex->done = 0;
 
-	/* generate a random cookie */
-	if (buffer_len(&kex->my) < KEX_COOKIE_LEN)
-		fatal("kex_send_kexinit: kex proposal too short");
-	cookie = buffer_ptr(&kex->my);
-	for (i = 0; i < KEX_COOKIE_LEN; i++) {
-		if (i % 4 == 0)
-			rnd = arc4random();
-		cookie[i] = rnd;
-		rnd >>= 8;
-	}
+	kex_prop2buf(kex);
 	ssh_packet_start(ssh, SSH2_MSG_KEXINIT);
 	ssh_packet_put_raw(ssh, buffer_ptr(&kex->my), buffer_len(&kex->my));
 	ssh_packet_send(ssh);
@@ -255,8 +241,8 @@ kex_new(struct ssh *ssh, char *proposal[PROPOSAL_MAX])
 	kex = xcalloc(1, sizeof(*kex));
 	buffer_init(&kex->peer);
 	buffer_init(&kex->my);
-	kex_prop2buf(&kex->my, proposal);
 	kex->done = 0;
+	kex->proposal = proposal;
 	kex_reset_dispatch(ssh);
 
 	return kex;

@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #include "ssh_api.h"
 #include "xmalloc.h"
@@ -60,6 +61,8 @@ void usage(void);
 uid_t original_real_uid;	/* XXX */
 TAILQ_HEAD(, session) sessions;
 struct kex_params kex_params;
+int foreground;
+int dump_packets;
 
 #define BUFSZ 16*1024
 char keybuf[BUFSZ];
@@ -259,7 +262,7 @@ ssh_packet_fwd(struct side *from, struct side *to)
 {
 	int type;
 	u_char *data;
-	u_int len;
+	u_int len, i;
 
 	if (!from->ssh || !to->ssh)
 		return;
@@ -268,6 +271,18 @@ ssh_packet_fwd(struct side *from, struct side *to)
 		data = ssh_packet_payload(from->ssh, &len);
 		debug("ssh_packet_fwd %d->%d type %d len %d",
 		    from->fd, to->fd, type, len);
+		if ((dump_packets && type != 50) ||
+		    dump_packets > 1) {
+			for (i = 0; i < len; i++) {
+				char c = data[i];
+				if (isascii(c) && isprint(c)) {
+					fputc(c, stderr);
+				} else {
+					fputc('.', stderr);
+				}
+			}
+			fputc('\n', stderr);
+		}
 		ssh_packet_put(to->ssh, type, data, len);
 	} else {
 		debug3("no packet on %d", from->fd);
@@ -376,7 +391,7 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	int ch, log_stderr = 1, foreground = 0, fd;
+	int ch, log_stderr = 1, fd;
 	struct event ev;
 	ssize_t len;
 	char *hostkey_file = NULL, *known_hostkey_file = NULL;
@@ -386,7 +401,7 @@ main(int argc, char **argv)
 
 	TAILQ_INIT(&sessions);
 
-	while ((ch = getopt(argc, argv, "dfC:L:S:")) != -1) {
+	while ((ch = getopt(argc, argv, "dfC:DL:S:")) != -1) {
 		switch (ch) {
 		case 'd':
 			if (log_level == SYSLOG_LEVEL_VERBOSE)
@@ -401,6 +416,10 @@ main(int argc, char **argv)
 			break;
 		case 'C':
 			known_hostkey_file = optarg;
+			break;
+		case 'D':
+			foreground = 1;
+			dump_packets++;
 			break;
 		case 'L':
 			if (parse_forward(&fwd, optarg, 0, 0) == 0)
