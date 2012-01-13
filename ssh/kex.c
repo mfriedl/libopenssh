@@ -270,6 +270,10 @@ kex_free(Kex *kex)
 {
 	buffer_free(&kex->peer);
 	buffer_free(&kex->my);
+	if (kex->dh)
+		DH_free(kex->dh);
+	if (kex->ec_client_key)
+		EC_KEY_free(kex->ec_client_key);
 	xfree(kex);
 }
 

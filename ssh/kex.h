@@ -136,7 +136,11 @@ struct Kex {
 	struct sshkey *(*load_host_private_key)(int, struct ssh *);
 	int	(*host_key_index)(struct sshkey *);
 	void	(*kex[KEX_MAX])(struct ssh *);
-	void	*state;
+	/* kex specific state */
+	DH	*dh;			/* DH */
+	int	min, max, nbits;	/* GEX */
+	EC_KEY	*ec_client_key;		/* ECÐH */
+	const EC_GROUP *ec_group;	/* ECÐH */
 };
 
 int	 kex_names_valid(const char *);

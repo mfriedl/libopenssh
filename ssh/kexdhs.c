@@ -47,35 +47,25 @@
 #include "compat.h"
 #include "err.h"
 
-struct kexdhs_state {
-	DH *dh;
-};
-
 static int input_kex_dh_init(int, u_int32_t, struct ssh *);
 
 void
 kexdh_server(struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
-	DH *dh;
-	struct kexdhs_state *kexdhs_state;
 
 	/* generate server DH public key */
 	switch (kex->kex_type) {
 	case KEX_DH_GRP1_SHA1:
-		dh = dh_new_group1();
+		kex->dh = dh_new_group1();
 		break;
 	case KEX_DH_GRP14_SHA1:
-		dh = dh_new_group14();
+		kex->dh = dh_new_group14();
 		break;
 	default:
 		fatal("%s: Unexpected KEX type %d", __func__, kex->kex_type);
 	}
-	dh_gen_key(dh, kex->we_need * 8);
-
-	kexdhs_state = xcalloc(1, sizeof(*kexdhs_state));
-	kexdhs_state->dh = dh;
-	kex->state = kexdhs_state;
+	dh_gen_key(kex->dh, kex->we_need * 8);
 
 	debug("expecting SSH2_MSG_KEXDH_INIT");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEXDH_INIT, &input_kex_dh_init);
@@ -85,15 +75,11 @@ static int
 input_kex_dh_init(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
-	struct kexdhs_state *kexdhs_state = kex->state;
 	BIGNUM *shared_secret = NULL, *dh_client_pub = NULL;
-	DH *dh;
 	struct sshkey *server_host_public, *server_host_private;
 	u_char *kbuf, *hash, *signature = NULL, *server_host_key_blob = NULL;
 	u_int sbloblen, klen, hashlen, slen;
 	int kout, r;
-
-	dh = kexdhs_state->dh;
 
 	if (kex->load_host_public_key == NULL ||
 	    kex->load_host_private_key == NULL)
@@ -120,18 +106,18 @@ input_kex_dh_init(int type, u_int32_t seq, struct ssh *ssh)
 #endif
 
 #ifdef DEBUG_KEXDH
-	DHparams_print_fp(stderr, dh);
+	DHparams_print_fp(stderr, kex->dh);
 	fprintf(stderr, "pub= ");
-	BN_print_fp(stderr, dh->pub_key);
+	BN_print_fp(stderr, kex->dh->pub_key);
 	fprintf(stderr, "\n");
 #endif
-	if (!dh_pub_is_valid(dh, dh_client_pub))
+	if (!dh_pub_is_valid(kex->dh, dh_client_pub))
 		ssh_packet_disconnect(ssh,
 		    "bad client public DH value");
 
-	klen = DH_size(dh);
+	klen = DH_size(kex->dh);
 	kbuf = xmalloc(klen);
-	if ((kout = DH_compute_key(kbuf, dh_client_pub, dh)) < 0)
+	if ((kout = DH_compute_key(kbuf, dh_client_pub, kex->dh)) < 0)
 		fatal("DH_compute_key: failed");
 #ifdef DEBUG_KEXDH
 	dump_digest("shared secret", kbuf, kout);
@@ -155,7 +141,7 @@ input_kex_dh_init(int type, u_int32_t seq, struct ssh *ssh)
 	    buffer_ptr(&kex->my), buffer_len(&kex->my),
 	    server_host_key_blob, sbloblen,
 	    dh_client_pub,
-	    dh->pub_key,
+	    kex->dh->pub_key,
 	    shared_secret,
 	    &hash, &hashlen
 	);
@@ -178,19 +164,18 @@ input_kex_dh_init(int type, u_int32_t seq, struct ssh *ssh)
 	/* send server hostkey, DH pubkey 'f' and singed H */
 	ssh_packet_start(ssh, SSH2_MSG_KEXDH_REPLY);
 	ssh_packet_put_string(ssh, server_host_key_blob, sbloblen);
-	ssh_packet_put_bignum2(ssh, dh->pub_key);	/* f */
+	ssh_packet_put_bignum2(ssh, kex->dh->pub_key);	/* f */
 	ssh_packet_put_string(ssh, signature, slen);
 	ssh_packet_send(ssh);
 
 	xfree(signature);
 	xfree(server_host_key_blob);
 	/* have keys, free DH */
-	DH_free(dh);
+	DH_free(kex->dh);
+	kex->dh = NULL;
 
 	kex_derive_keys(ssh, hash, hashlen, shared_secret);
 	BN_clear_free(shared_secret);
-	xfree(kex->state);
-	kex->state = NULL;
 	kex_finish(ssh);
 	return 0;
 }
