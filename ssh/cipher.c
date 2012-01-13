@@ -245,7 +245,7 @@ cipher_init(struct sshcipher_ctx *cc, struct sshcipher *cipher,
 
 	if (cipher->discard_len > 0) {
 		if ((junk = malloc(cipher->discard_len)) == NULL ||
-		    (discard = malloc(cipher->discard_len))) {
+		    (discard = malloc(cipher->discard_len)) == NULL) {
 			if (junk != NULL)
 				free(junk);
 			ret = SSH_ERR_ALLOC_FAIL;
