@@ -1439,6 +1439,8 @@ monitor_apply_keystate(struct monitor *pmonitor)
 	if (options.compression)
 		mm_init_compression(pmonitor->m_zlib);
 
+	packet_set_postauth();
+
 	/* Network I/O buffers */
 	/* XXX inefficient for large buffers, need: buffer_init_from_string */
 	buffer_clear(packet_get_input());
