@@ -128,7 +128,7 @@ ssh_add_hostkey(struct ssh* ssh, char *key)
 		/* Parse public key */
 		if ((parsed_key = sshkey_new(KEY_UNSPEC)) == NULL)
 			return -1;
-		if (sshkey_read(parsed_key, &key) != 0) {
+		if (sshkey_read(parsed_key, &key) == 0) {
 			k = xmalloc(sizeof(*k));
 			k->key = parsed_key;
 			TAILQ_INSERT_TAIL(&ssh->public_keys, k, next);
