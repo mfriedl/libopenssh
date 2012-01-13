@@ -1999,3 +1999,22 @@ ssh_packet_restore_state(struct ssh *ssh,
 		add_recv_bytes(len);
 	}
 }
+
+/* Reset after_authentication and reset compression in post-auth privsep */
+void
+ssh_packet_set_postauth(struct ssh *ssh)
+{
+	Comp *comp;
+	int mode;
+
+	debug("%s: called", __func__);
+	/* This was set in net child, but is not visible in user child */
+	ssh->state->after_authentication = 1;
+	for (mode = 0; mode < MODE_MAX; mode++) {
+		if (ssh->state->newkeys[mode] == NULL)
+			continue;
+		comp = &ssh->state->newkeys[mode]->comp;
+		if (comp && comp->enabled)
+			ssh_packet_init_compression(ssh);
+	}
+}
