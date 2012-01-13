@@ -47,7 +47,7 @@
 #include "compat.h"
 #include "err.h"
 
-static void input_kex_ecdh_init(int, u_int32_t, struct ssh *);
+static int input_kex_ecdh_init(int, u_int32_t, struct ssh *);
 
 void
 kexecdh_server(struct ssh *ssh)
@@ -56,7 +56,7 @@ kexecdh_server(struct ssh *ssh)
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_ECDH_INIT, &input_kex_ecdh_init);
 }
 
-static void
+static int
 input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
@@ -172,4 +172,5 @@ input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 	kex_derive_keys(ssh, hash, hashlen, shared_secret);
 	BN_clear_free(shared_secret);
 	kex_finish(ssh);
+	return 0;
 }

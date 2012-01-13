@@ -511,13 +511,13 @@ client_check_window_change(void)
 	}
 }
 
-static void
+static int
 client_global_request_reply(int type, u_int32_t seq, struct ssh *ssh)
 {
 	struct global_confirm *gc;
 
 	if ((gc = TAILQ_FIRST(&global_confirms)) == NULL)
-		return;
+		return 0;
 	if (gc->cb != NULL)
 		gc->cb(type, seq, gc->ctx);
 	if (--gc->ref_count <= 0) {
@@ -527,6 +527,7 @@ client_global_request_reply(int type, u_int32_t seq, struct ssh *ssh)
 	}
 
 	packet_set_alive_timeouts(0);
+	return 0;
 }
 
 static void
@@ -1655,7 +1656,7 @@ client_loop(int have_pty, int escape_char_arg, int ssh2_chan_id)
 
 /*********/
 
-static void
+static int
 client_input_stdout_data(int type, u_int32_t seq, struct ssh *ssh)
 {
 	u_int data_len;
@@ -1664,8 +1665,9 @@ client_input_stdout_data(int type, u_int32_t seq, struct ssh *ssh)
 	buffer_append(&stdout_buffer, data, data_len);
 	memset(data, 0, data_len);
 	xfree(data);
+	return 0;
 }
-static void
+static int
 client_input_stderr_data(int type, u_int32_t seq, struct ssh *ssh)
 {
 	u_int data_len;
@@ -1674,8 +1676,9 @@ client_input_stderr_data(int type, u_int32_t seq, struct ssh *ssh)
 	buffer_append(&stderr_buffer, data, data_len);
 	memset(data, 0, data_len);
 	xfree(data);
+	return 0;
 }
-static void
+static int
 client_input_exit_status(int type, u_int32_t seq, struct ssh *ssh)
 {
 	exit_status = packet_get_int();
@@ -1690,8 +1693,9 @@ client_input_exit_status(int type, u_int32_t seq, struct ssh *ssh)
 	packet_write_wait();
 	/* Flag that we want to exit. */
 	quit_pending = 1;
+	return 0;
 }
-static void
+static int
 client_input_agent_open(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
@@ -1730,6 +1734,7 @@ client_input_agent_open(int type, u_int32_t seq, struct ssh *ssh)
 		packet_put_int(c->self);
 	}
 	packet_send();
+	return 0;
 }
 
 static Channel *
@@ -1861,7 +1866,7 @@ client_request_tun_fwd(int tun_mode, int local_tun, int remote_tun)
 }
 
 /* XXXX move to generic input handler */
-static void
+static int
 client_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
@@ -1910,8 +1915,9 @@ client_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 		packet_send();
 	}
 	xfree(ctype);
+	return 0;
 }
-static void
+static int
 client_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
@@ -1956,8 +1962,9 @@ client_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 		packet_send();
 	}
 	xfree(rtype);
+	return 0;
 }
-static void
+static int
 client_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 {
 	char *rtype;
@@ -1975,6 +1982,7 @@ client_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 		packet_write_wait();
 	}
 	xfree(rtype);
+	return 0;
 }
 
 void

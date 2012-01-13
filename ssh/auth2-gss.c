@@ -43,10 +43,10 @@
 
 extern ServerOptions options;
 
-static void input_gssapi_token(int type, u_int32_t plen, struct ssh *ssh);
-static void input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh);
-static void input_gssapi_exchange_complete(int type, u_int32_t plen, struct ssh *ssh);
-static void input_gssapi_errtok(int, u_int32_t, struct ssh *);
+static int input_gssapi_token(int type, u_int32_t plen, struct ssh *ssh);
+static int input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh);
+static int input_gssapi_exchange_complete(int type, u_int32_t plen, struct ssh *ssh);
+static int input_gssapi_errtok(int, u_int32_t, struct ssh *);
 
 /*
  * We only support those mechanisms that we know about (ie ones that we know
@@ -128,7 +128,7 @@ userauth_gssapi(struct ssh *ssh)
 	return (0);
 }
 
-static void
+static int
 input_gssapi_token(int type, u_int32_t plen, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -180,9 +180,10 @@ input_gssapi_token(int type, u_int32_t plen, struct ssh *ssh)
 	}
 
 	gss_release_buffer(&min_status, &send_tok);
+	return 0;
 }
 
-static void
+static int
 input_gssapi_errtok(int type, u_int32_t plen, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -214,6 +215,7 @@ input_gssapi_errtok(int type, u_int32_t plen, struct ssh *ssh)
 	/* The client will have already moved on to the next auth */
 
 	gss_release_buffer(&maj_status, &send_tok);
+	return 0;
 }
 
 /*
@@ -222,7 +224,7 @@ input_gssapi_errtok(int type, u_int32_t plen, struct ssh *ssh)
  * which only enables it once the GSSAPI exchange is complete.
  */
 
-static void
+static int
 input_gssapi_exchange_complete(int type, u_int32_t plen, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -249,9 +251,10 @@ input_gssapi_exchange_complete(int type, u_int32_t plen, struct ssh *ssh)
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_MIC, NULL);
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_EXCHANGE_COMPLETE, NULL);
 	userauth_finish(ssh, authenticated, "gssapi-with-mic");
+	return 0;
 }
 
-static void
+static int
 input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -289,6 +292,7 @@ input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh)
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_MIC, NULL);
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_EXCHANGE_COMPLETE, NULL);
 	userauth_finish(ssh, authenticated, "gssapi-with-mic");
+	return 0;
 }
 
 Authmethod method_gssapi = {

@@ -64,9 +64,9 @@
  */
 
 /* Dispatch handlers */
-static void input_userauth_jpake_client_step1(int, u_int32_t, struct ssh *);
-static void input_userauth_jpake_client_step2(int, u_int32_t, struct ssh *);
-static void input_userauth_jpake_client_confirm(int, u_int32_t, struct ssh *);
+static int input_userauth_jpake_client_step1(int, u_int32_t, struct ssh *);
+static int input_userauth_jpake_client_step2(int, u_int32_t, struct ssh *);
+static int input_userauth_jpake_client_confirm(int, u_int32_t, struct ssh *);
 
 static int auth2_jpake_start(struct ssh *);
 
@@ -422,7 +422,7 @@ auth2_jpake_start(struct ssh *ssh)
 }
 
 /* ARGSUSED */
-static void
+static int
 input_userauth_jpake_client_step1(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -477,10 +477,11 @@ input_userauth_jpake_client_step1(int type, u_int32_t seq, struct ssh *ssh)
 	/* Expect step 2 packet from peer */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP2,
 	    input_userauth_jpake_client_step2);
+	return 0;
 }
 
 /* ARGSUSED */
-static void
+static int
 input_userauth_jpake_client_step2(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -527,10 +528,11 @@ input_userauth_jpake_client_step2(int type, u_int32_t seq, struct ssh *ssh)
 	/* Expect confirmation from peer */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_CONFIRM,
 	    input_userauth_jpake_client_confirm);
+	return 0;
 }
 
 /* ARGSUSED */
-static void
+static int
 input_userauth_jpake_client_confirm(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;

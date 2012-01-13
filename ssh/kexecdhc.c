@@ -50,7 +50,7 @@ struct kexecdhc_state {
 	const EC_GROUP *group;
 };
 
-static void input_kex_ecdh_reply(int, u_int32_t, struct ssh *);
+static int input_kex_ecdh_reply(int, u_int32_t, struct ssh *);
 
 void
 kexecdh_client(struct ssh *ssh)
@@ -88,7 +88,7 @@ kexecdh_client(struct ssh *ssh)
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_ECDH_REPLY, &input_kex_ecdh_reply);
 }
 
-static void
+static int
 input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
@@ -190,4 +190,5 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 	xfree(kex->state);
 	kex->state = NULL;
 	kex_finish(ssh);
+	return 0;
 }

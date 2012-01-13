@@ -35,7 +35,7 @@
 #include "packet.h"
 #include "compat.h"
 
-void
+int
 dispatch_protocol_error(int type, u_int32_t seq, struct ssh *ssh)
 {
 	logit("dispatch_protocol_error: type %d seq %u", type, seq);
@@ -45,12 +45,14 @@ dispatch_protocol_error(int type, u_int32_t seq, struct ssh *ssh)
 	ssh_packet_put_int(ssh, seq);
 	ssh_packet_send(ssh);
 	ssh_packet_write_wait(ssh);
+	return 0;
 }
 
-void
+int
 dispatch_protocol_ignore(int type, u_int32_t seq, struct ssh *ssh)
 {
 	logit("dispatch_protocol_ignore: type %d seq %u", type, seq);
+	return 0;
 }
 
 void

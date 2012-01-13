@@ -854,7 +854,7 @@ server_loop2(Authctxt *authctxt)
 	session_destroy_all(NULL);
 }
 
-static void
+static int
 server_input_keep_alive(int type, u_int32_t seq, struct ssh *ssh)
 {
 	debug("Got %d/%u for keepalive", type, seq);
@@ -864,9 +864,10 @@ server_input_keep_alive(int type, u_int32_t seq, struct ssh *ssh)
 	 * the bogus CHANNEL_REQUEST we send for keepalives.
 	 */
 	packet_set_alive_timeouts(0);
+	return 0;
 }
 
-static void
+static int
 server_input_stdin_data(int type, u_int32_t seq, struct ssh *ssh)
 {
 	char *data;
@@ -875,15 +876,16 @@ server_input_stdin_data(int type, u_int32_t seq, struct ssh *ssh)
 	/* Stdin data from the client.  Append it to the buffer. */
 	/* Ignore any data if the client has closed stdin. */
 	if (fdin == -1)
-		return;
+		return 0;
 	data = packet_get_string(&data_len);
 	packet_check_eom();
 	buffer_append(&stdin_buffer, data, data_len);
 	memset(data, 0, data_len);
 	xfree(data);
+	return 0;
 }
 
-static void
+static int
 server_input_eof(int type, u_int32_t seq, struct ssh *ssh)
 {
 	/*
@@ -894,9 +896,10 @@ server_input_eof(int type, u_int32_t seq, struct ssh *ssh)
 	debug("EOF received for stdin.");
 	packet_check_eom();
 	stdin_eof = 1;
+	return 0;
 }
 
-static void
+static int
 server_input_window_size(int type, u_int32_t seq, struct ssh *ssh)
 {
 	u_int row = packet_get_int();
@@ -908,6 +911,7 @@ server_input_window_size(int type, u_int32_t seq, struct ssh *ssh)
 	packet_check_eom();
 	if (fdin != -1)
 		pty_change_window_size(fdin, row, col, xpixel, ypixel);
+	return 0;
 }
 
 static Channel *
@@ -1008,7 +1012,7 @@ server_request_session(void)
 	return c;
 }
 
-static void
+static int
 server_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
@@ -1056,9 +1060,10 @@ server_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 		packet_send();
 	}
 	xfree(ctype);
+	return 0;
 }
 
-static void
+static int
 server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 {
 	char *rtype;
@@ -1123,9 +1128,10 @@ server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 		packet_write_wait();
 	}
 	xfree(rtype);
+	return 0;
 }
 
-static void
+static int
 server_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c;
@@ -1155,6 +1161,7 @@ server_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 		packet_send();
 	}
 	xfree(rtype);
+	return 0;
 }
 
 static void
