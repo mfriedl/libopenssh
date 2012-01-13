@@ -49,29 +49,24 @@
 #include "dispatch.h"
 #include "err.h"
 
-struct kexgexs_state {
-    int omin, min, omax, max, onbits;
-    DH *dh;
-};
-
 static int input_kex_dh_gex_init(int, u_int32_t, struct ssh *);
 
 void
 kexgex_server(struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
-	DH *dh;
-	int omin = -1, min = -1, omax = -1, max = -1, onbits = -1, nbits = -1;
+	int min = -1, max = -1, nbits = -1;
 	int type;
-	struct kexgexs_state *kexgexs_state;
+
+	kex->min = kex->nbits = kex->max = -1;
 
 	type = ssh_packet_read(ssh);
 	switch (type) {
 	case SSH2_MSG_KEX_DH_GEX_REQUEST:
 		debug("SSH2_MSG_KEX_DH_GEX_REQUEST received");
-		omin = min = ssh_packet_get_int(ssh);
-		onbits = nbits = ssh_packet_get_int(ssh);
-		omax = max = ssh_packet_get_int(ssh);
+		kex->min = min = ssh_packet_get_int(ssh);
+		kex->nbits = nbits = ssh_packet_get_int(ssh);
+		kex->max = max = ssh_packet_get_int(ssh);
 		min = MAX(DH_GRP_MIN, min);
 		max = MIN(DH_GRP_MAX, max);
 		nbits = MAX(DH_GRP_MIN, nbits);
@@ -79,46 +74,37 @@ kexgex_server(struct ssh *ssh)
 		break;
 	case SSH2_MSG_KEX_DH_GEX_REQUEST_OLD:
 		debug("SSH2_MSG_KEX_DH_GEX_REQUEST_OLD received");
-		onbits = nbits = ssh_packet_get_int(ssh);
+		kex->nbits = nbits = ssh_packet_get_int(ssh);
 		/* unused for old GEX */
-		omin = min = DH_GRP_MIN;
-		omax = max = DH_GRP_MAX;
+		kex->min = min = DH_GRP_MIN;
+		kex->max = max = DH_GRP_MAX;
 		break;
 	default:
 		fatal("protocol error during kex, no DH_GEX_REQUEST: %d", type);
 	}
 	ssh_packet_check_eom(ssh);
 
-	if (omax < omin || onbits < omin || omax < onbits)
+	if (kex->max < kex->min || kex->nbits < kex->min || kex->max < kex->nbits)
 		fatal("DH_GEX_REQUEST, bad parameters: %d !< %d !< %d",
-		    omin, onbits, omax);
+		    kex->min, kex->nbits, kex->max);
 
 	/* Contact privileged parent */
-	dh = PRIVSEP(choose_dh(min, nbits, max));
-	if (dh == NULL)
+	kex->dh = PRIVSEP(choose_dh(min, nbits, max));
+	if (kex->dh == NULL)
 		ssh_packet_disconnect(ssh,
 		    "Protocol error: no matching DH grp found");
 
 	debug("SSH2_MSG_KEX_DH_GEX_GROUP sent");
 	ssh_packet_start(ssh, SSH2_MSG_KEX_DH_GEX_GROUP);
-	ssh_packet_put_bignum2(ssh, dh->p);
-	ssh_packet_put_bignum2(ssh, dh->g);
+	ssh_packet_put_bignum2(ssh, kex->dh->p);
+	ssh_packet_put_bignum2(ssh, kex->dh->g);
 	ssh_packet_send(ssh);
 
 	/* flush */
 	ssh_packet_write_wait(ssh);
 
 	/* Compute our exchange value in parallel with the client */
-	dh_gen_key(dh, kex->we_need * 8);
-
-	kexgexs_state = xcalloc(1, sizeof(*kexgexs_state));
-	kexgexs_state->omin = omin;
-	kexgexs_state->omax = omax;
-	kexgexs_state->min = min;
-	kexgexs_state->max = max;
-	kexgexs_state->onbits = onbits;
-	kexgexs_state->dh = dh;
-	kex->state = kexgexs_state;
+	dh_gen_key(kex->dh, kex->we_need * 8);
 
 	debug("expecting SSH2_MSG_KEX_DH_GEX_INIT");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_DH_GEX_INIT, &input_kex_dh_gex_init);
@@ -128,20 +114,11 @@ static int
 input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
-	struct kexgexs_state *kexgexs_state = kex->state;
 	BIGNUM *shared_secret = NULL, *dh_client_pub = NULL;
 	struct sshkey *server_host_public, *server_host_private;
-	DH *dh;
 	u_int sbloblen, klen, slen, hashlen;
 	u_char *kbuf, *hash, *signature = NULL, *server_host_key_blob = NULL;
-	int omin, min, omax, max, onbits, kout, r;
-
-	dh = kexgexs_state->dh;
-	omin = kexgexs_state->omin;
-	min = kexgexs_state->min;
-	omax = kexgexs_state->omax;
-	max = kexgexs_state->max;
-	onbits = kexgexs_state->onbits;
+	int kout, r;
 
 	if (kex->load_host_public_key == NULL ||
 	    kex->load_host_private_key == NULL)
@@ -168,18 +145,18 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 #endif
 
 #ifdef DEBUG_KEXDH
-	DHparams_print_fp(stderr, dh);
+	DHparams_print_fp(stderr, kex->dh);
 	fprintf(stderr, "pub= ");
 	BN_print_fp(stderr, dh->pub_key);
 	fprintf(stderr, "\n");
 #endif
-	if (!dh_pub_is_valid(dh, dh_client_pub))
+	if (!dh_pub_is_valid(kex->dh, dh_client_pub))
 		ssh_packet_disconnect(ssh,
 		    "bad client public DH value");
 
-	klen = DH_size(dh);
+	klen = DH_size(kex->dh);
 	kbuf = xmalloc(klen);
-	if ((kout = DH_compute_key(kbuf, dh_client_pub, dh)) < 0)
+	if ((kout = DH_compute_key(kbuf, dh_client_pub, kex->dh)) < 0)
 		fatal("DH_compute_key: failed");
 #ifdef DEBUG_KEXDH
 	dump_digest("shared secret", kbuf, kout);
@@ -196,7 +173,7 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 		fatal("%s: sshkey_to_blob failed: %s", __func__, ssh_err(r));
 
 	if (type == SSH2_MSG_KEX_DH_GEX_REQUEST_OLD)
-		omin = min = omax = max = -1;
+		kex->min = kex->max = -1;
 
 	/* calc H */
 	kexgex_hash(
@@ -206,10 +183,10 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	    buffer_ptr(&kex->peer), buffer_len(&kex->peer),
 	    buffer_ptr(&kex->my), buffer_len(&kex->my),
 	    server_host_key_blob, sbloblen,
-	    omin, onbits, omax,
-	    dh->p, dh->g,
+	    kex->min, kex->nbits, kex->max,
+	    kex->dh->p, kex->dh->g,
 	    dh_client_pub,
-	    dh->pub_key,
+	    kex->dh->pub_key,
 	    shared_secret,
 	    &hash, &hashlen
 	);
@@ -233,20 +210,19 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	debug("SSH2_MSG_KEX_DH_GEX_REPLY sent");
 	ssh_packet_start(ssh, SSH2_MSG_KEX_DH_GEX_REPLY);
 	ssh_packet_put_string(ssh, server_host_key_blob, sbloblen);
-	ssh_packet_put_bignum2(ssh, dh->pub_key);	/* f */
+	ssh_packet_put_bignum2(ssh, kex->dh->pub_key);	/* f */
 	ssh_packet_put_string(ssh, signature, slen);
 	ssh_packet_send(ssh);
 
 	xfree(signature);
 	xfree(server_host_key_blob);
 	/* have keys, free DH */
-	DH_free(dh);
+	DH_free(kex->dh);
+	kex->dh = NULL;
 
 	kex_derive_keys(ssh, hash, hashlen, shared_secret);
 	BN_clear_free(shared_secret);
 
-	xfree(kex->state);
-	kex->state = NULL;
 	kex_finish(ssh);
 	return 0;
 }

@@ -45,11 +45,6 @@
 #include "compat.h"
 #include "err.h"
 
-struct kexecdhc_state {
-	EC_KEY *client_key;
-	const EC_GROUP *group;
-};
-
 static int input_kex_ecdh_reply(int, u_int32_t, struct ssh *);
 
 void
@@ -59,7 +54,6 @@ kexecdh_client(struct ssh *ssh)
 	EC_KEY *client_key;
 	const EC_GROUP *group;
 	int curve_nid;
-	struct kexecdhc_state *kexecdhc_state;
 
 	if ((curve_nid = kex_ecdh_name_to_nid(kex->name)) == -1)
 		fatal("%s: unsupported ECDH curve \"%s\"", __func__, kex->name);
@@ -79,10 +73,8 @@ kexecdh_client(struct ssh *ssh)
 	sshkey_dump_ec_key(client_key);
 #endif
 
-	kexecdhc_state = xcalloc(1, sizeof(*kexecdhc_state));
-	kexecdhc_state->client_key = client_key;
-	kexecdhc_state->group = group;
-	kex->state = kexecdhc_state;
+	kex->ec_client_key = client_key;
+	kex->ec_group = group;
 
 	debug("expecting SSH2_MSG_KEX_ECDH_REPLY");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_ECDH_REPLY, &input_kex_ecdh_reply);
@@ -92,7 +84,6 @@ static int
 input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
-	struct kexecdhc_state *kexecdhc_state = kex->state;
 	const EC_GROUP *group;
 	EC_POINT *server_public;
 	EC_KEY *client_key;
@@ -103,8 +94,8 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 	u_int klen, slen, sbloblen, hashlen;
 	int r;
 
-	group = kexecdhc_state->group;
-	client_key = kexecdhc_state->client_key;
+	group = kex->ec_group;
+	client_key = kex->ec_client_key;
 
 	/* hostkey */
 	server_host_key_blob = ssh_packet_get_string(ssh, &sbloblen);
@@ -170,7 +161,8 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 	);
 	xfree(server_host_key_blob);
 	EC_POINT_clear_free(server_public);
-	EC_KEY_free(client_key);
+	EC_KEY_free(kex->ec_client_key);
+	kex->ec_client_key = NULL;
 
 	if ((r = sshkey_verify(server_host_key, signature, slen, hash,
 	    hashlen, datafellows)) != 0)
@@ -187,8 +179,6 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 
 	kex_derive_keys(ssh, hash, hashlen, shared_secret);
 	BN_clear_free(shared_secret);
-	xfree(kex->state);
-	kex->state = NULL;
 	kex_finish(ssh);
 	return 0;
 }
