@@ -266,7 +266,7 @@ ssh_packet_fwd(struct side *from, struct side *to)
 
 	if (!from->ssh || !to->ssh)
 		return;
-	type = ssh_packet_get(from->ssh);
+	type = ssh_packet_next(from->ssh);
 	if (type) {
 		data = ssh_packet_payload(from->ssh, &len);
 		debug("ssh_packet_fwd %d->%d type %d len %d",
