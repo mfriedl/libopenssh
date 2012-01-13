@@ -54,7 +54,7 @@ struct kexgexs_state {
     DH *dh;
 };
 
-static void input_kex_dh_gex_init(int, u_int32_t, struct ssh *);
+static int input_kex_dh_gex_init(int, u_int32_t, struct ssh *);
 
 void
 kexgex_server(struct ssh *ssh)
@@ -124,7 +124,7 @@ kexgex_server(struct ssh *ssh)
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_DH_GEX_INIT, &input_kex_dh_gex_init);
 }
 
-static void
+static int
 input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
@@ -248,4 +248,5 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	xfree(kex->state);
 	kex->state = NULL;
 	kex_finish(ssh);
+	return 0;
 }

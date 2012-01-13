@@ -88,8 +88,8 @@ Authmethod *authmethods[] = {
 
 /* protocol */
 
-static void input_service_request(int, u_int32_t, struct ssh *);
-static void input_userauth_request(int, u_int32_t, struct ssh *);
+static int input_service_request(int, u_int32_t, struct ssh *);
+static int input_userauth_request(int, u_int32_t, struct ssh *);
 
 /* helper */
 static Authmethod *authmethod_lookup(const char *);
@@ -166,7 +166,7 @@ do_authentication2(Authctxt *authctxt)
 }
 
 /*ARGSUSED*/
-static void
+static int
 input_service_request(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -197,10 +197,11 @@ input_service_request(int type, u_int32_t seq, struct ssh *ssh)
 		ssh_packet_disconnect(ssh, "bad service request %s", service);
 	}
 	xfree(service);
+	return 0;
 }
 
 /*ARGSUSED*/
-static void
+static int
 input_userauth_request(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -270,6 +271,7 @@ input_userauth_request(int type, u_int32_t seq, struct ssh *ssh)
 	xfree(service);
 	xfree(user);
 	xfree(method);
+	return 0;
 }
 
 void

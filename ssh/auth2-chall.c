@@ -41,7 +41,7 @@
 
 static int auth2_challenge_start(struct ssh *);
 static int send_userauth_info_request(struct ssh *);
-static void input_userauth_info_response(int, u_int32_t, struct ssh *);
+static int input_userauth_info_response(int, u_int32_t, struct ssh *);
 
 extern KbdintDevice bsdauth_device;
 
@@ -234,7 +234,7 @@ send_userauth_info_request(struct ssh *ssh)
 	return 1;
 }
 
-static void
+static int
 input_userauth_info_response(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -301,6 +301,7 @@ input_userauth_info_response(int type, u_int32_t seq, struct ssh *ssh)
 	}
 	userauth_finish(ssh, authenticated, method);
 	xfree(method);
+	return 0;
 }
 
 void

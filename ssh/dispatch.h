@@ -36,10 +36,10 @@ enum {
 
 struct ssh;
 
-typedef void dispatch_fn(int, u_int32_t, struct ssh *);
+typedef int dispatch_fn(int, u_int32_t, struct ssh *);
 
-void	dispatch_protocol_error(int, u_int32_t, struct ssh *);
-void	dispatch_protocol_ignore(int, u_int32_t, struct ssh *);
+int	dispatch_protocol_error(int, u_int32_t, struct ssh *);
+int	dispatch_protocol_ignore(int, u_int32_t, struct ssh *);
 void	ssh_dispatch_init(struct ssh *, dispatch_fn *);
 void	ssh_dispatch_set(struct ssh *, int, dispatch_fn *);
 void	ssh_dispatch_range(struct ssh *, u_int, u_int, dispatch_fn *);

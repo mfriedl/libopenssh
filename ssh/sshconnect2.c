@@ -276,18 +276,18 @@ struct Authmethod {
 	int	*batch_flag;	/* flag in option struct that disables method */
 };
 
-void	input_userauth_service_accept(int, u_int32_t, struct ssh *);
-void	input_userauth_success(int, u_int32_t, struct ssh *);
-void	input_userauth_success_unexpected(int, u_int32_t, struct ssh *);
-void	input_userauth_failure(int, u_int32_t, struct ssh *);
-void	input_userauth_banner(int, u_int32_t, struct ssh *);
-void	input_userauth_error(int, u_int32_t, struct ssh *);
-void	input_userauth_info_req(int, u_int32_t, struct ssh *);
-void	input_userauth_pk_ok(int, u_int32_t, struct ssh *);
-void	input_userauth_passwd_changereq(int, u_int32_t, struct ssh *);
-void	input_userauth_jpake_server_step1(int, u_int32_t, struct ssh *);
-void	input_userauth_jpake_server_step2(int, u_int32_t, struct ssh *);
-void	input_userauth_jpake_server_confirm(int, u_int32_t, struct ssh *);
+int	input_userauth_service_accept(int, u_int32_t, struct ssh *);
+int	input_userauth_success(int, u_int32_t, struct ssh *);
+int	input_userauth_success_unexpected(int, u_int32_t, struct ssh *);
+int	input_userauth_failure(int, u_int32_t, struct ssh *);
+int	input_userauth_banner(int, u_int32_t, struct ssh *);
+int	input_userauth_error(int, u_int32_t, struct ssh *);
+int	input_userauth_info_req(int, u_int32_t, struct ssh *);
+int	input_userauth_pk_ok(int, u_int32_t, struct ssh *);
+int	input_userauth_passwd_changereq(int, u_int32_t, struct ssh *);
+int	input_userauth_jpake_server_step1(int, u_int32_t, struct ssh *);
+int	input_userauth_jpake_server_step2(int, u_int32_t, struct ssh *);
+int	input_userauth_jpake_server_confirm(int, u_int32_t, struct ssh *);
 
 int	userauth_none(struct ssh *);
 int	userauth_pubkey(struct ssh *);
@@ -300,11 +300,11 @@ void	userauth_jpake_cleanup(struct ssh *);
 
 #ifdef GSSAPI
 int	userauth_gssapi(struct ssh *);
-void	input_gssapi_response(int type, u_int32_t, struct ssh *);
-void	input_gssapi_token(int type, u_int32_t, struct ssh *);
-void	input_gssapi_hash(int type, u_int32_t, struct ssh *);
-void	input_gssapi_error(int, u_int32_t, struct ssh *);
-void	input_gssapi_errtok(int, u_int32_t, struct ssh *);
+int	input_gssapi_response(int type, u_int32_t, struct ssh *);
+int	input_gssapi_token(int type, u_int32_t, struct ssh *);
+int	input_gssapi_hash(int type, u_int32_t, struct ssh *);
+int	input_gssapi_error(int, u_int32_t, struct ssh *);
+int	input_gssapi_errtok(int, u_int32_t, struct ssh *);
 #endif
 
 void	userauth(struct ssh *, char *);
@@ -409,7 +409,7 @@ ssh_userauth2(const char *local_user, const char *server_user, char *host,
 }
 
 /* ARGSUSED */
-void
+int
 input_userauth_service_accept(int type, u_int32_t seq, struct ssh *ssh)
 {
 	if (ssh_packet_remaining(ssh) > 0) {
@@ -429,6 +429,7 @@ input_userauth_service_accept(int type, u_int32_t seq, struct ssh *ssh)
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_SUCCESS, &input_userauth_success);
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_FAILURE, &input_userauth_failure);
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_BANNER, &input_userauth_banner);
+	return 0;
 }
 
 void
@@ -472,15 +473,16 @@ userauth(struct ssh *ssh, char *authlist)
 }
 
 /* ARGSUSED */
-void
+int
 input_userauth_error(int type, u_int32_t seq, struct ssh *ssh)
 {
 	fatal("input_userauth_error: bad message during authentication: "
 	    "type %d", type);
+	return 0;
 }
 
 /* ARGSUSED */
-void
+int
 input_userauth_banner(int type, u_int32_t seq, struct ssh *ssh)
 {
 	char *msg, *raw, *lang;
@@ -499,10 +501,11 @@ input_userauth_banner(int type, u_int32_t seq, struct ssh *ssh)
 	}
 	xfree(raw);
 	xfree(lang);
+	return 0;
 }
 
 /* ARGSUSED */
-void
+int
 input_userauth_success(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -520,9 +523,10 @@ input_userauth_success(int type, u_int32_t seq, struct ssh *ssh)
 		authctxt->methoddata = NULL;
 	}
 	authctxt->success = 1;			/* break out */
+	return 0;
 }
 
-void
+int
 input_userauth_success_unexpected(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -532,10 +536,11 @@ input_userauth_success_unexpected(int type, u_int32_t seq, struct ssh *ssh)
 
 	fatal("Unexpected authentication success during %s.",
 	    authctxt->method->name);
+	return 0;
 }
 
 /* ARGSUSED */
-void
+int
 input_userauth_failure(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -554,10 +559,11 @@ input_userauth_failure(int type, u_int32_t seq, struct ssh *ssh)
 	debug("Authentications that can continue: %s", authlist);
 
 	userauth(ssh, authlist);
+	return 0;
 }
 
 /* ARGSUSED */
-void
+int
 input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -626,6 +632,7 @@ done:
 	/* try another method if we did not send a packet */
 	if (sent == 0)
 		userauth(ssh, NULL);
+	return 0;
 }
 
 #ifdef GSSAPI
@@ -740,7 +747,7 @@ process_gssapi_token(struct ssh *ssh, gss_buffer_t recv_tok)
 }
 
 /* ARGSUSED */
-void
+int
 input_gssapi_response(int type, u_int32_t plen, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -761,7 +768,7 @@ input_gssapi_response(int type, u_int32_t plen, struct ssh *ssh)
 		xfree(oidv);
 		debug("Badly encoded mechanism OID received");
 		userauth(ssh, NULL);
-		return;
+		return 0;
 	}
 
 	if (!ssh_gssapi_check_oid(gssctxt, oidv + 2, oidlen - 2))
@@ -775,12 +782,13 @@ input_gssapi_response(int type, u_int32_t plen, struct ssh *ssh)
 		/* Start again with next method on list */
 		debug("Trying to start again");
 		userauth(ssh, NULL);
-		return;
+		return 0;
 	}
+	return 0;
 }
 
 /* ARGSUSED */
-void
+int
 input_gssapi_token(int type, u_int32_t plen, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -803,12 +811,13 @@ input_gssapi_token(int type, u_int32_t plen, struct ssh *ssh)
 	if (GSS_ERROR(status)) {
 		/* Start again with the next method in the list */
 		userauth(ssh, NULL);
-		return;
+		return 0;
 	}
+	return 0;
 }
 
 /* ARGSUSED */
-void
+int
 input_gssapi_errtok(int type, u_int32_t plen, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -835,10 +844,11 @@ input_gssapi_errtok(int type, u_int32_t plen, struct ssh *ssh)
 	gss_release_buffer(&ms, &send_tok);
 
 	/* Server will be returning a failed packet after this one */
+	return 0;
 }
 
 /* ARGSUSED */
-void
+int
 input_gssapi_error(int type, u_int32_t plen, struct ssh *ssh)
 {
 	OM_uint32 maj, min;
@@ -855,6 +865,7 @@ input_gssapi_error(int type, u_int32_t plen, struct ssh *ssh)
 	debug("Server GSSAPI Error:\n%s", msg);
 	xfree(msg);
 	xfree(lang);
+	return 0;
 }
 #endif /* GSSAPI */
 
@@ -910,7 +921,7 @@ userauth_passwd(struct ssh *ssh)
  * parse PASSWD_CHANGEREQ, prompt user and send SSH2_MSG_USERAUTH_REQUEST
  */
 /* ARGSUSED */
-void
+int
 input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -951,7 +962,7 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
 		password = read_passphrase(prompt, RP_ALLOW_EOF);
 		if (password == NULL) {
 			/* bail out */
-			return;
+			return 0;
 		}
 		snprintf(prompt, sizeof(prompt),
 		    "Retype %.30s@%.128s's new password: ",
@@ -974,6 +985,7 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
 
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_PASSWD_CHANGEREQ,
 	    &input_userauth_passwd_changereq);
+	return 0;
 }
 
 #ifdef JPAKE
@@ -1035,7 +1047,7 @@ jpake_password_to_secret(Authctxt *authctxt, const char *crypt_scheme,
 }
 
 /* ARGSUSED */
-void
+int
 input_userauth_jpake_server_step1(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -1100,10 +1112,11 @@ input_userauth_jpake_server_step1(int type, u_int32_t seq, struct ssh *ssh)
 	/* Expect step 2 packet from peer */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_STEP2,
 	    input_userauth_jpake_server_step2);
+	return 0;
 }
 
 /* ARGSUSED */
-void
+int
 input_userauth_jpake_server_step2(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -1147,10 +1160,11 @@ input_userauth_jpake_server_step2(int type, u_int32_t seq, struct ssh *ssh)
 	/* Expect confirmation from peer */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_CONFIRM,
 	    input_userauth_jpake_server_confirm);
+	return 0;
 }
 
 /* ARGSUSED */
-void
+int
 input_userauth_jpake_server_confirm(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -1176,6 +1190,7 @@ input_userauth_jpake_server_confirm(int type, u_int32_t seq, struct ssh *ssh)
 	}
 
 	userauth_jpake_cleanup(ssh);
+	return 0;
 }
 #endif /* JPAKE */
 
@@ -1537,7 +1552,7 @@ userauth_kbdint(struct ssh *ssh)
 /*
  * parse INFO_REQUEST, prompt user and send INFO_RESPONSE
  */
-void
+int
 input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
@@ -1589,6 +1604,7 @@ input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 
 	ssh_packet_add_padding(ssh, 64);
 	ssh_packet_send(ssh);
+	return 0;
 }
 
 static int

@@ -51,7 +51,7 @@
 /* prototype */
 static void kex_kexinit_finish(struct ssh *);
 static void kex_choose_conf(struct ssh *);
-static void kex_input_newkeys(int, u_int32_t, struct ssh *);
+static int kex_input_newkeys(int, u_int32_t, struct ssh *);
 
 /* Validate KEX method name list */
 int
@@ -142,10 +142,11 @@ kex_prop_free(char **proposal)
 }
 
 /* ARGSUSED */
-static void
+static int
 kex_protocol_error(int type, u_int32_t seq, struct ssh *ssh)
 {
 	error("Hm, kex protocol error: type %d seq %u", type, seq);
+	return 0;
 }
 
 static void
@@ -168,7 +169,7 @@ kex_finish(struct ssh *ssh)
 	ssh_dispatch_set(ssh, SSH2_MSG_NEWKEYS, &kex_input_newkeys);
 }
 
-static void
+static int
 kex_input_newkeys(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
@@ -183,6 +184,7 @@ kex_input_newkeys(int type, u_int32_t seq, struct ssh *ssh)
 	kex->flags &= ~KEX_INIT_SENT;
 	xfree(kex->name);
 	kex->name = NULL;
+	return 0;
 }
 
 void
@@ -221,7 +223,7 @@ kex_send_kexinit(struct ssh *ssh)
 }
 
 /* ARGSUSED */
-void
+int
 kex_input_kexinit(int type, u_int32_t seq, struct ssh *ssh)
 {
 	char *ptr;
@@ -245,6 +247,7 @@ kex_input_kexinit(int type, u_int32_t seq, struct ssh *ssh)
 	ssh_packet_check_eom(ssh);
 
 	kex_kexinit_finish(ssh);
+	return 0;
 }
 
 Kex *
