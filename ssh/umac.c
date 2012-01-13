@@ -66,7 +66,6 @@
 #include <sys/types.h>
 #include <sys/endian.h>
 
-#include "xmalloc.h"
 #include "umac.h"
 #include <string.h>
 #include <stdlib.h>
@@ -1197,7 +1196,7 @@ int umac_delete(struct umac_ctx *ctx)
     if (ctx) {
         if (ALLOC_BOUNDARY)
             ctx = (struct umac_ctx *)ctx->free_ptr;
-        xfree(ctx);
+        free(ctx);
     }
     return (1);
 }
@@ -1213,7 +1212,7 @@ struct umac_ctx *umac_new(u_char key[])
     size_t bytes_to_add;
     aes_int_key prf_key;
     
-    octx = ctx = xmalloc(sizeof(*ctx) + ALLOC_BOUNDARY);
+    octx = ctx = malloc(sizeof(*ctx) + ALLOC_BOUNDARY);
     if (ctx) {
         if (ALLOC_BOUNDARY) {
             bytes_to_add = ALLOC_BOUNDARY -
