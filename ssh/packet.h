@@ -156,6 +156,8 @@ int	 ssh_packet_inc_alive_timeouts(struct ssh *);
 int	 ssh_packet_set_maxsize(struct ssh *, u_int);
 u_int	 ssh_packet_get_maxsize(struct ssh *);
 
+void	ssh_packet_set_postauth(struct ssh *);
+
 /* don't allow remaining bytes after the end of the message */
 #define ssh_packet_check_eom(active_state) \
 do { \
@@ -310,6 +312,8 @@ void     packet_set_connection(int, int);
 	ssh_packet_check_eom(active_state)
 #define set_newkeys(mode) \
 	ssh_set_newkeys(active_state, (mode))
+#define packet_set_postauth() \
+	ssh_packet_set_postauth(active_state)
 #endif
 
 #endif				/* PACKET_H */
