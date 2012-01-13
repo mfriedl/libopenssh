@@ -149,7 +149,7 @@ ssh_input_append(struct ssh* ssh, const char *data, u_int len)
 }
 
 int
-ssh_packet_get(struct ssh *ssh)
+ssh_packet_next(struct ssh *ssh)
 {
 	int type;                                                       
 	u_int32_t seqnr;                                                
