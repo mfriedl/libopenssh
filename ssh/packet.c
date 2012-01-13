@@ -74,6 +74,7 @@
 #include "ssh.h"
 #include "packet.h"
 #include "roaming.h"
+#include "err.h"
 
 #ifdef PACKET_DEBUG
 #define DBG(x) x
@@ -213,18 +214,20 @@ ssh_packet_set_connection(struct ssh *ssh, int fd_in, int fd_out)
 {
 	struct session_state *state;
 	Cipher *none = cipher_by_name("none");
+	int r;
 
 	if (none == NULL)
-		fatal("packet_set_connection: cannot load cipher 'none'");
+		fatal("%s: cannot load cipher 'none'", __func__);
 	if (ssh == NULL)
 		ssh = ssh_alloc_session_state();
 	state = ssh->state;
 	state->connection_in = fd_in;
 	state->connection_out = fd_out;
-	cipher_init(&state->send_context, none, (const u_char *)"",
-	    0, NULL, 0, CIPHER_ENCRYPT);
-	cipher_init(&state->receive_context, none, (const u_char *)"",
-	    0, NULL, 0, CIPHER_DECRYPT);
+	if ((r = cipher_init(&state->send_context, none,
+	    (const u_char *)"", 0, NULL, 0, CIPHER_ENCRYPT)) != 0 ||
+	    (r = cipher_init(&state->receive_context, none,
+	    (const u_char *)"", 0, NULL, 0, CIPHER_DECRYPT)) != 0)
+		fatal("%s: cipher_init failed: %s", __func__, ssh_err(r));
 	state->newkeys[MODE_IN] = state->newkeys[MODE_OUT] = NULL;
 	if (!state->initialized) {
 		state->initialized = 1;
@@ -334,13 +337,15 @@ ssh_packet_get_keyiv(struct ssh *ssh, int mode, u_char *iv,
     u_int len)
 {
 	CipherContext *cc;
+	int r;
 
 	if (mode == MODE_OUT)
 		cc = &ssh->state->send_context;
 	else
 		cc = &ssh->state->receive_context;
 
-	cipher_get_keyiv(cc, iv, len);
+	if ((r = cipher_get_keyiv(cc, iv, len)) != 0)
+		fatal("%s: cipher_get_keyiv failed: %s", __func__, ssh_err(r));
 }
 
 int
@@ -386,13 +391,15 @@ void
 ssh_packet_set_iv(struct ssh *ssh, int mode, u_char *dat)
 {
 	CipherContext *cc;
+	int r;
 
 	if (mode == MODE_OUT)
 		cc = &ssh->state->send_context;
 	else
 		cc = &ssh->state->receive_context;
 
-	cipher_set_keyiv(cc, dat);
+	if ((r = cipher_set_keyiv(cc, dat)) != 0)
+		fatal("%s: cipher_set_keyiv failed: %s", __func__, ssh_err(r));
 }
 
 int
@@ -480,6 +487,7 @@ void
 ssh_packet_close(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
+	int r;
 
 	if (!state->initialized)
 		return;
@@ -499,8 +507,9 @@ ssh_packet_close(struct ssh *ssh)
 		buffer_free(&state->compression_buffer);
 		buffer_compress_uninit();
 	}
-	cipher_cleanup(&state->send_context);
-	cipher_cleanup(&state->receive_context);
+	if ((r = cipher_cleanup(&state->send_context)) != 0 ||
+	    (r = cipher_cleanup(&state->receive_context)) != 0)
+		fatal("%s: cipher_cleanup failed: %s", __func__, ssh_err(r));
 }
 
 /* Sets remote side protocol flags. */
@@ -555,19 +564,28 @@ ssh_packet_set_encryption_key(struct ssh *ssh, const u_char *key, u_int keylen, 
 {
 	struct session_state *state = ssh->state;
 	Cipher *cipher = cipher_by_number(number);
+	int r;
+	const char *wmsg;
 
 	if (cipher == NULL)
-		fatal("packet_set_encryption_key: unknown cipher number %d", number);
+		fatal("%s: unknown cipher number %d", __func__, number);
 	if (keylen < 20)
-		fatal("packet_set_encryption_key: keylen too small: %d", keylen);
+		fatal("%s: keylen too small: %d", __func__, keylen);
 	if (keylen > SSH_SESSION_KEY_LENGTH)
-		fatal("packet_set_encryption_key: keylen too big: %d", keylen);
+		fatal("%s: keylen too big: %d", __func__, keylen);
 	memcpy(state->ssh1_key, key, keylen);
 	state->ssh1_keylen = keylen;
-	cipher_init(&state->send_context, cipher, key, keylen, NULL,
-	    0, CIPHER_ENCRYPT);
-	cipher_init(&state->receive_context, cipher, key, keylen, NULL,
-	    0, CIPHER_DECRYPT);
+	if ((r = cipher_init(&state->send_context, cipher, key, keylen,
+	    NULL, 0, CIPHER_ENCRYPT)) != 0 ||
+	    (r = cipher_init(&state->receive_context, cipher, key, keylen,
+	    NULL, 0, CIPHER_DECRYPT) != 0))
+		fatal("%s: cipher_init failed: %s", __func__, ssh_err(r));
+	if (!ssh->cipher_warning_done &&
+	    ((wmsg = cipher_warning_message(&state->send_context)) != NULL ||
+	    (wmsg = cipher_warning_message(&state->send_context)) != NULL)) {
+		error("Warning: %s", wmsg);
+		ssh->cipher_warning_done = 1;
+	}
 }
 
 u_int
@@ -661,7 +679,7 @@ ssh_packet_send1(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
 	u_char buf[8], *cp;
-	int i, padding, len;
+	int r, i, padding, len;
 	u_int checksum;
 	u_int32_t rnd = 0;
 
@@ -715,9 +733,10 @@ ssh_packet_send1(struct ssh *ssh)
 	buffer_append(&state->output, buf, 4);
 	cp = buffer_append_space(&state->output,
 	    buffer_len(&state->outgoing_packet));
-	cipher_crypt(&state->send_context, cp,
+	if ((r = cipher_crypt(&state->send_context, cp,
 	    buffer_ptr(&state->outgoing_packet),
-	    buffer_len(&state->outgoing_packet));
+	    buffer_len(&state->outgoing_packet))) != 0)
+		fatal("%s: cipher_crypt failed: %s", __func__, ssh_err(r));
 
 #ifdef PACKET_DEBUG
 	fprintf(stderr, "encrypted: ");
@@ -744,7 +763,8 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	Comp *comp;
 	CipherContext *cc;
 	u_int64_t *max_blocks;
-	int crypt_type;
+	int crypt_type, r;
+	const char *wmsg;
 
 	debug2("set_newkeys: mode %d", mode);
 
@@ -761,7 +781,9 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	}
 	if (state->newkeys[mode] != NULL) {
 		debug("set_newkeys: rekeying");
-		cipher_cleanup(cc);
+		if ((r = cipher_cleanup(cc)) != 0)
+			fatal("%s: cipher_cleanup failed: %s",
+			    __func__, ssh_err(r));
 		enc  = &state->newkeys[mode]->enc;
 		mac  = &state->newkeys[mode]->mac;
 		comp = &state->newkeys[mode]->comp;
@@ -783,8 +805,14 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	if (mac_init(mac) == 0)
 		mac->enabled = 1;
 	DBG(debug("cipher_init_context: %d", mode));
-	cipher_init(cc, enc->cipher, enc->key, enc->key_len,
-	    enc->iv, enc->block_size, crypt_type);
+	if ((r = cipher_init(cc, enc->cipher, enc->key, enc->key_len,
+	    enc->iv, enc->block_size, crypt_type)) != 0)
+		fatal("%s: cipher_init failed: %s", __func__, ssh_err(r));
+	if (!ssh->cipher_warning_done &&
+	    (wmsg = cipher_warning_message(cc)) != NULL) {
+		error("Warning: %s", wmsg);
+		ssh->cipher_warning_done = 1;
+	}
 	/* Deleting the keys does not gain extra security */
 	/* memset(enc->iv,  0, enc->block_size);
 	   memset(enc->key, 0, enc->key_len);
@@ -860,7 +888,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	Enc *enc   = NULL;
 	Mac *mac   = NULL;
 	Comp *comp = NULL;
-	int block_size;
+	int r, block_size;
 
 	if (state->newkeys[MODE_OUT] != NULL) {
 		enc  = &state->newkeys[MODE_OUT]->enc;
@@ -944,9 +972,10 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	/* encrypt packet and append to output buffer. */
 	cp = buffer_append_space(&state->output,
 	    buffer_len(&state->outgoing_packet));
-	cipher_crypt(&state->send_context, cp,
+	if ((r = cipher_crypt(&state->send_context, cp,
 	    buffer_ptr(&state->outgoing_packet),
-	    buffer_len(&state->outgoing_packet));
+	    buffer_len(&state->outgoing_packet))) != 0)
+		fatal("%s: cipher_crypt failed: %s", __func__, ssh_err(r));
 	/* append unencrypted MAC */
 	if (mac && mac->enabled)
 		buffer_append(&state->output, macbuf, mac->mac_len);
@@ -1160,6 +1189,7 @@ ssh_packet_read_poll1(struct ssh *ssh)
 	u_int len, padded_len;
 	u_char *cp, type;
 	u_int checksum, stored_checksum;
+	int r;
 
 	/* Check if input size is less than minimum packet size. */
 	if (buffer_len(&state->input) < 4 + 8)
@@ -1202,8 +1232,9 @@ ssh_packet_read_poll1(struct ssh *ssh)
 	/* Decrypt data to incoming_packet. */
 	buffer_clear(&state->incoming_packet);
 	cp = buffer_append_space(&state->incoming_packet, padded_len);
-	cipher_crypt(&state->receive_context, cp,
-	    buffer_ptr(&state->input), padded_len);
+	if ((r = cipher_crypt(&state->receive_context, cp,
+	    buffer_ptr(&state->input), padded_len)) != 0)
+		fatal("%s: cipher_crypt failed: %s", __func__, ssh_err(r));
 
 	buffer_consume(&state->input, padded_len);
 
@@ -1260,6 +1291,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 	Enc *enc   = NULL;
 	Mac *mac   = NULL;
 	Comp *comp = NULL;
+	int r;
 
 	if (state->packet_discard)
 		return SSH_MSG_NONE;
@@ -1282,8 +1314,10 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 		buffer_clear(&state->incoming_packet);
 		cp = buffer_append_space(&state->incoming_packet,
 		    block_size);
-		cipher_crypt(&state->receive_context, cp,
-		    buffer_ptr(&state->input), block_size);
+		if ((r = cipher_crypt(&state->receive_context, cp,
+		    buffer_ptr(&state->input), block_size)) != 0)
+			fatal("%s: cipher_crypt failed: %s",
+			    __func__, ssh_err(r));
 		cp = buffer_ptr(&state->incoming_packet);
 		state->packlen = get_u32(cp);
 		if (state->packlen < 1 + 4 ||
@@ -1321,8 +1355,9 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 	buffer_dump(&state->input);
 #endif
 	cp = buffer_append_space(&state->incoming_packet, need);
-	cipher_crypt(&state->receive_context, cp,
-	    buffer_ptr(&state->input), need);
+	if ((r = cipher_crypt(&state->receive_context, cp,
+	    buffer_ptr(&state->input), need)) != 0)
+		fatal("%s: cipher_crypt failed: %s", __func__, ssh_err(r));
 	buffer_consume(&state->input, need);
 	/*
 	 * compute MAC over seqnr and packet,
