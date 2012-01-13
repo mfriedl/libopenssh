@@ -186,6 +186,9 @@ struct session_state {
 	/* Used in packet_set_maxsize */
 	int set_maxsize_called;
 
+	/* One-off warning about weak ciphers */
+	int cipher_warning_done;
+
 	TAILQ_HEAD(, packet) outgoing;
 };
 
@@ -604,11 +607,11 @@ ssh_packet_set_encryption_key(struct ssh *ssh, const u_char *key, u_int keylen, 
 	    (r = cipher_init(&state->receive_context, cipher, key, keylen,
 	    NULL, 0, CIPHER_DECRYPT) != 0))
 		fatal("%s: cipher_init failed: %s", __func__, ssh_err(r));
-	if (!ssh->cipher_warning_done &&
+	if (!state->cipher_warning_done &&
 	    ((wmsg = cipher_warning_message(&state->send_context)) != NULL ||
 	    (wmsg = cipher_warning_message(&state->send_context)) != NULL)) {
 		error("Warning: %s", wmsg);
-		ssh->cipher_warning_done = 1;
+		state->cipher_warning_done = 1;
 	}
 }
 
@@ -863,10 +866,10 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	if ((r = cipher_init(cc, enc->cipher, enc->key, enc->key_len,
 	    enc->iv, enc->block_size, crypt_type)) != 0)
 		fatal("%s: cipher_init failed: %s", __func__, ssh_err(r));
-	if (!ssh->cipher_warning_done &&
+	if (!state->cipher_warning_done &&
 	    (wmsg = cipher_warning_message(cc)) != NULL) {
 		error("Warning: %s", wmsg);
-		ssh->cipher_warning_done = 1;
+		state->cipher_warning_done = 1;
 	}
 	/* Deleting the keys does not gain extra security */
 	/* memset(enc->iv,  0, enc->block_size);

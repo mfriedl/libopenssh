@@ -62,9 +62,6 @@ struct ssh {
 	/* Lists for private and public keys */
 	TAILQ_HEAD(, key_entry) private_keys;
 	TAILQ_HEAD(, key_entry) public_keys;
-
-	/* One-off warning about weak ciphers */
-	int cipher_warning_done;
 };
 
 struct ssh *ssh_alloc_session_state(void);
