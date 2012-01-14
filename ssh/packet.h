@@ -105,11 +105,11 @@ void	ssh_packet_enable_delayed_compress(struct ssh *);
 int      ssh_packet_read(struct ssh *);
 void     ssh_packet_read_expect(struct ssh *, int type);
 int      ssh_packet_read_poll(struct ssh *);
-int ssh_packet_read_poll1(struct ssh *);
-int ssh_packet_read_poll2(struct ssh *, u_int32_t *seqnr_p);
+int ssh_packet_read_poll1(struct ssh *, u_char *);
+int ssh_packet_read_poll2(struct ssh *, u_char *, u_int32_t *seqnr_p);
 void     ssh_packet_process_incoming(struct ssh *, const char *buf, u_int len);
-int      ssh_packet_read_seqnr(struct ssh *, u_int32_t *seqnr_p);
-int      ssh_packet_read_poll_seqnr(struct ssh *, u_int32_t *seqnr_p);
+int      ssh_packet_read_seqnr(struct ssh *, u_char *, u_int32_t *seqnr_p);
+int      ssh_packet_read_poll_seqnr(struct ssh *, u_char *, u_int32_t *seqnr_p);
 
 u_int	 ssh_packet_get_char(struct ssh *);
 u_int	 ssh_packet_get_int(struct ssh *);

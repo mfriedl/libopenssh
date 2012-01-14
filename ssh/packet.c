@@ -55,7 +55,6 @@
 #include <unistd.h>
 #include <signal.h>
 
-#include "xmalloc.h"
 #include "buffer.h"
 #include "crc32.h"
 #include "compress.h"
@@ -822,13 +821,13 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 		mac  = &state->newkeys[mode]->mac;
 		comp = &state->newkeys[mode]->comp;
 		mac_clear(mac);
-		xfree(enc->name);
-		xfree(enc->iv);
-		xfree(enc->key);
-		xfree(mac->name);
-		xfree(mac->key);
-		xfree(comp->name);
-		xfree(state->newkeys[mode]);
+		free(enc->name);
+		free(enc->iv);
+		free(enc->key);
+		free(mac->name);
+		free(mac->key);
+		free(comp->name);
+		free(state->newkeys[mode]);
 	}
 	state->newkeys[mode] = kex_get_newkeys(ssh, mode);
 	if (state->newkeys[mode] == NULL)
@@ -1081,7 +1080,7 @@ ssh_packet_send2(struct ssh *ssh)
 			sshbuf_free(state->outgoing_packet);
 			state->outgoing_packet = p->payload;
 			TAILQ_REMOVE(&state->outgoing, p, next);
-			xfree(p);
+			free(p);
 			if ((ret = ssh_packet_send2_wrapped(ssh)) != 0)
 				return ret;
 		}
@@ -1106,18 +1105,20 @@ ssh_packet_send(struct ssh *ssh)
  */
 
 int
-ssh_packet_read_seqnr(struct ssh *ssh, u_int32_t *seqnr_p)
+ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 {
 	struct session_state *state = ssh->state;
-	int type, len, ret, ms_remain, cont;
+	int len, ret, ms_remain, cont;
 	fd_set *setp;
 	char buf[8192];
 	struct timeval timeout, start, *timeoutp = NULL;
 
 	DBG(debug("packet_read()"));
 
-	setp = (fd_set *)xcalloc(howmany(state->connection_in + 1,
+	setp = (fd_set *)calloc(howmany(state->connection_in + 1,
 	    NFDBITS), sizeof(fd_mask));
+	if (setp == NULL)
+		return SSH_ERR_ALLOC_FAIL;
 
 	/* Since we are blocking, ensure that all written packets have been sent. */
 	ssh_packet_write_wait(ssh);
@@ -1125,17 +1126,21 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_int32_t *seqnr_p)
 	/* Stay in the loop until we have received a complete packet. */
 	for (;;) {
 		/* Try to read a packet from the buffer. */
-		type = ssh_packet_read_poll_seqnr(ssh, seqnr_p);
+		ret = ssh_packet_read_poll_seqnr(ssh, typep, seqnr_p);
+		if (ret != 0) {
+			free(setp);
+			return ret;
+		}
 		if (!compat20 && (
-		    type == SSH_SMSG_SUCCESS
-		    || type == SSH_SMSG_FAILURE
-		    || type == SSH_CMSG_EOF
-		    || type == SSH_CMSG_EXIT_CONFIRMATION))
+		    *typep == SSH_SMSG_SUCCESS
+		    || *typep == SSH_SMSG_FAILURE
+		    || *typep == SSH_CMSG_EOF
+		    || *typep == SSH_CMSG_EXIT_CONFIRMATION))
 			ssh_packet_check_eom(ssh);
 		/* If we got a packet, return it. */
-		if (type != SSH_MSG_NONE) {
-			xfree(setp);
-			return type;
+		if (*typep != SSH_MSG_NONE) {
+			free(setp);
+			return 0;
 		}
 		/*
 		 * Otherwise, wait for some data to arrive, add it to the
@@ -1194,7 +1199,12 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_int32_t *seqnr_p)
 int
 ssh_packet_read(struct ssh *ssh)
 {
-	return ssh_packet_read_seqnr(ssh, NULL);
+	u_char type;
+	int ret;
+
+	if ((ret = ssh_packet_read_seqnr(ssh, &type, NULL)) != 0)
+		fatal("%s: %s", __func__, ssh_err(ret));
+	return type;
 }
 
 /*
@@ -1224,17 +1234,19 @@ ssh_packet_read_expect(struct ssh *ssh, int expected_type)
  */
 
 int
-ssh_packet_read_poll1(struct ssh *ssh)
+ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 {
 	struct session_state *state = ssh->state;
 	u_int len, padded_len;
-	u_char *cp, type;
+	u_char *cp;
 	u_int checksum, stored_checksum;
 	int ret;
 
+	*typep = SSH_MSG_NONE;
+
 	/* Check if input size is less than minimum packet size. */
 	if (sshbuf_len(state->input) < 4 + 8)
-		return SSH_MSG_NONE;
+		return 0;
 	/* Get length of incoming packet. */
 	cp = sshbuf_ptr(state->input);
 	len = get_u32(cp);
@@ -1245,13 +1257,13 @@ ssh_packet_read_poll1(struct ssh *ssh)
 
 	/* Check if the packet has been entirely received. */
 	if (sshbuf_len(state->input) < 4 + padded_len)
-		return SSH_MSG_NONE;
+		return 0;
 
 	/* The entire packet is in buffer. */
 
 	/* Consume packet length. */
 	if ((ret = sshbuf_consume(state->input, 4)) != 0)
-		goto fail;
+		goto out;
 
 	/*
 	 * Cryptographic attack detector for ssh
@@ -1274,12 +1286,12 @@ ssh_packet_read_poll1(struct ssh *ssh)
 	/* Decrypt data to incoming_packet. */
 	sshbuf_reset(state->incoming_packet);
 	if ((ret = sshbuf_reserve(state->incoming_packet, padded_len, &cp)) != 0)
-		goto fail;
+		goto out;
 	cipher_crypt(&state->receive_context, cp,
 	    sshbuf_ptr(state->input), padded_len);
 
 	if ((ret = sshbuf_consume(state->input, padded_len)) != 0)
-		goto fail;
+		goto out;
 
 #ifdef PACKET_DEBUG
 	fprintf(stderr, "read_poll plain: ");
@@ -1292,7 +1304,7 @@ ssh_packet_read_poll1(struct ssh *ssh)
 
 	/* Skip padding. */
 	if ((ret = sshbuf_consume(state->incoming_packet, 8 - len % 8)) != 0)
-		goto fail;
+		goto out;
 
 	/* Test check bytes. */
 	if (len != sshbuf_len(state->incoming_packet))
@@ -1306,41 +1318,44 @@ ssh_packet_read_poll1(struct ssh *ssh)
 		ssh_packet_disconnect(ssh,
 		    "Corrupted check bytes on input.");
 	if ((ret = sshbuf_consume_end(state->incoming_packet, 4)) < 0)
-		goto fail;
+		goto out;
 
 	if (state->packet_compression) {
 		sshbuf_reset(state->compression_buffer);
 		buffer_uncompress(state->incoming_packet,
 		    state->compression_buffer);
 		sshbuf_reset(state->incoming_packet);
-		if ((ret = sshbuf_putb(state->incoming_packet, state->compression_buffer)) != 0)
-			goto fail;
+		if ((ret = sshbuf_putb(state->incoming_packet,
+		    state->compression_buffer)) != 0)
+			goto out;
 	}
 	state->p_read.packets++;
 	state->p_read.bytes += padded_len + 4;
-	type = buffer_get_char(state->incoming_packet);
-	if (type < SSH_MSG_MIN || type > SSH_MSG_MAX)
+	*typep = buffer_get_char(state->incoming_packet);
+	if (*typep < SSH_MSG_MIN || *typep > SSH_MSG_MAX)
 		ssh_packet_disconnect(ssh,
-		    "Invalid ssh1 packet type: %d", type);
-	return type;
- fail:
-	fatal("%s: %s", __func__, ssh_err(ret));
+		    "Invalid ssh1 packet type: %d", *typep);
+	ret = 0;
+ out:
+	return ret;
 }
 
 int
-ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
+ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 {
 	struct session_state *state = ssh->state;
 	u_int padlen, need;
-	u_char *macbuf, *cp, type;
+	u_char *macbuf, *cp;
 	u_int maclen, block_size;
 	Enc *enc   = NULL;
 	Mac *mac   = NULL;
 	Comp *comp = NULL;
 	int ret;
 
+	*typep = SSH_MSG_NONE;
+
 	if (state->packet_discard)
-		return SSH_MSG_NONE;
+		return 0;
 
 	if (state->newkeys[MODE_IN] != NULL) {
 		enc  = &state->newkeys[MODE_IN]->enc;
@@ -1356,11 +1371,11 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 		 * decrypt first block and extract length of incoming packet
 		 */
 		if (sshbuf_len(state->input) < block_size)
-			return SSH_MSG_NONE;
+			return 0;
 		sshbuf_reset(state->incoming_packet);
 		if ((ret = sshbuf_reserve(state->incoming_packet, block_size,
 		    &cp)) != 0)
-			goto fail;
+			goto out;
 		cipher_crypt(&state->receive_context, cp,
 		    sshbuf_ptr(state->input), block_size);
 		cp = sshbuf_ptr(state->incoming_packet);
@@ -1373,11 +1388,11 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 			logit("Bad packet length %u.", state->packlen);
 			ssh_packet_start_discard(ssh, enc, mac,
 			    state->packlen, PACKET_MAX_SIZE);
-			return SSH_MSG_NONE;
+			return 0;
 		}
 		DBG(debug("input: packet len %u", state->packlen+4));
 		if ((ret = sshbuf_consume(state->input, block_size)) != 0)
-			goto fail;
+			goto out;
 	}
 	/* we have a partial packet of block_size bytes */
 	need = 4 + state->packlen - block_size;
@@ -1388,24 +1403,24 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 		    need, block_size, need % block_size);
 		ssh_packet_start_discard(ssh, enc, mac,
 		    state->packlen, PACKET_MAX_SIZE - block_size);
-		return SSH_MSG_NONE;
+		return 0;
 	}
 	/*
 	 * check if the entire packet has been received and
 	 * decrypt into incoming_packet
 	 */
 	if (sshbuf_len(state->input) < need + maclen)
-		return SSH_MSG_NONE;
+		return 0;
 #ifdef PACKET_DEBUG
 	fprintf(stderr, "read_poll enc/full: ");
 	sshbuf_dump(state->input, stderr);
 #endif
 	if ((ret = sshbuf_reserve(state->incoming_packet, need, &cp)) != 0)
-		goto fail;
+		goto out;
 	cipher_crypt(&state->receive_context, cp,
 	    sshbuf_ptr(state->input), need);
 	if ((ret = sshbuf_consume(state->input, need)) != 0)
-		goto fail;
+		goto out;
 	/*
 	 * compute MAC over seqnr and packet,
 	 * increment sequence number for incoming packet
@@ -1421,12 +1436,12 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 				fatal("internal error need %d", need);
 			ssh_packet_start_discard(ssh, enc, mac,
 			    state->packlen, PACKET_MAX_SIZE - need);
-			return SSH_MSG_NONE;
+			return 0;
 		}
 				
 		DBG(debug("MAC #%d ok", state->p_read.seqnr));
 		if ((ret = sshbuf_consume(state->input, mac->mac_len)) != 0)
-			goto fail;
+			goto out;
 	}
 	/* XXX now it's safe to use fatal/packet_disconnect */
 	if (seqnr_p != NULL)
@@ -1450,7 +1465,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 	/* skip packet size + padlen, discard padding */
 	if ((ret = sshbuf_consume(state->incoming_packet, 4 + 1)) != 0 ||
 	    ((ret = sshbuf_consume_end(state->incoming_packet, padlen)) != 0))
-		goto fail;
+		goto out;
 
 	DBG(debug("input: len before de-compress %zd",
 	    sshbuf_len(state->incoming_packet)));
@@ -1460,7 +1475,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 		    state->compression_buffer);
 		sshbuf_reset(state->incoming_packet);
 		if ((ret = sshbuf_putb(state->incoming_packet, state->compression_buffer)) != 0)
-			goto fail;
+			goto out;
 		DBG(debug("input: len after de-compress %zd",
 		    sshbuf_len(state->incoming_packet)));
 	}
@@ -1468,42 +1483,44 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 	 * get packet type, implies consume.
 	 * return length of payload (without type field)
 	 */
-	type = buffer_get_char(state->incoming_packet);
-	if (type < SSH2_MSG_MIN || type >= SSH2_MSG_LOCAL_MIN)
+	*typep = buffer_get_char(state->incoming_packet);
+	if (*typep < SSH2_MSG_MIN || *typep >= SSH2_MSG_LOCAL_MIN)
 		ssh_packet_disconnect(ssh,
-		    "Invalid ssh2 packet type: %d", type);
-	if (type == SSH2_MSG_NEWKEYS)
+		    "Invalid ssh2 packet type: %d", *typep);
+	if (*typep == SSH2_MSG_NEWKEYS)
 		ssh_set_newkeys(ssh, MODE_IN);
-	else if (type == SSH2_MSG_USERAUTH_SUCCESS &&
+	else if (*typep == SSH2_MSG_USERAUTH_SUCCESS &&
 	    !state->server_side)
 		ssh_packet_enable_delayed_compress(ssh);
 #ifdef PACKET_DEBUG
-	fprintf(stderr, "read/plain[%d]:\ret\n", type);
+	fprintf(stderr, "read/plain[%d]:\ret\n", *typep);
 	sshbuf_dump(state->incoming_packet, stderr);
 #endif
 	/* reset for next packet */
 	state->packlen = 0;
-	return type;
- fail:
-	fatal("%s: %s", __func__, ssh_err(ret));
+	ret = 0;
+ out:
+	return ret;
 }
 
 int
-ssh_packet_read_poll_seqnr(struct ssh *ssh, u_int32_t *seqnr_p)
+ssh_packet_read_poll_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 {
 	struct session_state *state = ssh->state;
 	u_int reason, seqnr;
-	u_char type;
+	int ret;
 	char *msg;
 
 	for (;;) {
 		if (compat20) {
-			type = ssh_packet_read_poll2(ssh, seqnr_p);
-			if (type) {
+			ret = ssh_packet_read_poll2(ssh, typep, seqnr_p);
+			if (ret != 0)
+				return ret;
+			if (*typep) {
 				state->keep_alive_timeouts = 0;
-				DBG(debug("received packet type %d", type));
+				DBG(debug("received packet type %d", *typep));
 			}
-			switch (type) {
+			switch (*typep) {
 			case SSH2_MSG_IGNORE:
 				debug3("Received SSH2_MSG_IGNORE");
 				break;
@@ -1511,16 +1528,16 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_int32_t *seqnr_p)
 				ssh_packet_get_char(ssh);
 				msg = ssh_packet_get_string(ssh, NULL);
 				debug("Remote: %.900s", msg);
-				xfree(msg);
+				free(msg);
 				msg = ssh_packet_get_string(ssh, NULL);
-				xfree(msg);
+				free(msg);
 				break;
 			case SSH2_MSG_DISCONNECT:
 				reason = ssh_packet_get_int(ssh);
 				msg = ssh_packet_get_string(ssh, NULL);
 				logit("Received disconnect from %s: %u: %.400s",
 				    get_remote_ipaddr(), reason, msg);
-				xfree(msg);
+				free(msg);
 				cleanup_exit(255);
 				break;
 			case SSH2_MSG_UNIMPLEMENTED:
@@ -1529,17 +1546,17 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_int32_t *seqnr_p)
 				    seqnr);
 				break;
 			default:
-				return type;
+				return 0;
 			}
 		} else {
-			type = ssh_packet_read_poll1(ssh);
-			switch (type) {
+			ret = ssh_packet_read_poll1(ssh, typep);
+			switch (*typep) {
 			case SSH_MSG_IGNORE:
 				break;
 			case SSH_MSG_DEBUG:
 				msg = ssh_packet_get_string(ssh, NULL);
 				debug("Remote: %.900s", msg);
-				xfree(msg);
+				free(msg);
 				break;
 			case SSH_MSG_DISCONNECT:
 				msg = ssh_packet_get_string(ssh, NULL);
@@ -1548,18 +1565,12 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_int32_t *seqnr_p)
 				cleanup_exit(255);
 				break;
 			default:
-				if (type)
-					DBG(debug("received packet type %d", type));
-				return type;
+				if (*typep)
+					DBG(debug("received packet type %d", *typep));
+				return 0;
 			}
 		}
 	}
-}
-
-int
-ssh_packet_read_poll(struct ssh *ssh)
-{
-	return ssh_packet_read_poll_seqnr(ssh, NULL);
 }
 
 /*
@@ -1673,7 +1684,7 @@ ssh_packet_remaining(struct ssh *ssh)
 
 /*
  * Returns a string from the packet data.  The string is allocated using
- * xmalloc; it is the responsibility of the calling program to free it when
+ * malloc; it is the responsibility of the calling program to free it when
  * no longer needed.  The length_ptr argument may be NULL, or point to an
  * integer into which the length of the string is stored.
  */
@@ -1844,8 +1855,10 @@ ssh_packet_write_wait(struct ssh *ssh)
 	struct timeval start, timeout, *timeoutp = NULL;
 	struct session_state *state = ssh->state;
 
-	setp = (fd_set *)xcalloc(howmany(state->connection_out + 1,
+	setp = (fd_set *)calloc(howmany(state->connection_out + 1,
 	    NFDBITS), sizeof(fd_mask));
+	if (setp == NULL)
+		fatal("%s: calloc failed", __func__);
 	ssh_packet_write_poll(ssh);
 	while (ssh_packet_have_data_to_write(ssh)) {
 		memset(setp, 0, howmany(state->connection_out + 1,
@@ -1881,7 +1894,7 @@ ssh_packet_write_wait(struct ssh *ssh)
 		}
 		ssh_packet_write_poll(ssh);
 	}
-	xfree(setp);
+	free(setp);
 }
 
 /* Returns true if there is buffered data to write to the connection. */
