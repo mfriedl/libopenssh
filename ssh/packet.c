@@ -283,7 +283,7 @@ void
 ssh_packet_stop_discard(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
-	int ret;
+	int r;
 
 	if (state->packet_discard_mac) {
 		char buf[1024];
@@ -291,9 +291,9 @@ ssh_packet_stop_discard(struct ssh *ssh)
 		memset(buf, 'a', sizeof(buf));
 		while (sshbuf_len(state->incoming_packet) <
 		    PACKET_MAX_SIZE)
-			if ((ret = sshbuf_put(state->incoming_packet, buf,
+			if ((r = sshbuf_put(state->incoming_packet, buf,
 			    sizeof(buf))) != 0)
-				fatal("%s: %s", __func__, ssh_err(ret));
+				fatal("%s: %s", __func__, ssh_err(r));
 		(void) mac_compute(state->packet_discard_mac,
 		    state->p_read.seqnr,
 		    sshbuf_ptr(state->incoming_packet),
@@ -608,10 +608,10 @@ ssh_packet_get_encryption_key(struct ssh *ssh, u_char *key)
 void
 ssh_packet_start(struct ssh *ssh, u_char type)
 {
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_start(ssh, type)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_start(ssh, type)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 /* Append payload. */
@@ -619,82 +619,82 @@ void
 ssh_packet_put_char(struct ssh *ssh, int value)
 {
 	char ch = value;
-	int ret;
+	int r;
 
-	if ((ret = sshbuf_put(ssh->state->outgoing_packet, &ch, 1)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshbuf_put(ssh->state->outgoing_packet, &ch, 1)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 void
 ssh_packet_put_int(struct ssh *ssh, u_int value)
 {
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_put_u32(ssh, value)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_put_u32(ssh, value)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 void
 ssh_packet_put_int64(struct ssh *ssh, u_int64_t value)
 {
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_put_u64(ssh, value)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_put_u64(ssh, value)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 void
 ssh_packet_put_string(struct ssh *ssh, const void *buf, u_int len)
 {
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_put_string(ssh, buf, len)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_put_string(ssh, buf, len)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 void
 ssh_packet_put_cstring(struct ssh *ssh, const char *str)
 {
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_put_cstring(ssh, str)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_put_cstring(ssh, str)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 void
 ssh_packet_put_raw(struct ssh *ssh, const void *buf, u_int len)
 {
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_put(ssh, buf, len)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_put(ssh, buf, len)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 void
 ssh_packet_put_bignum(struct ssh *ssh, BIGNUM * value)
 {
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_put_bignum1(ssh, value)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_put_bignum1(ssh, value)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 void
 ssh_packet_put_bignum2(struct ssh *ssh, BIGNUM * value)
 {
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_put_bignum2(ssh, value)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_put_bignum2(ssh, value)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 void
 ssh_packet_put_ecpoint(struct ssh *ssh, const EC_GROUP *curve, const EC_POINT *point)
 {
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_put_ec(ssh, point, curve)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_put_ec(ssh, point, curve)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 /*
@@ -707,7 +707,7 @@ ssh_packet_send1(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
 	u_char buf[8], *cp;
-	int i, padding, len, ret;
+	int i, padding, len, r;
 	u_int checksum;
 	u_int32_t rnd = 0;
 
@@ -718,16 +718,16 @@ ssh_packet_send1(struct ssh *ssh)
 	if (state->packet_compression) {
 		sshbuf_reset(state->compression_buffer);
 		/* Skip padding. */
-		if ((ret = sshbuf_consume(state->outgoing_packet, 8)) != 0)
+		if ((r = sshbuf_consume(state->outgoing_packet, 8)) != 0)
 			goto out;
 		/* padding */
-		if ((ret = sshbuf_put(state->compression_buffer,
+		if ((r = sshbuf_put(state->compression_buffer,
 		    "\0\0\0\0\0\0\0\0", 8)) != 0)
 			goto out;
 		buffer_compress(state->outgoing_packet,
 		    state->compression_buffer);
 		sshbuf_reset(state->outgoing_packet);
-                if ((ret = sshbuf_putb(state->outgoing_packet,
+                if ((r = sshbuf_putb(state->outgoing_packet,
                     state->compression_buffer)) != 0)
 			goto out;
 	}
@@ -745,14 +745,14 @@ ssh_packet_send1(struct ssh *ssh)
 			rnd >>= 8;
 		}
 	}
-	if ((ret = sshbuf_consume(state->outgoing_packet, 8 - padding)) != 0)
+	if ((r = sshbuf_consume(state->outgoing_packet, 8 - padding)) != 0)
 		goto out;
 
 	/* Add check bytes. */
 	checksum = ssh_crc32(sshbuf_ptr(state->outgoing_packet),
 	    sshbuf_len(state->outgoing_packet));
 	put_u32(buf, checksum);
-	if ((ret = sshbuf_put(state->outgoing_packet, buf, 4)) != 0)
+	if ((r = sshbuf_put(state->outgoing_packet, buf, 4)) != 0)
 		goto out;
 
 #ifdef PACKET_DEBUG
@@ -762,9 +762,9 @@ ssh_packet_send1(struct ssh *ssh)
 
 	/* Append to output. */
 	put_u32(buf, len);
-	if ((ret = sshbuf_put(state->output, buf, 4)) != 0)
+	if ((r = sshbuf_put(state->output, buf, 4)) != 0)
 		goto out;
-	if ((ret = sshbuf_reserve(state->output,
+	if ((r = sshbuf_reserve(state->output,
 	    sshbuf_len(state->outgoing_packet), &cp)) != 0)
 		goto out;
 	cipher_crypt(&state->send_context, cp,
@@ -785,9 +785,9 @@ ssh_packet_send1(struct ssh *ssh)
 	 * actually sent until packet_write_wait or packet_write_poll is
 	 * called.
 	 */
-	ret = 0;
+	r = 0;
  out:
-	return ret;
+	return r;
 }
 
 void
@@ -915,7 +915,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	Enc *enc   = NULL;
 	Mac *mac   = NULL;
 	Comp *comp = NULL;
-	int block_size, ret;
+	int block_size, r;
 
 	if (state->newkeys[MODE_OUT] != NULL) {
 		enc  = &state->newkeys[MODE_OUT]->enc;
@@ -935,15 +935,15 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	if (comp && comp->enabled) {
 		len = sshbuf_len(state->outgoing_packet);
 		/* skip header, compress only payload */
-		if ((ret = sshbuf_consume(state->outgoing_packet, 5)) != 0)
+		if ((r = sshbuf_consume(state->outgoing_packet, 5)) != 0)
 			goto out;
 		sshbuf_reset(state->compression_buffer);
 		buffer_compress(state->outgoing_packet,
 		    state->compression_buffer);
 		sshbuf_reset(state->outgoing_packet);
-		if ((ret = sshbuf_put(state->outgoing_packet,
+		if ((r = sshbuf_put(state->outgoing_packet,
 		    "\0\0\0\0\0", 5)) != 0 ||
-		    (ret = sshbuf_putb(state->outgoing_packet,
+		    (r = sshbuf_putb(state->outgoing_packet,
 		    state->compression_buffer)) != 0)
 			goto out;
 		DBG(debug("compression: raw %d compressed %zd", len,
@@ -971,7 +971,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 		padlen += pad;
 		state->extra_pad = 0;
 	}
-	if ((ret = sshbuf_reserve(state->outgoing_packet, padlen, &cp)) != 0)
+	if ((r = sshbuf_reserve(state->outgoing_packet, padlen, &cp)) != 0)
 		goto out;
 	if (enc && !state->send_context.plaintext) {
 		/* random padding */
@@ -1000,7 +1000,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 		DBG(debug("done calc MAC out #%d", state->p_send.seqnr));
 	}
 	/* encrypt packet and append to output buffer. */
-	if ((ret = sshbuf_reserve(state->output,
+	if ((r = sshbuf_reserve(state->output,
 	    sshbuf_len(state->outgoing_packet), &cp)) != 0)
 		goto out;
 	cipher_crypt(&state->send_context, cp,
@@ -1008,7 +1008,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	    sshbuf_len(state->outgoing_packet));
 	/* append unencrypted MAC */
 	if (mac && mac->enabled)
-		if ((ret = sshbuf_put(state->output, macbuf, mac->mac_len)) != 0)
+		if ((r = sshbuf_put(state->output, macbuf, mac->mac_len)) != 0)
 			goto out;
 #ifdef PACKET_DEBUG
 	fprintf(stderr, "encrypted: ");
@@ -1028,9 +1028,9 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 		ssh_set_newkeys(ssh, MODE_OUT);
 	else if (type == SSH2_MSG_USERAUTH_SUCCESS && state->server_side)
 		ssh_packet_enable_delayed_compress(ssh);
-	ret = 0;
+	r = 0;
  out:
-	return ret;
+	return r;
 }
 
 int
@@ -1039,7 +1039,7 @@ ssh_packet_send2(struct ssh *ssh)
 	struct session_state *state = ssh->state;
 	struct packet *p;
 	u_char type, *cp;
-	int ret;
+	int r;
 
 	cp = sshbuf_ptr(state->outgoing_packet);
 	type = cp[5];
@@ -1068,8 +1068,8 @@ ssh_packet_send2(struct ssh *ssh)
 	if (type == SSH2_MSG_KEXINIT)
 		state->rekeying = 1;
 
-	if ((ret = ssh_packet_send2_wrapped(ssh)) != 0)
-		return ret;
+	if ((r = ssh_packet_send2_wrapped(ssh)) != 0)
+		return r;
 
 	/* after a NEWKEYS message we can send the complete queue */
 	if (type == SSH2_MSG_NEWKEYS) {
@@ -1081,8 +1081,8 @@ ssh_packet_send2(struct ssh *ssh)
 			state->outgoing_packet = p->payload;
 			TAILQ_REMOVE(&state->outgoing, p, next);
 			free(p);
-			if ((ret = ssh_packet_send2_wrapped(ssh)) != 0)
-				return ret;
+			if ((r = ssh_packet_send2_wrapped(ssh)) != 0)
+				return r;
 		}
 	}
 	return 0;
@@ -1091,10 +1091,10 @@ ssh_packet_send2(struct ssh *ssh)
 void
 ssh_packet_send(struct ssh *ssh)
 {
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_send(ssh)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	DBG(debug("packet_send done"));
 }
 
@@ -1108,7 +1108,7 @@ int
 ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 {
 	struct session_state *state = ssh->state;
-	int len, ret, ms_remain, cont;
+	int len, r, ms_remain, cont;
 	fd_set *setp;
 	char buf[8192];
 	struct timeval timeout, start, *timeoutp = NULL;
@@ -1126,10 +1126,10 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	/* Stay in the loop until we have received a complete packet. */
 	for (;;) {
 		/* Try to read a packet from the buffer. */
-		ret = ssh_packet_read_poll_seqnr(ssh, typep, seqnr_p);
-		if (ret != 0) {
+		r = ssh_packet_read_poll_seqnr(ssh, typep, seqnr_p);
+		if (r != 0) {
 			free(setp);
-			return ret;
+			return r;
 		}
 		if (!compat20 && (
 		    *typep == SSH_SMSG_SUCCESS
@@ -1160,7 +1160,7 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 				ms_to_timeval(&timeout, ms_remain);
 				gettimeofday(&start, NULL);
 			}
-			if ((ret = select(state->connection_in + 1, setp,
+			if ((r = select(state->connection_in + 1, setp,
 			    NULL, NULL, timeoutp)) >= 0)
 				break;
 			if (errno != EAGAIN && errno != EINTR)
@@ -1169,11 +1169,11 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 				continue;
 			ms_subtract_diff(&start, &ms_remain);
 			if (ms_remain <= 0) {
-				ret = 0;
+				r = 0;
 				break;
 			}
 		}
-		if (ret == 0) {
+		if (r == 0) {
 			logit("Connection to %.200s timed out while "
 			    "waiting to read", get_remote_ipaddr());
 			cleanup_exit(255);
@@ -1200,10 +1200,10 @@ int
 ssh_packet_read(struct ssh *ssh)
 {
 	u_char type;
-	int ret;
+	int r;
 
-	if ((ret = ssh_packet_read_seqnr(ssh, &type, NULL)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = ssh_packet_read_seqnr(ssh, &type, NULL)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	return type;
 }
 
@@ -1240,7 +1240,7 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 	u_int len, padded_len;
 	u_char *cp;
 	u_int checksum, stored_checksum;
-	int ret;
+	int r;
 
 	*typep = SSH_MSG_NONE;
 
@@ -1262,7 +1262,7 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 	/* The entire packet is in buffer. */
 
 	/* Consume packet length. */
-	if ((ret = sshbuf_consume(state->input, 4)) != 0)
+	if ((r = sshbuf_consume(state->input, 4)) != 0)
 		goto out;
 
 	/*
@@ -1285,12 +1285,12 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 
 	/* Decrypt data to incoming_packet. */
 	sshbuf_reset(state->incoming_packet);
-	if ((ret = sshbuf_reserve(state->incoming_packet, padded_len, &cp)) != 0)
+	if ((r = sshbuf_reserve(state->incoming_packet, padded_len, &cp)) != 0)
 		goto out;
 	cipher_crypt(&state->receive_context, cp,
 	    sshbuf_ptr(state->input), padded_len);
 
-	if ((ret = sshbuf_consume(state->input, padded_len)) != 0)
+	if ((r = sshbuf_consume(state->input, padded_len)) != 0)
 		goto out;
 
 #ifdef PACKET_DEBUG
@@ -1303,7 +1303,7 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 	    sshbuf_len(state->incoming_packet) - 4);
 
 	/* Skip padding. */
-	if ((ret = sshbuf_consume(state->incoming_packet, 8 - len % 8)) != 0)
+	if ((r = sshbuf_consume(state->incoming_packet, 8 - len % 8)) != 0)
 		goto out;
 
 	/* Test check bytes. */
@@ -1317,7 +1317,7 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 	if (checksum != stored_checksum)
 		ssh_packet_disconnect(ssh,
 		    "Corrupted check bytes on input.");
-	if ((ret = sshbuf_consume_end(state->incoming_packet, 4)) < 0)
+	if ((r = sshbuf_consume_end(state->incoming_packet, 4)) < 0)
 		goto out;
 
 	if (state->packet_compression) {
@@ -1325,7 +1325,7 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 		buffer_uncompress(state->incoming_packet,
 		    state->compression_buffer);
 		sshbuf_reset(state->incoming_packet);
-		if ((ret = sshbuf_putb(state->incoming_packet,
+		if ((r = sshbuf_putb(state->incoming_packet,
 		    state->compression_buffer)) != 0)
 			goto out;
 	}
@@ -1335,9 +1335,9 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 	if (*typep < SSH_MSG_MIN || *typep > SSH_MSG_MAX)
 		ssh_packet_disconnect(ssh,
 		    "Invalid ssh1 packet type: %d", *typep);
-	ret = 0;
+	r = 0;
  out:
-	return ret;
+	return r;
 }
 
 int
@@ -1350,7 +1350,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	Enc *enc   = NULL;
 	Mac *mac   = NULL;
 	Comp *comp = NULL;
-	int ret;
+	int r;
 
 	*typep = SSH_MSG_NONE;
 
@@ -1373,7 +1373,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		if (sshbuf_len(state->input) < block_size)
 			return 0;
 		sshbuf_reset(state->incoming_packet);
-		if ((ret = sshbuf_reserve(state->incoming_packet, block_size,
+		if ((r = sshbuf_reserve(state->incoming_packet, block_size,
 		    &cp)) != 0)
 			goto out;
 		cipher_crypt(&state->receive_context, cp,
@@ -1391,7 +1391,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 			return 0;
 		}
 		DBG(debug("input: packet len %u", state->packlen+4));
-		if ((ret = sshbuf_consume(state->input, block_size)) != 0)
+		if ((r = sshbuf_consume(state->input, block_size)) != 0)
 			goto out;
 	}
 	/* we have a partial packet of block_size bytes */
@@ -1415,11 +1415,11 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	fprintf(stderr, "read_poll enc/full: ");
 	sshbuf_dump(state->input, stderr);
 #endif
-	if ((ret = sshbuf_reserve(state->incoming_packet, need, &cp)) != 0)
+	if ((r = sshbuf_reserve(state->incoming_packet, need, &cp)) != 0)
 		goto out;
 	cipher_crypt(&state->receive_context, cp,
 	    sshbuf_ptr(state->input), need);
-	if ((ret = sshbuf_consume(state->input, need)) != 0)
+	if ((r = sshbuf_consume(state->input, need)) != 0)
 		goto out;
 	/*
 	 * compute MAC over seqnr and packet,
@@ -1440,7 +1440,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		}
 				
 		DBG(debug("MAC #%d ok", state->p_read.seqnr));
-		if ((ret = sshbuf_consume(state->input, mac->mac_len)) != 0)
+		if ((r = sshbuf_consume(state->input, mac->mac_len)) != 0)
 			goto out;
 	}
 	/* XXX now it's safe to use fatal/packet_disconnect */
@@ -1463,8 +1463,8 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		    "Corrupted padlen %d on input.", padlen);
 
 	/* skip packet size + padlen, discard padding */
-	if ((ret = sshbuf_consume(state->incoming_packet, 4 + 1)) != 0 ||
-	    ((ret = sshbuf_consume_end(state->incoming_packet, padlen)) != 0))
+	if ((r = sshbuf_consume(state->incoming_packet, 4 + 1)) != 0 ||
+	    ((r = sshbuf_consume_end(state->incoming_packet, padlen)) != 0))
 		goto out;
 
 	DBG(debug("input: len before de-compress %zd",
@@ -1474,7 +1474,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		buffer_uncompress(state->incoming_packet,
 		    state->compression_buffer);
 		sshbuf_reset(state->incoming_packet);
-		if ((ret = sshbuf_putb(state->incoming_packet, state->compression_buffer)) != 0)
+		if ((r = sshbuf_putb(state->incoming_packet, state->compression_buffer)) != 0)
 			goto out;
 		DBG(debug("input: len after de-compress %zd",
 		    sshbuf_len(state->incoming_packet)));
@@ -1493,14 +1493,14 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	    !state->server_side)
 		ssh_packet_enable_delayed_compress(ssh);
 #ifdef PACKET_DEBUG
-	fprintf(stderr, "read/plain[%d]:\ret\n", *typep);
+	fprintf(stderr, "read/plain[%d]:\r\n", *typep);
 	sshbuf_dump(state->incoming_packet, stderr);
 #endif
 	/* reset for next packet */
 	state->packlen = 0;
-	ret = 0;
+	r = 0;
  out:
-	return ret;
+	return r;
 }
 
 int
@@ -1508,14 +1508,14 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 {
 	struct session_state *state = ssh->state;
 	u_int reason, seqnr;
-	int ret;
+	int r;
 	char *msg;
 
 	for (;;) {
 		if (compat20) {
-			ret = ssh_packet_read_poll2(ssh, typep, seqnr_p);
-			if (ret != 0)
-				return ret;
+			r = ssh_packet_read_poll2(ssh, typep, seqnr_p);
+			if (r != 0)
+				return r;
 			if (*typep) {
 				state->keep_alive_timeouts = 0;
 				DBG(debug("received packet type %d", *typep));
@@ -1549,7 +1549,7 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 				return 0;
 			}
 		} else {
-			ret = ssh_packet_read_poll1(ssh, typep);
+			r = ssh_packet_read_poll1(ssh, typep);
 			switch (*typep) {
 			case SSH_MSG_IGNORE:
 				break;
@@ -1582,7 +1582,7 @@ void
 ssh_packet_process_incoming(struct ssh *ssh, const char *buf, u_int len)
 {
 	struct session_state *state = ssh->state;
-	int ret;
+	int r;
 
 	if (state->packet_discard) {
 		state->keep_alive_timeouts = 0; /* ?? */
@@ -1591,8 +1591,8 @@ ssh_packet_process_incoming(struct ssh *ssh, const char *buf, u_int len)
 		state->packet_discard -= len;
 		return;
 	}
-	if ((ret = sshbuf_put(ssh->state->input, buf, len)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshbuf_put(ssh->state->input, buf, len)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 /* Returns a character from the packet. */
@@ -1601,10 +1601,10 @@ u_int
 ssh_packet_get_char(struct ssh *ssh)
 {
 	u_char ch;
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_get_u8(ssh, &ch)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_get_u8(ssh, &ch)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	return ch;
 }
 
@@ -1614,10 +1614,10 @@ u_int
 ssh_packet_get_int(struct ssh *ssh)
 {
 	u_int val;
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_get_u32(ssh, &val)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_get_u32(ssh, &val)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	return val;
 }
 
@@ -1627,10 +1627,10 @@ u_int64_t
 ssh_packet_get_int64(struct ssh *ssh)
 {
 	u_int64_t val;
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_get_u64(ssh, &val)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_get_u64(ssh, &val)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	return val;
 }
 
@@ -1642,28 +1642,28 @@ ssh_packet_get_int64(struct ssh *ssh)
 void
 ssh_packet_get_bignum(struct ssh *ssh, BIGNUM * value)
 {
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_get_bignum1(ssh, value)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_get_bignum1(ssh, value)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 void
 ssh_packet_get_bignum2(struct ssh *ssh, BIGNUM * value)
 {
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_get_bignum2(ssh, value)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_get_bignum2(ssh, value)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 void
 ssh_packet_get_ecpoint(struct ssh *ssh, const EC_GROUP *curve, EC_POINT *point)
 {
-	int ret;
+	int r;
 
-	if ((ret = sshpkt_get_ec(ssh, point, curve)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_get_ec(ssh, point, curve)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 void *
@@ -1692,12 +1692,12 @@ ssh_packet_remaining(struct ssh *ssh)
 void *
 ssh_packet_get_string(struct ssh *ssh, u_int *length_ptr)
 {
-	int ret;
+	int r;
 	size_t len;
 	u_char *val;
 
-	if ((ret = sshpkt_get_string(ssh, &val, &len)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_get_string(ssh, &val, &len)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	if (length_ptr != NULL)
 		*length_ptr = (u_int)len;
 	return val;
@@ -1706,12 +1706,12 @@ ssh_packet_get_string(struct ssh *ssh, u_int *length_ptr)
 const void *
 ssh_packet_get_string_ptr(struct ssh *ssh, u_int *length_ptr)
 {
-	int ret;
+	int r;
 	size_t len;
 	const u_char *val;
 
-	if ((ret = sshpkt_get_string_direct(ssh, &val, &len)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_get_string_direct(ssh, &val, &len)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	if (length_ptr != NULL)
 		*length_ptr = (u_int)len;
 	return val;
@@ -1721,12 +1721,12 @@ ssh_packet_get_string_ptr(struct ssh *ssh, u_int *length_ptr)
 char *
 ssh_packet_get_cstring(struct ssh *ssh, u_int *length_ptr)
 {
-	int ret;
+	int r;
 	size_t len;
 	char *val;
 
-	if ((ret = sshpkt_get_cstring(ssh, &val, &len)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = sshpkt_get_cstring(ssh, &val, &len)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	if (length_ptr != NULL)
 		*length_ptr = (u_int)len;
 	return val;
@@ -1824,7 +1824,7 @@ ssh_packet_write_poll(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
 	int len = sshbuf_len(state->output);
-	int cont, ret;
+	int cont, r;
 
 	if (len > 0) {
 		cont = 0;
@@ -1837,8 +1837,8 @@ ssh_packet_write_poll(struct ssh *ssh)
 		}
 		if (len == 0 && !cont)
 			fatal("Write connection closed");
-		if ((ret = sshbuf_consume(state->output, len)) != 0)
-			fatal("%s: %s", __func__, ssh_err(ret));
+		if ((r = sshbuf_consume(state->output, len)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 	}
 }
 
@@ -2129,7 +2129,7 @@ ssh_packet_restore_state(struct ssh *ssh,
 	struct ssh *tmp;
 	void *buf;
 	u_int len;
-	int ret;
+	int r;
 
 	tmp = backup_state;
 	backup_state = ssh;
@@ -2141,8 +2141,8 @@ ssh_packet_restore_state(struct ssh *ssh,
 	len = sshbuf_len(backup_state->state->input);
 	if (len > 0) {
 		buf = sshbuf_ptr(backup_state->state->input);
-		if ((ret = sshbuf_put(ssh->state->input, buf, len)) != 0)
-			fatal("%s: %s", __func__, ssh_err(ret));
+		if ((r = sshbuf_put(ssh->state->input, buf, len)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		sshbuf_reset(backup_state->state->input);
 		add_recv_bytes(len);
 	}
