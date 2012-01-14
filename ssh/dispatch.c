@@ -34,6 +34,7 @@
 #include "dispatch.h"
 #include "packet.h"
 #include "compat.h"
+#include "err.h"
 
 int
 dispatch_protocol_error(int type, u_int32_t seq, struct ssh *ssh)
@@ -82,13 +83,18 @@ void
 ssh_dispatch_run(struct ssh *ssh, int mode, volatile sig_atomic_t *done)
 {
 	for (;;) {
-		int type;
+		int ret;
+		u_char type;
 		u_int32_t seqnr;
 
 		if (mode == DISPATCH_BLOCK) {
-			type = ssh_packet_read_seqnr(ssh, &seqnr);
+			ret = ssh_packet_read_seqnr(ssh, &type, &seqnr);
+			if (ret)
+				fatal("%s: %s", __func__, ssh_err(ret));
 		} else {
-			type = ssh_packet_read_poll_seqnr(ssh, &seqnr);
+			ret = ssh_packet_read_poll_seqnr(ssh, &type, &seqnr);
+			if (ret)
+				fatal("%s: %s", __func__, ssh_err(ret));
 			if (type == SSH_MSG_NONE)
 				return;
 		}

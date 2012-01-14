@@ -10,6 +10,7 @@
 #include "version.h"
 #include "xmalloc.h"
 #include "myproposal.h"
+#include "err.h"
 
 #include <string.h>
 
@@ -151,7 +152,8 @@ ssh_input_append(struct ssh* ssh, const char *data, u_int len)
 int
 ssh_packet_next(struct ssh *ssh)
 {
-	int type;                                                       
+	int ret;
+	u_char type;
 	u_int32_t seqnr;                                                
 
 	if (ssh->kex->client_version_string == NULL ||
@@ -163,7 +165,8 @@ ssh_packet_next(struct ssh *ssh)
 	 * Try to read a packet. Returns SSH_MSG_NONE if no packet or not
 	 * enough data.
 	 */
-	type = ssh_packet_read_poll2(ssh, &seqnr);
+	if ((ret = ssh_packet_read_poll2(ssh, &type, &seqnr)) != 0)
+		fatal("%s: %s", __func__, ssh_err(ret));
 	/*
 	 * If we enough data and we have a dispatch function, call the
 	 * function and return SSH_MSG_NONE. Otherwise return the packet type to
