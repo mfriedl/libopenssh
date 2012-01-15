@@ -496,32 +496,39 @@ kex_choose_conf(struct ssh *ssh)
 	kex_prop_free(peer);
 }
 
-static u_char *
-derive_key(struct ssh *ssh, Kex *kex, int id, u_int need, u_char *hash, u_int hashlen,
-    BIGNUM *shared_secret)
+static int
+derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
+    BIGNUM *shared_secret, u_char **keyp)
 {
-	Buffer b;
+	Kex *kex = ssh->kex;
+	struct sshbuf *b = NULL;
 	EVP_MD_CTX md;
 	char c = id;
 	u_int have;
-	int mdsz;
-	u_char *digest;
+	u_char *digest = NULL;
+	int r, mdsz;
 
 	if ((mdsz = EVP_MD_size(kex->evp_md)) <= 0)
-		fatal("bad kex md size %d", mdsz);
-	digest = xmalloc(roundup(need, mdsz));
-
-	buffer_init(&b);
-	buffer_put_bignum2(&b, shared_secret);
+		return SSH_ERR_INVALID_ARGUMENT;
+	if ((digest = calloc(1, roundup(need, mdsz))) == NULL ||
+	    (b = sshbuf_new()) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
+	if ((r = sshbuf_put_bignum2(b, shared_secret)) != 0)
+		goto out;
 
 	/* K1 = HASH(K || H || "A" || session_id) */
-	EVP_DigestInit(&md, kex->evp_md);
-	if (!(ssh->datafellows & SSH_BUG_DERIVEKEY))
-		EVP_DigestUpdate(&md, buffer_ptr(&b), buffer_len(&b));
-	EVP_DigestUpdate(&md, hash, hashlen);
-	EVP_DigestUpdate(&md, &c, 1);
-	EVP_DigestUpdate(&md, kex->session_id, kex->session_id_len);
-	EVP_DigestFinal(&md, digest, NULL);
+	if (EVP_DigestInit(&md, kex->evp_md) != 1 ||
+	    (!(ssh->datafellows & SSH_BUG_DERIVEKEY) &&
+	    EVP_DigestUpdate(&md, sshbuf_ptr(b), sshbuf_len(b)) != 1) ||
+	    EVP_DigestUpdate(&md, hash, hashlen) != 1 ||
+	    EVP_DigestUpdate(&md, &c, 1) != 1 ||
+	    EVP_DigestUpdate(&md, kex->session_id, kex->session_id_len) != 1 ||
+	    EVP_DigestFinal(&md, digest, NULL) != 1) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
 
 	/*
 	 * expand key:
@@ -529,36 +536,49 @@ derive_key(struct ssh *ssh, Kex *kex, int id, u_int need, u_char *hash, u_int ha
 	 * Key = K1 || K2 || ... || Kn
 	 */
 	for (have = mdsz; need > have; have += mdsz) {
-		EVP_DigestInit(&md, kex->evp_md);
-		if (!(ssh->datafellows & SSH_BUG_DERIVEKEY))
-			EVP_DigestUpdate(&md, buffer_ptr(&b), buffer_len(&b));
-		EVP_DigestUpdate(&md, hash, hashlen);
-		EVP_DigestUpdate(&md, digest, have);
-		EVP_DigestFinal(&md, digest + have, NULL);
+		if (EVP_DigestInit(&md, kex->evp_md) != 1 ||
+		    (!(ssh->datafellows & SSH_BUG_DERIVEKEY) &&
+		    EVP_DigestUpdate(&md, sshbuf_ptr(b), sshbuf_len(b)) != 1) ||
+		    EVP_DigestUpdate(&md, hash, hashlen) != 1 ||
+		    EVP_DigestUpdate(&md, digest, have) != 1 ||
+		    EVP_DigestFinal(&md, digest + have, NULL) != 1) {
+			r = SSH_ERR_LIBCRYPTO_ERROR;
+			goto out;
+		}
 	}
-	buffer_free(&b);
 #ifdef DEBUG_KEX
 	fprintf(stderr, "key '%c'== ", c);
 	dump_digest("key", digest, need);
 #endif
-	return digest;
+	*keyp = digest;
+	digest = NULL;
+	r = 0;
+ out:
+	if (digest)
+		free (digest);
+	if (b)
+		sshbuf_free(b);
+	return r;
 }
 
 #define NKEYS	6
-void
+int
 kex_derive_keys(struct ssh *ssh, u_char *hash, u_int hashlen,
     BIGNUM *shared_secret)
 {
 	Kex *kex = ssh->kex;
 	u_char *keys[NKEYS];
-	u_int i, mode, ctos;
+	u_int i, j, mode, ctos;
+	int r;
 
 	for (i = 0; i < NKEYS; i++) {
-		keys[i] = derive_key(ssh, kex, 'A'+i, kex->we_need, hash, hashlen,
-		    shared_secret);
+		if ((r = derive_key(ssh, 'A'+i, kex->we_need, hash, hashlen,
+		    shared_secret, &keys[i])) != 0) {
+			for (j = 0; j < i; j++)
+				free(keys[j]);
+			return r;
+		}
 	}
-
-	debug2("kex_derive_keys");
 	for (mode = 0; mode < MODE_MAX; mode++) {
 		ssh->current_keys[mode] = kex->newkeys[mode];
 		kex->newkeys[mode] = NULL;
@@ -568,6 +588,7 @@ kex_derive_keys(struct ssh *ssh, u_char *hash, u_int hashlen,
 		ssh->current_keys[mode]->enc.key = keys[ctos ? 2 : 3];
 		ssh->current_keys[mode]->mac.key = keys[ctos ? 4 : 5];
 	}
+	return 0;
 }
 
 Newkeys *
