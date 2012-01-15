@@ -34,53 +34,58 @@
 #include "key.h"
 #include "cipher.h"
 #include "kex.h"
+#include "err.h"
 
-void
+int
 kex_dh_hash(
     char *client_version_string,
     char *server_version_string,
-    char *ckexinit, int ckexinitlen,
-    char *skexinit, int skexinitlen,
-    u_char *serverhostkeyblob, int sbloblen,
+    char *ckexinit, size_t ckexinitlen,
+    char *skexinit, size_t skexinitlen,
+    u_char *serverhostkeyblob, size_t sbloblen,
     BIGNUM *client_dh_pub,
     BIGNUM *server_dh_pub,
     BIGNUM *shared_secret,
-    u_char **hash, u_int *hashlen)
+    u_char **hash, size_t *hashlen)
 {
-	Buffer b;
+	struct sshbuf *b;
 	static u_char digest[EVP_MAX_MD_SIZE];
 	const EVP_MD *evp_md = EVP_sha1();
 	EVP_MD_CTX md;
+	int r;
 
-	buffer_init(&b);
-	buffer_put_cstring(&b, client_version_string);
-	buffer_put_cstring(&b, server_version_string);
-
-	/* kexinit messages: fake header: len+SSH2_MSG_KEXINIT */
-	buffer_put_int(&b, ckexinitlen+1);
-	buffer_put_char(&b, SSH2_MSG_KEXINIT);
-	buffer_append(&b, ckexinit, ckexinitlen);
-	buffer_put_int(&b, skexinitlen+1);
-	buffer_put_char(&b, SSH2_MSG_KEXINIT);
-	buffer_append(&b, skexinit, skexinitlen);
-
-	buffer_put_string(&b, serverhostkeyblob, sbloblen);
-	buffer_put_bignum2(&b, client_dh_pub);
-	buffer_put_bignum2(&b, server_dh_pub);
-	buffer_put_bignum2(&b, shared_secret);
-
+	if ((b = sshbuf_new()) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if ((r = sshbuf_put_cstring(b, client_version_string)) != 0 ||
+	    (r = sshbuf_put_cstring(b, server_version_string)) != 0 ||
+	    /* kexinit messages: fake header: len+SSH2_MSG_KEXINIT */
+	    (r = sshbuf_put_u32(b, ckexinitlen+1)) != 0 ||
+	    (r = sshbuf_put_u8(b, SSH2_MSG_KEXINIT)) != 0 ||
+	    (r = sshbuf_put(b, ckexinit, ckexinitlen)) != 0 ||
+	    (r = sshbuf_put_u32(b, skexinitlen+1)) != 0 ||
+	    (r = sshbuf_put_u8(b, SSH2_MSG_KEXINIT)) != 0 ||
+	    (r = sshbuf_put(b, skexinit, skexinitlen)) != 0 ||
+	    (r = sshbuf_put_string(b, serverhostkeyblob, sbloblen)) != 0 ||
+	    (r = sshbuf_put_bignum2(b, client_dh_pub)) != 0 ||
+	    (r = sshbuf_put_bignum2(b, server_dh_pub)) != 0 ||
+	    (r = sshbuf_put_bignum2(b, shared_secret)) != 0) {
+		sshbuf_free(b);
+		return r;
+	}
 #ifdef DEBUG_KEX
-	buffer_dump(&b);
+	sshbuf_dump(&b, stderr);
 #endif
-	EVP_DigestInit(&md, evp_md);
-	EVP_DigestUpdate(&md, buffer_ptr(&b), buffer_len(&b));
-	EVP_DigestFinal(&md, digest, NULL);
-
-	buffer_free(&b);
-
+	if (EVP_DigestInit(&md, evp_md) != 1 ||
+	    EVP_DigestUpdate(&md, sshbuf_ptr(b), sshbuf_len(b)) != 1 ||
+	    EVP_DigestFinal(&md, digest, NULL) != 1) {
+		sshbuf_free(b);
+		return SSH_ERR_LIBCRYPTO_ERROR;
+	}
+	sshbuf_free(b);
 #ifdef DEBUG_KEX
 	dump_digest("hash", digest, EVP_MD_size(evp_md));
 #endif
 	*hash = digest;
 	*hashlen = EVP_MD_size(evp_md);
+	return 0;
 }

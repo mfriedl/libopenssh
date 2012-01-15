@@ -31,7 +31,6 @@
 #include <string.h>
 #include <signal.h>
 
-#include "xmalloc.h"
 #include "buffer.h"
 #include "key.h"
 #include "cipher.h"
@@ -50,6 +49,7 @@ void
 kexdh_client(struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
+	int r;
 
 	/* generate and send 'e', client DH public key */
 	switch (kex->kex_type) {
@@ -60,12 +60,18 @@ kexdh_client(struct ssh *ssh)
 		kex->dh = dh_new_group14();
 		break;
 	default:
-		fatal("%s: Unexpected KEX type %d", __func__, kex->kex_type);
+		r = SSH_ERR_INVALID_ARGUMENT;
+		goto out;
 	}
-	dh_gen_key(kex->dh, kex->we_need * 8);
-	ssh_packet_start(ssh, SSH2_MSG_KEXDH_INIT);
-	ssh_packet_put_bignum2(ssh, kex->dh->pub_key);
-	ssh_packet_send(ssh);
+	if (kex->dh == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
+	if ((r = dh_gen_key(kex->dh, kex->we_need * 8)) != 0 ||
+	    (r = sshpkt_start(ssh, SSH2_MSG_KEXDH_INIT)) != 0 ||
+	    (r = sshpkt_put_bignum2(ssh, kex->dh->pub_key)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		goto out;
 
 	debug("sending SSH2_MSG_KEXDH_INIT");
 #ifdef DEBUG_KEXDH
@@ -77,6 +83,9 @@ kexdh_client(struct ssh *ssh)
 
 	debug("expecting SSH2_MSG_KEXDH_REPLY");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEXDH_REPLY, &input_kex_dh);
+	return;
+ out:
+	fatal("%s: %s", __func__, ssh_err(r));
 }
 
 static int
@@ -84,28 +93,41 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
 	BIGNUM *dh_server_pub = NULL, *shared_secret = NULL;
-	struct sshkey *server_host_key;
-	u_char *server_host_key_blob = NULL, *signature = NULL;
-	u_char *kbuf, *hash;
-	u_int klen, slen, sbloblen, hashlen;
+	struct sshkey *server_host_key = NULL;
+	u_char *kbuf = NULL, *server_host_key_blob = NULL, *signature = NULL;
+	u_char *hash;
+	size_t klen = 0, slen, sbloblen, hashlen;
 	int kout, r;
 
+	if (kex->verify_host_key == NULL) {
+		r = SSH_ERR_INVALID_ARGUMENT;
+		goto out;
+	}
 	/* key, cert */
-	server_host_key_blob = ssh_packet_get_string(ssh, &sbloblen);
-	if ((r = sshkey_from_blob(server_host_key_blob, sbloblen,
+	if ((r = sshpkt_get_string(ssh, &server_host_key_blob, &sbloblen))
+	    != 0 ||
+	    (r = sshkey_from_blob(server_host_key_blob, sbloblen,
 	    &server_host_key)) != 0)
-		fatal("cannot decode server_host_key_blob: %s", ssh_err(r));
-	if (server_host_key->type != kex->hostkey_type)
-		fatal("type mismatch for decoded server_host_key_blob");
-	if (kex->verify_host_key == NULL)
-		fatal("cannot verify server_host_key");
-	if (kex->verify_host_key(server_host_key, ssh) == -1)
-		fatal("server_host_key verification failed");
+		goto out;
+	if (server_host_key->type != kex->hostkey_type) {
+		r = SSH_ERR_KEY_TYPE_MISMATCH;
+		goto out;
+	}
+	if (kex->verify_host_key(server_host_key, ssh) == -1) {
+		r = SSH_ERR_SIGNATURE_INVALID;
+		goto out;
+	}
 
 	/* DH parameter f, server public DH key */
-	if ((dh_server_pub = BN_new()) == NULL)
-		fatal("dh_server_pub == NULL");
-	ssh_packet_get_bignum2(ssh, dh_server_pub);
+	if ((dh_server_pub = BN_new()) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
+	/* signed H */
+	if ((r = sshpkt_get_bignum2(ssh, dh_server_pub)) != 0 ||
+	    (r = sshpkt_get_string(ssh, &signature, &slen)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		goto out;
 
 #ifdef DEBUG_KEXDH
 	fprintf(stderr, "dh_server_pub= ");
@@ -114,30 +136,30 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 	debug("bits %d", BN_num_bits(dh_server_pub));
 #endif
 
-	/* signed H */
-	signature = ssh_packet_get_string(ssh, &slen);
-	ssh_packet_check_eom(ssh);
-
-	if (!dh_pub_is_valid(kex->dh, dh_server_pub))
-		ssh_packet_disconnect(ssh,
-		    "bad server public DH value");
+	if (!dh_pub_is_valid(kex->dh, dh_server_pub)) {
+		sshpkt_disconnect(ssh, "bad server public DH value");
+		r = SSH_ERR_MESSAGE_INCOMPLETE;
+		goto out;
+	}
 
 	klen = DH_size(kex->dh);
-	kbuf = xmalloc(klen);
-	if ((kout = DH_compute_key(kbuf, dh_server_pub, kex->dh)) < 0)
-		fatal("DH_compute_key: failed");
+	if ((kbuf = malloc(klen)) == NULL ||
+	    (shared_secret = BN_new()) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
+	if ((kout = DH_compute_key(kbuf, dh_server_pub, kex->dh)) < 0 ||
+	    BN_bin2bn(kbuf, kout, shared_secret) == NULL) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
+
 #ifdef DEBUG_KEXDH
 	dump_digest("shared secret", kbuf, kout);
 #endif
-	if ((shared_secret = BN_new()) == NULL)
-		fatal("kexdh_client: BN_new failed");
-	if (BN_bin2bn(kbuf, kout, shared_secret) == NULL)
-		fatal("kexdh_client: BN_bin2bn failed");
-	memset(kbuf, 0, klen);
-	xfree(kbuf);
 
 	/* calc and verify H */
-	kex_dh_hash(
+	if ((r = kex_dh_hash(
 	    kex->client_version_string,
 	    kex->server_version_string,
 	    buffer_ptr(&kex->my), buffer_len(&kex->my),
@@ -146,28 +168,46 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 	    kex->dh->pub_key,
 	    dh_server_pub,
 	    shared_secret,
-	    &hash, &hashlen
-	);
-	xfree(server_host_key_blob);
-	BN_clear_free(dh_server_pub);
-	DH_free(kex->dh);
-	kex->dh = NULL;
+	    &hash, &hashlen)) != 0)
+		goto out;
 
-	if (sshkey_verify(server_host_key, signature, slen, hash, hashlen,
-	    datafellows) != 0)
-		fatal("key_verify failed for server_host_key");
-	sshkey_free(server_host_key);
-	xfree(signature);
+	if ((r = sshkey_verify(server_host_key, signature, slen, hash, hashlen,
+	    datafellows)) != 0)
+		goto out;
 
 	/* save session id */
 	if (kex->session_id == NULL) {
 		kex->session_id_len = hashlen;
-		kex->session_id = xmalloc(kex->session_id_len);
+		kex->session_id = malloc(kex->session_id_len);
+		if (kex->session_id == NULL) {
+			r = SSH_ERR_ALLOC_FAIL;
+			goto out;
+		}
 		memcpy(kex->session_id, hash, kex->session_id_len);
 	}
 
+	/* XXX check error */
 	kex_derive_keys(ssh, hash, hashlen, shared_secret);
-	BN_clear_free(shared_secret);
 	kex_finish(ssh);
-	return 0;
+	r = 0;
+ out:
+	DH_free(kex->dh);
+	kex->dh = NULL;
+	if (server_host_key_blob)
+		free(server_host_key_blob);
+	if (server_host_key)
+		sshkey_free(server_host_key);
+	if (dh_server_pub)
+		BN_clear_free(dh_server_pub);
+	if (kbuf) {
+		bzero(kbuf, klen);
+		free(kbuf);
+	}
+	if (shared_secret)
+		BN_clear_free(shared_secret);
+	if (signature)
+		free(signature);
+	if (r != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	return r;
 }

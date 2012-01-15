@@ -167,9 +167,9 @@ void	 kexgex_server(struct ssh *);
 void	 kexecdh_client(struct ssh *);
 void	 kexecdh_server(struct ssh *);
 
-void
-kex_dh_hash(char *, char *, char *, int, char *, int, u_char *, int,
-    BIGNUM *, BIGNUM *, BIGNUM *, u_char **, u_int *);
+int
+kex_dh_hash(char *, char *, char *, size_t, char *, size_t, u_char *, size_t,
+    BIGNUM *, BIGNUM *, BIGNUM *, u_char **, size_t *);
 void
 kexgex_hash(const EVP_MD *, char *, char *, char *, int, char *,
     int, u_char *, int, int, int, int, BIGNUM *, BIGNUM *, BIGNUM *,

@@ -109,7 +109,8 @@ input_kex_dh_gex_group(int type, u_int32_t seq, struct ssh *ssh)
 		    kex->min, BN_num_bits(p), kex->max);
 
 	kex->dh = dh_new_group(g, p);
-	dh_gen_key(kex->dh, kex->we_need * 8);
+	if (dh_gen_key(kex->dh, kex->we_need * 8) != 0)
+		fatal("dh_gen_key failed");
 
 #ifdef DEBUG_KEXDH
 	DHparams_print_fp(stderr, kex->dh);
