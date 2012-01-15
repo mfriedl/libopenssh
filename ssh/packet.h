@@ -97,9 +97,9 @@ void     ssh_packet_put_string(struct ssh *, const void *buf, u_int len);
 void     ssh_packet_put_cstring(struct ssh *, const char *str);
 void     ssh_packet_put_raw(struct ssh *, const void *buf, u_int len);
 void     ssh_packet_send(struct ssh *);
-void     ssh_packet_send1(struct ssh *);
-void	ssh_packet_send2_wrapped(struct ssh *);
-void     ssh_packet_send2(struct ssh *);
+int	 ssh_packet_send1(struct ssh *);
+int	 ssh_packet_send2_wrapped(struct ssh *);
+int	 ssh_packet_send2(struct ssh *);
 void	ssh_packet_enable_delayed_compress(struct ssh *);
 
 int      ssh_packet_read(struct ssh *);
@@ -312,5 +312,31 @@ void     packet_set_connection(int, int);
 #define packet_set_postauth() \
 	ssh_packet_set_postauth(active_state)
 #endif
+
+/* new API */
+int	sshpkt_start(struct ssh *ssh, u_char type);
+int	sshpkt_send(struct ssh *ssh);
+int     sshpkt_disconnect(struct ssh *, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+
+int	sshpkt_put(struct ssh *ssh, const void *v, size_t len);
+int	sshpkt_put_u8(struct ssh *ssh, u_char val);
+int	sshpkt_put_u32(struct ssh *ssh, u_int32_t val);
+int	sshpkt_put_u64(struct ssh *ssh, u_int64_t val);
+int	sshpkt_put_string(struct ssh *ssh, const void *v, size_t len);
+int	sshpkt_put_cstring(struct ssh *ssh, const void *v);
+int	sshpkt_put_ec(struct ssh *ssh, const EC_POINT *v, const EC_GROUP *g);
+int	sshpkt_put_bignum1(struct ssh *ssh, const BIGNUM *v);
+int	sshpkt_put_bignum2(struct ssh *ssh, const BIGNUM *v);
+
+int	sshpkt_get_u8(struct ssh *ssh, u_char *valp);
+int	sshpkt_get_u32(struct ssh *ssh, u_int32_t *valp);
+int	sshpkt_get_u64(struct ssh *ssh, u_int64_t *valp);
+int	sshpkt_get_string(struct ssh *ssh, u_char **valp, size_t *lenp);
+int	sshpkt_get_string_direct(struct ssh *ssh, const u_char **valp, size_t *lenp);
+int	sshpkt_get_cstring(struct ssh *ssh, char **valp, size_t *lenp);
+int	sshpkt_get_ec(struct ssh *ssh, EC_POINT *v, const EC_GROUP *g);
+int	sshpkt_get_bignum1(struct ssh *ssh, BIGNUM *v);
+int	sshpkt_get_bignum2(struct ssh *ssh, BIGNUM *v);
+int	sshpkt_get_end(struct ssh *ssh);
 
 #endif				/* PACKET_H */
