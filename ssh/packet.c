@@ -771,7 +771,7 @@ ssh_packet_send1(struct ssh *ssh)
 	/* Add check bytes. */
 	checksum = ssh_crc32(sshbuf_ptr(state->outgoing_packet),
 	    sshbuf_len(state->outgoing_packet));
-	put_u32(buf, checksum);
+	POKE_U32(buf, checksum);
 	if ((r = sshbuf_put(state->outgoing_packet, buf, 4)) != 0)
 		goto out;
 
@@ -781,7 +781,7 @@ ssh_packet_send1(struct ssh *ssh)
 #endif
 
 	/* Append to output. */
-	put_u32(buf, len);
+	POKE_U32(buf, len);
 	if ((r = sshbuf_put(state->output, buf, 4)) != 0)
 		goto out;
 	if ((r = sshbuf_reserve(state->output,
@@ -1019,7 +1019,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	/* packet_length includes payload, padding and padding length field */
 	packet_length = sshbuf_len(state->outgoing_packet) - 4;
 	cp = sshbuf_ptr(state->outgoing_packet);
-	put_u32(cp, packet_length);
+	POKE_U32(cp, packet_length);
 	cp[4] = padlen;
 	DBG(debug("send: len %d (includes padlen %d)", packet_length+4, padlen));
 
@@ -1283,7 +1283,7 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 		return 0;
 	/* Get length of incoming packet. */
 	cp = sshbuf_ptr(state->input);
-	len = get_u32(cp);
+	len = PEEK_U32(cp);
 	if (len < 1 + 2 + 2 || len > 256 * 1024)
 		ssh_packet_disconnect(ssh, "Bad packet length %u.",
 		    len);
@@ -1348,7 +1348,7 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 		    len, sshbuf_len(state->incoming_packet));
 
 	cp = (u_char *)sshbuf_ptr(state->incoming_packet) + len - 4;
-	stored_checksum = get_u32(cp);
+	stored_checksum = PEEK_U32(cp);
 	if (checksum != stored_checksum)
 		ssh_packet_disconnect(ssh,
 		    "Corrupted check bytes on input.");
@@ -1415,7 +1415,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		    sshbuf_ptr(state->input), block_size)) != 0)
 			goto out;
 		cp = sshbuf_ptr(state->incoming_packet);
-		state->packlen = get_u32(cp);
+		state->packlen = PEEK_U32(cp);
 		if (state->packlen < 1 + 4 ||
 		    state->packlen > PACKET_MAX_SIZE) {
 #ifdef PACKET_DEBUG
