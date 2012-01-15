@@ -152,7 +152,7 @@ ssh_input_append(struct ssh* ssh, const char *data, u_int len)
 int
 ssh_packet_next(struct ssh *ssh)
 {
-	int ret;
+	int r;
 	u_char type;
 	u_int32_t seqnr;                                                
 
@@ -165,8 +165,8 @@ ssh_packet_next(struct ssh *ssh)
 	 * Try to read a packet. Returns SSH_MSG_NONE if no packet or not
 	 * enough data.
 	 */
-	if ((ret = ssh_packet_read_poll2(ssh, &type, &seqnr)) != 0)
-		fatal("%s: %s", __func__, ssh_err(ret));
+	if ((r = ssh_packet_read_poll2(ssh, &type, &seqnr)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	/*
 	 * If we enough data and we have a dispatch function, call the
 	 * function and return SSH_MSG_NONE. Otherwise return the packet type to
@@ -180,7 +180,9 @@ ssh_packet_next(struct ssh *ssh)
 	if (type > 0 && type < DISPATCH_MAX &&
 	    type >= SSH2_MSG_KEXINIT && type <= SSH2_MSG_TRANSPORT_MAX &&
 	    ssh->dispatch[type] != NULL) {
-		(*ssh->dispatch[type])(type, seqnr, ssh);
+		r = (*ssh->dispatch[type])(type, seqnr, ssh);
+		if (r != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		return (SSH_MSG_NONE);
 	}
 	return (type);

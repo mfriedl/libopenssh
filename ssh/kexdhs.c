@@ -208,7 +208,5 @@ input_kex_dh_init(int type, u_int32_t seq, struct ssh *ssh)
 		free(server_host_key_blob);
 	if (signature)
 		free(signature);
-	if (r != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
 	return r;
 }

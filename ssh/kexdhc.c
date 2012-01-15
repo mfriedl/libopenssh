@@ -207,7 +207,5 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 		BN_clear_free(shared_secret);
 	if (signature)
 		free(signature);
-	if (r != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
 	return r;
 }
