@@ -36,6 +36,7 @@
 #include "pathnames.h"
 #include "log.h"
 #include "misc.h"
+#include "err.h"
 
 static int
 parse_prime(int linenum, char *line, struct dhgroup *dhg)
@@ -228,36 +229,28 @@ dh_pub_is_valid(DH *dh, BIGNUM *dh_pub)
 	return 0;
 }
 
-void
+int
 dh_gen_key(DH *dh, int need)
 {
-	int i, bits_set, tries = 0;
+	int tries = 0;
 
-	if (need < 0)
-		fatal("dh_gen_key: need < 0");
-	if (dh->p == NULL)
-		fatal("dh_gen_key: dh->p == NULL");
-	if (need > INT_MAX / 2 || 2 * need >= BN_num_bits(dh->p))
-		fatal("dh_gen_key: group too small: %d (2*need %d)",
-		    BN_num_bits(dh->p), 2*need);
+	if (need < 0 || dh->p == NULL ||
+	    need > INT_MAX / 2 || 2 * need >= BN_num_bits(dh->p))
+		return SSH_ERR_INVALID_ARGUMENT;
 	do {
 		if (dh->priv_key != NULL)
 			BN_clear_free(dh->priv_key);
 		if ((dh->priv_key = BN_new()) == NULL)
-			fatal("dh_gen_key: BN_new failed");
+			return SSH_ERR_ALLOC_FAIL;
 		/* generate a 2*need bits random private exponent */
-		if (!BN_rand(dh->priv_key, 2*need, 0, 0))
-			fatal("dh_gen_key: BN_rand failed");
-		if (DH_generate_key(dh) == 0)
-			fatal("DH_generate_key");
-		for (i = 0, bits_set = 0; i <= BN_num_bits(dh->priv_key); i++)
-			if (BN_is_bit_set(dh->priv_key, i))
-				bits_set++;
-		debug2("dh_gen_key: priv key bits set: %d/%d",
-		    bits_set, BN_num_bits(dh->priv_key));
-		if (tries++ > 10)
-			fatal("dh_gen_key: too many bad keys: giving up");
+		if (!BN_rand(dh->priv_key, 2*need, 0, 0) ||
+		    DH_generate_key(dh) == 0 || 
+		    tries++ > 10) {
+			BN_clear_free(dh->priv_key);
+			return SSH_ERR_LIBCRYPTO_ERROR;
+		}
 	} while (!dh_pub_is_valid(dh, dh->pub_key));
+	return 0;
 }
 
 DH *

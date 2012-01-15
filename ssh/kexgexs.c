@@ -104,7 +104,8 @@ kexgex_server(struct ssh *ssh)
 	ssh_packet_write_wait(ssh);
 
 	/* Compute our exchange value in parallel with the client */
-	dh_gen_key(kex->dh, kex->we_need * 8);
+	if (dh_gen_key(kex->dh, kex->we_need * 8) != 0)
+		fatal("dh_gen_key failed");
 
 	debug("expecting SSH2_MSG_KEX_DH_GEX_INIT");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_DH_GEX_INIT, &input_kex_dh_gex_init);

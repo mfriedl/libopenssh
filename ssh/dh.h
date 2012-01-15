@@ -38,7 +38,7 @@ DH	*dh_new_group(BIGNUM *, BIGNUM *);
 DH	*dh_new_group1(void);
 DH	*dh_new_group14(void);
 
-void	 dh_gen_key(DH *, int);
+int	 dh_gen_key(DH *, int);
 int	 dh_pub_is_valid(DH *, BIGNUM *);
 
 int	 dh_estimate(int);
