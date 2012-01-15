@@ -125,7 +125,7 @@ struct Kex {
 	struct sshkey *(*load_host_public_key)(int, struct ssh *);
 	struct sshkey *(*load_host_private_key)(int, struct ssh *);
 	int	(*host_key_index)(struct sshkey *);
-	void	(*kex[KEX_MAX])(struct ssh *);
+	int	(*kex[KEX_MAX])(struct ssh *);
 	/* kex specific state */
 	DH	*dh;			/* DH */
 	int	min, max, nbits;	/* GEX */
@@ -150,12 +150,12 @@ int	 kex_derive_keys(struct ssh *, u_char *, u_int, BIGNUM *);
 
 Newkeys *kex_get_newkeys(struct ssh *, int);
 
-void	 kexdh_client(struct ssh *);
-void	 kexdh_server(struct ssh *);
-void	 kexgex_client(struct ssh *);
-void	 kexgex_server(struct ssh *);
-void	 kexecdh_client(struct ssh *);
-void	 kexecdh_server(struct ssh *);
+int	 kexdh_client(struct ssh *);
+int	 kexdh_server(struct ssh *);
+int	 kexgex_client(struct ssh *);
+int	 kexgex_server(struct ssh *);
+int	 kexecdh_client(struct ssh *);
+int	 kexecdh_server(struct ssh *);
 
 int
 kex_dh_hash(char *, char *, char *, size_t, char *, size_t, u_char *, size_t,

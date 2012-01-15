@@ -47,7 +47,7 @@
 
 static int input_kex_ecdh_reply(int, u_int32_t, struct ssh *);
 
-void
+int
 kexecdh_client(struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
@@ -86,11 +86,11 @@ kexecdh_client(struct ssh *ssh)
 
 	debug("expecting SSH2_MSG_KEX_ECDH_REPLY");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_ECDH_REPLY, &input_kex_ecdh_reply);
-	return;
+	r = 0;
  out:
 	if (client_key)
 		EC_KEY_free(client_key);
-	fatal("%s: %s", __func__, ssh_err(r));
+	return r;
 }
 
 static int

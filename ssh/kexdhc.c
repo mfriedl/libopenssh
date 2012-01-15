@@ -45,7 +45,7 @@
 
 static int input_kex_dh(int, u_int32_t, struct ssh *);
 
-void
+int
 kexdh_client(struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
@@ -81,9 +81,9 @@ kexdh_client(struct ssh *ssh)
 #endif
 	debug("expecting SSH2_MSG_KEXDH_REPLY");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEXDH_REPLY, &input_kex_dh);
-	return;
+	r = 0;
  out:
-	fatal("%s: %s", __func__, ssh_err(r));
+	return r;
 }
 
 static int

@@ -49,11 +49,12 @@
 
 static int input_kex_ecdh_init(int, u_int32_t, struct ssh *);
 
-void
+int
 kexecdh_server(struct ssh *ssh)
 {
 	debug("expecting SSH2_MSG_KEX_ECDH_INIT");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_ECDH_INIT, &input_kex_ecdh_init);
+	return 0;
 }
 
 static int

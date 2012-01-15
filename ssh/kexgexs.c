@@ -52,7 +52,7 @@
 static int input_kex_dh_gex_request(int, u_int32_t, struct ssh *);
 static int input_kex_dh_gex_init(int, u_int32_t, struct ssh *);
 
-void
+int
 kexgex_server(struct ssh *ssh)
 {
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_DH_GEX_REQUEST_OLD,
@@ -60,7 +60,7 @@ kexgex_server(struct ssh *ssh)
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_DH_GEX_REQUEST,
 	    &input_kex_dh_gex_request);
 	debug("expecting SSH2_MSG_KEX_DH_GEX_REQUEST");
-	return;
+	return 0;
 }
 
 static int
