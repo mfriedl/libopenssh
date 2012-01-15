@@ -199,8 +199,7 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 
 	/* XXX check error */
 	kex_derive_keys(ssh, hash, hashlen, shared_secret);
-	kex_finish(ssh);
-	r = 0;
+	r = kex_finish(ssh);
  out:
 	if (kex->ec_client_key) {
 		EC_KEY_free(kex->ec_client_key);

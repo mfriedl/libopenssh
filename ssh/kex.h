@@ -137,7 +137,7 @@ int	 kex_names_valid(const char *);
 
 Kex	*kex_new(struct ssh *, char *[PROPOSAL_MAX]);
 Kex	*kex_setup(struct ssh *, char *[PROPOSAL_MAX]);
-void	 kex_finish(struct ssh *);
+int	 kex_finish(struct ssh *);
 void	 kex_free(Kex *);
 
 char   **kex_buf2prop(Buffer *, int *);
