@@ -79,6 +79,8 @@ ssh_err(int n)
 		return "agent refused operation";
 	case SSH_ERR_DH_GEX_OUT_OF_RANGE:
 		return "DH GEX group out of range";
+	case SSH_ERR_DISCONNECTED:
+		return "disconnected";
 	default:
 		return "unknown error";
 	}

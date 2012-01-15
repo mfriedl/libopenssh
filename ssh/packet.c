@@ -1366,7 +1366,8 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 	}
 	state->p_read.packets++;
 	state->p_read.bytes += padded_len + 4;
-	*typep = buffer_get_char(state->incoming_packet);
+	if ((r = sshbuf_get_u8(state->incoming_packet, typep)) != 0)
+		goto out;
 	if (*typep < SSH_MSG_MIN || *typep > SSH_MSG_MAX)
 		ssh_packet_disconnect(ssh,
 		    "Invalid ssh1 packet type: %d", *typep);
@@ -1522,7 +1523,8 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	 * get packet type, implies consume.
 	 * return length of payload (without type field)
 	 */
-	*typep = buffer_get_char(state->incoming_packet);
+	if ((r = sshbuf_get_u8(state->incoming_packet, typep)) != 0)
+		goto out;
 	if (*typep < SSH2_MSG_MIN || *typep >= SSH2_MSG_LOCAL_MIN)
 		ssh_packet_disconnect(ssh,
 		    "Invalid ssh2 packet type: %d", *typep);
@@ -1548,9 +1550,10 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	struct session_state *state = ssh->state;
 	u_int reason, seqnr;
 	int r;
-	char *msg;
+	u_char *msg;
 
 	for (;;) {
+		msg = NULL;
 		if (compat20) {
 			r = ssh_packet_read_poll2(ssh, typep, seqnr_p);
 			if (r != 0)
@@ -1564,23 +1567,27 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 				debug3("Received SSH2_MSG_IGNORE");
 				break;
 			case SSH2_MSG_DEBUG:
-				ssh_packet_get_char(ssh);
-				msg = ssh_packet_get_string(ssh, NULL);
+				if ((r = sshpkt_get_u8(ssh, NULL)) != 0 ||
+				    (r = sshpkt_get_string(ssh, &msg, NULL)) != 0 ||
+				    (r = sshpkt_get_string(ssh, NULL, NULL)) != 0) {
+					if (msg)
+						free(msg);
+					return r;
+				}
 				debug("Remote: %.900s", msg);
-				free(msg);
-				msg = ssh_packet_get_string(ssh, NULL);
 				free(msg);
 				break;
 			case SSH2_MSG_DISCONNECT:
-				reason = ssh_packet_get_int(ssh);
-				msg = ssh_packet_get_string(ssh, NULL);
+				if ((r = sshpkt_get_u32(ssh, &reason)) != 0 ||
+				    (r = sshpkt_get_string(ssh, &msg, NULL)) != 0)
+					return r;
 				logit("Received disconnect from %s: %u: %.400s",
 				    get_remote_ipaddr(), reason, msg);
 				free(msg);
-				cleanup_exit(255);
-				break;
+				return SSH_ERR_DISCONNECTED;
 			case SSH2_MSG_UNIMPLEMENTED:
-				seqnr = ssh_packet_get_int(ssh);
+				if ((r = sshpkt_get_u32(ssh, &seqnr)) != 0)
+					return r;
 				debug("Received SSH2_MSG_UNIMPLEMENTED for %u",
 				    seqnr);
 				break;
@@ -1593,15 +1600,18 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 			case SSH_MSG_IGNORE:
 				break;
 			case SSH_MSG_DEBUG:
-				msg = ssh_packet_get_string(ssh, NULL);
+				if ((r = sshpkt_get_string(ssh, &msg, NULL)) != 0)
+					return r;
 				debug("Remote: %.900s", msg);
 				free(msg);
 				break;
 			case SSH_MSG_DISCONNECT:
-				msg = ssh_packet_get_string(ssh, NULL);
+				if ((r = sshpkt_get_string(ssh, &msg, NULL)) != 0)
+					return r;
 				logit("Received disconnect from %s: %.400s",
 				    get_remote_ipaddr(), msg);
-				cleanup_exit(255);
+				free(msg);
+				return SSH_ERR_DISCONNECTED;
 				break;
 			default:
 				if (*typep)
@@ -2208,7 +2218,7 @@ ssh_packet_set_postauth(struct ssh *ssh)
 
 /* NEW API */
 
-/* put data to the incoming packet */
+/* put data to the outgoing packet */
 
 int
 sshpkt_put(struct ssh *ssh, const void *v, size_t len)

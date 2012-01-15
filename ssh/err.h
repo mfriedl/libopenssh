@@ -49,6 +49,7 @@
 #define SSH_ERR_AGENT_COMMUNICATION		-25
 #define SSH_ERR_AGENT_FAILURE			-26
 #define SSH_ERR_DH_GEX_OUT_OF_RANGE		-27
+#define SSH_ERR_DISCONNECTED			-28
 
 /* Translate a numeric error code to a human-readable error string */
 const char *ssh_err(int n);
