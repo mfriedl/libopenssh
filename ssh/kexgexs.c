@@ -49,17 +49,28 @@
 #include "dispatch.h"
 #include "err.h"
 
+static int input_kex_dh_gex_request(int, u_int32_t, struct ssh *);
 static int input_kex_dh_gex_init(int, u_int32_t, struct ssh *);
 
 void
 kexgex_server(struct ssh *ssh)
 {
+	ssh_dispatch_set(ssh, SSH2_MSG_KEX_DH_GEX_REQUEST_OLD,
+	    &input_kex_dh_gex_request);
+	ssh_dispatch_set(ssh, SSH2_MSG_KEX_DH_GEX_REQUEST,
+	    &input_kex_dh_gex_request);
+	debug("expecting SSH2_MSG_KEX_DH_GEX_REQUEST");
+	return;
+}
+
+static int
+input_kex_dh_gex_request(int type, u_int32_t seq, struct ssh *ssh)
+{
 	Kex *kex = ssh->kex;
-	int r, type, min = -1, max = -1, nbits = -1;
+	int r, min = -1, max = -1, nbits = -1;
 
 	kex->min = kex->nbits = kex->max = -1;
 
-	type = ssh_packet_read(ssh);
 	switch (type) {
 	case SSH2_MSG_KEX_DH_GEX_REQUEST:
 		debug("SSH2_MSG_KEX_DH_GEX_REQUEST received");
@@ -91,7 +102,8 @@ kexgex_server(struct ssh *ssh)
 		goto out;
 	}
 
-	if (kex->max < kex->min || kex->nbits < kex->min || kex->max < kex->nbits) {
+	if (kex->max < kex->min || kex->nbits < kex->min ||
+	    kex->max < kex->nbits) {
 		r = SSH_ERR_DH_GEX_OUT_OF_RANGE;
 		goto out;
 	}
@@ -116,9 +128,9 @@ kexgex_server(struct ssh *ssh)
 
 	debug("expecting SSH2_MSG_KEX_DH_GEX_INIT");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_DH_GEX_INIT, &input_kex_dh_gex_init);
-	return;
+	r = 0;
  out:
-	fatal("%s: %s", __func__, ssh_err(r));
+	return r;
 }
 
 static int
