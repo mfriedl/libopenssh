@@ -67,20 +67,18 @@ kexdh_client(struct ssh *ssh)
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
+	debug("sending SSH2_MSG_KEXDH_INIT");
 	if ((r = dh_gen_key(kex->dh, kex->we_need * 8)) != 0 ||
 	    (r = sshpkt_start(ssh, SSH2_MSG_KEXDH_INIT)) != 0 ||
 	    (r = sshpkt_put_bignum2(ssh, kex->dh->pub_key)) != 0 ||
 	    (r = sshpkt_send(ssh)) != 0)
 		goto out;
-
-	debug("sending SSH2_MSG_KEXDH_INIT");
 #ifdef DEBUG_KEXDH
 	DHparams_print_fp(stderr, kex->dh);
 	fprintf(stderr, "pub= ");
 	BN_print_fp(stderr, kex->dh->pub_key);
 	fprintf(stderr, "\n");
 #endif
-
 	debug("expecting SSH2_MSG_KEXDH_REPLY");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEXDH_REPLY, &input_kex_dh);
 	return;
@@ -104,8 +102,8 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 		goto out;
 	}
 	/* key, cert */
-	if ((r = sshpkt_get_string(ssh, &server_host_key_blob, &sbloblen))
-	    != 0 ||
+	if ((r = sshpkt_get_string(ssh, &server_host_key_blob,
+	    &sbloblen)) != 0 ||
 	    (r = sshkey_from_blob(server_host_key_blob, sbloblen,
 	    &server_host_key)) != 0)
 		goto out;
@@ -117,7 +115,6 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 		r = SSH_ERR_SIGNATURE_INVALID;
 		goto out;
 	}
-
 	/* DH parameter f, server public DH key */
 	if ((dh_server_pub = BN_new()) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
@@ -128,14 +125,12 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 	    (r = sshpkt_get_string(ssh, &signature, &slen)) != 0 ||
 	    (r = sshpkt_get_end(ssh)) != 0)
 		goto out;
-
 #ifdef DEBUG_KEXDH
 	fprintf(stderr, "dh_server_pub= ");
 	BN_print_fp(stderr, dh_server_pub);
 	fprintf(stderr, "\n");
 	debug("bits %d", BN_num_bits(dh_server_pub));
 #endif
-
 	if (!dh_pub_is_valid(kex->dh, dh_server_pub)) {
 		sshpkt_disconnect(ssh, "bad server public DH value");
 		r = SSH_ERR_MESSAGE_INCOMPLETE;
@@ -153,7 +148,6 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 		r = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
 	}
-
 #ifdef DEBUG_KEXDH
 	dump_digest("shared secret", kbuf, kout);
 #endif

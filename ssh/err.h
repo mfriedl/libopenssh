@@ -48,6 +48,7 @@
 #define SSH_ERR_KEY_CERT_INVALID		-24
 #define SSH_ERR_AGENT_COMMUNICATION		-25
 #define SSH_ERR_AGENT_FAILURE			-26
+#define SSH_ERR_DH_GEX_OUT_OF_RANGE		-27
 
 /* Translate a numeric error code to a human-readable error string */
 const char *ssh_err(int n);
