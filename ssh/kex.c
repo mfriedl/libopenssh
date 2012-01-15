@@ -229,28 +229,41 @@ kex_send_kexinit(struct ssh *ssh)
 int
 kex_input_kexinit(int type, u_int32_t seq, struct ssh *ssh)
 {
+	Kex *kex = ssh->kex;
 	char *ptr;
 	u_int i, dlen;
-	Kex *kex = ssh->kex;
+	int r;
 
 	debug("SSH2_MSG_KEXINIT received");
 	if (kex == NULL)
-		fatal("kex_input_kexinit: no kex, cannot rekey");
+		return SSH_ERR_INVALID_ARGUMENT;
 
 	ptr = ssh_packet_get_raw(ssh, &dlen);
-	buffer_append(&kex->peer, ptr, dlen);
+	if ((r = sshbuf_put(&kex->peer, ptr, dlen)) != 0)
+		return r;
 
 	/* discard packet */
 	for (i = 0; i < KEX_COOKIE_LEN; i++)
-		ssh_packet_get_char(ssh);
+		if ((r = sshpkt_get_u8(ssh, NULL)) != 0)
+			return r;
 	for (i = 0; i < PROPOSAL_MAX; i++)
-		xfree(ssh_packet_get_string(ssh, NULL));
-	(void) ssh_packet_get_char(ssh);
-	(void) ssh_packet_get_int(ssh);
-	ssh_packet_check_eom(ssh);
+		if ((r = sshpkt_get_string(ssh, NULL, NULL)) != 0)
+			return r;
+	if ((r = sshpkt_get_u8(ssh, NULL)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, NULL)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+			return r;
 
-	kex_kexinit_finish(ssh);
-	return 0;
+	/* XXX check error */
+	if (!(kex->flags & KEX_INIT_SENT))
+		kex_send_kexinit(ssh);
+	kex_choose_conf(ssh);
+
+	if (kex->kex_type >= 0 && kex->kex_type < KEX_MAX &&
+	    kex->kex[kex->kex_type] != NULL)
+		return (kex->kex[kex->kex_type])(ssh);
+
+	return SSH_ERR_INTERNAL_ERROR;
 }
 
 Kex *
@@ -286,23 +299,6 @@ kex_setup(struct ssh *ssh, char *proposal[PROPOSAL_MAX])
 	ssh->kex = kex_new(ssh, proposal);
 	kex_send_kexinit(ssh);				/* we start */
 	return ssh->kex;
-}
-
-static void
-kex_kexinit_finish(struct ssh *ssh)
-{
-	Kex *kex = ssh->kex;
-	if (!(kex->flags & KEX_INIT_SENT))
-		kex_send_kexinit(ssh);
-
-	kex_choose_conf(ssh);
-
-	if (kex->kex_type >= 0 && kex->kex_type < KEX_MAX &&
-	    kex->kex[kex->kex_type] != NULL) {
-		(kex->kex[kex->kex_type])(ssh);
-	} else {
-		fatal("Unsupported key exchange %d", kex->kex_type);
-	}
 }
 
 static void

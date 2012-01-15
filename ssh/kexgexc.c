@@ -48,7 +48,7 @@
 static int input_kex_dh_gex_group(int, u_int32_t, struct ssh *);
 static int input_kex_dh_gex_reply(int, u_int32_t, struct ssh *);
 
-void
+int
 kexgex_client(struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
@@ -84,9 +84,9 @@ kexgex_client(struct ssh *ssh)
 #endif
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_DH_GEX_GROUP,
 	    &input_kex_dh_gex_group);
-	return;
+	r = 0;
  out:
-	fatal("%s: %s", __func__, ssh_err(r));
+	return r;
 }
 
 static int
