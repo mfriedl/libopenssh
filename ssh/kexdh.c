@@ -82,10 +82,10 @@ kex_dh_hash(
 		return SSH_ERR_LIBCRYPTO_ERROR;
 	}
 	sshbuf_free(b);
-#ifdef DEBUG_KEX
-	dump_digest("hash", digest, EVP_MD_size(evp_md));
-#endif
 	*hash = digest;
 	*hashlen = EVP_MD_size(evp_md);
+#ifdef DEBUG_KEX
+	dump_digest("hash", digest, *hashlen);
+#endif
 	return 0;
 }
