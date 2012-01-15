@@ -197,9 +197,8 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 		memcpy(kex->session_id, hash, kex->session_id_len);
 	}
 
-	/* XXX check error */
-	kex_derive_keys(ssh, hash, hashlen, shared_secret);
-	r = kex_finish(ssh);
+	if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) == 0)
+		r = kex_finish(ssh);
  out:
 	if (kex->ec_client_key) {
 		EC_KEY_free(kex->ec_client_key);
