@@ -164,10 +164,10 @@ int
 kexgex_hash(const EVP_MD *, char *, char *, char *, size_t, char *,
     size_t, u_char *, size_t, int, int, int, BIGNUM *, BIGNUM *, BIGNUM *,
     BIGNUM *, BIGNUM *, u_char **, size_t *);
-void
-kex_ecdh_hash(const EVP_MD *, const EC_GROUP *, char *, char *, char *, int,
-    char *, int, u_char *, int, const EC_POINT *, const EC_POINT *,
-    const BIGNUM *, u_char **, u_int *);
+int
+kex_ecdh_hash(const EVP_MD *, const EC_GROUP *, char *, char *, char *, size_t,
+    char *, size_t, u_char *, size_t, const EC_POINT *, const EC_POINT *,
+    const BIGNUM *, u_char **, size_t *);
 
 int	kex_ecdh_name_to_nid(const char *);
 const EVP_MD *kex_ecdh_name_to_evpmd(const char *);
