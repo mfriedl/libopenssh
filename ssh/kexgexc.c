@@ -242,10 +242,7 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 
 	/* XXX check error */
 	kex_derive_keys(ssh, hash, hashlen, shared_secret);
-	kex_finish(ssh);
-
-	ssh_dispatch_set(ssh, SSH2_MSG_KEX_DH_GEX_REPLY, NULL);
-	r = 0;
+	r = kex_finish(ssh);
  out:
 	DH_free(kex->dh);
 	kex->dh = NULL;

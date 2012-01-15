@@ -157,16 +157,19 @@ kex_reset_dispatch(struct ssh *ssh)
 	ssh_dispatch_set(ssh, SSH2_MSG_KEXINIT, &kex_input_kexinit);
 }
 
-void
+int
 kex_finish(struct ssh *ssh)
 {
-	kex_reset_dispatch(ssh);
+	int r;
 
-	ssh_packet_start(ssh, SSH2_MSG_NEWKEYS);
-	ssh_packet_send(ssh);
+	kex_reset_dispatch(ssh);
+	if ((r = sshpkt_start(ssh, SSH2_MSG_NEWKEYS)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		return r;
 	debug("SSH2_MSG_NEWKEYS sent");
 	debug("expecting SSH2_MSG_NEWKEYS");
 	ssh_dispatch_set(ssh, SSH2_MSG_NEWKEYS, &kex_input_newkeys);
+	return 0;
 }
 
 static int
