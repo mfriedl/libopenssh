@@ -83,6 +83,7 @@ kexecdh_client(struct ssh *ssh)
 #endif
 	kex->ec_client_key = client_key;
 	kex->ec_group = group;
+	client_key = NULL;	/* owned by the kex */
 
 	debug("expecting SSH2_MSG_KEX_ECDH_REPLY");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_ECDH_REPLY, &input_kex_ecdh_reply);

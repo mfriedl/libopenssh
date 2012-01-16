@@ -49,7 +49,6 @@
 #include "err.h"
 
 /* prototype */
-static void kex_kexinit_finish(struct ssh *);
 static void kex_choose_conf(struct ssh *);
 static int kex_input_newkeys(int, u_int32_t, struct ssh *);
 
