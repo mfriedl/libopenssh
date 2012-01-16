@@ -67,8 +67,8 @@ struct ssh {
 struct ssh *ssh_alloc_session_state(void);
 struct ssh *ssh_packet_set_connection(struct ssh *, int, int);
 void     ssh_packet_set_timeout(struct ssh *, int, int);
-void	 ssh_packet_stop_discard(struct ssh *);
-void	 ssh_packet_start_discard(struct ssh *, Enc*, Mac*, u_int, u_int);
+int	 ssh_packet_stop_discard(struct ssh *);
+int	 ssh_packet_start_discard(struct ssh *, Enc*, Mac*, u_int, u_int);
 int	ssh_packet_connection_af(struct ssh *);
 void     ssh_packet_set_nonblocking(struct ssh *);
 int      ssh_packet_get_connection_in(struct ssh *);

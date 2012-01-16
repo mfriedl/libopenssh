@@ -81,9 +81,9 @@ ssh_err(int n)
 		return "DH GEX group out of range";
 	case SSH_ERR_DISCONNECTED:
 		return "disconnected";
+	case SSH_ERR_MAC_INVALID:
+		return "message authentication code incorrect";
 	default:
 		return "unknown error";
 	}
 }
-
-
