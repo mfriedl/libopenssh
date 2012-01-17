@@ -1070,7 +1070,7 @@ ssh_packet_send1(struct ssh *ssh)
 	return r;
 }
 
-void
+int
 ssh_set_newkeys(struct ssh *ssh, int mode)
 {
 	struct session_state *state = ssh->state;
@@ -1098,8 +1098,7 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	if (state->newkeys[mode] != NULL) {
 		debug("set_newkeys: rekeying");
 		if ((r = cipher_cleanup(cc)) != 0)
-			fatal("%s: cipher_cleanup failed: %s",
-			    __func__, ssh_err(r));
+			return r;
 		enc  = &state->newkeys[mode]->enc;
 		mac  = &state->newkeys[mode]->mac;
 		comp = &state->newkeys[mode]->comp;
@@ -1114,17 +1113,17 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	}
 	state->newkeys[mode] = kex_get_newkeys(ssh, mode);
 	if (state->newkeys[mode] == NULL)
-		fatal("newkeys: no keys for mode %d", mode);
+		return SSH_ERR_INTERNAL_ERROR;
 	enc  = &state->newkeys[mode]->enc;
 	mac  = &state->newkeys[mode]->mac;
 	comp = &state->newkeys[mode]->comp;
 	if ((r = mac_init(mac)) != 0)
-		fatal("newkeys: mac_init_failed: %s", ssh_err(r));
+		return r;
 	mac->enabled = 1;
 	DBG(debug("cipher_init_context: %d", mode));
 	if ((r = cipher_init(cc, enc->cipher, enc->key, enc->key_len,
 	    enc->iv, enc->block_size, crypt_type)) != 0)
-		fatal("%s: cipher_init failed: %s", __func__, ssh_err(r));
+		return r;
 	if (!state->cipher_warning_done &&
 	    (wmsg = cipher_warning_message(cc)) != NULL) {
 		error("Warning: %s", wmsg);
@@ -1138,13 +1137,13 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	    (comp->type == COMP_DELAYED &&
 	     state->after_authentication)) && comp->enabled == 0) {
 		if ((r = ssh_packet_init_compression(ssh)) < 0)
-			fatal("%s: %s", __func__, ssh_err(r));
+			return r;
 		if (mode == MODE_OUT) {
 			if ((r = start_compression_out(ssh, 6)) != 0)
-				fatal("%s: %s", __func__, ssh_err(r));
+				return r;
 		} else {
 			if ((r = start_compression_in(ssh)) != 0)
-				fatal("%s: %s", __func__, ssh_err(r));
+				return r;
 		}
 		comp->enabled = 1;
 	}
@@ -1159,6 +1158,7 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	if (state->rekey_limit)
 		*max_blocks = MIN(*max_blocks,
 		    state->rekey_limit / enc->block_size);
+	return 0;
 }
 
 /*
@@ -1166,7 +1166,7 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
  * This happens on the server side after a SSH2_MSG_USERAUTH_SUCCESS is sent,
  * and on the client side after a SSH2_MSG_USERAUTH_SUCCESS is received.
  */
-void
+static int
 ssh_packet_enable_delayed_compress(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
@@ -1185,17 +1185,18 @@ ssh_packet_enable_delayed_compress(struct ssh *ssh)
 		comp = &state->newkeys[mode]->comp;
 		if (comp && !comp->enabled && comp->type == COMP_DELAYED) {
 			if ((r = ssh_packet_init_compression(ssh)) != 0)
-				fatal("%s: %s", __func__, ssh_err(r));
+				return r;
 			if (mode == MODE_OUT) {
 				if ((r = start_compression_out(ssh, 6)) != 0)
-					fatal("%s: %s", __func__, ssh_err(r));
+					return r;
 			} else {
 				if ((r = start_compression_in(ssh)) != 0)
-					fatal("%s: %s", __func__, ssh_err(r));
+					return r;
 			}
 			comp->enabled = 1;
 		}
 	}
+	return 0;
 }
 
 /*
@@ -1327,10 +1328,11 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	sshbuf_reset(state->outgoing_packet);
 
 	if (type == SSH2_MSG_NEWKEYS)
-		ssh_set_newkeys(ssh, MODE_OUT);
+		r = ssh_set_newkeys(ssh, MODE_OUT);
 	else if (type == SSH2_MSG_USERAUTH_SUCCESS && state->server_side)
-		ssh_packet_enable_delayed_compress(ssh);
-	r = 0;
+		r = ssh_packet_enable_delayed_compress(ssh);
+	else
+		r = 0;
  out:
 	return r;
 }
@@ -1797,17 +1799,17 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		ssh_packet_disconnect(ssh,
 		    "Invalid ssh2 packet type: %d", *typep);
 	if (*typep == SSH2_MSG_NEWKEYS)
-		ssh_set_newkeys(ssh, MODE_IN);
-	else if (*typep == SSH2_MSG_USERAUTH_SUCCESS &&
-	    !state->server_side)
-		ssh_packet_enable_delayed_compress(ssh);
+		r = ssh_set_newkeys(ssh, MODE_IN);
+	else if (*typep == SSH2_MSG_USERAUTH_SUCCESS && !state->server_side)
+		r = ssh_packet_enable_delayed_compress(ssh);
+	else
+		r = 0;
 #ifdef PACKET_DEBUG
 	fprintf(stderr, "read/plain[%d]:\r\n", *typep);
 	sshbuf_dump(state->incoming_packet, stderr);
 #endif
 	/* reset for next packet */
 	state->packlen = 0;
-	r = 0;
  out:
 	return r;
 }
