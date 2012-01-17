@@ -298,8 +298,8 @@ ssh_packet_stop_discard(struct ssh *ssh)
 				fatal("%s: %s", __func__, ssh_err(r));
 		(void) mac_compute(state->packet_discard_mac,
 		    state->p_read.seqnr,
-		    sshbuf_ptr(state->incoming_packet),
-		    PACKET_MAX_SIZE);
+		    sshbuf_ptr(state->incoming_packet), PACKET_MAX_SIZE,
+		    NULL, 0);
 	}
 	logit("Finished discarding for %.200s", get_remote_ipaddr());
 	cleanup_exit(255);
@@ -856,8 +856,9 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	enc  = &state->newkeys[mode]->enc;
 	mac  = &state->newkeys[mode]->mac;
 	comp = &state->newkeys[mode]->comp;
-	if (mac_init(mac) == 0)
-		mac->enabled = 1;
+	if ((r = mac_init(mac)) != 0)
+		fatal("newkeys: mac_init_failed: %s", ssh_err(r));
+	mac->enabled = 1;
 	DBG(debug("cipher_init_context: %d", mode));
 	if ((r = cipher_init(cc, enc->cipher, enc->key, enc->key_len,
 	    enc->iv, enc->block_size, crypt_type)) != 0)
@@ -934,7 +935,7 @@ int
 ssh_packet_send2_wrapped(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
-	u_char type, *cp, *macbuf = NULL;
+	u_char type, *cp, macbuf[MAC_DIGEST_LEN_MAX];
 	u_char padlen, pad;
 	u_int packet_length = 0;
 	u_int i, len;
@@ -1021,9 +1022,11 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 
 	/* compute MAC over seqnr and packet(length fields, payload, padding) */
 	if (mac && mac->enabled) {
-		macbuf = mac_compute(mac, state->p_send.seqnr,
+		if ((r = mac_compute(mac, state->p_send.seqnr,
 		    sshbuf_ptr(state->outgoing_packet),
-		    sshbuf_len(state->outgoing_packet));
+		    sshbuf_len(state->outgoing_packet),
+		    macbuf, sizeof(macbuf))) != 0)
+			goto out;
 		DBG(debug("done calc MAC out #%d", state->p_send.seqnr));
 	}
 	/* encrypt packet and append to output buffer. */
@@ -1374,7 +1377,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 {
 	struct session_state *state = ssh->state;
 	u_int padlen, need;
-	u_char *macbuf, *cp;
+	u_char macbuf[MAC_DIGEST_LEN_MAX], *cp;
 	u_int maclen, block_size;
 	Enc *enc   = NULL;
 	Mac *mac   = NULL;
@@ -1457,10 +1460,12 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	 * increment sequence number for incoming packet
 	 */
 	if (mac && mac->enabled) {
-		macbuf = mac_compute(mac, state->p_read.seqnr,
+		if ((r = mac_compute(mac, state->p_read.seqnr,
 		    sshbuf_ptr(state->incoming_packet),
-		    sshbuf_len(state->incoming_packet));
-		if (timingsafe_bcmp(macbuf, sshbuf_ptr(state->input),
+		    sshbuf_len(state->incoming_packet),
+		    macbuf, sizeof(macbuf))) != 0)
+			goto out;
+		if (timingsafe_bcmp(macbuf, buffer_ptr(state->input),
 		    mac->mac_len) != 0) {
 			logit("Corrupted MAC on input.");
 			if (need > PACKET_MAX_SIZE)

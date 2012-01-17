@@ -38,6 +38,7 @@
 #include "kex.h"
 #include "mac.h"
 #include "misc.h"
+#include "err.h"
 
 #include "umac.h"
 
@@ -66,7 +67,7 @@ struct {
 	{ NULL,				0, NULL, 0, -1, -1 }
 };
 
-static void
+static int
 mac_setup_by_id(Mac *mac, int which)
 {
 	int evp_len;
@@ -74,7 +75,7 @@ mac_setup_by_id(Mac *mac, int which)
 	if (mac->type == SSH_EVP) {
 		mac->evp_md = (*macs[which].mdfunc)();
 		if ((evp_len = EVP_MD_size(mac->evp_md)) <= 0)
-			fatal("mac %s len %d", mac->name, evp_len);
+			return SSH_ERR_LIBCRYPTO_ERROR;
 		mac->key_len = mac->mac_len = (u_int)evp_len;
 	} else {
 		mac->mac_len = macs[which].len / 8;
@@ -83,6 +84,7 @@ mac_setup_by_id(Mac *mac, int which)
 	}
 	if (macs[which].truncatebits != 0)
 		mac->mac_len = macs[which].truncatebits / 8;
+	return 0;
 }
 
 int
@@ -93,63 +95,72 @@ mac_setup(Mac *mac, char *name)
 	for (i = 0; macs[i].name; i++) {
 		if (strcmp(name, macs[i].name) == 0) {
 			if (mac != NULL)
-				mac_setup_by_id(mac, i);
-			debug2("mac_setup: found %s", name);
-			return (0);
+				return mac_setup_by_id(mac, i);
+			return 0;
 		}
 	}
-	debug2("mac_setup: unknown %s", name);
-	return (-1);
+	return SSH_ERR_INVALID_ARGUMENT;
 }
 
 int
 mac_init(Mac *mac)
 {
 	if (mac->key == NULL)
-		fatal("mac_init: no key");
+		return SSH_ERR_INVALID_ARGUMENT;
 	switch (mac->type) {
 	case SSH_EVP:
 		if (mac->evp_md == NULL)
-			return -1;
+			return SSH_ERR_INVALID_ARGUMENT;
 		HMAC_CTX_init(&mac->evp_ctx);
-		HMAC_Init(&mac->evp_ctx, mac->key, mac->key_len, mac->evp_md);
+		if (HMAC_Init(&mac->evp_ctx, mac->key, mac->key_len,
+		    mac->evp_md) != 1) {
+			HMAC_CTX_cleanup(&mac->evp_ctx);
+			return SSH_ERR_LIBCRYPTO_ERROR;
+		}
 		return 0;
 	case SSH_UMAC:
-		mac->umac_ctx = umac_new(mac->key);
+		if ((mac->umac_ctx = umac_new(mac->key)) == NULL)
+			return SSH_ERR_ALLOC_FAIL;
 		return 0;
 	default:
-		return -1;
+		return SSH_ERR_INVALID_ARGUMENT;
 	}
 }
 
-u_char *
-mac_compute(Mac *mac, u_int32_t seqno, u_char *data, int datalen)
+int
+mac_compute(Mac *mac, u_int32_t seqno, u_char *data, int datalen,
+    u_char *digest, size_t dlen)
 {
-	static u_char m[EVP_MAX_MD_SIZE];
+	static u_char m[MAC_DIGEST_LEN_MAX];
 	u_char b[4], nonce[8];
 
 	if (mac->mac_len > sizeof(m))
-		fatal("mac_compute: mac too long %u %lu",
-		    mac->mac_len, (u_long)sizeof(m));
+		return SSH_ERR_INTERNAL_ERROR;
 
 	switch (mac->type) {
 	case SSH_EVP:
-		put_u32(b, seqno);
+		POKE_U32(b, seqno);
 		/* reset HMAC context */
-		HMAC_Init(&mac->evp_ctx, NULL, 0, NULL);
-		HMAC_Update(&mac->evp_ctx, b, sizeof(b));
-		HMAC_Update(&mac->evp_ctx, data, datalen);
-		HMAC_Final(&mac->evp_ctx, m, NULL);
+		if (HMAC_Init(&mac->evp_ctx, NULL, 0, NULL) != 1 ||
+		    HMAC_Update(&mac->evp_ctx, b, sizeof(b)) != 1 ||
+		    HMAC_Update(&mac->evp_ctx, data, datalen) != 1 ||
+		    HMAC_Final(&mac->evp_ctx, m, NULL) != 1)
+			return SSH_ERR_LIBCRYPTO_ERROR;
 		break;
 	case SSH_UMAC:
-		put_u64(nonce, seqno);
+		POKE_U64(nonce, seqno);
 		umac_update(mac->umac_ctx, data, datalen);
 		umac_final(mac->umac_ctx, m, nonce);
 		break;
 	default:
-		fatal("mac_compute: unknown MAC type");
+		return SSH_ERR_INVALID_ARGUMENT;
 	}
-	return (m);
+	if (digest != NULL) {
+		if (dlen > mac->mac_len)
+			dlen = mac->mac_len;
+		memcpy(digest, m, dlen);
+	}
+	return 0;
 }
 
 void
@@ -172,19 +183,16 @@ mac_valid(const char *names)
 	char *maclist, *cp, *p;
 
 	if (names == NULL || strcmp(names, "") == 0)
-		return (0);
-	maclist = cp = xstrdup(names);
+		return 0;
+	if ((maclist = cp = xstrdup(names)) == NULL)
+		return 0;
 	for ((p = strsep(&cp, MAC_SEP)); p && *p != '\0';
 	    (p = strsep(&cp, MAC_SEP))) {
 		if (mac_setup(NULL, p) < 0) {
-			debug("bad mac %s [%s]", p, names);
-			xfree(maclist);
-			return (0);
-		} else {
-			debug3("mac ok: %s [%s]", p, names);
+			free(maclist);
+			return 0;
 		}
 	}
-	debug3("macs ok: [%s]", names);
-	xfree(maclist);
-	return (1);
+	free(maclist);
+	return 1;
 }
