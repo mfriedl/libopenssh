@@ -84,8 +84,6 @@ static Gssctxt *gsscontext = NULL;
 /* Imports */
 extern ServerOptions options;
 extern u_int utmp_len;
-extern z_stream incoming_stream;
-extern z_stream outgoing_stream;
 extern u_char session_id[];
 extern Buffer auth_debug;
 extern int auth_debug_init;
@@ -94,8 +92,8 @@ extern Buffer loginmsg;
 /* State exported from the child */
 
 struct {
-	z_stream incoming;
-	z_stream outgoing;
+	u_char *compstate;
+	u_int compstatelen;
 	u_char *keyin;
 	u_int keyinlen;
 	u_char *keyout;
@@ -399,6 +397,27 @@ monitor_sync(struct monitor *pmonitor)
 		/* The member allocation is not visible, so sync it */
 		mm_share_sync(&pmonitor->m_zlib, &pmonitor->m_zback);
 	}
+}
+
+/* Allocation functions for zlib */
+static void *
+mm_zalloc(struct mm_master *mm, u_int ncount, u_int size)
+{
+	size_t len = (size_t) size * ncount;
+	void *address;
+
+	if (len == 0 || ncount > SIZE_T_MAX / size)
+		fatal("%s: mm_zalloc(%u, %u)", __func__, ncount, size);
+
+	address = mm_malloc(mm, len);
+
+	return (address);
+}
+
+static void
+mm_zfree(struct mm_master *mm, void *address)
+{
+	mm_free(mm, address);
 }
 
 static int
@@ -1407,6 +1426,8 @@ mm_answer_term(int sock, Buffer *req)
 void
 monitor_apply_keystate(struct monitor *pmonitor)
 {
+	int r;
+
 	if (compat20) {
 		set_newkeys(MODE_IN);
 		set_newkeys(MODE_OUT);
@@ -1430,16 +1451,20 @@ monitor_apply_keystate(struct monitor *pmonitor)
 		xfree(child_state.ivin);
 	}
 
-	memcpy(&incoming_stream, &child_state.incoming,
-	    sizeof(incoming_stream));
-	memcpy(&outgoing_stream, &child_state.outgoing,
-	    sizeof(outgoing_stream));
+	if ((r = packet_set_compress_state(child_state.compstate,
+	    child_state.compstatelen)) != 0)
+		fatal("%s: packet_set_compress_state: %s",
+		    __func__, ssh_err(r));
+	xfree(child_state.compstate);
 
 	/* Update with new address */
-	if (options.compression)
-		mm_init_compression(pmonitor->m_zlib);
+	if (options.compression) {
+		packet_set_compress_hooks(pmonitor->m_zlib,
+		    (ssh_packet_comp_alloc_func *)mm_zalloc,
+		    (ssh_packet_comp_free_func *)mm_zfree);
+	}
 
-	packet_set_postauth();
+	packet_set_postauth(); /* XXX merge into packet_set_compress_state? */
 
 	/* Network I/O buffers */
 	/* XXX inefficient for large buffers, need: buffer_init_from_string */
@@ -1506,8 +1531,8 @@ void
 mm_get_keystate(struct monitor *pmonitor)
 {
 	Buffer m;
-	u_char *blob, *p;
-	u_int bloblen, plen;
+	u_char *blob;
+	u_int bloblen;
 	u_int32_t seqnr, packets;
 	u_int64_t blocks, bytes;
 
@@ -1557,17 +1582,8 @@ mm_get_keystate(struct monitor *pmonitor)
 
 	debug3("%s: Getting compression state", __func__);
 	/* Get compression state */
-	p = buffer_get_string(&m, &plen);
-	if (plen != sizeof(child_state.outgoing))
-		fatal("%s: bad request size", __func__);
-	memcpy(&child_state.outgoing, p, sizeof(child_state.outgoing));
-	xfree(p);
-
-	p = buffer_get_string(&m, &plen);
-	if (plen != sizeof(child_state.incoming))
-		fatal("%s: bad request size", __func__);
-	memcpy(&child_state.incoming, p, sizeof(child_state.incoming));
-	xfree(p);
+	child_state.compstate = buffer_get_string(&m,
+	    &child_state.compstatelen);
 
 	/* Network I/O buffers */
 	debug3("%s: Getting Network I/O buffers", __func__);
@@ -1583,39 +1599,6 @@ mm_get_keystate(struct monitor *pmonitor)
 	buffer_free(&m);
 }
 
-
-/* Allocation functions for zlib */
-void *
-mm_zalloc(struct mm_master *mm, u_int ncount, u_int size)
-{
-	size_t len = (size_t) size * ncount;
-	void *address;
-
-	if (len == 0 || ncount > SIZE_T_MAX / size)
-		fatal("%s: mm_zalloc(%u, %u)", __func__, ncount, size);
-
-	address = mm_malloc(mm, len);
-
-	return (address);
-}
-
-void
-mm_zfree(struct mm_master *mm, void *address)
-{
-	mm_free(mm, address);
-}
-
-void
-mm_init_compression(struct mm_master *mm)
-{
-	outgoing_stream.zalloc = (alloc_func)mm_zalloc;
-	outgoing_stream.zfree = (free_func)mm_zfree;
-	outgoing_stream.opaque = mm;
-
-	incoming_stream.zalloc = (alloc_func)mm_zalloc;
-	incoming_stream.zfree = (free_func)mm_zfree;
-	incoming_stream.opaque = mm;
-}
 
 /* XXX */
 
@@ -1664,7 +1647,9 @@ monitor_init(void)
 		mon->m_zlib = mm_create(mon->m_zback, 20 * MM_MEMSIZE);
 
 		/* Compression needs to share state across borders */
-		mm_init_compression(mon->m_zlib);
+		packet_set_compress_hooks(mon->m_zlib,
+		    (ssh_packet_comp_alloc_func *)mm_zalloc,
+		    (ssh_packet_comp_free_func *)mm_zfree);
 	}
 
 	return mon;
