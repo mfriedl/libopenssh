@@ -144,7 +144,7 @@ char   **kex_buf2prop(Buffer *, int *);
 void	 kex_prop2buf(Buffer *, char *proposal[PROPOSAL_MAX]);
 void	 kex_prop_free(char **);
 
-void	 kex_send_kexinit(struct ssh *);
+int	 kex_send_kexinit(struct ssh *);
 int	 kex_input_kexinit(int, u_int32_t, struct ssh *);
 int	 kex_derive_keys(struct ssh *, u_char *, u_int, BIGNUM *);
 

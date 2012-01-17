@@ -104,6 +104,7 @@
 #include "match.h"
 #include "msg.h"
 #include "roaming.h"
+#include "err.h"
 
 /* import options */
 extern Options options;
@@ -1380,7 +1381,7 @@ client_loop(int have_pty, int escape_char_arg, int ssh2_chan_id)
 {
 	fd_set *readset = NULL, *writeset = NULL;
 	double start_time, total_time;
-	int max_fd = 0, max_fd2 = 0, len, rekeying = 0;
+	int r, max_fd = 0, max_fd2 = 0, len, rekeying = 0;
 	u_int64_t ibytes, obytes;
 	u_int nalloc = 0;
 	char buf[100];
@@ -1511,7 +1512,10 @@ client_loop(int have_pty, int escape_char_arg, int ssh2_chan_id)
 			if (need_rekeying || packet_need_rekeying()) {
 				debug("need rekeying");
 				active_state->kex->done = 0;
-				kex_send_kexinit(active_state);
+				if ((r = kex_send_kexinit(active_state)) != 0) {
+					fatal("%s: kex_send_kexinit: %s",
+					    __func__, ssh_err(r));
+				}
 				need_rekeying = 0;
 			}
 		}

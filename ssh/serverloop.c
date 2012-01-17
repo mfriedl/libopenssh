@@ -77,6 +77,7 @@
 #include "serverloop.h"
 #include "misc.h"
 #include "roaming.h"
+#include "err.h"
 
 extern ServerOptions options;
 
@@ -787,7 +788,7 @@ void
 server_loop2(Authctxt *authctxt)
 {
 	fd_set *readset = NULL, *writeset = NULL;
-	int rekeying = 0, max_fd, nalloc = 0;
+	int r, rekeying = 0, max_fd, nalloc = 0;
 
 	debug("Entering interactive session for SSH2.");
 
@@ -832,7 +833,10 @@ server_loop2(Authctxt *authctxt)
 			if (packet_need_rekeying()) {
 				debug("need rekeying");
 				active_state->kex->done = 0;
-				kex_send_kexinit(active_state);
+				if ((r = kex_send_kexinit(active_state)) != 0) {
+					fatal("%s: kex_send_kexinit: %s",
+					    __func__, ssh_err(r));
+				}
 			}
 		}
 		process_input(readset);
