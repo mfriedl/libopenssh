@@ -99,7 +99,6 @@ void     ssh_packet_send(struct ssh *);
 int	 ssh_packet_send1(struct ssh *);
 int	 ssh_packet_send2_wrapped(struct ssh *);
 int	 ssh_packet_send2(struct ssh *);
-void	ssh_packet_enable_delayed_compress(struct ssh *);
 
 int      ssh_packet_read(struct ssh *);
 void     ssh_packet_read_expect(struct ssh *, int type);
@@ -123,7 +122,7 @@ const void *ssh_packet_get_string_ptr(struct ssh *, u_int *length_ptr);
 void     ssh_packet_disconnect(struct ssh *, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 void     ssh_packet_send_debug(struct ssh *, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 
-void	 ssh_set_newkeys(struct ssh *, int mode);
+int	 ssh_set_newkeys(struct ssh *, int mode);
 int	 ssh_packet_get_keyiv_len(struct ssh *, int);
 void	 ssh_packet_get_keyiv(struct ssh *, int, u_char *, u_int);
 int	 ssh_packet_get_keycontext(struct ssh *, int, u_char *);

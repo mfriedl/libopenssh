@@ -1429,8 +1429,9 @@ monitor_apply_keystate(struct monitor *pmonitor)
 	int r;
 
 	if (compat20) {
-		set_newkeys(MODE_IN);
-		set_newkeys(MODE_OUT);
+		if ((r = set_newkeys(MODE_IN)) != 0 ||
+		    (r = set_newkeys(MODE_OUT)) != 0)
+			fatal("%s: set_newkeys: %s", __func__, ssh_err(r));
 	} else {
 		packet_set_protocol_flags(child_state.ssh1protoflags);
 		packet_set_encryption_key(child_state.ssh1key,
