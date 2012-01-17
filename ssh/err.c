@@ -83,6 +83,16 @@ ssh_err(int n)
 		return "disconnected";
 	case SSH_ERR_MAC_INVALID:
 		return "message authentication code incorrect";
+	case SSH_ERR_NO_CIPHER_ALG_MATCH:
+		return "no matching cipher found";
+	case SSH_ERR_NO_MAC_ALG_MATCH:
+		return "no matching MAC found";
+	case SSH_ERR_NO_COMPRESS_ALG_MATCH:
+		return "no matching compression method found";
+	case SSH_ERR_NO_KEX_ALG_MATCH:
+		return "no matching key exchange method found";
+	case SSH_ERR_NO_HOSTKEY_ALG_MATCH:
+		return "no matching host key type found";
 	default:
 		return "unknown error";
 	}

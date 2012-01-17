@@ -44,6 +44,7 @@
 #include "canohost.h"
 #include "hostfile.h"
 #include "auth.h"
+#include "err.h"
 
 /* Session id for the current session. */
 u_char session_id[16];
@@ -476,7 +477,7 @@ try_password_authentication(char *prompt)
 void
 ssh_kex(char *host, struct sockaddr *hostaddr)
 {
-	int i;
+	int i, r;
 	BIGNUM *key;
 	struct sshkey *host_key, *server_key;
 	int bits, rbits;
@@ -539,7 +540,9 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 
 	client_flags = SSH_PROTOFLAG_SCREEN_NUMBER | SSH_PROTOFLAG_HOST_IN_FWD_OPEN;
 
-	derive_ssh1_session_id(host_key->rsa->n, server_key->rsa->n, cookie, session_id);
+	if ((r = derive_ssh1_session_id(host_key->rsa->n, server_key->rsa->n,
+	    cookie, session_id)) != 0)
+		fatal("derive_ssh1_session_id: %s", ssh_err(r));
 
 	/* Generate a session key. */
 	arc4random_stir();

@@ -51,6 +51,11 @@
 #define SSH_ERR_DH_GEX_OUT_OF_RANGE		-27
 #define SSH_ERR_DISCONNECTED			-28
 #define SSH_ERR_MAC_INVALID			-29
+#define SSH_ERR_NO_CIPHER_ALG_MATCH		-30
+#define SSH_ERR_NO_MAC_ALG_MATCH		-31
+#define SSH_ERR_NO_COMPRESS_ALG_MATCH		-32
+#define SSH_ERR_NO_KEX_ALG_MATCH		-33
+#define SSH_ERR_NO_HOSTKEY_ALG_MATCH		-34
 
 /* Translate a numeric error code to a human-readable error string */
 const char *ssh_err(int n);
