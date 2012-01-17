@@ -1322,7 +1322,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 		logit("outgoing seqnr wraps around");
 	if (++state->p_send.packets == 0)
 		if (!(ssh->datafellows & SSH_BUG_NOREKEY))
-			fatal("XXX too many packets with same key");
+			return SSH_ERR_INTERNAL_ERROR;	/* XXX */
 	state->p_send.blocks += (packet_length + 4) / block_size;
 	state->p_send.bytes += packet_length + 4;
 	sshbuf_reset(state->outgoing_packet);
@@ -1742,7 +1742,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		    mac->mac_len) != 0) {
 			logit("Corrupted MAC on input.");
 			if (need > PACKET_MAX_SIZE)
-				fatal("internal error need %d", need);
+				return SSH_ERR_INTERNAL_ERROR;
 			return ssh_packet_start_discard(ssh, enc, mac,
 			    state->packlen, PACKET_MAX_SIZE - need);
 		}
@@ -1758,7 +1758,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		logit("incoming seqnr wraps around");
 	if (++state->p_read.packets == 0)
 		if (!(ssh->datafellows & SSH_BUG_NOREKEY))
-			fatal("XXX too many packets with same key");
+			return SSH_ERR_INTERNAL_ERROR;	/* XXX */
 	state->p_read.blocks += (state->packlen + 4) / block_size;
 	state->p_read.bytes += state->packlen + 4;
 
