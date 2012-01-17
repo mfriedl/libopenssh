@@ -140,7 +140,7 @@ Kex	*kex_setup(struct ssh *, char *[PROPOSAL_MAX]);
 int	 kex_finish(struct ssh *);
 void	 kex_free(Kex *);
 
-char   **kex_buf2prop(Buffer *, int *);
+int	 kex_buf2prop(Buffer *, int *, char ***);
 void	 kex_prop2buf(Buffer *, char *proposal[PROPOSAL_MAX]);
 void	 kex_prop_free(char **);
 
@@ -172,7 +172,7 @@ kex_ecdh_hash(const EVP_MD *, const EC_GROUP *, char *, char *, char *, size_t,
 int	kex_ecdh_name_to_nid(const char *);
 const EVP_MD *kex_ecdh_name_to_evpmd(const char *);
 
-void
+int
 derive_ssh1_session_id(BIGNUM *, BIGNUM *, u_int8_t[8], u_int8_t[16]);
 
 #if defined(DEBUG_KEX) || defined(DEBUG_KEXDH) || defined(DEBUG_KEXECDH)

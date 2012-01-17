@@ -382,10 +382,11 @@ _ssh_order_hostkeyalgs(struct ssh *ssh)
 	char *orig, *avail, *oavail,*alg, *replace;
 	char **proposal;
 	size_t maxlen;
-	int ktype;
+	int ktype, r;
 
 	/* XXX we de-serialize ssh->kex->my, modify it, and change it */
-	proposal = kex_buf2prop(&ssh->kex->my, NULL);
+	if ((r = kex_buf2prop(&ssh->kex->my, NULL, &proposal)) != 0)
+		fatal("%s: kex_buf2prop (my): %s", __func__, ssh_err(r));
 	orig = proposal[PROPOSAL_SERVER_HOST_KEY_ALGS];
 	oavail = avail = xstrdup(orig);
 	maxlen = strlen(avail) + 1;

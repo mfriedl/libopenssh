@@ -1996,7 +1996,7 @@ ssh1_session_key(BIGNUM *session_key_int)
 static void
 do_ssh1_kex(void)
 {
-	int i, len;
+	int i, len, r;
 	int rsafail = 0;
 	BIGNUM *session_key_int;
 	u_char session_key[SSH_SESSION_KEY_LENGTH];
@@ -2106,10 +2106,11 @@ do_ssh1_kex(void)
 			BN_bn2bin(session_key_int,
 			    session_key + sizeof(session_key) - len);
 
-			derive_ssh1_session_id(
+			if ((r = derive_ssh1_session_id(
 			    sensitive_data.ssh1_host_key->rsa->n,
 			    sensitive_data.server_key->rsa->n,
-			    cookie, session_id);
+			    cookie, session_id)) != 0)
+				fatal("derive_ssh1_session_id: %s", ssh_err(r));
 			/*
 			 * Xor the first 16 bytes of the session key with the
 			 * session id.
