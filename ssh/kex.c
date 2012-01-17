@@ -82,7 +82,7 @@ kex_names_valid(const char *names)
 }
 
 /* put algorithm proposal into buffer */
-static void
+void
 kex_prop2buf(Buffer *b, char *proposal[PROPOSAL_MAX])
 {
 	u_int i;
@@ -101,7 +101,7 @@ kex_prop2buf(Buffer *b, char *proposal[PROPOSAL_MAX])
 }
 
 /* parse buffer and return algorithm proposal */
-static char **
+char **
 kex_buf2prop(Buffer *raw, int *first_kex_follows)
 {
 	Buffer b;
@@ -131,7 +131,7 @@ kex_buf2prop(Buffer *raw, int *first_kex_follows)
 	return proposal;
 }
 
-static void
+void
 kex_prop_free(char **proposal)
 {
 	u_int i;
@@ -260,6 +260,14 @@ kex_new(struct ssh *ssh, char *proposal[PROPOSAL_MAX])
 	kex_reset_dispatch(ssh);
 
 	return kex;
+}
+
+void
+kex_free(Kex *kex)
+{
+	buffer_free(&kex->peer);
+	buffer_free(&kex->my);
+	xfree(kex);
 }
 
 Kex *

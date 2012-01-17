@@ -1,4 +1,9 @@
-% test -f /tmp/hk2 || ssh-keygen -N '' -t ecdsa -f  /tmp/hk2
-% ssh-keyscan -t ecdsa 127.0.0.1 | sed 's/^[^ ]* //'  > /tmp/hk.pub
-% ./ssh-proxy/obj/ssh-proxy -f -S /tmp/hk2 -C /tmp/hk.pub -L 127.0.0.1:12345:127.0.0.1:22 -d
-% ssh -o hostkeyalgorithms'='ecdsa-sha2-nistp256 -o hostkeyalias'='egal2 -v 127.0.0.1 -p 12345
+# example usage of proxy:
+# generate hostkey
+test -f /tmp/hk2 || ssh-keygen -N '' -t ecdsa -f  /tmp/hk2
+# get known hostkey for target (127.0.0.1:22)
+ssh-keyscan -t ecdsa 127.0.0.1 | sed 's/^[^ ]* //'  > /tmp/hk.pub
+# start proxy in foreground, enable packet dumping (except auth-requests)
+./ssh-proxy/obj/ssh-proxy -S /tmp/hk2 -C /tmp/hk.pub -L 127.0.0.1:12345:127.0.0.1:22 -dDf
+# connect
+ssh -o hostkeyalias'='egal2 -v 127.0.0.1 -p 12345
