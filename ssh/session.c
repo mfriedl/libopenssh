@@ -83,6 +83,7 @@
 #endif
 #include "monitor_wrap.h"
 #include "sftp.h"
+#include "err.h"
 
 #ifdef KRB5
 #include <kafs.h>
@@ -280,7 +281,7 @@ do_authenticated1(Authctxt *authctxt)
 {
 	Session *s;
 	char *command;
-	int success, type, screen_flag;
+	int r, success, type, screen_flag;
 	int enable_compression_after_reply = 0;
 	u_int proto_len, data_len, dlen, compression_level = 0;
 
@@ -416,7 +417,9 @@ do_authenticated1(Authctxt *authctxt)
 		/* Enable compression now that we have replied if appropriate. */
 		if (enable_compression_after_reply) {
 			enable_compression_after_reply = 0;
-			packet_start_compression(compression_level);
+			if ((r = packet_start_compression(compression_level)) != 0)
+				fatal("%s: packet_start_compression: %s",
+				    __func__, ssh_err(r));
 		}
 	}
 }
