@@ -189,39 +189,36 @@ kex_input_newkeys(int type, u_int32_t seq, struct ssh *ssh)
 	return 0;
 }
 
-void
+int
 kex_send_kexinit(struct ssh *ssh)
 {
-	u_int32_t rnd = 0;
 	u_char *cookie;
-	u_int i;
 	Kex *kex = ssh->kex;
+	int r;
 
-	if (kex == NULL) {
-		error("kex_send_kexinit: no kex, cannot rekey");
-		return;
-	}
-	if (kex->flags & KEX_INIT_SENT) {
-		debug("KEX_INIT_SENT");
-		return;
-	}
+	if (kex == NULL)
+		return SSH_ERR_INTERNAL_ERROR;
+	if (kex->flags & KEX_INIT_SENT)
+		return 0;
 	kex->done = 0;
 
 	/* generate a random cookie */
 	if (buffer_len(&kex->my) < KEX_COOKIE_LEN)
-		fatal("kex_send_kexinit: kex proposal too short");
-	cookie = buffer_ptr(&kex->my);
-	for (i = 0; i < KEX_COOKIE_LEN; i++) {
-		if (i % 4 == 0)
-			rnd = arc4random();
-		cookie[i] = rnd;
-		rnd >>= 8;
-	}
-	ssh_packet_start(ssh, SSH2_MSG_KEXINIT);
-	ssh_packet_put_raw(ssh, buffer_ptr(&kex->my), buffer_len(&kex->my));
-	ssh_packet_send(ssh);
+		return SSH_ERR_INVALID_FORMAT;
+	if ((cookie = sshbuf_ptr(&kex->my)) == NULL)
+		return SSH_ERR_INTERNAL_ERROR;
+	arc4random_buf(cookie, KEX_COOKIE_LEN);
+
+	if ((r = sshpkt_start(ssh, SSH2_MSG_KEXINIT)) != 0)
+		return r;
+	if ((r = sshpkt_put(ssh, buffer_ptr(&kex->my),
+	    buffer_len(&kex->my))) != 0)
+		return r;
+	if ((r = sshpkt_send(ssh)) != 0)
+		return r;
 	debug("SSH2_MSG_KEXINIT sent");
 	kex->flags |= KEX_INIT_SENT;
+	return 0;
 }
 
 /* ARGSUSED */
@@ -254,8 +251,10 @@ kex_input_kexinit(int type, u_int32_t seq, struct ssh *ssh)
 			return r;
 
 	/* XXX check error */
-	if (!(kex->flags & KEX_INIT_SENT))
-		kex_send_kexinit(ssh);
+	if (!(kex->flags & KEX_INIT_SENT)) {
+		if ((r = kex_send_kexinit(ssh)) != 0)
+			return r;
+	}
 	kex_choose_conf(ssh);
 
 	if (kex->kex_type >= 0 && kex->kex_type < KEX_MAX &&
@@ -296,7 +295,8 @@ Kex *
 kex_setup(struct ssh *ssh, char *proposal[PROPOSAL_MAX])
 {
 	ssh->kex = kex_new(ssh, proposal);
-	kex_send_kexinit(ssh);				/* we start */
+	if (kex_send_kexinit(ssh) != 0)		/* we start */
+		return NULL;	/* XXX */
 	return ssh->kex;
 }
 
