@@ -34,6 +34,7 @@ typedef void (test_onerror_func_t)(void *);
 /* Supplied by test suite */
 void tests(void);
 
+const char *test_data_file(const char *name);
 void test_start(const char *n);
 void set_onerror_func(test_onerror_func_t *f, void *ctx);
 void test_done(void);

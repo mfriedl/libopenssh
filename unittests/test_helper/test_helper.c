@@ -20,11 +20,13 @@
 #include <sys/types.h>
 #include <sys/param.h>
 
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <unistd.h>
 
 #include <openssl/bn.h>
 
@@ -101,14 +103,18 @@ static char *active_test_name = NULL;
 static u_int test_number = 0;
 static test_onerror_func_t *test_onerror = NULL;
 static void *onerror_ctx = NULL;
+static const char *data_dir = NULL;
 
 int
 main(int argc, char **argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "v")) != -1) {
+	while ((ch = getopt(argc, argv, "vd:")) != -1) {
 		switch (ch) {
+		case 'd':
+			data_dir = optarg;
+			break;
 		case 'v':
 			verbose_mode = 1;
 			break;
@@ -127,6 +133,23 @@ main(int argc, char **argv)
 
 	printf(" %u tests ok\n", test_number);
 	return 0;
+}
+
+const char *
+test_data_file(const char *name)
+{
+	static char ret[PATH_MAX];
+
+	if (data_dir != NULL)
+		snprintf(ret, sizeof(ret), "%s/%s", data_dir, name);
+	else
+		strlcpy(ret, name, sizeof(ret));
+	if (access(ret, F_OK) != 0) {
+		fprintf(stderr, "Cannot access data file %s: %s\n",
+		    ret, strerror(errno));
+		exit(1);
+	}
+	return ret;
 }
 
 void

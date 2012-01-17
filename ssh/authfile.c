@@ -83,7 +83,7 @@ key_private_rsa1_to_blob(struct sshkey *key, Buffer *blob,
 {
 	Buffer buffer, encrypted;
 	u_char buf[100], *cp;
-	int i, cipher_num;
+	int r, i, cipher_num;
 	CipherContext ciphercontext;
 	Cipher *cipher;
 	u_int32_t rnd;
@@ -143,11 +143,14 @@ key_private_rsa1_to_blob(struct sshkey *key, Buffer *blob,
 	/* Allocate space for the private part of the key in the buffer. */
 	cp = buffer_append_space(&encrypted, buffer_len(&buffer));
 
-	cipher_set_key_string(&ciphercontext, cipher, passphrase,
-	    CIPHER_ENCRYPT);
-	cipher_crypt(&ciphercontext, cp,
-	    buffer_ptr(&buffer), buffer_len(&buffer));
-	cipher_cleanup(&ciphercontext);
+	if ((r = cipher_set_key_string(&ciphercontext, cipher, passphrase,
+	    CIPHER_ENCRYPT)) != 0)
+		fatal("%s: cipher_set_key_string: %s", __func__, ssh_err(r));
+	if ((r = cipher_crypt(&ciphercontext, cp,
+	    buffer_ptr(&buffer), buffer_len(&buffer))) != 0)
+		fatal("%s: cipher_crypt: %s", __func__, ssh_err(r));
+	if ((r = cipher_cleanup(&ciphercontext)) != 0)
+		fatal("%s: cipher_cleanup: %s", __func__, ssh_err(r));
 	memset(&ciphercontext, 0, sizeof(ciphercontext));
 
 	/* Destroy temporary data. */
@@ -410,7 +413,7 @@ key_load_public_type(int type, const char *filename, char **commentp)
 static struct sshkey *
 key_parse_private_rsa1(Buffer *blob, const char *passphrase, char **commentp)
 {
-	int check1, check2, cipher_type;
+	int r, check1, check2, cipher_type;
 	Buffer decrypted;
 	u_char *cp;
 	CipherContext ciphercontext;
@@ -467,11 +470,14 @@ key_parse_private_rsa1(Buffer *blob, const char *passphrase, char **commentp)
 	cp = buffer_append_space(&decrypted, buffer_len(&copy));
 
 	/* Rest of the buffer is encrypted.  Decrypt it using the passphrase. */
-	cipher_set_key_string(&ciphercontext, cipher, passphrase,
-	    CIPHER_DECRYPT);
-	cipher_crypt(&ciphercontext, cp,
-	    buffer_ptr(&copy), buffer_len(&copy));
-	cipher_cleanup(&ciphercontext);
+	if ((r = cipher_set_key_string(&ciphercontext, cipher, passphrase,
+	    CIPHER_DECRYPT)) != 0)
+		fatal("%s: cipher_set_key_string: %s", __func__, ssh_err(r));
+	if ((r = cipher_crypt(&ciphercontext, cp,
+	    buffer_ptr(&copy), buffer_len(&copy))) != 0)
+		fatal("%s: cipher_crypt: %s", __func__, ssh_err(r));
+	if ((r = cipher_cleanup(&ciphercontext)) != 0)
+		fatal("%s: cipher_cleanup: %s", __func__, ssh_err(r));
 	memset(&ciphercontext, 0, sizeof(ciphercontext));
 	buffer_free(&copy);
 

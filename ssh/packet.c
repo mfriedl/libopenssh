@@ -55,10 +55,11 @@
 #include <unistd.h>
 #include <signal.h>
 
+#include <zlib.h>
+
 #include "xmalloc.h"
 #include "buffer.h"
 #include "crc32.h"
-#include "compress.h"
 #include "deattack.h"
 #include "channels.h"
 #include "compat.h"
@@ -74,6 +75,7 @@
 #include "ssh.h"
 #include "packet.h"
 #include "roaming.h"
+#include "err.h"
 
 #ifdef PACKET_DEBUG
 #define DBG(x) x
@@ -131,6 +133,14 @@ struct session_state {
 	Buffer compression_buffer;
 	int compression_buffer_ready;
 
+	/* Incoming/outgoing compression dictionaries */
+	z_stream compression_in_stream;
+	z_stream compression_out_stream;
+	int compression_in_started;
+	int compression_out_started;
+	int compression_in_failures;
+	int compression_out_failures;
+
 	/*
 	 * Flag indicating whether packet compression/decompression is
 	 * enabled.
@@ -187,6 +197,9 @@ struct session_state {
 	/* Used in packet_set_maxsize */
 	int set_maxsize_called;
 
+	/* One-off warning about weak ciphers */
+	int cipher_warning_done;
+
 	TAILQ_HEAD(, packet) outgoing;
 };
 
@@ -213,18 +226,20 @@ ssh_packet_set_connection(struct ssh *ssh, int fd_in, int fd_out)
 {
 	struct session_state *state;
 	Cipher *none = cipher_by_name("none");
+	int r;
 
 	if (none == NULL)
-		fatal("packet_set_connection: cannot load cipher 'none'");
+		fatal("%s: cannot load cipher 'none'", __func__);
 	if (ssh == NULL)
 		ssh = ssh_alloc_session_state();
 	state = ssh->state;
 	state->connection_in = fd_in;
 	state->connection_out = fd_out;
-	cipher_init(&state->send_context, none, (const u_char *)"",
-	    0, NULL, 0, CIPHER_ENCRYPT);
-	cipher_init(&state->receive_context, none, (const u_char *)"",
-	    0, NULL, 0, CIPHER_DECRYPT);
+	if ((r = cipher_init(&state->send_context, none,
+	    (const u_char *)"", 0, NULL, 0, CIPHER_ENCRYPT)) != 0 ||
+	    (r = cipher_init(&state->receive_context, none,
+	    (const u_char *)"", 0, NULL, 0, CIPHER_DECRYPT)) != 0)
+		fatal("%s: cipher_init failed: %s", __func__, ssh_err(r));
 	state->newkeys[MODE_IN] = state->newkeys[MODE_OUT] = NULL;
 	if (!state->initialized) {
 		state->initialized = 1;
@@ -271,8 +286,8 @@ ssh_packet_stop_discard(struct ssh *ssh)
 			    sizeof(buf));
 		(void) mac_compute(state->packet_discard_mac,
 		    state->p_read.seqnr,
-		    buffer_ptr(&state->incoming_packet),
-		    PACKET_MAX_SIZE);
+		    buffer_ptr(&state->incoming_packet), PACKET_MAX_SIZE,
+		    NULL, 0);
 	}
 	logit("Finished discarding for %.200s", get_remote_ipaddr());
 	cleanup_exit(255);
@@ -334,13 +349,15 @@ ssh_packet_get_keyiv(struct ssh *ssh, int mode, u_char *iv,
     u_int len)
 {
 	CipherContext *cc;
+	int r;
 
 	if (mode == MODE_OUT)
 		cc = &ssh->state->send_context;
 	else
 		cc = &ssh->state->receive_context;
 
-	cipher_get_keyiv(cc, iv, len);
+	if ((r = cipher_get_keyiv(cc, iv, len)) != 0)
+		fatal("%s: cipher_get_keyiv failed: %s", __func__, ssh_err(r));
 }
 
 int
@@ -386,13 +403,15 @@ void
 ssh_packet_set_iv(struct ssh *ssh, int mode, u_char *dat)
 {
 	CipherContext *cc;
+	int r;
 
 	if (mode == MODE_OUT)
 		cc = &ssh->state->send_context;
 	else
 		cc = &ssh->state->receive_context;
 
-	cipher_set_keyiv(cc, dat);
+	if ((r = cipher_set_keyiv(cc, dat)) != 0)
+		fatal("%s: cipher_set_keyiv failed: %s", __func__, ssh_err(r));
 }
 
 int
@@ -432,6 +451,97 @@ ssh_packet_set_state(struct ssh *ssh, int mode, u_int32_t seqnr, u_int64_t block
 	pstate->packets = packets;
 	pstate->bytes = bytes;
 }
+
+/* Serialise compression state into a blob for privsep */
+int
+ssh_packet_get_compress_state(struct ssh *ssh, u_char **blob, u_int *len)
+{
+	struct session_state *state = ssh->state;
+	struct sshbuf *m;
+	int r;
+
+	*blob = NULL;
+	*len = 0;
+	if ((m = sshbuf_new()) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if (state->compression_in_started) {
+		if ((r = sshbuf_put_string(m, &state->compression_in_stream,
+		    sizeof(state->compression_in_stream))) != 0)
+			goto out;
+	} else if ((r = sshbuf_put_string(m, NULL, 0)) != 0)
+		goto out;
+	if (state->compression_out_started) {
+		if ((r = sshbuf_put_string(m, &state->compression_out_stream,
+		    sizeof(state->compression_out_stream))) != 0)
+			goto out;
+	} else if ((r = sshbuf_put_string(m, NULL, 0)) != 0)
+		goto out;
+	if ((*blob = malloc(sshbuf_len(m))) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
+	memcpy(*blob, sshbuf_ptr(m), sshbuf_len(m));
+	*len = sshbuf_len(m);
+	r = 0;
+ out:
+	sshbuf_free(m);
+	return r;
+}
+
+/* Deserialise compression state from a blob for privsep */
+int
+ssh_packet_set_compress_state(struct ssh *ssh, u_char *blob, u_int len)
+{
+	struct session_state *state = ssh->state;
+	struct sshbuf *m;
+	int r;
+	const u_char *inblob, *outblob;
+	size_t inl, outl;
+
+	if ((m = sshbuf_new()) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if ((r = sshbuf_put(m, blob, len)) != 0)
+		goto out;
+	if ((r = sshbuf_get_string_direct(m, &inblob, &inl)) != 0 ||
+	    (r = sshbuf_get_string_direct(m, &outblob, &outl)) != 0)
+		goto out;
+	if (inl == 0)
+		state->compression_in_started = 0;
+	else if (inl != sizeof(state->compression_in_stream)) {
+		r = SSH_ERR_INTERNAL_ERROR;
+		goto out;
+	} else {
+		state->compression_in_started = 1;
+		memcpy(&state->compression_in_stream, inblob, inl);
+	}
+	if (outl == 0)
+		state->compression_out_started = 0;
+	else if (outl != sizeof(state->compression_out_stream)) {
+		r = SSH_ERR_INTERNAL_ERROR;
+		goto out;
+	} else {
+		state->compression_out_started = 1;
+		memcpy(&state->compression_out_stream, outblob, outl);
+	}
+	r = 0;
+ out:
+	sshbuf_free(m);
+	return r;
+}
+
+void
+ssh_packet_set_compress_hooks(struct ssh *ssh, void *ctx,
+    void *(*allocfunc)(void *, u_int, u_int),
+    void (*freefunc)(void *, void *))
+{
+	ssh->state->compression_out_stream.zalloc = (alloc_func)allocfunc;
+	ssh->state->compression_out_stream.zfree = (free_func)freefunc;
+	ssh->state->compression_out_stream.opaque = ctx;
+	ssh->state->compression_in_stream.zalloc = (alloc_func)allocfunc;
+	ssh->state->compression_in_stream.zfree = (free_func)freefunc;
+	ssh->state->compression_in_stream.opaque = ctx;
+}
+
 
 int
 ssh_packet_connection_af(struct ssh *ssh)
@@ -480,6 +590,7 @@ void
 ssh_packet_close(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
+	int r;
 
 	if (!state->initialized)
 		return;
@@ -497,10 +608,33 @@ ssh_packet_close(struct ssh *ssh)
 	buffer_free(&state->incoming_packet);
 	if (state->compression_buffer_ready) {
 		buffer_free(&state->compression_buffer);
-		buffer_compress_uninit();
+
+		if (ssh->state->compression_out_started) {
+			z_streamp stream = &state->compression_out_stream;
+			debug("compress outgoing: "
+			    "raw data %llu, compressed %llu, factor %.2f",
+		    		(unsigned long long)stream->total_in,
+		    		(unsigned long long)stream->total_out,
+		    		stream->total_in == 0 ? 0.0 :
+		    		(double) stream->total_out / stream->total_in);
+			if (ssh->state->compression_out_failures == 0)
+				deflateEnd(stream);
+		}
+		if (ssh->state->compression_in_started) {
+			z_streamp stream = &state->compression_out_stream;
+			debug("compress incoming: "
+			    "raw data %llu, compressed %llu, factor %.2f",
+			    (unsigned long long)stream->total_out,
+			    (unsigned long long)stream->total_in,
+			    stream->total_out == 0 ? 0.0 :
+			    (double) stream->total_in / stream->total_out);
+			if (ssh->state->compression_in_failures == 0)
+				inflateEnd(stream);
+		}
 	}
-	cipher_cleanup(&state->send_context);
-	cipher_cleanup(&state->receive_context);
+	if ((r = cipher_cleanup(&state->send_context)) != 0 ||
+	    (r = cipher_cleanup(&state->receive_context)) != 0)
+		fatal("%s: cipher_cleanup failed: %s", __func__, ssh_err(r));
 }
 
 /* Sets remote side protocol flags. */
@@ -533,6 +667,27 @@ ssh_packet_init_compression(struct ssh *ssh)
 	buffer_init(&ssh->state->compression_buffer);
 }
 
+static void
+start_compression_out(struct ssh *ssh, int level)
+{
+	if (level < 1 || level > 9)
+		fatal("Bad compression level %d.", level);
+	debug("Enabling compression at level %d.", level);
+	if (ssh->state->compression_out_started == 1)
+		deflateEnd(&ssh->state->compression_out_stream);
+	ssh->state->compression_out_started = 1;
+	deflateInit(&ssh->state->compression_out_stream, level);
+}
+
+static void
+start_compression_in(struct ssh *ssh)
+{
+	if (ssh->state->compression_in_started == 1)
+		inflateEnd(&ssh->state->compression_in_stream);
+	ssh->state->compression_in_started = 1;
+	inflateInit(&ssh->state->compression_in_stream);
+}
+
 void
 ssh_packet_start_compression(struct ssh *ssh, int level)
 {
@@ -540,8 +695,99 @@ ssh_packet_start_compression(struct ssh *ssh, int level)
 		fatal("Compression already enabled.");
 	ssh->state->packet_compression = 1;
 	ssh_packet_init_compression(ssh);
-	buffer_compress_init_send(level);
-	buffer_compress_init_recv();
+
+	start_compression_in(ssh);
+	start_compression_out(ssh, level);
+}
+
+/* XXX remove need for separate compression buffer */
+static int
+compress_buffer(struct ssh *ssh, struct sshbuf *in, struct sshbuf *out)
+{
+	u_char buf[4096];
+	int r, status;
+
+	if (ssh->state->compression_out_started != 1)
+		return SSH_ERR_INTERNAL_ERROR;
+
+	/* This case is not handled below. */
+	if (sshbuf_len(in) == 0)
+		return 0;
+
+	/* Input is the contents of the input buffer. */
+	ssh->state->compression_out_stream.next_in = sshbuf_ptr(in);
+	ssh->state->compression_out_stream.avail_in = sshbuf_len(in);
+
+	/* Loop compressing until deflate() returns with avail_out != 0. */
+	do {
+		/* Set up fixed-size output buffer. */
+		ssh->state->compression_out_stream.next_out = buf;
+		ssh->state->compression_out_stream.avail_out = sizeof(buf);
+
+		/* Compress as much data into the buffer as possible. */
+		status = deflate(&ssh->state->compression_out_stream,
+		    Z_PARTIAL_FLUSH);
+		switch (status) {
+		case Z_MEM_ERROR:
+			return SSH_ERR_ALLOC_FAIL;
+		case Z_OK:
+			/* Append compressed data to output_buffer. */
+			if ((r = sshbuf_put(out, buf, sizeof(buf) -
+			    ssh->state->compression_out_stream.avail_out)) != 0)
+				return r;
+			break;
+		case Z_STREAM_ERROR:
+		default:
+			ssh->state->compression_out_failures++;
+			return SSH_ERR_INVALID_FORMAT;
+		}
+	} while (ssh->state->compression_out_stream.avail_out == 0);
+	return 0;
+}
+
+static int
+uncompress_buffer(struct ssh *ssh, struct sshbuf *in, struct sshbuf *out)
+{
+	u_char buf[4096];
+	int r, status;
+
+	if (ssh->state->compression_in_started != 1)
+		return SSH_ERR_INTERNAL_ERROR;
+
+	ssh->state->compression_in_stream.next_in = sshbuf_ptr(in);
+	ssh->state->compression_in_stream.avail_in = sshbuf_len(in);
+
+	for (;;) {
+		/* Set up fixed-size output buffer. */
+		ssh->state->compression_in_stream.next_out = buf;
+		ssh->state->compression_in_stream.avail_out = sizeof(buf);
+
+		status = inflate(&ssh->state->compression_in_stream,
+		    Z_PARTIAL_FLUSH);
+		switch (status) {
+		case Z_OK:
+			if ((r = sshbuf_put(out, buf, sizeof(buf) -
+			    ssh->state->compression_in_stream.avail_out)) != 0)
+				return r;
+			break;
+		case Z_BUF_ERROR:
+			/*
+			 * Comments in zlib.h say that we should keep calling
+			 * inflate() until we get an error.  This appears to
+			 * be the error that we get.
+			 */
+			return 0;
+		case Z_DATA_ERROR:
+			return SSH_ERR_INVALID_FORMAT;
+		case Z_MEM_ERROR:
+			return SSH_ERR_ALLOC_FAIL;
+		case Z_STREAM_ERROR:
+		default:
+			ssh->state->compression_in_failures++;
+			return SSH_ERR_INTERNAL_ERROR;
+		}
+	}
+	/* NOTREACHED */
 }
 
 /*
@@ -555,19 +801,28 @@ ssh_packet_set_encryption_key(struct ssh *ssh, const u_char *key, u_int keylen, 
 {
 	struct session_state *state = ssh->state;
 	Cipher *cipher = cipher_by_number(number);
+	int r;
+	const char *wmsg;
 
 	if (cipher == NULL)
-		fatal("packet_set_encryption_key: unknown cipher number %d", number);
+		fatal("%s: unknown cipher number %d", __func__, number);
 	if (keylen < 20)
-		fatal("packet_set_encryption_key: keylen too small: %d", keylen);
+		fatal("%s: keylen too small: %d", __func__, keylen);
 	if (keylen > SSH_SESSION_KEY_LENGTH)
-		fatal("packet_set_encryption_key: keylen too big: %d", keylen);
+		fatal("%s: keylen too big: %d", __func__, keylen);
 	memcpy(state->ssh1_key, key, keylen);
 	state->ssh1_keylen = keylen;
-	cipher_init(&state->send_context, cipher, key, keylen, NULL,
-	    0, CIPHER_ENCRYPT);
-	cipher_init(&state->receive_context, cipher, key, keylen, NULL,
-	    0, CIPHER_DECRYPT);
+	if ((r = cipher_init(&state->send_context, cipher, key, keylen,
+	    NULL, 0, CIPHER_ENCRYPT)) != 0 ||
+	    (r = cipher_init(&state->receive_context, cipher, key, keylen,
+	    NULL, 0, CIPHER_DECRYPT) != 0))
+		fatal("%s: cipher_init failed: %s", __func__, ssh_err(r));
+	if (!state->cipher_warning_done &&
+	    ((wmsg = cipher_warning_message(&state->send_context)) != NULL ||
+	    (wmsg = cipher_warning_message(&state->send_context)) != NULL)) {
+		error("Warning: %s", wmsg);
+		state->cipher_warning_done = 1;
+	}
 }
 
 u_int
@@ -661,7 +916,7 @@ ssh_packet_send1(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
 	u_char buf[8], *cp;
-	int i, padding, len;
+	int r, i, padding, len;
 	u_int checksum;
 	u_int32_t rnd = 0;
 
@@ -676,8 +931,9 @@ ssh_packet_send1(struct ssh *ssh)
 		/* padding */
 		buffer_append(&state->compression_buffer,
 		    "\0\0\0\0\0\0\0\0", 8);
-		buffer_compress(&state->outgoing_packet,
-		    &state->compression_buffer);
+		if ((r = compress_buffer(ssh, &state->outgoing_packet,
+		    &state->compression_buffer)) != 0)
+			fatal("%s: compress_buffer: %s", __func__, ssh_err(r));
 		buffer_clear(&state->outgoing_packet);
 		buffer_append(&state->outgoing_packet,
 		    buffer_ptr(&state->compression_buffer),
@@ -715,9 +971,10 @@ ssh_packet_send1(struct ssh *ssh)
 	buffer_append(&state->output, buf, 4);
 	cp = buffer_append_space(&state->output,
 	    buffer_len(&state->outgoing_packet));
-	cipher_crypt(&state->send_context, cp,
+	if ((r = cipher_crypt(&state->send_context, cp,
 	    buffer_ptr(&state->outgoing_packet),
-	    buffer_len(&state->outgoing_packet));
+	    buffer_len(&state->outgoing_packet))) != 0)
+		fatal("%s: cipher_crypt failed: %s", __func__, ssh_err(r));
 
 #ifdef PACKET_DEBUG
 	fprintf(stderr, "encrypted: ");
@@ -744,7 +1001,8 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	Comp *comp;
 	CipherContext *cc;
 	u_int64_t *max_blocks;
-	int crypt_type;
+	int crypt_type, r;
+	const char *wmsg;
 
 	debug2("set_newkeys: mode %d", mode);
 
@@ -761,7 +1019,9 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	}
 	if (state->newkeys[mode] != NULL) {
 		debug("set_newkeys: rekeying");
-		cipher_cleanup(cc);
+		if ((r = cipher_cleanup(cc)) != 0)
+			fatal("%s: cipher_cleanup failed: %s",
+			    __func__, ssh_err(r));
 		enc  = &state->newkeys[mode]->enc;
 		mac  = &state->newkeys[mode]->mac;
 		comp = &state->newkeys[mode]->comp;
@@ -780,11 +1040,18 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	enc  = &state->newkeys[mode]->enc;
 	mac  = &state->newkeys[mode]->mac;
 	comp = &state->newkeys[mode]->comp;
-	if (mac_init(mac) == 0)
-		mac->enabled = 1;
+	if ((r = mac_init(mac)) != 0)
+		fatal("newkeys: mac_init_failed: %s", ssh_err(r));
+	mac->enabled = 1;
 	DBG(debug("cipher_init_context: %d", mode));
-	cipher_init(cc, enc->cipher, enc->key, enc->key_len,
-	    enc->iv, enc->block_size, crypt_type);
+	if ((r = cipher_init(cc, enc->cipher, enc->key, enc->key_len,
+	    enc->iv, enc->block_size, crypt_type)) != 0)
+		fatal("%s: cipher_init failed: %s", __func__, ssh_err(r));
+	if (!state->cipher_warning_done &&
+	    (wmsg = cipher_warning_message(cc)) != NULL) {
+		error("Warning: %s", wmsg);
+		state->cipher_warning_done = 1;
+	}
 	/* Deleting the keys does not gain extra security */
 	/* memset(enc->iv,  0, enc->block_size);
 	   memset(enc->key, 0, enc->key_len);
@@ -794,9 +1061,9 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	     state->after_authentication)) && comp->enabled == 0) {
 		ssh_packet_init_compression(ssh);
 		if (mode == MODE_OUT)
-			buffer_compress_init_send(6);
+			start_compression_out(ssh, 6);
 		else
-			buffer_compress_init_recv();
+			start_compression_in(ssh);
 		comp->enabled = 1;
 	}
 	/*
@@ -837,9 +1104,9 @@ ssh_packet_enable_delayed_compress(struct ssh *ssh)
 		if (comp && !comp->enabled && comp->type == COMP_DELAYED) {
 			ssh_packet_init_compression(ssh);
 			if (mode == MODE_OUT)
-				buffer_compress_init_send(6);
+				start_compression_out(ssh, 6);
 			else
-				buffer_compress_init_recv();
+				start_compression_in(ssh);
 			comp->enabled = 1;
 		}
 	}
@@ -852,7 +1119,7 @@ void
 ssh_packet_send2_wrapped(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
-	u_char type, *cp, *macbuf = NULL;
+	u_char type, *cp, macbuf[MAC_DIGEST_LEN_MAX];
 	u_char padlen, pad;
 	u_int packet_length = 0;
 	u_int i, len;
@@ -860,7 +1127,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	Enc *enc   = NULL;
 	Mac *mac   = NULL;
 	Comp *comp = NULL;
-	int block_size;
+	int r, block_size;
 
 	if (state->newkeys[MODE_OUT] != NULL) {
 		enc  = &state->newkeys[MODE_OUT]->enc;
@@ -882,8 +1149,9 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 		/* skip header, compress only payload */
 		buffer_consume(&state->outgoing_packet, 5);
 		buffer_clear(&state->compression_buffer);
-		buffer_compress(&state->outgoing_packet,
-		    &state->compression_buffer);
+		if ((r = compress_buffer(ssh, &state->outgoing_packet,
+		    &state->compression_buffer)) != 0)
+			fatal("%s: compress_buffer: %s", __func__, ssh_err(r));
 		buffer_clear(&state->outgoing_packet);
 		buffer_append(&state->outgoing_packet, "\0\0\0\0\0", 5);
 		buffer_append(&state->outgoing_packet,
@@ -936,17 +1204,20 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 
 	/* compute MAC over seqnr and packet(length fields, payload, padding) */
 	if (mac && mac->enabled) {
-		macbuf = mac_compute(mac, state->p_send.seqnr,
+		if ((r = mac_compute(mac, state->p_send.seqnr,
 		    buffer_ptr(&state->outgoing_packet),
-		    buffer_len(&state->outgoing_packet));
+		    buffer_len(&state->outgoing_packet),
+		    macbuf, sizeof(macbuf))) != 0)
+			fatal("send: mac_compute: %s", ssh_err(r));
 		DBG(debug("done calc MAC out #%d", state->p_send.seqnr));
 	}
 	/* encrypt packet and append to output buffer. */
 	cp = buffer_append_space(&state->output,
 	    buffer_len(&state->outgoing_packet));
-	cipher_crypt(&state->send_context, cp,
+	if ((r = cipher_crypt(&state->send_context, cp,
 	    buffer_ptr(&state->outgoing_packet),
-	    buffer_len(&state->outgoing_packet));
+	    buffer_len(&state->outgoing_packet))) != 0)
+		fatal("%s: cipher_crypt failed: %s", __func__, ssh_err(r));
 	/* append unencrypted MAC */
 	if (mac && mac->enabled)
 		buffer_append(&state->output, macbuf, mac->mac_len);
@@ -1160,6 +1431,7 @@ ssh_packet_read_poll1(struct ssh *ssh)
 	u_int len, padded_len;
 	u_char *cp, type;
 	u_int checksum, stored_checksum;
+	int r;
 
 	/* Check if input size is less than minimum packet size. */
 	if (buffer_len(&state->input) < 4 + 8)
@@ -1202,8 +1474,9 @@ ssh_packet_read_poll1(struct ssh *ssh)
 	/* Decrypt data to incoming_packet. */
 	buffer_clear(&state->incoming_packet);
 	cp = buffer_append_space(&state->incoming_packet, padded_len);
-	cipher_crypt(&state->receive_context, cp,
-	    buffer_ptr(&state->input), padded_len);
+	if ((r = cipher_crypt(&state->receive_context, cp,
+	    buffer_ptr(&state->input), padded_len)) != 0)
+		fatal("%s: cipher_crypt failed: %s", __func__, ssh_err(r));
 
 	buffer_consume(&state->input, padded_len);
 
@@ -1234,8 +1507,10 @@ ssh_packet_read_poll1(struct ssh *ssh)
 
 	if (state->packet_compression) {
 		buffer_clear(&state->compression_buffer);
-		buffer_uncompress(&state->incoming_packet,
-		    &state->compression_buffer);
+		if ((r = uncompress_buffer(ssh, &state->incoming_packet,
+		    &state->compression_buffer)) != 0)
+			fatal("%s: uncompress_buffer: %s",
+			    __func__, ssh_err(r));
 		buffer_clear(&state->incoming_packet);
 		buffer_append(&state->incoming_packet,
 		    buffer_ptr(&state->compression_buffer),
@@ -1255,11 +1530,12 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 {
 	struct session_state *state = ssh->state;
 	u_int padlen, need;
-	u_char *macbuf, *cp, type;
+	u_char macbuf[MAC_DIGEST_LEN_MAX], *cp, type;
 	u_int maclen, block_size;
 	Enc *enc   = NULL;
 	Mac *mac   = NULL;
 	Comp *comp = NULL;
+	int r;
 
 	if (state->packet_discard)
 		return SSH_MSG_NONE;
@@ -1282,8 +1558,10 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 		buffer_clear(&state->incoming_packet);
 		cp = buffer_append_space(&state->incoming_packet,
 		    block_size);
-		cipher_crypt(&state->receive_context, cp,
-		    buffer_ptr(&state->input), block_size);
+		if ((r = cipher_crypt(&state->receive_context, cp,
+		    buffer_ptr(&state->input), block_size)) != 0)
+			fatal("%s: cipher_crypt failed: %s",
+			    __func__, ssh_err(r));
 		cp = buffer_ptr(&state->incoming_packet);
 		state->packlen = get_u32(cp);
 		if (state->packlen < 1 + 4 ||
@@ -1321,17 +1599,20 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 	buffer_dump(&state->input);
 #endif
 	cp = buffer_append_space(&state->incoming_packet, need);
-	cipher_crypt(&state->receive_context, cp,
-	    buffer_ptr(&state->input), need);
+	if ((r = cipher_crypt(&state->receive_context, cp,
+	    buffer_ptr(&state->input), need)) != 0)
+		fatal("%s: cipher_crypt failed: %s", __func__, ssh_err(r));
 	buffer_consume(&state->input, need);
 	/*
 	 * compute MAC over seqnr and packet,
 	 * increment sequence number for incoming packet
 	 */
 	if (mac && mac->enabled) {
-		macbuf = mac_compute(mac, state->p_read.seqnr,
+		if ((r = mac_compute(mac, state->p_read.seqnr,
 		    buffer_ptr(&state->incoming_packet),
-		    buffer_len(&state->incoming_packet));
+		    buffer_len(&state->incoming_packet),
+		    macbuf, sizeof(macbuf))) != 0)
+			fatal("%s: mac_compute: %s", __func__, ssh_err(r));
 		if (timingsafe_bcmp(macbuf, buffer_ptr(&state->input),
 		    mac->mac_len) != 0) {
 			logit("Corrupted MAC on input.");
@@ -1372,8 +1653,10 @@ ssh_packet_read_poll2(struct ssh *ssh, u_int32_t *seqnr_p)
 	    buffer_len(&state->incoming_packet)));
 	if (comp && comp->enabled) {
 		buffer_clear(&state->compression_buffer);
-		buffer_uncompress(&state->incoming_packet,
-		    &state->compression_buffer);
+		if ((r = uncompress_buffer(ssh, &state->incoming_packet,
+		    &state->compression_buffer)) != 0)
+			fatal("%s: uncompress_buffer: %s",
+			    __func__, ssh_err(r));
 		buffer_clear(&state->incoming_packet);
 		buffer_append(&state->incoming_packet,
 		    buffer_ptr(&state->compression_buffer),

@@ -27,8 +27,9 @@
 #define KEX_H
 
 #include <openssl/evp.h>
-#include <openssl/hmac.h>
 #include <openssl/ec.h>
+
+#include "mac.h"
 
 #define KEX_COOKIE_LEN	16
 
@@ -76,7 +77,7 @@ enum kex_exchange {
 #define KEX_INIT_SENT	0x0001
 
 typedef struct Kex Kex;
-typedef struct Mac Mac;
+typedef struct sshmac Mac;
 typedef struct Comp Comp;
 typedef struct Enc Enc;
 typedef struct Newkeys Newkeys;
@@ -89,17 +90,6 @@ struct Enc {
 	u_int	block_size;
 	u_char	*key;
 	u_char	*iv;
-};
-struct Mac {
-	char	*name;
-	int	enabled;
-	u_int	mac_len;
-	u_char	*key;
-	u_int	key_len;
-	int	type;
-	const EVP_MD	*evp_md;
-	HMAC_CTX	evp_ctx;
-	struct umac_ctx *umac_ctx;
 };
 struct Comp {
 	int	type;

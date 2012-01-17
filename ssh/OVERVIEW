@@ -65,8 +65,8 @@ these programs.
       packets.  CRC code comes from crc32.c.
 
     - The code in packet.c calls the buffer manipulation routines
-      (buffer.c, bufaux.c), compression routines (compress.c, zlib),
-      and the encryption routines.
+      (buffer.c, bufaux.c), compression routines (zlib), and the
+      encryption routines.
 
   X11, TCP/IP, and Agent forwarding
 
