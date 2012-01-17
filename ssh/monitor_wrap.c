@@ -74,8 +74,6 @@
 
 /* Imports */
 extern int compat20;
-extern z_stream incoming_stream;
-extern z_stream outgoing_stream;
 extern struct monitor *pmonitor;
 extern Buffer loginmsg;
 extern ServerOptions options;
@@ -595,6 +593,7 @@ mm_send_keystate(struct monitor *monitor)
 	u_int bloblen, plen;
 	u_int32_t seqnr, packets;
 	u_int64_t blocks, bytes;
+	int r;
 
 	buffer_init(&m);
 
@@ -672,8 +671,11 @@ mm_send_keystate(struct monitor *monitor)
 
 	/* Compression state */
 	debug3("%s: Sending compression state", __func__);
-	buffer_put_string(&m, &outgoing_stream, sizeof(outgoing_stream));
-	buffer_put_string(&m, &incoming_stream, sizeof(incoming_stream));
+	if ((r = packet_get_compress_state(&p, &plen)) != 0)
+		fatal("%s: packet_get_compress_state: %s",
+		    __func__, ssh_err(r));
+	buffer_put_string(&m, p, plen);
+	xfree(p);
 
 	/* Network I/O buffers */
 	input = (Buffer *)packet_get_input();

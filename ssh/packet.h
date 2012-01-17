@@ -135,6 +135,13 @@ int	 ssh_packet_get_ssh1_cipher(struct ssh *);
 void	 ssh_packet_set_iv(struct ssh *, int, u_char *);
 void	*ssh_packet_get_newkeys(struct ssh *, int);
 
+typedef void *(ssh_packet_comp_alloc_func)(void *, u_int, u_int);
+typedef void (ssh_packet_comp_free_func)(void *, void *);
+void	 ssh_packet_set_compress_hooks(struct ssh *, void *,
+    ssh_packet_comp_alloc_func *, ssh_packet_comp_free_func *);
+int	 ssh_packet_get_compress_state(struct ssh *, u_char **, u_int *);
+int	 ssh_packet_set_compress_state(struct ssh *, u_char *, u_int);
+
 void     ssh_packet_write_poll(struct ssh *);
 void     ssh_packet_write_wait(struct ssh *);
 int      ssh_packet_have_data_to_write(struct ssh *);
@@ -305,6 +312,13 @@ void     packet_set_connection(int, int);
 	ssh_packet_get_output(active_state)
 #define packet_get_newkeys(mode) \
 	ssh_packet_get_newkeys(active_state, (mode))
+#define packet_get_compress_state(blobp, lenp) \
+	ssh_packet_get_compress_state(active_state, blobp, lenp)
+#define packet_set_compress_state(blob, len) \
+	ssh_packet_set_compress_state(active_state, blob, len)
+#define packet_set_compress_hooks(ctx, allocfunc, freefunc) \
+	ssh_packet_set_compress_hooks(active_state, ctx, \
+	    allocfunc, freefunc);
 #define packet_check_eom() \
 	ssh_packet_check_eom(active_state)
 #define set_newkeys(mode) \

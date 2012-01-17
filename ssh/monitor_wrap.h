@@ -107,11 +107,4 @@ void mm_jpake_key_confirm(struct modp_group *, BIGNUM *, BIGNUM *,
 int mm_jpake_check_confirm(const BIGNUM *,
     const u_char *, u_int, const u_char *, u_int, const u_char *, u_int);
 
-
-/* zlib allocation hooks */
-
-void *mm_zalloc(struct mm_master *, u_int, u_int);
-void mm_zfree(struct mm_master *, void *);
-void mm_init_compression(struct mm_master *);
-
 #endif /* _MM_WRAP_H_ */

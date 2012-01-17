@@ -7,7 +7,7 @@ LIB=	ssh
 WANTLINT=no
 SRCS=	authfd.c authfile.c bufaux.c bufec.c bufbn.c buffer.c canohost.c \
 	channels.c cipher.c cipher-3des1.c cipher-bf1.c cipher-ctr.c \
-	cleanup.c compat.c compress.c crc32.c deattack.c fatal.c \
+	cleanup.c compat.c crc32.c deattack.c fatal.c \
 	hostfile.c log.c match.c nchan.c packet.c readpass.c \
 	rsa.c ttymodes.c xmalloc.c atomicio.c \
 	key.c dispatch.c kex.c mac.c uidswap.c uuencode.c misc.c \
