@@ -95,6 +95,7 @@
 #include "uidswap.h"
 #include "roaming.h"
 #include "version.h"
+#include "err.h"
 
 #ifdef ENABLE_PKCS11
 #include "ssh-pkcs11.h"
@@ -1110,7 +1111,7 @@ check_agent_present(void)
 static int
 ssh_session(void)
 {
-	int type;
+	int r, type;
 	int interactive = 0;
 	int have_tty = 0;
 	struct winsize ws;
@@ -1133,9 +1134,12 @@ ssh_session(void)
 		packet_send();
 		packet_write_wait();
 		type = packet_read();
-		if (type == SSH_SMSG_SUCCESS)
-			packet_start_compression(options.compression_level);
-		else if (type == SSH_SMSG_FAILURE)
+		if (type == SSH_SMSG_SUCCESS) {
+			if ((r = packet_start_compression(
+			    options.compression_level)) != 0)
+				fatal("%s: packet_start_compression: %s",
+				    __func__, ssh_err(r));
+		} else if (type == SSH_SMSG_FAILURE)
 			logit("Warning: Remote host refused compression.");
 		else
 			packet_disconnect("Protocol error waiting for "

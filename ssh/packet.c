@@ -687,46 +687,65 @@ ssh_packet_get_protocol_flags(struct ssh *ssh)
  * Level is compression level 1 (fastest) - 9 (slow, best) as in gzip.
  */
 
-void
+static int
 ssh_packet_init_compression(struct ssh *ssh)
 {
-	if (ssh->state->compression_buffer ||
-	   ((ssh->state->compression_buffer = sshbuf_new()) != NULL))
-		return;
-	return;	/* XX */
+	if (!ssh->state->compression_buffer &&
+	   ((ssh->state->compression_buffer = sshbuf_new()) == NULL))
+		return SSH_ERR_ALLOC_FAIL;
+	return 0;
 }
 
-static void
+static int
 start_compression_out(struct ssh *ssh, int level)
 {
 	if (level < 1 || level > 9)
-		fatal("Bad compression level %d.", level);
+		return SSH_ERR_INVALID_ARGUMENT;
 	debug("Enabling compression at level %d.", level);
 	if (ssh->state->compression_out_started == 1)
 		deflateEnd(&ssh->state->compression_out_stream);
-	ssh->state->compression_out_started = 1;
-	deflateInit(&ssh->state->compression_out_stream, level);
+	switch (deflateInit(&ssh->state->compression_out_stream, level)) {
+	case Z_OK:
+		ssh->state->compression_out_started = 1;
+		break;
+	case Z_MEM_ERROR:
+		return SSH_ERR_ALLOC_FAIL;
+	default:
+		return SSH_ERR_INTERNAL_ERROR;
+	}
+	return 0;
 }
 
-static void
+static int
 start_compression_in(struct ssh *ssh)
 {
 	if (ssh->state->compression_in_started == 1)
 		inflateEnd(&ssh->state->compression_in_stream);
-	ssh->state->compression_in_started = 1;
-	inflateInit(&ssh->state->compression_in_stream);
+	switch (inflateInit(&ssh->state->compression_in_stream)) {
+	case Z_OK:
+		ssh->state->compression_in_started = 1;
+		break;
+	case Z_MEM_ERROR:
+		return SSH_ERR_ALLOC_FAIL;
+	default:
+		return SSH_ERR_INTERNAL_ERROR;
+	}
+	return 0;
 }
 
-void
+int
 ssh_packet_start_compression(struct ssh *ssh, int level)
 {
-	if (ssh->state->packet_compression && !compat20)
-		fatal("Compression already enabled.");
-	ssh->state->packet_compression = 1;
-	ssh_packet_init_compression(ssh);
+	int r;
 
-	start_compression_in(ssh);
-	start_compression_out(ssh, level);
+	if (ssh->state->packet_compression && !compat20)
+		return SSH_ERR_INTERNAL_ERROR;
+	ssh->state->packet_compression = 1;
+	if ((r = ssh_packet_init_compression(ssh)) != 0 ||
+	    (r = start_compression_in(ssh)) != 0 ||
+	    (r = start_compression_out(ssh, level)) != 0)
+		return r;
+	return 0;
 }
 
 /* XXX remove need for separate compression buffer */
@@ -1118,11 +1137,15 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	if ((comp->type == COMP_ZLIB ||
 	    (comp->type == COMP_DELAYED &&
 	     state->after_authentication)) && comp->enabled == 0) {
-		ssh_packet_init_compression(ssh);
-		if (mode == MODE_OUT)
-			start_compression_out(ssh, 6);
-		else
-			start_compression_in(ssh);
+		if ((r = ssh_packet_init_compression(ssh)) < 0)
+			fatal("%s: %s", __func__, ssh_err(r));
+		if (mode == MODE_OUT) {
+			if ((r = start_compression_out(ssh, 6)) != 0)
+				fatal("%s: %s", __func__, ssh_err(r));
+		} else {
+			if ((r = start_compression_in(ssh)) != 0)
+				fatal("%s: %s", __func__, ssh_err(r));
+		}
 		comp->enabled = 1;
 	}
 	/*
@@ -1148,7 +1171,7 @@ ssh_packet_enable_delayed_compress(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
 	Comp *comp = NULL;
-	int mode;
+	int r, mode;
 
 	/*
 	 * Remember that we are past the authentication step, so rekeying
@@ -1161,11 +1184,15 @@ ssh_packet_enable_delayed_compress(struct ssh *ssh)
 			continue;
 		comp = &state->newkeys[mode]->comp;
 		if (comp && !comp->enabled && comp->type == COMP_DELAYED) {
-			ssh_packet_init_compression(ssh);
-			if (mode == MODE_OUT)
-				start_compression_out(ssh, 6);
-			else
-				start_compression_in(ssh);
+			if ((r = ssh_packet_init_compression(ssh)) != 0)
+				fatal("%s: %s", __func__, ssh_err(r));
+			if (mode == MODE_OUT) {
+				if ((r = start_compression_out(ssh, 6)) != 0)
+					fatal("%s: %s", __func__, ssh_err(r));
+			} else {
+				if ((r = start_compression_in(ssh)) != 0)
+					fatal("%s: %s", __func__, ssh_err(r));
+			}
 			comp->enabled = 1;
 		}
 	}
@@ -2446,7 +2473,7 @@ void
 ssh_packet_set_postauth(struct ssh *ssh)
 {
 	Comp *comp;
-	int mode;
+	int r, mode;
 
 	debug("%s: called", __func__);
 	/* This was set in net child, but is not visible in user child */
@@ -2456,7 +2483,8 @@ ssh_packet_set_postauth(struct ssh *ssh)
 			continue;
 		comp = &ssh->state->newkeys[mode]->comp;
 		if (comp && comp->enabled)
-			ssh_packet_init_compression(ssh);
+			if ((r = ssh_packet_init_compression(ssh)) != 0)
+				fatal("%s: %s", __func__, ssh_err(r));
 	}
 }
 
