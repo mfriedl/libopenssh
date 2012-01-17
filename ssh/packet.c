@@ -1465,7 +1465,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		    sshbuf_len(state->incoming_packet),
 		    macbuf, sizeof(macbuf))) != 0)
 			goto out;
-		if (timingsafe_bcmp(macbuf, buffer_ptr(state->input),
+		if (timingsafe_bcmp(macbuf, sshbuf_ptr(state->input),
 		    mac->mac_len) != 0) {
 			logit("Corrupted MAC on input.");
 			if (need > PACKET_MAX_SIZE)
