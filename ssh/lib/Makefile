@@ -21,11 +21,12 @@ SRCS=	authfd.c authfile.c bufaux.c bufec.c bufbn.c buffer.c canohost.c \
 	sshbuf.c \
 	err.c
 
+SRCS+=	kexdhs.c kexgexs.c kexecdhs.c
 SRCS+=	opacket.c ssh_api.c
+SRCS+=	roaming_dummy.c
 
 DEBUGLIBS= no
 NOPROFILE= yes
-NOPIC=	yes
 
 install:
 	@echo -n
