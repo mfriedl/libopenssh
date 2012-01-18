@@ -169,9 +169,9 @@ input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 	}
 
 	/* sign H */
-	if (PRIVSEP(sshkey_sign(server_host_private, &signature, &slen,
-	    hash, hashlen, datafellows)) < 0)
-		fatal("kexdh_server: sshkey_sign failed");
+	if ((r = PRIVSEP(sshkey_sign(server_host_private, &signature, &slen,
+	    hash, hashlen, datafellows))) < 0)
+		goto out;
 
 	/* destroy_sensitive_data(); */
 

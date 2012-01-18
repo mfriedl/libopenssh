@@ -185,7 +185,7 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 
 	if ((r = sshkey_verify(server_host_key, signature, slen, hash,
 	    hashlen, datafellows)) != 0)
-		fatal("key_verify failed for server_host_key: %s", ssh_err(r));
+		goto out;
 
 	/* save session id */
 	if (kex->session_id == NULL) {
