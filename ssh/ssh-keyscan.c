@@ -88,18 +88,21 @@ typedef struct Connection {
 	int c_len;		/* Total bytes which must be read. */
 	int c_off;		/* Length of data read so far. */
 	int c_keytype;		/* Only one of KT_RSA1, KT_DSA, or KT_RSA */
+	int c_done;		/* SSH2 done */
 	char *c_namebase;	/* Address to free for c_name and c_namelist */
 	char *c_name;		/* Hostname of connection for errors */
 	char *c_namelist;	/* Pointer to other possible addresses */
 	char *c_output_name;	/* Hostname of connection for output */
 	char *c_data;		/* Data read from this fd */
-	Kex *c_kex;		/* The key-exchange struct for ssh2 */
+	struct ssh *c_ssh;	/* SSH-connection */
 	struct timeval c_tv;	/* Time at which connection gets aborted */
 	TAILQ_ENTRY(Connection) c_link;	/* List of connections in timeout order. */
 } con;
 
 TAILQ_HEAD(conlist, Connection) tq;	/* Timeout Queue */
 con *fdcon;
+
+static void keyprint(con *c, struct sshkey *key);
 
 static int
 fdlim_get(int hard)
@@ -205,10 +208,19 @@ keygrab_ssh1(con *c)
 }
 
 static int
-hostjump(struct sshkey *hostkey, struct ssh *ssh)
+key_print_wrapper(struct sshkey *hostkey, struct ssh *ssh)
 {
-	kexjmp_key = hostkey;
-	longjmp(kexjmp, 1);
+	con *c;
+
+	TAILQ_FOREACH(c, &tq, c_link) {
+		if (c->c_ssh == ssh) {
+			keyprint(c, hostkey);
+			c->c_done = 1;
+			break;
+		}
+	}
+	/* always abort key exchange */
+	return -1;
 }
 
 static int
@@ -227,48 +239,35 @@ ssh2_capable(int remote_major, int remote_minor)
 	return 0;
 }
 
-static struct sshkey *
+static void
 keygrab_ssh2(con *c)
 {
-	int j, r;
+	int r;
 
-	packet_set_connection(c->c_fd, c->c_fd);
 	enable_compat20();
+	c->c_ssh = ssh_packet_set_connection(NULL, c->c_fd, c->c_fd);
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = c->c_keytype == KT_DSA?
 	    "ssh-dss" : (c->c_keytype == KT_RSA ? "ssh-rsa" :
 	    "ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521");
-	/*
-	 * XXX the following avoids a crash, but ssh-keyscan is broken.
-	 * after the first key is retrieved active_state is not properly
-	 * cleared and will fail when kex_setup tries to send a packet.
-	 */
-	if (active_state->kex != NULL)
-		active_state->kex = NULL;
-	if ((r = kex_setup(active_state, myproposal)) != 0) {
+	if ((r = kex_setup(c->c_ssh, myproposal)) != 0) {
+		free(c->c_ssh);
 		fprintf(stderr, "kex_setup: %s\n", ssh_err(r));
 		exit(1);
 	}
-	c->c_kex = active_state->kex;
-	c->c_kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
-	c->c_kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
-	c->c_kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
-	c->c_kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
-	c->c_kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
-	c->c_kex->verify_host_key = hostjump;
-
-	if (!(j = setjmp(kexjmp))) {
-		nonfatal_fatal = 1;
-		ssh_dispatch_run(active_state, DISPATCH_BLOCK,
-		    &active_state->kex->done);
-		fprintf(stderr, "Impossible! dispatch_run() returned!\n");
-		exit(1);
-	}
-	nonfatal_fatal = 0;
-	xfree(c->c_kex);
-	c->c_kex = NULL;
-	packet_close();
-
-	return j < 0? NULL : kexjmp_key;
+	c->c_ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
+	c->c_ssh->kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
+	c->c_ssh->kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
+	c->c_ssh->kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
+	c->c_ssh->kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
+	c->c_ssh->kex->verify_host_key = key_print_wrapper;
+	/*
+	 * do the key-exchange until an error occurs or until
+	 * the key_print_wrapper() callback sets c_done.
+	 */
+	ssh_dispatch_run(c->c_ssh, DISPATCH_BLOCK, &c->c_done);
+	ssh_packet_close(c->c_ssh);
+	free(c->c_ssh);
+	c->c_ssh = NULL;
 }
 
 static void
@@ -468,7 +467,7 @@ congreet(int s)
 		return;
 	}
 	if (c->c_keytype != KT_RSA1) {
-		keyprint(c, keygrab_ssh2(c));
+		keygrab_ssh2(c);
 		confree(s);
 		return;
 	}

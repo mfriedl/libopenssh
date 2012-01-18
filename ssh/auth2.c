@@ -51,6 +51,7 @@
 #include "ssh-gss.h"
 #endif
 #include "monitor_wrap.h"
+#include "err.h"
 
 /* import */
 extern ServerOptions options;
@@ -158,10 +159,13 @@ void
 do_authentication2(Authctxt *authctxt)
 {
 	struct ssh *ssh = active_state;		/* XXX */
+	int r;
+
 	ssh->authctxt = authctxt;		/* XXX move to caller */
 	ssh_dispatch_init(ssh, &dispatch_protocol_error);
 	ssh_dispatch_set(ssh, SSH2_MSG_SERVICE_REQUEST, &input_service_request);
-	ssh_dispatch_run(ssh, DISPATCH_BLOCK, &authctxt->success);
+	if ((r = ssh_dispatch_run(ssh, DISPATCH_BLOCK, &authctxt->success)) != 0)
+		fatal("%s: ssh_dispatch_run failed: %s", __func__, ssh_err(r));
 	ssh->authctxt = NULL;
 }
 
