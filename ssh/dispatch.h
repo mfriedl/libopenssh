@@ -43,13 +43,13 @@ int	dispatch_protocol_ignore(int, u_int32_t, struct ssh *);
 void	ssh_dispatch_init(struct ssh *, dispatch_fn *);
 void	ssh_dispatch_set(struct ssh *, int, dispatch_fn *);
 void	ssh_dispatch_range(struct ssh *, u_int, u_int, dispatch_fn *);
-void	ssh_dispatch_run(struct ssh *, int, volatile sig_atomic_t *);
+int	ssh_dispatch_run(struct ssh *, int, volatile sig_atomic_t *);
+void	dispatch_run(int, volatile sig_atomic_t *);
 
 #ifdef DISPATCH_COMPAT
 #define dispatch_init(dflt) ssh_dispatch_init(active_state, (dflt))
 #define dispatch_range(from, to, fn) ssh_dispatch_range(active_state, (from), (to,) (fn))
 #define dispatch_set(type, fn) ssh_dispatch_set(active_state, (type), (fn))
-#define dispatch_run(mode, done) ssh_dispatch_run(active_state, (mode), (done))
 #endif
 
 #endif

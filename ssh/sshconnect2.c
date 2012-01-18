@@ -206,7 +206,8 @@ ssh_kex2(char *host, struct sockaddr *hostaddr, u_short port)
 	ssh->kex->server_version_string=server_version_string;
 	ssh->kex->verify_host_key=&verify_host_key_callback;
 
-	ssh_dispatch_run(ssh, DISPATCH_BLOCK, &ssh->kex->done);
+	if ((r = ssh_dispatch_run(ssh, DISPATCH_BLOCK, &ssh->kex->done)) != 0)
+		fatal("%s: ssh_dispatch_run failed: %s", __func__, ssh_err(r));
 
 	if (options.use_roaming && !ssh->kex->roaming) {
 		debug("Roaming not allowed by server");

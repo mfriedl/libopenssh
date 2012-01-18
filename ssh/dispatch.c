@@ -63,6 +63,7 @@ ssh_dispatch_init(struct ssh *ssh, dispatch_fn *dflt)
 	for (i = 0; i < DISPATCH_MAX; i++)
 		ssh->dispatch[i] = dflt;
 }
+
 void
 ssh_dispatch_range(struct ssh *ssh, u_int from, u_int to, dispatch_fn *fn)
 {
@@ -74,12 +75,14 @@ ssh_dispatch_range(struct ssh *ssh, u_int from, u_int to, dispatch_fn *fn)
 		ssh->dispatch[i] = fn;
 	}
 }
+
 void
 ssh_dispatch_set(struct ssh *ssh, int type, dispatch_fn *fn)
 {
 	ssh->dispatch[type] = fn;
 }
-void
+
+int
 ssh_dispatch_run(struct ssh *ssh, int mode, volatile sig_atomic_t *done)
 {
 	int r;
@@ -90,24 +93,36 @@ ssh_dispatch_run(struct ssh *ssh, int mode, volatile sig_atomic_t *done)
 		if (mode == DISPATCH_BLOCK) {
 			r = ssh_packet_read_seqnr(ssh, &type, &seqnr);
 			if (r != 0)
-				break;
+				return r;
 		} else {
 			r = ssh_packet_read_poll_seqnr(ssh, &type, &seqnr);
 			if (r != 0)
-				break;
+				return r;
 			if (type == SSH_MSG_NONE)
-				return;
+				return 0;
 		}
 		if (type > 0 && type < DISPATCH_MAX &&
 		    ssh->dispatch[type] != NULL) {
 			r = (*ssh->dispatch[type])(type, seqnr, ssh);
 			if (r != 0)
-				break;
-		} else
-			ssh_packet_disconnect(ssh, "protocol error: rcvd type %d",
-			    type);
+				return r;
+		} else {
+			r = sshpkt_disconnect(ssh,
+			    "protocol error: rcvd type %d", type);
+			if (r != 0)
+				return r;
+			return SSH_ERR_DISCONNECTED;
+		}
 		if (done != NULL && *done)
-			return;
+			return 0;
 	}
-	fatal("%s: %s", __func__, ssh_err(r));
+}
+
+void
+dispatch_run(int mode, volatile sig_atomic_t *done)
+{
+	int r;
+
+	if ((r = ssh_dispatch_run(active_state, mode, done)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
