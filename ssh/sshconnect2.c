@@ -152,7 +152,7 @@ void
 ssh_kex2(char *host, struct sockaddr *hostaddr, u_short port)
 {
 	struct ssh * ssh = active_state; /* XXX */
-	Kex *kex;
+	int r;
 
 	ssh->host = host;
 	ssh->hostaddr = hostaddr;
@@ -195,27 +195,26 @@ ssh_kex2(char *host, struct sockaddr *hostaddr, u_short port)
 		ssh_packet_set_rekey_limit(ssh, (u_int32_t)options.rekey_limit);
 
 	/* start key exchange */
-	kex = kex_setup(ssh, myproposal);
-	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
-	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
-	kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
-	kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
-	kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
-	kex->client_version_string=client_version_string;
-	kex->server_version_string=server_version_string;
-	kex->verify_host_key=&verify_host_key_callback;
+	if ((r = kex_setup(ssh, myproposal)) != 0)
+		fatal("kex_setup: %s", ssh_err(r));
+	ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
+	ssh->kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
+	ssh->kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
+	ssh->kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
+	ssh->kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
+	ssh->kex->client_version_string=client_version_string;
+	ssh->kex->server_version_string=server_version_string;
+	ssh->kex->verify_host_key=&verify_host_key_callback;
 
-	ssh->kex = kex;
+	ssh_dispatch_run(ssh, DISPATCH_BLOCK, &ssh->kex->done);
 
-	ssh_dispatch_run(ssh, DISPATCH_BLOCK, &kex->done);
-
-	if (options.use_roaming && !kex->roaming) {
+	if (options.use_roaming && !ssh->kex->roaming) {
 		debug("Roaming not allowed by server");
 		options.use_roaming = 0;
 	}
 
-	session_id2 = kex->session_id;
-	session_id2_len = kex->session_id_len;
+	session_id2 = ssh->kex->session_id;
+	session_id2_len = ssh->kex->session_id_len;
 
 #ifdef DEBUG_KEXDH
 	/* send 1st encrypted/maced/compressed message */

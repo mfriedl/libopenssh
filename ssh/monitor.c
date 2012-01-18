@@ -1507,12 +1507,13 @@ mm_get_kex(Buffer *m)
 	kex->hostkey_type = buffer_get_int(m);
 	kex->kex_type = buffer_get_int(m);
 	blob = buffer_get_string(m, &bloblen);
-	buffer_init(&kex->my);
-	buffer_append(&kex->my, blob, bloblen);
+	if ((kex->my = sshbuf_new()) == NULL ||
+	    (kex->peer = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	buffer_append(kex->my, blob, bloblen);
 	xfree(blob);
 	blob = buffer_get_string(m, &bloblen);
-	buffer_init(&kex->peer);
-	buffer_append(&kex->peer, blob, bloblen);
+	buffer_append(kex->peer, blob, bloblen);
 	xfree(blob);
 	kex->done = 1;
 	kex->flags = buffer_get_int(m);
