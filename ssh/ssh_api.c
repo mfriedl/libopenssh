@@ -14,10 +14,10 @@
 
 #include <string.h>
 
-void	_ssh_exchange_banner(struct ssh *);
-char	*_ssh_send_banner(struct ssh *);
-char	*_ssh_read_banner(struct ssh *);
-void	_ssh_order_hostkeyalgs(struct ssh *);
+int	_ssh_exchange_banner(struct ssh *);
+int	_ssh_send_banner(struct ssh *, char **);
+int	_ssh_read_banner(struct ssh *, char **);
+int	_ssh_order_hostkeyalgs(struct ssh *);
 int	_ssh_verify_host_key(struct sshkey *, struct ssh *);
 struct sshkey *_ssh_host_public_key(int, struct ssh *);
 struct sshkey *_ssh_host_private_key(int, struct ssh *);
@@ -50,8 +50,8 @@ mm_choose_dh(int min, int nbits, int max)
 
 /* API */
 
-struct ssh *
-ssh_init(int is_server, struct kex_params *kex_params)
+int
+ssh_init(struct ssh **sshp, int is_server, struct kex_params *kex_params)
 {
 	struct ssh *ssh;
 	char **proposal;
@@ -70,8 +70,8 @@ ssh_init(int is_server, struct kex_params *kex_params)
 	/* Initialize key exchange */
 	proposal = kex_params ? kex_params->proposal : myproposal;
 	if ((r = kex_new(ssh, proposal, &ssh->kex)) != 0) {
-		error("%s: kex_new: %s", __func__, ssh_err(r));
-		return NULL; /* XXX return error code */
+		ssh_free(ssh);
+		return r;
 	}
 	ssh->kex->server = is_server;
 	if (is_server) {
@@ -90,7 +90,8 @@ ssh_init(int is_server, struct kex_params *kex_params)
 		ssh->kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
 		ssh->kex->verify_host_key =&_ssh_verify_host_key;
 	}
-	return (ssh);
+	*sshp = ssh;
+	return 0;
 }
 
 void
@@ -102,79 +103,90 @@ ssh_free(struct ssh *ssh)
 	xfree(ssh);
 }
 
-/* Returns -1 on error, 0 otherwise */
+/* Returns < 0 on error, 0 otherwise */
 int
 ssh_add_hostkey(struct ssh* ssh, char *key)
 {
-	struct sshkey *parsed_key, *pubkey;
-	struct key_entry *k;
-	Buffer key_buf;
+	struct sshkey *parsed_key = NULL, *pubkey = NULL;
+	struct sshbuf *key_buf = NULL;
+	struct key_entry *k = NULL, *k_prv = NULL;
+	int r;
 
 	if (ssh->kex->server) {
 		/* Parse private key */
-		buffer_init(&key_buf);
-		buffer_append(&key_buf, key, strlen(key));
-		parsed_key = key_parse_private(&key_buf, "hostkey", "", NULL);
-		buffer_free(&key_buf);
-
-		if (parsed_key != NULL) {
-			if (sshkey_from_private(parsed_key, &pubkey) != 0) {
-				sshkey_free(parsed_key);
-				return (-1);
-			}
-			k = xmalloc(sizeof(*k));
-			k->key = parsed_key;
-			TAILQ_INSERT_TAIL(&ssh->private_keys, k, next);
-
-			/* add the public key, too */
-			k = xmalloc(sizeof(*k));
-			k->key = pubkey;
-			TAILQ_INSERT_TAIL(&ssh->public_keys, k, next);
-
-			return (0);
+		if ((key_buf = sshbuf_new()) == NULL)
+			return SSH_ERR_ALLOC_FAIL;
+		if ((r = sshbuf_put(key_buf, key, strlen(key))) != 0)
+			goto out;
+		if ((parsed_key = key_parse_private(key_buf, "hostkey", "",
+		    NULL)) == NULL) {
+			r = SSH_ERR_INVALID_FORMAT;
+			goto out;
 		}
+		if ((r = sshkey_from_private(parsed_key, &pubkey)) != 0)
+			goto out;
+		if ((k = malloc(sizeof(*k))) == NULL ||
+		    (k_prv = malloc(sizeof(*k_prv))) == NULL) {
+			r = SSH_ERR_ALLOC_FAIL;
+			goto out;
+		}
+		k_prv->key = parsed_key;
+		TAILQ_INSERT_TAIL(&ssh->private_keys, k_prv, next);
+
+		/* add the public key, too */
+		k->key = pubkey;
+		TAILQ_INSERT_TAIL(&ssh->public_keys, k, next);
+		r = 0;
 	} else {
 		/* Parse public key */
 		if ((parsed_key = sshkey_new(KEY_UNSPEC)) == NULL)
-			return -1;
-		if (sshkey_read(parsed_key, &key) == 0) {
-			k = xmalloc(sizeof(*k));
-			k->key = parsed_key;
-			TAILQ_INSERT_TAIL(&ssh->public_keys, k, next);
-
-			return (0);
-		} else {
-			sshkey_free(parsed_key);
+			return SSH_ERR_ALLOC_FAIL;
+		if ((r = sshkey_read(parsed_key, &key)) != 0)
+			goto out;
+		if ((k = malloc(sizeof(*k))) == NULL) {
+			r = SSH_ERR_ALLOC_FAIL;
+			goto out;
 		}
+		k->key = parsed_key;
+		TAILQ_INSERT_TAIL(&ssh->public_keys, k, next);
+		r = 0;
 	}
 
-	return (-1);
-}
-
-void
-ssh_input_append(struct ssh* ssh, const char *data, u_int len)
-{
-	buffer_append(ssh_packet_get_input(ssh), data, len);
+out:
+	if (key_buf)
+		sshbuf_free(key_buf);
+	if (r != 0) {
+		if (parsed_key)
+			sshkey_free(parsed_key);
+		if (k)
+			free(k);
+	}
+	return r;
 }
 
 int
-ssh_packet_next(struct ssh *ssh)
+ssh_input_append(struct ssh* ssh, const char *data, u_int len)
+{
+	return sshbuf_put(ssh_packet_get_input(ssh), data, len);
+}
+
+int
+ssh_packet_next(struct ssh *ssh, u_char *typep)
 {
 	int r;
+	u_int32_t seqnr;
 	u_char type;
-	u_int32_t seqnr;                                                
 
+	*typep = SSH_MSG_NONE;
 	if (ssh->kex->client_version_string == NULL ||
-	    ssh->kex->server_version_string == NULL) {
-		_ssh_exchange_banner(ssh);
-		return (SSH_MSG_NONE);
-	}
+	    ssh->kex->server_version_string == NULL)
+		return _ssh_exchange_banner(ssh);
 	/*
 	 * Try to read a packet. Returns SSH_MSG_NONE if no packet or not
 	 * enough data.
 	 */
 	if ((r = ssh_packet_read_poll2(ssh, &type, &seqnr)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
+		return r;
 	/*
 	 * If we enough data and we have a dispatch function, call the
 	 * function and return SSH_MSG_NONE. Otherwise return the packet type to
@@ -187,13 +199,10 @@ ssh_packet_next(struct ssh *ssh)
 	 */
 	if (type > 0 && type < DISPATCH_MAX &&
 	    type >= SSH2_MSG_KEXINIT && type <= SSH2_MSG_TRANSPORT_MAX &&
-	    ssh->dispatch[type] != NULL) {
-		r = (*ssh->dispatch[type])(type, seqnr, ssh);
-		if (r != 0)
-			fatal("%s: %s", __func__, ssh_err(r));
-		return (SSH_MSG_NONE);
-	}
-	return (type);
+	    ssh->dispatch[type] != NULL)
+		return (*ssh->dispatch[type])(type, seqnr, ssh);
+	*typep = type;
+	return 0;
 }
 
 void *
@@ -202,57 +211,62 @@ ssh_packet_payload(struct ssh* ssh, u_int *len)
 	return (ssh_packet_get_raw(ssh, len));
 }
 
-void
+int
 ssh_packet_put(struct ssh* ssh, int type, const char *data, u_int len)
 {
-	ssh_packet_start(ssh, type);
-	ssh_packet_put_raw(ssh, data, len);
-	ssh_packet_send(ssh);
+	int r;
+
+	if ((r = sshpkt_start(ssh, type)) != 0 ||
+	    (r = sshpkt_put(ssh, data, len)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		return r;
+	return 0;
 }
 
 void *
-ssh_output_ptr(struct ssh* ssh, u_int *len)
+ssh_output_ptr(struct ssh *ssh, u_int *len)
 {
-	Buffer *output = ssh_packet_get_output(ssh);
+	struct sshbuf *output = ssh_packet_get_output(ssh);
 
-	*len = buffer_len(output);
-	return (buffer_ptr(output));
-}
-
-void
-ssh_output_consume(struct ssh* ssh, u_int len)
-{
-	buffer_consume(ssh_packet_get_output(ssh), len);
+	*len = sshbuf_len(output);
+	return (sshbuf_ptr(output));
 }
 
 int
-ssh_output_space(struct ssh* ssh, u_int len)
+ssh_output_consume(struct ssh *ssh, u_int len)
 {
-	return (buffer_check_alloc(ssh_packet_get_output(ssh), len));
+	return sshbuf_consume(ssh_packet_get_output(ssh), len);
 }
 
 int
-ssh_input_space(struct ssh* ssh, u_int len)
+ssh_output_space(struct ssh *ssh, u_int len)
 {
-	return (buffer_check_alloc(ssh_packet_get_input(ssh), len));
+	return (0 == sshbuf_check_reserve(ssh_packet_get_output(ssh), len));
+}
+
+int
+ssh_input_space(struct ssh *ssh, u_int len)
+{
+	return (0 == sshbuf_check_reserve(ssh_packet_get_input(ssh), len));
 }
 
 /* Read other side's version identification. */
-char *
-_ssh_read_banner(struct ssh *ssh)
+int
+_ssh_read_banner(struct ssh *ssh, char **bannerp)
 {
-	Buffer *input;
+	struct sshbuf *input;
 	char c, *s, buf[256], remote_version[256];	/* must be same size! */
-	int remote_major, remote_minor;
+	int r, remote_major, remote_minor;
 	u_int i, n, j, len;
 
+	*bannerp = NULL;
 	input = ssh_packet_get_input(ssh);
-	len = buffer_len(input);
-	s = buffer_ptr(input);
+	len = sshbuf_len(input);
+	s = sshbuf_ptr(input);
 	for (j = n = 0;;) {
 		for (i = 0; i < sizeof(buf) - 1; i++) {
 			if (j >= len)
-				return (NULL);
+				return (0);
 			c = s[j++];
 			if (c == '\r') {
 				buf[i] = '\n';
@@ -270,10 +284,10 @@ _ssh_read_banner(struct ssh *ssh)
 			break;
 		debug("ssh_exchange_identification: %s", buf);
 		if (++n > 65536)
-			fatal("ssh_exchange_identification: "
-			    "No banner received");
+			return SSH_ERR_INVALID_FORMAT;	/* XXX */
 	}
-	buffer_consume(input, j);
+	if ((r = sshbuf_consume(input, j)) != 0)
+		return r;
 
 	/*
 	 * Check that the versions match.  In future this might accept
@@ -281,7 +295,7 @@ _ssh_read_banner(struct ssh *ssh)
 	 */
 	if (sscanf(buf, "SSH-%d.%d-%[^\n]\n",
 	    &remote_major, &remote_minor, remote_version) != 3)
-		fatal("Bad remote protocol version identification: '%.100s'", buf);
+		return SSH_ERR_INVALID_FORMAT;
 	debug("Remote protocol version %d.%d, remote software version %.100s",
 	    remote_major, remote_minor, remote_version);
 
@@ -291,52 +305,69 @@ _ssh_read_banner(struct ssh *ssh)
 		remote_minor = 0;
 	}
 	if (remote_major != 2)
-		fatal("Protocol major versions differ: 2 vs. %d", remote_major);
+		return SSH_ERR_INVALID_FORMAT;	/* XXX */
 	enable_compat20();
 	chop(buf);
 	debug("Remote version string %.100s", buf);
-	return (xstrdup(buf));
+	if ((*bannerp = strdup(buf)) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	return 0;
 }
 
 /* Send our own protocol version identification. */
-char *
-_ssh_send_banner(struct ssh *ssh)
+int
+_ssh_send_banner(struct ssh *ssh, char **bannerp)
 {
 	char buf[256];
+	int r;
 
 	snprintf(buf, sizeof buf, "SSH-2.0-%.100s\r\n", SSH_VERSION);
-	buffer_append(ssh_packet_get_output(ssh), buf, strlen(buf));
+	if ((r = sshbuf_put(ssh_packet_get_output(ssh), buf, strlen(buf))) != 0)
+		return r;
 	chop(buf);
 	debug("Local version string %.100s", buf);
-	return (xstrdup(buf));
+	if ((*bannerp = strdup(buf)) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	return 0;
 }
 
-void
+int
 _ssh_exchange_banner(struct ssh *ssh)
 {
+	Kex *kex = ssh->kex;
+	int r;
+
 	/*
 	 * if _ssh_read_banner() cannot parse a full version string
 	 * it will return NULL and we end up calling it again.
 	 */
-	if (ssh->kex->server) {
-		if (ssh->kex->server_version_string == NULL)
-			ssh->kex->server_version_string = _ssh_send_banner(ssh);
-		if (ssh->kex->server_version_string != NULL &&
-		    ssh->kex->client_version_string == NULL)
-			ssh->kex->client_version_string = _ssh_read_banner(ssh);
+
+	r = 0;
+	if (kex->server) {
+		if (kex->server_version_string == NULL)
+			r = _ssh_send_banner(ssh, &kex->server_version_string);
+		if (r == 0 &&
+		    kex->server_version_string != NULL &&
+		    kex->client_version_string == NULL)
+			r = _ssh_read_banner(ssh, &kex->client_version_string);
 	} else {
-		if (ssh->kex->server_version_string == NULL)
-			ssh->kex->server_version_string = _ssh_read_banner(ssh);
-		if (ssh->kex->server_version_string != NULL &&
-		    ssh->kex->client_version_string == NULL)
-			ssh->kex->client_version_string = _ssh_send_banner(ssh);
+		if (kex->server_version_string == NULL)
+			r = _ssh_read_banner(ssh, &kex->server_version_string);
+		if (r == 0 &&
+		    kex->server_version_string != NULL &&
+		    kex->client_version_string == NULL)
+			r = _ssh_send_banner(ssh, &kex->client_version_string);
 	}
+	if (r != 0)
+		return r;
 	/* start initial kex as soon as we have exchanged the banners */
-	if (ssh->kex->server_version_string != NULL &&
-	    ssh->kex->client_version_string != NULL) {
-		_ssh_order_hostkeyalgs(ssh);
-		kex_send_kexinit(ssh);
+	if (kex->server_version_string != NULL &&
+	    kex->client_version_string != NULL) {
+		if ((r = _ssh_order_hostkeyalgs(ssh)) != 0 ||
+		    (r = kex_send_kexinit(ssh)) != 0)
+			return r;
 	}
+	return 0;
 }
 
 struct sshkey *
@@ -347,8 +378,8 @@ _ssh_host_public_key(int type, struct ssh *ssh)
 	debug3("%s: need %d", __func__, type);
 	TAILQ_FOREACH(k, &ssh->public_keys, next) {
 		debug3("%s: check %s", __func__, sshkey_type(k->key));
-                if (k->key->type == type)
-                        return (k->key);
+		if (k->key->type == type)
+			return (k->key);
 	}
 	return (NULL);
 }
@@ -362,8 +393,8 @@ _ssh_host_private_key(int type, struct ssh *ssh)
 	debug3("%s: need %d", __func__, type);
 	TAILQ_FOREACH(k, &ssh->private_keys, next) {
 		debug3("%s: check %s", __func__, sshkey_type(k->key));
-                if (k->key->type == type)
-                        return (k->key);
+		if (k->key->type == type)
+			return (k->key);
 	}
 	return (NULL);
 }
@@ -376,37 +407,42 @@ _ssh_verify_host_key(struct sshkey *hostkey, struct ssh *ssh)
 	debug3("%s: need %s", __func__, sshkey_type(hostkey));
 	TAILQ_FOREACH(k, &ssh->public_keys, next) {
 		debug3("%s: check %s", __func__, sshkey_type(k->key));
-                if (sshkey_equal_public(hostkey, k->key))
-                        return (0);	/* ok */
+		if (sshkey_equal_public(hostkey, k->key))
+			return (0);	/* ok */
 	}
 	return (-1);	/* failed */
 }
 
 /* offer hostkey algorithms in kexinit depending on registered keys */
-void
+int
 _ssh_order_hostkeyalgs(struct ssh *ssh)
 {
 	struct key_entry *k;
-	char *orig, *avail, *oavail,*alg, *replace;
+	char *orig, *avail, *oavail = NULL, *alg, *replace = NULL;
 	char **proposal;
 	size_t maxlen;
 	int ktype, r;
 
 	/* XXX we de-serialize ssh->kex->my, modify it, and change it */
 	if ((r = kex_buf2prop(ssh->kex->my, NULL, &proposal)) != 0)
-		fatal("%s: kex_buf2prop (my): %s",
-		    __func__, ssh_err(r)); /* XXX return error */
+		return r;
 	orig = proposal[PROPOSAL_SERVER_HOST_KEY_ALGS];
-	oavail = avail = xstrdup(orig);
+	if ((oavail = avail = strdup(orig)) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
 	maxlen = strlen(avail) + 1;
-	replace = xmalloc(maxlen);
+	if ((replace = xmalloc(maxlen)) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
 	*replace = '\0';
 	while ((alg = strsep(&avail, ",")) && *alg != '\0') {
 		if ((ktype = sshkey_type_from_name(alg)) == KEY_UNSPEC)
-			fatal("%s: unknown alg %s", __func__, alg);
+			continue;
 		TAILQ_FOREACH(k, &ssh->public_keys, next) {
 			if (k->key->type == ktype ||
-                            (sshkey_is_cert(k->key) && k->key->type ==
+			    (sshkey_is_cert(k->key) && k->key->type ==
 			    sshkey_type_plain(ktype))) {
 				if (*replace != '\0')
 					strlcat(replace, ",", maxlen);
@@ -415,17 +451,19 @@ _ssh_order_hostkeyalgs(struct ssh *ssh)
 			}
 		}
 	}
-	xfree(oavail);
 	if (*replace != '\0') {
 		debug2("%s: orig/%d    %s", __func__, ssh->kex->server, orig);
 		debug2("%s: replace/%d %s", __func__, ssh->kex->server, replace);
-		xfree(orig);
+		free(orig);
 		proposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = replace;
-		if ((r = kex_prop2buf(ssh->kex->my, proposal)) != 0)
-			fatal("%s: kex_prop2buf (my): %s",
-			    __func__, ssh_err(r)); /* XXX return error */
-	} else {
-		xfree(replace);
+		replace = NULL;	/* owned by proposal */
+		r = kex_prop2buf(ssh->kex->my, proposal);
 	}
+ out:
+	if (oavail)
+		free(oavail);
+	if (replace)
+		free(replace);
 	kex_prop_free(proposal);
+	return r;
 }

@@ -34,6 +34,7 @@
 #include "misc.h"
 #include "myproposal.h"
 #include "readconf.h"
+#include "err.h"
 
 struct side {
 	int fd;
@@ -55,7 +56,7 @@ void output_cb(int, short, void *);
 int do_connect(const char *, int);
 int do_listen(const char *, int);
 void session_close(struct session *);
-void ssh_packet_fwd(struct side *, struct side *);
+int ssh_packet_fwd(struct side *, struct side *);
 void usage(void);
 
 uid_t original_real_uid;	/* XXX */
@@ -180,6 +181,7 @@ session_close(struct session *s)
 		}
 		TAILQ_REMOVE(&sessions, s, next);
 	}
+	debug2("closing session %p", s);
 	xfree(s);
 }
 
@@ -213,6 +215,7 @@ accept_cb(int fd, short type, void *arg)
 	}
 	event_set(&s->server.output, s->server.fd, EV_WRITE, connect_cb, s);
 	event_add(&s->server.output, NULL);
+	debug2("new session %p", s);
 	return;
 fail:
 	if (s) {
@@ -227,6 +230,7 @@ connect_cb(int fd, short type, void *arg)
 {
 	struct session *s = arg;
 	int soerr;
+	int r;
 	socklen_t sz = sizeof(soerr);
 
 	event_del(&s->server.output);
@@ -234,39 +238,52 @@ connect_cb(int fd, short type, void *arg)
 		soerr = errno;
 		error("connect_cb: getsockopt: %s", strerror(errno));
 	}
-	if (soerr != 0) {
-		close(s->server.fd);
-		s->server.fd = -1;
-		session_close(s);
-		return;
+	if (soerr != 0)
+		goto fail;
+	memcpy(kex_params.proposal, myproposal, sizeof(kex_params.proposal));
+	if ((r = ssh_init(&s->client.ssh, 1, &kex_params)) != 0) {
+		error("could init client context: %s", ssh_err(r));
+		goto fail;
+	}
+	if ((r = ssh_init(&s->server.ssh, 0, &kex_params)) != 0) {
+		error("could init server context: %s", ssh_err(r));
+		goto fail;
+	}
+	if ((r = ssh_add_hostkey(s->client.ssh, keybuf)) != 0) {
+		error("could not load server hostkey: %s", ssh_err(r));
+		goto fail;
+	}
+	if ((r = ssh_add_hostkey(s->server.ssh, known_keybuf)) !=  0) {
+		error("could not load client hostkey: %s", ssh_err(r));
+		goto fail;
 	}
 	event_set(&s->client.input,  s->client.fd, EV_READ, input_cb, s);
 	event_set(&s->client.output, s->client.fd, EV_WRITE, output_cb, s);
 	event_set(&s->server.input,  s->server.fd, EV_READ, input_cb, s);
 	event_set(&s->server.output, s->server.fd, EV_WRITE, output_cb, s);
-	memcpy(kex_params.proposal, myproposal, sizeof(kex_params.proposal));
-	s->client.ssh = ssh_init(1, &kex_params);
-	s->server.ssh = ssh_init(0, &kex_params);
-	if (ssh_add_hostkey(s->client.ssh, keybuf) < 0)
-		fatal("could not load server hostkey");
-	if (ssh_add_hostkey(s->server.ssh, known_keybuf) < 0)
-		fatal("could not load client hostkey");
 	event_add(&s->server.input, NULL);
 	event_add(&s->client.input, NULL);
 	s->connected = 1;
 	TAILQ_INSERT_TAIL(&sessions, s, next);
+	return;
+ fail:
+	close(s->server.fd);
+	s->server.fd = -1;
+	session_close(s);
+	return;
 }
 
-void
+int
 ssh_packet_fwd(struct side *from, struct side *to)
 {
-	int type;
-	u_char *data;
+	u_char *data, type;
 	u_int len, i;
+	int ret;
 
 	if (!from->ssh || !to->ssh)
-		return;
-	type = ssh_packet_next(from->ssh);
+		return 0;
+	if ((ret = ssh_packet_next(from->ssh, &type)) != 0)
+		return ret;
 	if (type) {
 		data = ssh_packet_payload(from->ssh, &len);
 		debug("ssh_packet_fwd %d->%d type %d len %d",
@@ -283,7 +300,8 @@ ssh_packet_fwd(struct side *from, struct side *to)
 			}
 			fputc('\n', stderr);
 		}
-		ssh_packet_put(to->ssh, type, data, len);
+		if ((ret = ssh_packet_put(to->ssh, type, data, len)) != 0)
+			return ret;
 	} else {
 		debug3("no packet on %d", from->fd);
 	}
@@ -297,6 +315,7 @@ ssh_packet_fwd(struct side *from, struct side *to)
 		debug3("output %d for %d", len, to->fd);
 		event_add(&to->output, NULL);
 	}
+	return 0;
 }
 
 void
@@ -307,6 +326,7 @@ input_cb(int fd, short type, void *arg)
 	struct side *r, *w;
 	ssize_t len;
 	const char *tag;
+	int ret;
 
 	if (fd == s->client.fd) {
 		tag = "client";
@@ -330,8 +350,11 @@ input_cb(int fd, short type, void *arg)
 		event_add(&r->input, NULL);
 		ssh_input_append(r->ssh, buf, len);
 	}
-	ssh_packet_fwd(r, w);
-	ssh_packet_fwd(w, r);
+	if ((ret = ssh_packet_fwd(r, w)) != 0 ||
+	    (ret = ssh_packet_fwd(w, r)) != 0) {
+		error("ssh_packet_fwd: %s", ssh_err(ret));
+		session_close(s);
+	}
 }
 
 void
