@@ -114,8 +114,8 @@ struct Kex {
 	int	hostkey_type;
 	int	kex_type;
 	int	roaming;
-	Buffer	my;
-	Buffer	peer;
+	struct sshbuf *my;
+	struct sshbuf *peer;
 	sig_atomic_t done;
 	int	flags;
 	const EVP_MD *evp_md;
@@ -135,13 +135,13 @@ struct Kex {
 
 int	 kex_names_valid(const char *);
 
-Kex	*kex_new(struct ssh *, char *[PROPOSAL_MAX]);
-Kex	*kex_setup(struct ssh *, char *[PROPOSAL_MAX]);
+int	kex_new(struct ssh *, char *[PROPOSAL_MAX], Kex **);
+int	 kex_setup(struct ssh *, char *[PROPOSAL_MAX]);
 int	 kex_finish(struct ssh *);
 void	 kex_free(Kex *);
 
-char   **kex_buf2prop(Buffer *, int *);
-void	 kex_prop2buf(Buffer *, char *proposal[PROPOSAL_MAX]);
+int	 kex_buf2prop(struct sshbuf *, int *, char ***);
+int	 kex_prop2buf(struct sshbuf *, char *proposal[PROPOSAL_MAX]);
 void	 kex_prop_free(char **);
 
 int	 kex_send_kexinit(struct ssh *);
@@ -172,7 +172,7 @@ kex_ecdh_hash(const EVP_MD *, const EC_GROUP *, char *, char *, char *, size_t,
 int	kex_ecdh_name_to_nid(const char *);
 const EVP_MD *kex_ecdh_name_to_evpmd(const char *);
 
-void
+int
 derive_ssh1_session_id(BIGNUM *, BIGNUM *, u_int8_t[8], u_int8_t[16]);
 
 #if defined(DEBUG_KEX) || defined(DEBUG_KEXDH) || defined(DEBUG_KEXECDH)
