@@ -57,7 +57,7 @@ kex_ecdh_name_to_evpmd(const char *kexname)
 	int nid = kex_ecdh_name_to_nid(kexname);
 
 	if (nid == -1)
-		fatal("%s: unsupported ECDH curve \"%s\"", __func__, kexname);
+		return NULL;
 	return sshkey_ec_nid_to_evpmd(nid);
 }
 
