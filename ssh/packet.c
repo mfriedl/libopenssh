@@ -661,9 +661,10 @@ ssh_packet_close(struct ssh *ssh)
 				inflateEnd(stream);
 		}
 	}
-	if ((r = cipher_cleanup(&state->send_context)) != 0 ||
-	    (r = cipher_cleanup(&state->receive_context)) != 0)
-		fatal("%s: cipher_cleanup failed: %s", __func__, ssh_err(r));
+	if ((r = cipher_cleanup(&state->send_context)) != 0)
+		error("%s: cipher_cleanup failed: %s", __func__, ssh_err(r));
+	if ((r = cipher_cleanup(&state->receive_context)) != 0)
+		error("%s: cipher_cleanup failed: %s", __func__, ssh_err(r));
 }
 
 /* Sets remote side protocol flags. */
