@@ -52,6 +52,7 @@ ssh_init(int is_server, struct kex_params *kex_params)
 	struct ssh *ssh;
 	char **proposal;
 	static int called;
+	int r;
 
 	if (!called) {
 		OpenSSL_add_all_algorithms();
@@ -64,7 +65,10 @@ ssh_init(int is_server, struct kex_params *kex_params)
 
 	/* Initialize key exchange */
 	proposal = kex_params ? kex_params->proposal : myproposal;
-	ssh->kex = kex_new(ssh, proposal);
+	if ((r = kex_new(ssh, proposal, &ssh->kex)) != 0) {
+		error("%s: kex_new: %s", __func__, ssh_err(r));
+		return NULL; /* XXX return error code */
+	}
 	ssh->kex->server = is_server;
 	if (is_server) {
 		ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
@@ -385,8 +389,9 @@ _ssh_order_hostkeyalgs(struct ssh *ssh)
 	int ktype, r;
 
 	/* XXX we de-serialize ssh->kex->my, modify it, and change it */
-	if ((r = kex_buf2prop(&ssh->kex->my, NULL, &proposal)) != 0)
-		fatal("%s: kex_buf2prop (my): %s", __func__, ssh_err(r));
+	if ((r = kex_buf2prop(ssh->kex->my, NULL, &proposal)) != 0)
+		fatal("%s: kex_buf2prop (my): %s",
+		    __func__, ssh_err(r)); /* XXX return error */
 	orig = proposal[PROPOSAL_SERVER_HOST_KEY_ALGS];
 	oavail = avail = xstrdup(orig);
 	maxlen = strlen(avail) + 1;
@@ -412,7 +417,9 @@ _ssh_order_hostkeyalgs(struct ssh *ssh)
 		debug2("%s: replace/%d %s", __func__, ssh->kex->server, replace);
 		xfree(orig);
 		proposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = replace;
-		kex_prop2buf(&ssh->kex->my, proposal);
+		if ((r = kex_prop2buf(ssh->kex->my, proposal)) != 0)
+			fatal("%s: kex_prop2buf (my): %s",
+			    __func__, ssh_err(r)); /* XXX return error */
 	} else {
 		xfree(replace);
 	}
