@@ -418,6 +418,8 @@ choose_kex(Kex *k, char *client, char *server)
 	    sizeof(KEX_ECDH_SHA2_STEM) - 1) == 0) {
 		k->kex_type = KEX_ECDH_SHA2;
 		k->evp_md = kex_ecdh_name_to_evpmd(k->name);
+		if (k->evp_md == NULL)
+			return SSH_ERR_INTERNAL_ERROR;
 	} else
 		return SSH_ERR_INTERNAL_ERROR;
 	return 0;
