@@ -26,7 +26,7 @@ ssh_err(int n)
 	case SSH_ERR_SUCCESS:
 		return "success";
 	case SSH_ERR_INTERNAL_ERROR:
-		return "internal buffer error";
+		return "unexpected internal error";
 	case SSH_ERR_ALLOC_FAIL:
 		return "memory allocation failed";
 	case SSH_ERR_MESSAGE_INCOMPLETE:

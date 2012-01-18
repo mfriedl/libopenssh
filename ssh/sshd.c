@@ -2170,6 +2170,7 @@ static void
 do_ssh2_kex(void)
 {
 	Kex *kex;
+	int r;
 
 	if (options.ciphers != NULL) {
 		myproposal[PROPOSAL_ENC_ALGS_CTOS] =
@@ -2197,7 +2198,9 @@ do_ssh2_kex(void)
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = list_hostkey_types();
 
 	/* start key exchange */
-	kex = kex_setup(active_state, myproposal);
+	if ((r = kex_setup(active_state, myproposal)) != 0)
+		fatal("kex_setup: %s", ssh_err(r));
+	kex = active_state->kex;
 	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
 	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
 	kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;

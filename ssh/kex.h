@@ -114,8 +114,8 @@ struct Kex {
 	int	hostkey_type;
 	int	kex_type;
 	int	roaming;
-	Buffer	my;
-	Buffer	peer;
+	struct sshbuf *my;
+	struct sshbuf *peer;
 	sig_atomic_t done;
 	int	flags;
 	const EVP_MD *evp_md;
@@ -135,13 +135,13 @@ struct Kex {
 
 int	 kex_names_valid(const char *);
 
-Kex	*kex_new(struct ssh *, char *[PROPOSAL_MAX]);
-Kex	*kex_setup(struct ssh *, char *[PROPOSAL_MAX]);
+int	kex_new(struct ssh *, char *[PROPOSAL_MAX], Kex **);
+int	 kex_setup(struct ssh *, char *[PROPOSAL_MAX]);
 int	 kex_finish(struct ssh *);
 void	 kex_free(Kex *);
 
-int	 kex_buf2prop(Buffer *, int *, char ***);
-void	 kex_prop2buf(Buffer *, char *proposal[PROPOSAL_MAX]);
+int	 kex_buf2prop(struct sshbuf *, int *, char ***);
+int	 kex_prop2buf(struct sshbuf *, char *proposal[PROPOSAL_MAX]);
 void	 kex_prop_free(char **);
 
 int	 kex_send_kexinit(struct ssh *);

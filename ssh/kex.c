@@ -81,27 +81,35 @@ kex_names_valid(const char *names)
 }
 
 /* put algorithm proposal into buffer */
-void
-kex_prop2buf(Buffer *b, char *proposal[PROPOSAL_MAX])
+int
+kex_prop2buf(struct sshbuf *b, char *proposal[PROPOSAL_MAX])
 {
 	u_int i;
+	int r;
 
-	buffer_clear(b);
+	sshbuf_reset(b);
+
 	/*
 	 * add a dummy cookie, the cookie will be overwritten by
 	 * kex_send_kexinit(), each time a kexinit is set
 	 */
-	for (i = 0; i < KEX_COOKIE_LEN; i++)
-		buffer_put_char(b, 0);
-	for (i = 0; i < PROPOSAL_MAX; i++)
-		buffer_put_cstring(b, proposal[i]);
-	buffer_put_char(b, 0);			/* first_kex_packet_follows */
-	buffer_put_int(b, 0);			/* uint32 reserved */
+	for (i = 0; i < KEX_COOKIE_LEN; i++) {
+		if ((r = sshbuf_put_u8(b, 0)) != 0)
+			return r;
+	}
+	for (i = 0; i < PROPOSAL_MAX; i++) {
+		if ((r = sshbuf_put_cstring(b, proposal[i])) != 0)
+			return r;
+	}
+	if ((r = sshbuf_put_u8(b, 0)) != 0 ||	/* first_kex_packet_follows */
+	    (r = sshbuf_put_u32(b, 0)) != 0)	/* uint32 reserved */
+		return r;
+	return 0;
 }
 
 /* parse buffer and return algorithm proposal */
 int
-kex_buf2prop(Buffer *raw, int *first_kex_follows, char ***propp)
+kex_buf2prop(struct sshbuf *raw, int *first_kex_follows, char ***propp)
 {
 	struct sshbuf *b = NULL;
 	u_char v;
@@ -192,8 +200,8 @@ kex_input_newkeys(int type, u_int32_t seq, struct ssh *ssh)
 	ssh_packet_check_eom(ssh);
 
 	kex->done = 1;
-	buffer_clear(&kex->peer);
-	/* buffer_clear(&kex->my); */
+	sshbuf_reset(kex->peer);
+	/* sshbuf_reset(kex->my); */
 	kex->flags &= ~KEX_INIT_SENT;
 	xfree(kex->name);
 	kex->name = NULL;
@@ -214,16 +222,16 @@ kex_send_kexinit(struct ssh *ssh)
 	kex->done = 0;
 
 	/* generate a random cookie */
-	if (buffer_len(&kex->my) < KEX_COOKIE_LEN)
+	if (sshbuf_len(kex->my) < KEX_COOKIE_LEN)
 		return SSH_ERR_INVALID_FORMAT;
-	if ((cookie = sshbuf_ptr(&kex->my)) == NULL)
+	if ((cookie = sshbuf_ptr(kex->my)) == NULL)
 		return SSH_ERR_INTERNAL_ERROR;
 	arc4random_buf(cookie, KEX_COOKIE_LEN);
 
 	if ((r = sshpkt_start(ssh, SSH2_MSG_KEXINIT)) != 0)
 		return r;
-	if ((r = sshpkt_put(ssh, buffer_ptr(&kex->my),
-	    buffer_len(&kex->my))) != 0)
+	if ((r = sshpkt_put(ssh, sshbuf_ptr(kex->my),
+	    sshbuf_len(kex->my))) != 0)
 		return r;
 	if ((r = sshpkt_send(ssh)) != 0)
 		return r;
@@ -246,7 +254,7 @@ kex_input_kexinit(int type, u_int32_t seq, struct ssh *ssh)
 		return SSH_ERR_INVALID_ARGUMENT;
 
 	ptr = ssh_packet_get_raw(ssh, &dlen);
-	if ((r = sshbuf_put(&kex->peer, ptr, dlen)) != 0)
+	if ((r = sshbuf_put(kex->peer, ptr, dlen)) != 0)
 		return r;
 
 	/* discard packet */
@@ -276,40 +284,59 @@ kex_input_kexinit(int type, u_int32_t seq, struct ssh *ssh)
 	return SSH_ERR_INTERNAL_ERROR;
 }
 
-Kex *
-kex_new(struct ssh *ssh, char *proposal[PROPOSAL_MAX])
+int
+kex_new(struct ssh *ssh, char *proposal[PROPOSAL_MAX], Kex **kexp)
 {
 	Kex *kex;
+	int r;
 
-	kex = xcalloc(1, sizeof(*kex));
-	buffer_init(&kex->peer);
-	buffer_init(&kex->my);
-	kex_prop2buf(&kex->my, proposal);
+	*kexp = NULL;
+	if ((kex = calloc(1, sizeof(*kex))) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if ((kex->peer = sshbuf_new()) == NULL ||
+	    (kex->my = sshbuf_new()) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
+	if ((r = kex_prop2buf(kex->my, proposal)) != 0)
+		goto out;
 	kex->done = 0;
 	kex_reset_dispatch(ssh);
-
-	return kex;
+	r = 0;
+	*kexp = kex;
+ out:
+	if (r != 0)
+		kex_free(kex);
+	return r;
 }
 
 void
 kex_free(Kex *kex)
 {
-	buffer_free(&kex->peer);
-	buffer_free(&kex->my);
+	if (kex->peer != NULL)
+		sshbuf_free(kex->peer);
+	if (kex->my != NULL)
+		sshbuf_free(kex->my);
 	if (kex->dh)
 		DH_free(kex->dh);
 	if (kex->ec_client_key)
 		EC_KEY_free(kex->ec_client_key);
-	xfree(kex);
+	free(kex);
 }
 
-Kex *
+int
 kex_setup(struct ssh *ssh, char *proposal[PROPOSAL_MAX])
 {
-	ssh->kex = kex_new(ssh, proposal);
-	if (kex_send_kexinit(ssh) != 0)		/* we start */
-		return NULL;	/* XXX */
-	return ssh->kex;
+	int r;
+
+	if ((r = kex_new(ssh, proposal, &ssh->kex)) != 0)
+		return r;
+	if ((r = kex_send_kexinit(ssh)) != 0) {		/* we start */
+		kex_free(ssh->kex);
+		ssh->kex = NULL;
+		return r;
+	}
+	return 0;
 }
 
 static int
@@ -446,8 +473,8 @@ kex_choose_conf(struct ssh *ssh)
 	int r, first_kex_follows;
 	Kex *kex = ssh->kex;
 
-	if ((r = kex_buf2prop(&kex->my, NULL, &my)) != 0 ||
-	    (r = kex_buf2prop(&kex->peer, &first_kex_follows, &peer)) != 0) {
+	if ((r = kex_buf2prop(kex->my, NULL, &my)) != 0 ||
+	    (r = kex_buf2prop(kex->peer, &first_kex_follows, &peer)) != 0) {
 		goto out;
 	}
 

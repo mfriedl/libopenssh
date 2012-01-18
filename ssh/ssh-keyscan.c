@@ -230,14 +230,25 @@ ssh2_capable(int remote_major, int remote_minor)
 static struct sshkey *
 keygrab_ssh2(con *c)
 {
-	int j;
+	int j, r;
 
 	packet_set_connection(c->c_fd, c->c_fd);
 	enable_compat20();
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = c->c_keytype == KT_DSA?
 	    "ssh-dss" : (c->c_keytype == KT_RSA ? "ssh-rsa" :
 	    "ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521");
-	c->c_kex = kex_setup(active_state, myproposal);
+	/*
+	 * XXX the following avoids a crash, but ssh-keyscan is broken.
+	 * after the first key is retrieved active_state is not properly
+	 * cleared and will fail when kex_setup tries to send a packet.
+	 */
+	if (active_state->kex != NULL)
+		active_state->kex = NULL;
+	if ((r = kex_setup(active_state, myproposal)) != 0) {
+		fprintf(stderr, "kex_setup: %s\n", ssh_err(r));
+		exit(1);
+	}
+	c->c_kex = active_state->kex;
 	c->c_kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
 	c->c_kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
 	c->c_kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;

@@ -154,8 +154,8 @@ input_kex_dh_init(int type, u_int32_t seq, struct ssh *ssh)
 	if ((r = kex_dh_hash(
 	    kex->client_version_string,
 	    kex->server_version_string,
-	    buffer_ptr(&kex->peer), buffer_len(&kex->peer),
-	    buffer_ptr(&kex->my), buffer_len(&kex->my),
+	    sshbuf_ptr(kex->peer), sshbuf_len(kex->peer),
+	    sshbuf_ptr(kex->my), sshbuf_len(kex->my),
 	    server_host_key_blob, sbloblen,
 	    dh_client_pub,
 	    kex->dh->pub_key,
