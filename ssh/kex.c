@@ -32,7 +32,6 @@
 
 #include <openssl/crypto.h>
 
-#include "xmalloc.h"
 #include "ssh2.h"
 #include "buffer.h"
 #include "packet.h"
@@ -60,7 +59,8 @@ kex_names_valid(const char *names)
 
 	if (names == NULL || strcmp(names, "") == 0)
 		return 0;
-	s = cp = xstrdup(names);
+	if ((s = cp = strdup(names)) == NULL)
+		return 0;
 	for ((p = strsep(&cp, ",")); p && *p != '\0';
 	    (p = strsep(&cp, ","))) {
 	    	if (strcmp(p, KEX_DHGEX_SHA256) != 0 &&
@@ -71,12 +71,12 @@ kex_names_valid(const char *names)
 		    sizeof(KEX_ECDH_SHA2_STEM) - 1) != 0 ||
 		    kex_ecdh_name_to_nid(p) == -1)) {
 			error("Unsupported KEX algorithm \"%.100s\"", p);
-			xfree(s);
+			free(s);
 			return 0;
 		}
 	}
 	debug3("kex names ok: [%s]", names);
-	xfree(s);
+	free(s);
 	return 1;
 }
 
@@ -155,8 +155,8 @@ kex_prop_free(char **proposal)
 	u_int i;
 
 	for (i = 0; i < PROPOSAL_MAX; i++)
-		xfree(proposal[i]);
-	xfree(proposal);
+		free(proposal[i]);
+	free(proposal);
 }
 
 /* ARGSUSED */
@@ -194,16 +194,18 @@ static int
 kex_input_newkeys(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
+	int r;
 
 	debug("SSH2_MSG_NEWKEYS received");
 	ssh_dispatch_set(ssh, SSH2_MSG_NEWKEYS, &kex_protocol_error);
-	ssh_packet_check_eom(ssh);
+	if ((r = sshpkt_get_end(ssh)) != 0)
+		return r;
 
 	kex->done = 1;
 	sshbuf_reset(kex->peer);
 	/* sshbuf_reset(kex->my); */
 	kex->flags &= ~KEX_INIT_SENT;
-	xfree(kex->name);
+	free(kex->name);
 	kex->name = NULL;
 	return 0;
 }
@@ -471,7 +473,6 @@ kex_choose_conf(struct ssh *ssh)
 	char **cprop, **sprop;
 	int nenc, nmac, ncomp;
 	u_int mode, ctos, need;
-	u_char type;
 	int r, first_kex_follows;
 	Kex *kex = ssh->kex;
 
@@ -544,11 +545,8 @@ kex_choose_conf(struct ssh *ssh)
 
 	/* ignore the next message if the proposals do not match */
 	if (first_kex_follows && !proposals_match(my, peer) &&
-	    !(ssh->datafellows & SSH_BUG_FIRSTKEX)) {
-		if ((r = ssh_packet_read_seqnr(ssh, &type, NULL)) != 0)
-			goto out;
-		debug2("skipping next packet (type %u)", type);
-	}
+	    !(ssh->datafellows & SSH_BUG_FIRSTKEX))
+		ssh->skip_packets = 1;
 	r = 0;
  out:
 	kex_prop_free(my);
