@@ -17,7 +17,6 @@
 
 #include <errno.h>
 #include <netdb.h>
-#include <setjmp.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,9 +68,6 @@ extern char *__progname;
 fd_set *read_wait;
 size_t read_wait_nfdset;
 int ncon;
-int nonfatal_fatal = 0;
-jmp_buf kexjmp;
-struct sshkey *kexjmp_key;
 
 /*
  * Keep a connection structure for each file descriptor.  The state
@@ -591,10 +587,7 @@ fatal(const char *fmt,...)
 	va_start(args, fmt);
 	do_log(SYSLOG_LEVEL_FATAL, fmt, args);
 	va_end(args);
-	if (nonfatal_fatal)
-		longjmp(kexjmp, -1);
-	else
-		exit(255);
+	exit(255);
 }
 
 static void
