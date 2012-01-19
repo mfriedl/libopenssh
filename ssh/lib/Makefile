@@ -1,7 +1,6 @@
 #	$OpenBSD: Makefile,v 1.63 2011/04/25 04:53:21 deraadt Exp $
 
 .PATH:		${.CURDIR}/..
-.include "${.CURDIR}/../Makefile.inc"
 
 LIB=	ssh
 WANTLINT=no
@@ -21,15 +20,17 @@ SRCS=	authfd.c authfile.c bufaux.c bufec.c bufbn.c buffer.c canohost.c \
 	sshbuf.c \
 	err.c
 
+SRCS+=	kexdhs.c kexgexs.c kexecdhs.c
 SRCS+=	opacket.c ssh_api.c
+SRCS+=	roaming_dummy.c
 
 DEBUGLIBS= no
 NOPROFILE= yes
-NOPIC=	yes
 
 install:
 	@echo -n
 
+.include "${.CURDIR}/../Makefile.inc"
 .include <bsd.own.mk>
 
 .if (${KERBEROS5:L} == "yes")

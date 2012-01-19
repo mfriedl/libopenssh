@@ -10,7 +10,7 @@ BINMODE?=555
 BINDIR=	/usr/bin
 MAN=	ssh-keyscan.1
 
-SRCS=	ssh-keyscan.c roaming_dummy.c
+SRCS=	ssh-keyscan.c
 
 .include <bsd.prog.mk>
 
