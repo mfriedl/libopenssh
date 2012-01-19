@@ -2215,7 +2215,9 @@ do_ssh2_kex(void)
 
 	active_state->kex = kex;
 
-	dispatch_run(DISPATCH_BLOCK, &kex->done);
+	if ((r = ssh_dispatch_run(active_state, DISPATCH_BLOCK,
+	    &kex->done)) != 0)
+		fatal("%s: key exchange failed: %s", __func__, ssh_err(r));
 
 	session_id2 = kex->session_id;
 	session_id2_len = kex->session_id_len;
