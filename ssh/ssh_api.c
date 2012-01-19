@@ -177,14 +177,14 @@ ssh_packet_next(struct ssh *ssh, u_char *typep)
 	u_int32_t seqnr;
 	u_char type;
 
+	/*
+	 * Try to read a packet. Return SSH_MSG_NONE if no packet or not
+	 * enough data.
+	 */
 	*typep = SSH_MSG_NONE;
 	if (ssh->kex->client_version_string == NULL ||
 	    ssh->kex->server_version_string == NULL)
 		return _ssh_exchange_banner(ssh);
-	/*
-	 * Try to read a packet. Returns SSH_MSG_NONE if no packet or not
-	 * enough data.
-	 */
 	if ((r = ssh_packet_read_poll2(ssh, &type, &seqnr)) != 0)
 		return r;
 	/*
@@ -284,7 +284,7 @@ _ssh_read_banner(struct ssh *ssh, char **bannerp)
 			break;
 		debug("ssh_exchange_identification: %s", buf);
 		if (++n > 65536)
-			return SSH_ERR_INVALID_FORMAT;	/* XXX */
+			return SSH_ERR_NO_PROTOCOL_VERSION;
 	}
 	if ((r = sshbuf_consume(input, j)) != 0)
 		return r;
@@ -305,7 +305,7 @@ _ssh_read_banner(struct ssh *ssh, char **bannerp)
 		remote_minor = 0;
 	}
 	if (remote_major != 2)
-		return SSH_ERR_INVALID_FORMAT;	/* XXX */
+		return SSH_ERR_PROTOCOL_MISMATCH;
 	enable_compat20();
 	chop(buf);
 	debug("Remote version string %.100s", buf);
