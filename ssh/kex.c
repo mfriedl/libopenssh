@@ -270,11 +270,9 @@ kex_input_kexinit(int type, u_int32_t seq, struct ssh *ssh)
 	    (r = sshpkt_get_end(ssh)) != 0)
 			return r;
 
-	/* XXX check error */
-	if (!(kex->flags & KEX_INIT_SENT)) {
+	if (!(kex->flags & KEX_INIT_SENT))
 		if ((r = kex_send_kexinit(ssh)) != 0)
 			return r;
-	}
 	if ((r = kex_choose_conf(ssh)) != 0)
 		return r;
 
