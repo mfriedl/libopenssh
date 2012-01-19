@@ -32,7 +32,6 @@
 
 #include <openssl/dh.h>
 
-#include "xmalloc.h"
 #include "buffer.h"
 #include "key.h"
 #include "cipher.h"

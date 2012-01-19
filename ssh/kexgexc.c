@@ -32,7 +32,6 @@
 #include <string.h>
 #include <signal.h>
 
-#include "xmalloc.h"
 #include "buffer.h"
 #include "key.h"
 #include "cipher.h"
