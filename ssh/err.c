@@ -93,6 +93,14 @@ ssh_err(int n)
 		return "no matching key exchange method found";
 	case SSH_ERR_NO_HOSTKEY_ALG_MATCH:
 		return "no matching host key type found";
+	case SSH_ERR_PROTOCOL_MISMATCH:
+		return "protocol version mismatch";
+	case SSH_ERR_NO_PROTOCOL_VERSION:
+		return "failed to not read protocol version";
+	case SSH_ERR_NO_HOSTKEY_LOADED:
+		return "could not load host key";
+	case SSH_ERR_NEED_REKEY:
+		return "rekeying not supported by peer";
 	default:
 		return "unknown error";
 	}
