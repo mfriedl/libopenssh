@@ -30,7 +30,6 @@
 
 #include <openssl/ecdh.h>
 
-#include "xmalloc.h"
 #include "buffer.h"
 #include "key.h"
 #include "cipher.h"
