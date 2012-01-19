@@ -104,6 +104,11 @@ ssh_dispatch_run(struct ssh *ssh, int mode, volatile sig_atomic_t *done)
 		}
 		if (type > 0 && type < DISPATCH_MAX &&
 		    ssh->dispatch[type] != NULL) {
+			if (ssh->skip_packets) {
+				debug2("skipped packet (type %u)", type);
+				ssh->skip_packets--;
+				continue;
+			}
 			r = (*ssh->dispatch[type])(type, seqnr, ssh);
 			if (r != 0)
 				return r;

@@ -55,6 +55,8 @@ struct ssh {
 
 	/* Dispatcher table */
 	dispatch_fn *dispatch[DISPATCH_MAX];
+	/* number of packets to ignore in the dispatcher */
+	int skip_packets;
 
 	/* datafellows */
 	int datafellows;
