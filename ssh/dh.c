@@ -46,6 +46,7 @@ parse_prime(int linenum, char *line, struct dhgroup *dhg)
 	const char *errstr = NULL;
 	long long n;
 
+	dhg->g = dhg->p = NULL;
 	cp = line;
 	if ((arg = strdelim(&cp)) == NULL)
 		return 0;
@@ -93,27 +94,20 @@ parse_prime(int linenum, char *line, struct dhgroup *dhg)
 	if (cp != NULL || *prime == '\0')
 		goto fail;
 
-	if ((dhg->g = BN_new()) == NULL)
-		fatal("parse_prime: BN_new failed");
-	if ((dhg->p = BN_new()) == NULL)
-		fatal("parse_prime: BN_new failed");
-	if (BN_hex2bn(&dhg->g, gen) == 0)
-		goto failclean;
-
-	if (BN_hex2bn(&dhg->p, prime) == 0)
-		goto failclean;
-
-	if (BN_num_bits(dhg->p) != dhg->size)
-		goto failclean;
-
-	if (BN_is_zero(dhg->g) || BN_is_one(dhg->g))
-		goto failclean;
-
+	if ((dhg->g = BN_new()) == NULL ||
+	    (dhg->p = BN_new()) == NULL ||
+	    BN_hex2bn(&dhg->g, gen) == 0 ||
+	    BN_hex2bn(&dhg->p, prime) == 0 ||
+	    BN_num_bits(dhg->p) != dhg->size ||
+	    BN_is_zero(dhg->g) || BN_is_one(dhg->g)) {
+		if (dhg->g)
+			BN_clear_free(dhg->g);
+		if (dhg->p)
+			BN_clear_free(dhg->p);
+		goto fail;
+	}
+    
 	return (1);
-
- failclean:
-	BN_clear_free(dhg->g);
-	BN_clear_free(dhg->p);
  fail:
 	error("Bad prime description in line %d", linenum);
 	return (0);
@@ -178,9 +172,11 @@ choose_dh(int min, int wantbits, int max)
 		break;
 	}
 	fclose(f);
-	if (linenum != which+1)
-		fatal("WARNING: line %d disappeared in %s, giving up",
+	if (linenum != which+1) {
+		logit("WARNING: line %d disappeared in %s, giving up",
 		    which, _PATH_DH_PRIMES);
+		return (dh_new_group14());
+	}
 
 	return (dh_new_group(dhg.g, dhg.p));
 }
@@ -259,13 +255,12 @@ dh_new_group_asc(const char *gen, const char *modulus)
 	DH *dh;
 
 	if ((dh = DH_new()) == NULL)
-		fatal("dh_new_group_asc: DH_new");
-
-	if (BN_hex2bn(&dh->p, modulus) == 0)
-		fatal("BN_hex2bn p");
-	if (BN_hex2bn(&dh->g, gen) == 0)
-		fatal("BN_hex2bn g");
-
+		return NULL;
+	if (BN_hex2bn(&dh->p, modulus) == 0 ||
+	    BN_hex2bn(&dh->g, gen) == 0) {
+		DH_free(dh);
+		return NULL;
+	}
 	return (dh);
 }
 
@@ -280,7 +275,7 @@ dh_new_group(BIGNUM *gen, BIGNUM *modulus)
 	DH *dh;
 
 	if ((dh = DH_new()) == NULL)
-		fatal("dh_new_group: DH_new");
+		return NULL;
 	dh->p = modulus;
 	dh->g = gen;
 
