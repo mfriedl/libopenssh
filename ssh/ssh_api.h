@@ -81,7 +81,7 @@ int	ssh_input_space(struct ssh *ssh, u_int len);
 /*
  * ssh_input_append() appends data to the input byte-stream.
  */
-int	ssh_input_append(struct ssh* ssh, const char *data, u_int len);
+int	ssh_input_append(struct ssh *ssh, const char *data, u_int len);
 
 /*
  * ssh_output_space() checks if 'len' bytes can be appended to the
