@@ -31,6 +31,7 @@
 #include "ssh1.h"
 #include "ssh2.h"
 #include "log.h"
+#define DISPATCH_COMPAT
 #include "dispatch.h"
 #include "packet.h"
 #include "compat.h"
