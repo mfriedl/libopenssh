@@ -135,9 +135,8 @@ struct Kex {
 
 int	 kex_names_valid(const char *);
 
-int	kex_new(struct ssh *, char *[PROPOSAL_MAX], Kex **);
+int	 kex_new(struct ssh *, char *[PROPOSAL_MAX], Kex **);
 int	 kex_setup(struct ssh *, char *[PROPOSAL_MAX]);
-int	 kex_finish(struct ssh *);
 void	 kex_free(Kex *);
 
 int	 kex_buf2prop(struct sshbuf *, int *, char ***);
@@ -147,6 +146,7 @@ void	 kex_prop_free(char **);
 int	 kex_send_kexinit(struct ssh *);
 int	 kex_input_kexinit(int, u_int32_t, struct ssh *);
 int	 kex_derive_keys(struct ssh *, u_char *, u_int, BIGNUM *);
+int	 kex_send_newkeys(struct ssh *);
 
 Newkeys *kex_get_newkeys(struct ssh *, int);
 
