@@ -106,7 +106,7 @@ parse_prime(int linenum, char *line, struct dhgroup *dhg)
 			BN_clear_free(dhg->p);
 		goto fail;
 	}
-    
+
 	return (1);
  fail:
 	error("Bad prime description in line %d", linenum);
