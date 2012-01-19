@@ -7,9 +7,7 @@ PROG=	ssh-proxy
 BINDIR=	/usr/sbin
 NOMAN=	yes
 
-SRCS=	ssh-proxy.c readconf.c \
-	kexdhs.c kexgexs.c kexecdhs.c \
-	roaming_dummy.c
+SRCS=	ssh-proxy.c readconf.c
 
 .include <bsd.prog.mk>
 

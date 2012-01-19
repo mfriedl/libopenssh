@@ -10,7 +10,7 @@ BINMODE?=4555
 BINDIR=	/usr/libexec
 MAN=	ssh-keysign.8
 
-SRCS=	ssh-keysign.c readconf.c roaming_dummy.c
+SRCS=	ssh-keysign.c readconf.c
 
 .include <bsd.prog.mk>
 

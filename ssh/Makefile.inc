@@ -27,10 +27,15 @@ CFLAGS+=	-DHAVE_DLOPEN
 
 .include <bsd.obj.mk>
 
+.if !defined(LIB)
 .if exists(${.CURDIR}/../lib/${__objdir})
-LDADD+=         -L${.CURDIR}/../lib/${__objdir} -lssh
+LDADD+=         -L${.CURDIR}/../lib/${__objdir} -lssh -lgssapi -lkrb5
 DPADD+=         ${.CURDIR}/../lib/${__objdir}/libssh.a
 .else
-LDADD+=         -L${.CURDIR}/../lib -lssh
+LDADD+=         -L${.CURDIR}/../lib -lssh -lgssapi -lkrb5
 DPADD+=         ${.CURDIR}/../lib/libssh.a
+.endif
+DPADD+=         ${.CURDIR}/../lib/shlib_version
+LDADD+=         -lcrypto -lz
+DPADD+=         ${LIBCRYPTO} ${LIBZ}
 .endif
