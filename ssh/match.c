@@ -39,8 +39,8 @@
 
 #include <ctype.h>
 #include <string.h>
+#include <stdlib.h>
 
-#include "xmalloc.h"
 #include "match.h"
 
 /*
@@ -218,13 +218,14 @@ match_user(const char *user, const char *host, const char *ipaddr,
 	if ((p = strchr(pattern,'@')) == NULL)
 		return match_pattern(user, pattern);
 
-	pat = xstrdup(pattern);
+	if ((pat = strdup(pattern)) == NULL)
+		return 0;
 	p = strchr(pat, '@');
 	*p++ = '\0';
 
 	if ((ret = match_pattern(user, pat)) == 1)
 		ret = match_host_and_ip(host, ipaddr, p);
-	xfree(pat);
+	free(pat);
 
 	return ret;
 }
@@ -242,8 +243,12 @@ match_list(const char *client, const char *server, u_int *next)
 	char *c, *s, *p, *ret, *cp, *sp;
 	int i, j, nproposals;
 
-	c = cp = xstrdup(client);
-	s = sp = xstrdup(server);
+	if ((c = cp = strdup(client)) == NULL ||
+	    (s = sp = strdup(server)) == NULL) {
+		if (c)
+			free(c);
+		return NULL;
+	}
 
 	for ((p = strsep(&sp, SEP)), i=0; p && *p != '\0';
 	    (p = strsep(&sp, SEP)), i++) {
@@ -258,19 +263,19 @@ match_list(const char *client, const char *server, u_int *next)
 	    (p = strsep(&cp, SEP)), i++) {
 		for (j = 0; j < nproposals; j++) {
 			if (strcmp(p, sproposals[j]) == 0) {
-				ret = xstrdup(p);
+				ret = strdup(p);
 				if (next != NULL)
 					*next = (cp == NULL) ?
 					    strlen(c) : (u_int)(cp - c);
-				xfree(c);
-				xfree(s);
+				free(c);
+				free(s);
 				return ret;
 			}
 		}
 	}
 	if (next != NULL)
 		*next = strlen(c);
-	xfree(c);
-	xfree(s);
+	free(c);
+	free(s);
 	return NULL;
 }
