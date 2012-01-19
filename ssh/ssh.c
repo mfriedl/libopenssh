@@ -196,8 +196,8 @@ usage(void)
 	exit(255);
 }
 
-static int ssh_session(void);
-static int ssh_session2(void);
+static int ssh_session(struct ssh *);
+static int ssh_session2(struct ssh *);
 static void load_public_identity_files(void);
 static void main_sigchld_handler(int);
 
@@ -899,7 +899,7 @@ main(int ac, char **av)
 		}
 	}
 
-	exit_status = compat20 ? ssh_session2() : ssh_session();
+	exit_status = compat20 ? ssh_session2(ssh) : ssh_session(ssh);
 	ssh_packet_close(ssh);
 
 	if (options.control_path != NULL && muxserver_sock != -1)
@@ -971,6 +971,7 @@ fork_postauth(void)
 static void
 ssh_confirm_remote_forward(int type, u_int32_t seq, void *ctxt)
 {
+	struct ssh *ssh = active_state; /* XXX */
 	Forward *rfwd = (Forward *)ctxt;
 
 	/* XXX verbose() on failure? */
@@ -979,7 +980,7 @@ ssh_confirm_remote_forward(int type, u_int32_t seq, void *ctxt)
 	    rfwd->listen_port, rfwd->connect_host, rfwd->connect_port);
 	if (rfwd->listen_port == 0) {
 		if (type == SSH2_MSG_REQUEST_SUCCESS) {
-			rfwd->allocated_port = packet_get_int();
+			rfwd->allocated_port = ssh_packet_get_int(ssh);
 			logit("Allocated port %u for remote forward to %s:%d",
 			    rfwd->allocated_port,
 			    rfwd->connect_host, rfwd->connect_port);
@@ -1035,7 +1036,7 @@ ssh_init_stdio_forwarding(void)
 }
 
 static void
-ssh_init_forwarding(void)
+ssh_init_forwarding(struct ssh *ssh)
 {
 	int success = 0;
 	int i;
@@ -1091,7 +1092,7 @@ ssh_init_forwarding(void)
 
 	/* Initiate tunnel forwarding. */
 	if (options.tun_open != SSH_TUNMODE_NO) {
-		if (client_request_tun_fwd(options.tun_open,
+		if (client_request_tun_fwd(ssh, options.tun_open,
 		    options.tun_local, options.tun_remote) == -1) {
 			if (options.exit_on_forward_failure)
 				fatal("Could not request tunnel forwarding.");
@@ -1112,7 +1113,7 @@ check_agent_present(void)
 }
 
 static int
-ssh_session(void)
+ssh_session(struct ssh *ssh)
 {
 	int r, type;
 	int interactive = 0;
@@ -1132,20 +1133,20 @@ ssh_session(void)
 			    "9 (slow, best).");
 
 		/* Send the request. */
-		packet_start(SSH_CMSG_REQUEST_COMPRESSION);
-		packet_put_int(options.compression_level);
-		packet_send();
-		packet_write_wait();
-		type = packet_read();
+		ssh_packet_start(ssh, SSH_CMSG_REQUEST_COMPRESSION);
+		ssh_packet_put_int(ssh, options.compression_level);
+		ssh_packet_send(ssh);
+		ssh_packet_write_wait(ssh);
+		type = ssh_packet_read(ssh);
 		if (type == SSH_SMSG_SUCCESS) {
-			if ((r = packet_start_compression(
+			if ((r = ssh_packet_start_compression(ssh,
 			    options.compression_level)) != 0)
 				fatal("%s: packet_start_compression: %s",
 				    __func__, ssh_err(r));
 		} else if (type == SSH_SMSG_FAILURE)
 			logit("Warning: Remote host refused compression.");
 		else
-			packet_disconnect("Protocol error waiting for "
+			ssh_packet_disconnect(ssh, "Protocol error waiting for "
 			    "compression response.");
 	}
 	/* Allocate a pseudo tty if appropriate. */
@@ -1153,32 +1154,32 @@ ssh_session(void)
 		debug("Requesting pty.");
 
 		/* Start the packet. */
-		packet_start(SSH_CMSG_REQUEST_PTY);
+		ssh_packet_start(ssh, SSH_CMSG_REQUEST_PTY);
 
 		/* Store TERM in the packet.  There is no limit on the
 		   length of the string. */
 		cp = getenv("TERM");
 		if (!cp)
 			cp = "";
-		packet_put_cstring(cp);
+		ssh_packet_put_cstring(ssh, cp);
 
 		/* Store window size in the packet. */
 		if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) < 0)
 			memset(&ws, 0, sizeof(ws));
-		packet_put_int((u_int)ws.ws_row);
-		packet_put_int((u_int)ws.ws_col);
-		packet_put_int((u_int)ws.ws_xpixel);
-		packet_put_int((u_int)ws.ws_ypixel);
+		ssh_packet_put_int(ssh, (u_int)ws.ws_row);
+		ssh_packet_put_int(ssh, (u_int)ws.ws_col);
+		ssh_packet_put_int(ssh, (u_int)ws.ws_xpixel);
+		ssh_packet_put_int(ssh, (u_int)ws.ws_ypixel);
 
 		/* Store tty modes in the packet. */
 		tty_make_modes(fileno(stdin), NULL);
 
 		/* Send the packet, and wait for it to leave. */
-		packet_send();
-		packet_write_wait();
+		ssh_packet_send(ssh);
+		ssh_packet_write_wait(ssh);
 
 		/* Read response from the server. */
-		type = packet_read();
+		type = ssh_packet_read(ssh);
 		if (type == SSH_SMSG_SUCCESS) {
 			interactive = 1;
 			have_tty = 1;
@@ -1186,7 +1187,8 @@ ssh_session(void)
 			logit("Warning: Remote host failed or refused to "
 			    "allocate a pseudo tty.");
 		else
-			packet_disconnect("Protocol error waiting for pty "
+			ssh_packet_disconnect(ssh,
+			    "Protocol error waiting for pty "
 			    "request response.");
 	}
 	/* Request X11 forwarding if enabled and DISPLAY is set. */
@@ -1204,18 +1206,19 @@ ssh_session(void)
 		x11_request_forwarding_with_spoofing(0, display, proto,
 		    data, 0);
 		/* Read response from the server. */
-		type = packet_read();
+		type = ssh_packet_read(ssh);
 		if (type == SSH_SMSG_SUCCESS) {
 			interactive = 1;
 		} else if (type == SSH_SMSG_FAILURE) {
 			logit("Warning: Remote host denied X11 forwarding.");
 		} else {
-			packet_disconnect("Protocol error waiting for X11 "
+			ssh_packet_disconnect(ssh,
+			    "Protocol error waiting for X11 "
 			    "forwarding");
 		}
 	}
 	/* Tell the packet module whether this is an interactive session. */
-	packet_set_interactive(interactive,
+	ssh_packet_set_interactive(ssh, interactive,
 	    options.ip_qos_interactive, options.ip_qos_bulk);
 
 	/* Request authentication agent forwarding if appropriate. */
@@ -1226,15 +1229,15 @@ ssh_session(void)
 		auth_request_forwarding();
 
 		/* Read response from the server. */
-		type = packet_read();
-		packet_check_eom();
+		type = ssh_packet_read(ssh);
+		ssh_packet_check_eom(ssh);
 		if (type != SSH_SMSG_SUCCESS)
 			logit("Warning: Remote host denied authentication agent forwarding.");
 	}
 
 	/* Initiate port forwardings. */
 	ssh_init_stdio_forwarding();
-	ssh_init_forwarding();
+	ssh_init_forwarding(ssh);
 
 	/* Execute a local command */
 	if (options.local_command != NULL &&
@@ -1264,19 +1267,19 @@ ssh_session(void)
 			len = 900;
 		debug("Sending command: %.*s", len,
 		    (u_char *)buffer_ptr(&command));
-		packet_start(SSH_CMSG_EXEC_CMD);
-		packet_put_string(buffer_ptr(&command), buffer_len(&command));
-		packet_send();
-		packet_write_wait();
+		ssh_packet_start(ssh, SSH_CMSG_EXEC_CMD);
+		ssh_packet_put_string(ssh, buffer_ptr(&command), buffer_len(&command));
+		ssh_packet_send(ssh);
+		ssh_packet_write_wait(ssh);
 	} else {
 		debug("Requesting shell.");
-		packet_start(SSH_CMSG_EXEC_SHELL);
-		packet_send();
-		packet_write_wait();
+		ssh_packet_start(ssh, SSH_CMSG_EXEC_SHELL);
+		ssh_packet_send(ssh);
+		ssh_packet_write_wait(ssh);
 	}
 
 	/* Enter the interactive session. */
-	return client_loop(have_tty, tty_flag ?
+	return client_loop(ssh, have_tty, tty_flag ?
 	    options.escape_char : SSH_ESCAPECHAR_NONE, 0);
 }
 
@@ -1284,6 +1287,7 @@ ssh_session(void)
 static void
 ssh_session2_setup(int id, int success, void *arg)
 {
+	struct ssh *ssh = arg;
 	extern char **environ;
 	const char *display;
 	int interactive = tty_flag;
@@ -1312,16 +1316,16 @@ ssh_session2_setup(int id, int success, void *arg)
 	if (options.forward_agent) {
 		debug("Requesting authentication agent forwarding.");
 		channel_request_start(id, "auth-agent-req@openssh.com", 0);
-		packet_send();
+		ssh_packet_send(ssh);
 	}
 
-	client_session2_setup(id, tty_flag, subsystem_flag, getenv("TERM"),
+	client_session2_setup(ssh, id, tty_flag, subsystem_flag, getenv("TERM"),
 	    NULL, fileno(stdin), &command, environ);
 }
 
 /* open new channel for a session */
 static int
-ssh_session2_open(void)
+ssh_session2_open(struct ssh *ssh)
 {
 	Channel *c;
 	int window, packetmax, in, out, err;
@@ -1361,20 +1365,20 @@ ssh_session2_open(void)
 	channel_send_open(c->self);
 	if (!no_shell_flag)
 		channel_register_open_confirm(c->self,
-		    ssh_session2_setup, NULL);
+		    ssh_session2_setup, ssh);
 
 	return c->self;
 }
 
 static int
-ssh_session2(void)
+ssh_session2(struct ssh *ssh)
 {
 	int id = -1;
 
 	/* XXX should be pre-session */
 	if (!options.control_persist)
 		ssh_init_stdio_forwarding();
-	ssh_init_forwarding();
+	ssh_init_forwarding(ssh);
 
 	/* Start listening for multiplex clients */
 	muxserver_listen();
@@ -1408,16 +1412,16 @@ ssh_session2(void)
 		ssh_init_stdio_forwarding();
 
 	if (!no_shell_flag || (datafellows & SSH_BUG_DUMMYCHAN))
-		id = ssh_session2_open();
+		id = ssh_session2_open(ssh);
 
 	/* If we don't expect to open a new session, then disallow it */
 	if (options.control_master == SSHCTL_MASTER_NO &&
 	    (datafellows & SSH_NEW_OPENSSH)) {
 		debug("Requesting no-more-sessions@openssh.com");
-		packet_start(SSH2_MSG_GLOBAL_REQUEST);
-		packet_put_cstring("no-more-sessions@openssh.com");
-		packet_put_char(0);
-		packet_send();
+		ssh_packet_start(ssh, SSH2_MSG_GLOBAL_REQUEST);
+		ssh_packet_put_cstring(ssh, "no-more-sessions@openssh.com");
+		ssh_packet_put_char(ssh, 0);
+		ssh_packet_send(ssh);
 	}
 
 	/* Execute a local command */
@@ -1441,7 +1445,7 @@ ssh_session2(void)
 	if (options.use_roaming)
 		request_roaming();
 
-	return client_loop(tty_flag, tty_flag ?
+	return client_loop(ssh, tty_flag, tty_flag ?
 	    options.escape_char : SSH_ESCAPECHAR_NONE, id);
 }
 

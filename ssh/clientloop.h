@@ -37,14 +37,16 @@
 
 #include <termios.h>
 
+struct ssh;
+
 /* Client side main loop for the interactive session. */
-int	 client_loop(int, int, int);
+int	 client_loop(struct ssh *, int, int, int);
 void	 client_x11_get_proto(const char *, const char *, u_int, u_int,
 	    char **, char **);
 void	 client_global_request_reply_fwd(int, u_int32_t, void *);
-void	 client_session2_setup(int, int, int, const char *, struct termios *,
-	    int, Buffer *, char **);
-int	 client_request_tun_fwd(int, int, int);
+void	 client_session2_setup(struct ssh *, int, int, int, const char *,
+	    struct termios *, int, Buffer *, char **);
+int	 client_request_tun_fwd(struct ssh *, int, int, int);
 void	 client_stop_mux(void);
 
 /* Escape filter for protocol 2 sessions */

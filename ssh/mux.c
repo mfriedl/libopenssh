@@ -1221,6 +1221,7 @@ muxserver_listen(void)
 static void
 mux_session_confirm(int id, int success, void *arg)
 {
+	struct ssh *ssh = active_state; /* XXXX */
 	struct mux_session_confirm_ctx *cctx = arg;
 	const char *display;
 	Channel *c, *cc;
@@ -1268,7 +1269,7 @@ mux_session_confirm(int id, int success, void *arg)
 		packet_send();
 	}
 
-	client_session2_setup(id, cctx->want_tty, cctx->want_subsys,
+	client_session2_setup(ssh, id, cctx->want_tty, cctx->want_subsys,
 	    cctx->term, &cctx->tio, c->rfd, &cctx->cmd, cctx->env);
 
 	debug3("%s: sending success reply", __func__);
