@@ -105,7 +105,7 @@ ssh_free(struct ssh *ssh)
 
 /* Returns < 0 on error, 0 otherwise */
 int
-ssh_add_hostkey(struct ssh* ssh, char *key)
+ssh_add_hostkey(struct ssh *ssh, char *key)
 {
 	struct sshkey *parsed_key = NULL, *pubkey = NULL;
 	struct sshbuf *key_buf = NULL;
@@ -165,7 +165,7 @@ out:
 }
 
 int
-ssh_input_append(struct ssh* ssh, const char *data, u_int len)
+ssh_input_append(struct ssh *ssh, const char *data, u_int len)
 {
 	return sshbuf_put(ssh_packet_get_input(ssh), data, len);
 }
@@ -206,13 +206,13 @@ ssh_packet_next(struct ssh *ssh, u_char *typep)
 }
 
 void *
-ssh_packet_payload(struct ssh* ssh, u_int *len)
+ssh_packet_payload(struct ssh *ssh, u_int *len)
 {
 	return (ssh_packet_get_raw(ssh, len));
 }
 
 int
-ssh_packet_put(struct ssh* ssh, int type, const char *data, u_int len)
+ssh_packet_put(struct ssh *ssh, int type, const char *data, u_int len)
 {
 	int r;
 
