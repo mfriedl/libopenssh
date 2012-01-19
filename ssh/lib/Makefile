@@ -40,4 +40,5 @@ SRCS+= gss-genr.c
 CFLAGS+= -DGSSAPI
 .endif # KERBEROS5
 
+NOPIC= yes
 .include <bsd.lib.mk>
