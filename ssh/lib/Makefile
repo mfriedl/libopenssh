@@ -26,7 +26,6 @@ SRCS+=	roaming_dummy.c
 
 DEBUGLIBS= no
 NOPROFILE= yes
-NOPIC= yes
 
 install:
 	@echo -n
