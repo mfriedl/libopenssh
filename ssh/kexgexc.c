@@ -241,7 +241,7 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 	}
 
 	if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) == 0)
-		r = kex_finish(ssh);
+		r = kex_send_newkeys(ssh);
  out:
 	DH_free(kex->dh);
 	kex->dh = NULL;

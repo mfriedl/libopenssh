@@ -176,7 +176,7 @@ kex_reset_dispatch(struct ssh *ssh)
 }
 
 int
-kex_finish(struct ssh *ssh)
+kex_send_newkeys(struct ssh *ssh)
 {
 	int r;
 
@@ -200,7 +200,6 @@ kex_input_newkeys(int type, u_int32_t seq, struct ssh *ssh)
 	ssh_dispatch_set(ssh, SSH2_MSG_NEWKEYS, &kex_protocol_error);
 	if ((r = sshpkt_get_end(ssh)) != 0)
 		return r;
-
 	kex->done = 1;
 	sshbuf_reset(kex->peer);
 	/* sshbuf_reset(kex->my); */
@@ -477,9 +476,8 @@ kex_choose_conf(struct ssh *ssh)
 	Kex *kex = ssh->kex;
 
 	if ((r = kex_buf2prop(kex->my, NULL, &my)) != 0 ||
-	    (r = kex_buf2prop(kex->peer, &first_kex_follows, &peer)) != 0) {
+	    (r = kex_buf2prop(kex->peer, &first_kex_follows, &peer)) != 0)
 		goto out;
-	}
 
 	if (kex->server) {
 		cprop=peer;
