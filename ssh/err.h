@@ -56,6 +56,10 @@
 #define SSH_ERR_NO_COMPRESS_ALG_MATCH		-32
 #define SSH_ERR_NO_KEX_ALG_MATCH		-33
 #define SSH_ERR_NO_HOSTKEY_ALG_MATCH		-34
+#define SSH_ERR_NO_HOSTKEY_LOADED		-35
+#define SSH_ERR_PROTOCOL_MISMATCH		-36
+#define SSH_ERR_NO_PROTOCOL_VERSION		-37
+#define SSH_ERR_NEED_REKEY			-38
 
 /* Translate a numeric error code to a human-readable error string */
 const char *ssh_err(int n);

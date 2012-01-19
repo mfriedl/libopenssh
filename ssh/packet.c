@@ -1323,7 +1323,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 		logit("outgoing seqnr wraps around");
 	if (++state->p_send.packets == 0)
 		if (!(ssh->datafellows & SSH_BUG_NOREKEY))
-			return SSH_ERR_INTERNAL_ERROR;	/* XXX */
+			return SSH_ERR_NEED_REKEY;
 	state->p_send.blocks += (packet_length + 4) / block_size;
 	state->p_send.bytes += packet_length + 4;
 	sshbuf_reset(state->outgoing_packet);
@@ -1759,7 +1759,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		logit("incoming seqnr wraps around");
 	if (++state->p_read.packets == 0)
 		if (!(ssh->datafellows & SSH_BUG_NOREKEY))
-			return SSH_ERR_INTERNAL_ERROR;	/* XXX */
+			return SSH_ERR_NEED_REKEY;
 	state->p_read.blocks += (state->packlen + 4) / block_size;
 	state->p_read.bytes += state->packlen + 4;
 

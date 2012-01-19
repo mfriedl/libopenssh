@@ -101,7 +101,7 @@ input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 	    ssh)) == NULL ||
 	    (server_host_private = kex->load_host_private_key(kex->hostkey_type,
 	    ssh)) == NULL) {
-		r = SSH_ERR_KEY_TYPE_MISMATCH;  /* XXX */
+		r = SSH_ERR_NO_HOSTKEY_LOADED;
 		goto out;
 	}
 	if ((client_public = EC_POINT_new(group)) == NULL) {
