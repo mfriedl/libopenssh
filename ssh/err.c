@@ -96,7 +96,7 @@ ssh_err(int n)
 	case SSH_ERR_PROTOCOL_MISMATCH:
 		return "protocol version mismatch";
 	case SSH_ERR_NO_PROTOCOL_VERSION:
-		return "failed to not read protocol version";
+		return "could not read protocol version";
 	case SSH_ERR_NO_HOSTKEY_LOADED:
 		return "could not load host key";
 	case SSH_ERR_NEED_REKEY:
