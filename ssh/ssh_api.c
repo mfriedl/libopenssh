@@ -8,7 +8,6 @@
 #include "ssh1.h"
 #include "ssh2.h"
 #include "version.h"
-#include "xmalloc.h"
 #include "myproposal.h"
 #include "err.h"
 
@@ -100,7 +99,7 @@ ssh_free(struct ssh *ssh)
 	ssh_packet_close(ssh);
 	if (ssh->kex);
 		kex_free(ssh->kex);
-	xfree(ssh);
+	free(ssh);
 }
 
 /* Returns < 0 on error, 0 otherwise */
@@ -444,7 +443,7 @@ _ssh_order_hostkeyalgs(struct ssh *ssh)
 		goto out;
 	}
 	maxlen = strlen(avail) + 1;
-	if ((replace = xmalloc(maxlen)) == NULL) {
+	if ((replace = calloc(1, maxlen)) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
