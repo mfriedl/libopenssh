@@ -2180,6 +2180,9 @@ do_ssh2_kex(void)
 	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_CTOS]);
 	myproposal[PROPOSAL_ENC_ALGS_STOC] =
 	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_STOC]);
+	if (myproposal[PROPOSAL_ENC_ALGS_CTOS] == NULL ||
+	    myproposal[PROPOSAL_ENC_ALGS_STOC] == NULL)
+		fatal("no compatible ciphers found");
 
 	if (options.macs != NULL) {
 		myproposal[PROPOSAL_MAC_ALGS_CTOS] =

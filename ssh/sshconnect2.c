@@ -169,6 +169,9 @@ ssh_kex2(char *host, struct sockaddr *hostaddr, u_short port)
 	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_CTOS]);
 	myproposal[PROPOSAL_ENC_ALGS_STOC] =
 	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_STOC]);
+	if (myproposal[PROPOSAL_ENC_ALGS_CTOS] == NULL ||
+	    myproposal[PROPOSAL_ENC_ALGS_STOC] == NULL)
+		fatal("no compatible ciphers found");
 	if (options.compression) {
 		myproposal[PROPOSAL_COMP_ALGS_CTOS] =
 		myproposal[PROPOSAL_COMP_ALGS_STOC] = "zlib@openssh.com,zlib,none";

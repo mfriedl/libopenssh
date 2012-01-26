@@ -29,8 +29,6 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include "xmalloc.h"
-#include "buffer.h"
 #include "compat.h"
 #include "log.h"
 #include "match.h"
@@ -184,7 +182,9 @@ proto_spec(const char *spec)
 
 	if (spec == NULL)
 		return ret;
-	q = s = xstrdup(spec);
+	q = s = strdup(spec);
+	if (s == NULL)
+		return ret;
 	for ((p = strsep(&q, SEP)); p && *p != '\0'; (p = strsep(&q, SEP))) {
 		switch (atoi(p)) {
 		case 1:
@@ -200,37 +200,40 @@ proto_spec(const char *spec)
 			break;
 		}
 	}
-	xfree(s);
+	free(s);
 	return ret;
 }
 
 char *
 compat_cipher_proposal(char *cipher_prop)
 {
-	Buffer b;
-	char *orig_prop, *fix_ciphers;
-	char *cp, *tmp;
+	char *orig_prop, *fix_ciphers, *cp, *tmp;
+	size_t maxlen;
 
 	if (!(datafellows & SSH_BUG_BIGENDIANAES))
-		return(cipher_prop);
+		return cipher_prop;
 
-	buffer_init(&b);
-	tmp = orig_prop = xstrdup(cipher_prop);
+	tmp = orig_prop = strdup(cipher_prop);
+	if (!tmp)
+		return NULL;
+	maxlen = strlen(orig_prop) + 1;
+	if ((fix_ciphers = calloc(1, maxlen)) == NULL) {
+		free(orig_prop);
+		return NULL;
+	}
 	while ((cp = strsep(&tmp, ",")) != NULL) {
 		if (strncmp(cp, "aes", 3) != 0) {
-			if (buffer_len(&b) > 0)
-				buffer_append(&b, ",", 1);
-			buffer_append(&b, cp, strlen(cp));
+			if (*fix_ciphers != '\0')
+				strlcat(fix_ciphers, ",", maxlen);
+			strlcat(fix_ciphers, cp, maxlen);
 		}
 	}
-	buffer_append(&b, "\0", 1);
-	fix_ciphers = xstrdup(buffer_ptr(&b));
-	buffer_free(&b);
-	xfree(orig_prop);
+	free(orig_prop);
 	debug2("Original cipher proposal: %s", cipher_prop);
 	debug2("Compat cipher proposal: %s", fix_ciphers);
-	if (!*fix_ciphers)
-		fatal("No available ciphers found.");
-
-	return(fix_ciphers);
+	if (!*fix_ciphers) {
+		free(fix_ciphers);
+		return NULL;
+	}
+	return fix_ciphers;
 }
