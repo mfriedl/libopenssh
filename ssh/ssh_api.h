@@ -43,6 +43,15 @@ void	ssh_free(struct ssh *);
 int	ssh_add_hostkey(struct ssh *ssh, char *key);
 
 /*
+ * ssh_set_verify_host_key_callback() registers a callback function
+ * which should be called instead of the default verification. The
+ * function given must return 0 if the hostkey is ok, -1 if the
+ * verification has failed.
+ */
+int	ssh_set_verify_host_key_callback(struct ssh *ssh,
+    int (*cb)(struct sshkey *, struct ssh *));
+
+/*
  * ssh_packet_next() advances to the next input packet and returns
  * the packet type in typep.
  * ssh_packet_next() works by processing an input byte-stream,
