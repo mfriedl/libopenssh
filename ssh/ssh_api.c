@@ -165,6 +165,18 @@ out:
 }
 
 int
+ssh_set_verify_host_key_callback(struct ssh *ssh,
+    int (*cb)(struct sshkey *, struct ssh *))
+{
+	if (cb == NULL || ssh->kex == NULL)
+		return SSH_ERR_INVALID_ARGUMENT;
+
+	ssh->kex->verify_host_key = cb;
+
+	return 0;
+}
+
+int
 ssh_input_append(struct ssh *ssh, const char *data, u_int len)
 {
 	return sshbuf_put(ssh_packet_get_input(ssh), data, len);
