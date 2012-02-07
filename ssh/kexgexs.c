@@ -68,8 +68,6 @@ input_kex_dh_gex_request(int type, u_int32_t seq, struct ssh *ssh)
 	Kex *kex = ssh->kex;
 	int r, min = -1, max = -1, nbits = -1;
 
-	kex->min = kex->nbits = kex->max = -1;
-
 	switch (type) {
 	case SSH2_MSG_KEX_DH_GEX_REQUEST:
 		debug("SSH2_MSG_KEX_DH_GEX_REQUEST received");
@@ -124,6 +122,10 @@ input_kex_dh_gex_request(int type, u_int32_t seq, struct ssh *ssh)
 	/* Compute our exchange value in parallel with the client */
 	if ((r = dh_gen_key(kex->dh, kex->we_need * 8)) != 0)
 		goto out;
+
+	/* old KEX does not use min/max in kexgex_hash() */
+	if (type == SSH2_MSG_KEX_DH_GEX_REQUEST_OLD)
+		kex->min = kex->max = -1;
 
 	debug("expecting SSH2_MSG_KEX_DH_GEX_INIT");
 	ssh_dispatch_set(ssh, SSH2_MSG_KEX_DH_GEX_INIT, &input_kex_dh_gex_init);
@@ -202,8 +204,6 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	if ((r = sshkey_to_blob(server_host_public, &server_host_key_blob,
 	    &sbloblen)) != 0)
 		goto out;
-	if (type == SSH2_MSG_KEX_DH_GEX_REQUEST_OLD)
-		kex->min = kex->max = -1;
 	/* calc H */
 	if ((r = kexgex_hash(
 	    kex->evp_md,
