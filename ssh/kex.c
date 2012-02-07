@@ -694,16 +694,13 @@ derive_ssh1_session_id(BIGNUM *host_modulus, BIGNUM *server_modulus,
 void
 dump_digest(char *msg, u_char *digest, int len)
 {
-	int i;
+	struct sshbuf *b;
 
 	fprintf(stderr, "%s\n", msg);
-	for (i = 0; i < len; i++) {
-		fprintf(stderr, "%02x", digest[i]);
-		if (i%32 == 31)
-			fprintf(stderr, "\n");
-		else if (i%8 == 7)
-			fprintf(stderr, " ");
-	}
-	fprintf(stderr, "\n");
+	if ((b = sshbuf_new()) == NULL)
+		return;
+	if (sshbuf_put(b, digest, len) == 0)
+		sshbuf_dump(b, stderr);
+	sshbuf_free(b);
 }
 #endif
