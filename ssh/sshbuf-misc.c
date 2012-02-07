@@ -24,6 +24,7 @@
 #include <limits.h>
 #include <string.h>
 #include <resolv.h>
+#include <ctype.h>
 
 #include "err.h"
 #define SSHBUF_INTERNAL
@@ -33,16 +34,29 @@ void
 sshbuf_dump(struct sshbuf *buf, FILE *f)
 {
 	u_char *p = sshbuf_ptr(buf);
-	size_t i, len = sshbuf_len(buf);
+	size_t i, j, len = sshbuf_len(buf);
 
-	/* XXX replace with pretty hexdump + ASCII */
 	fprintf(f, "buffer %p len = %zu\n", buf, len);
-	for (i = 0; i < len; i++) {
-		if (i > 0 && (i % 32) == 0)
-			fprintf(f, "\n");
-		fprintf(f, "%02x", p[i]);
+	for (i = 0; i < len; i += 16) {
+		fprintf(f, "%.4zd: ", i);
+		for (j = i; j < i + 16; j++) {
+			if (j < len)
+				fprintf(f, "%02x ", p[j]);
+			else
+				fprintf(f, "    ");
+		}
+		fprintf(f, " ");
+		for (j = i; j < i + 16; j++) {
+			if (j < len) {
+				if  (isascii(p[j]) && isprint(p[j]))
+					fprintf(f, "%c", p[j]);
+				else
+					fprintf(f, ".");
+			} else
+				fprintf(f, " ");
+		}
+		fprintf(f, "\n");
 	}
-	fprintf(f, "\n");
 }
 
 char *
