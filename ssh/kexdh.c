@@ -73,7 +73,7 @@ kex_dh_hash(
 		return r;
 	}
 #ifdef DEBUG_KEX
-	sshbuf_dump(&b, stderr);
+	sshbuf_dump(b, stderr);
 #endif
 	if (EVP_DigestInit(&md, evp_md) != 1 ||
 	    EVP_DigestUpdate(&md, sshbuf_ptr(b), sshbuf_len(b)) != 1 ||

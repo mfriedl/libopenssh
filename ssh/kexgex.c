@@ -67,9 +67,9 @@ kexgex_hash(
 	    (r = sshbuf_put_u8(b, SSH2_MSG_KEXINIT)) != 0 ||
 	    (r = sshbuf_put(b, skexinit, skexinitlen)) != 0 ||
 	    (r = sshbuf_put_string(b, serverhostkeyblob, sbloblen)) != 0 ||
-	    (max != -1 && (r = sshbuf_put_u32(b, min)) != 0) ||
+	    (min != -1 && (r = sshbuf_put_u32(b, min)) != 0) ||
 	    (r = sshbuf_put_u32(b, wantbits)) != 0 ||
-	    (min != -1 && (r = sshbuf_put_u32(b, max)) != 0) ||
+	    (max != -1 && (r = sshbuf_put_u32(b, max)) != 0) ||
 	    (r = sshbuf_put_bignum2(b, prime)) != 0 ||
 	    (r = sshbuf_put_bignum2(b, gen)) != 0 ||
 	    (r = sshbuf_put_bignum2(b, client_dh_pub)) != 0 ||
@@ -79,7 +79,7 @@ kexgex_hash(
 		return r;
 	}
 #ifdef DEBUG_KEXDH
-	sshbuf_dump(&b, stderr);
+	sshbuf_dump(b, stderr);
 #endif
 	if (EVP_DigestInit(&md, evp_md) != 1 ||
 	    EVP_DigestUpdate(&md, sshbuf_ptr(b), sshbuf_len(b)) != 1 ||
