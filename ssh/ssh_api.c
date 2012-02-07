@@ -196,24 +196,30 @@ ssh_packet_next(struct ssh *ssh, u_char *typep)
 	if (ssh->kex->client_version_string == NULL ||
 	    ssh->kex->server_version_string == NULL)
 		return _ssh_exchange_banner(ssh);
-	if ((r = ssh_packet_read_poll2(ssh, &type, &seqnr)) != 0)
-		return r;
 	/*
-	 * If we enough data and we have a dispatch function, call the
-	 * function and return SSH_MSG_NONE. Otherwise return the packet type to
-	 * the caller so it can decide how to go on.
+	 * If we enough data and a dispatch function then
+	 * call the function and get the next packet.
+	 * Otherwise return the packet type to the caller so it
+	 * can decide how to go on.
 	 *
 	 * We will only call the dispatch function for:
 	 *     20-29    Algorithm negotiation
 	 *     30-49    Key exchange method specific (numbers can be reused for
 	 *              different authentication methods)
 	 */
-	if (type > 0 && type < DISPATCH_MAX &&
-	    type >= SSH2_MSG_KEXINIT && type <= SSH2_MSG_TRANSPORT_MAX &&
-	    ssh->dispatch[type] != NULL)
-		return (*ssh->dispatch[type])(type, seqnr, ssh);
-	*typep = type;
-	return 0;
+	for (;;) {
+		if ((r = ssh_packet_read_poll2(ssh, &type, &seqnr)) != 0)
+			return r;
+		if (type > 0 && type < DISPATCH_MAX &&
+		    type >= SSH2_MSG_KEXINIT && type <= SSH2_MSG_TRANSPORT_MAX &&
+		    ssh->dispatch[type] != NULL) {
+			if ((r = (*ssh->dispatch[type])(type, seqnr, ssh)) != 0)
+				return r;
+		} else {
+			*typep = type;
+			return 0;
+		}
+	}
 }
 
 void *

@@ -282,9 +282,13 @@ ssh_packet_fwd(struct side *from, struct side *to)
 
 	if (!from->ssh || !to->ssh)
 		return 0;
-	if ((ret = ssh_packet_next(from->ssh, &type)) != 0)
-		return ret;
-	if (type) {
+	for (;;) {
+		if ((ret = ssh_packet_next(from->ssh, &type)) != 0)
+			return ret;
+		if (!type) {
+			debug3("no packet on %d", from->fd);
+			break;
+		}
 		data = ssh_packet_payload(from->ssh, &len);
 		debug("ssh_packet_fwd %d->%d type %d len %d",
 		    from->fd, to->fd, type, len);
@@ -302,8 +306,6 @@ ssh_packet_fwd(struct side *from, struct side *to)
 		}
 		if ((ret = ssh_packet_put(to->ssh, type, data, len)) != 0)
 			return ret;
-	} else {
-		debug3("no packet on %d", from->fd);
 	}
 	ssh_output_ptr(from->ssh, &len);
 	if (len) {
