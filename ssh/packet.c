@@ -1697,6 +1697,9 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		if (state->packlen < 1 + 4 ||
 		    state->packlen > PACKET_MAX_SIZE) {
 #ifdef PACKET_DEBUG
+			fprintf(stderr, "input: \n");
+			sshbuf_dump(state->input, stderr);
+			fprintf(stderr, "incoming_packet: \n");
 			sshbuf_dump(state->incoming_packet, stderr);
 #endif
 			logit("Bad packet length %u.", state->packlen);
