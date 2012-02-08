@@ -230,6 +230,11 @@ ssh_alloc_session_state(void)
 		state->p_send.packets = state->p_read.packets = 0;
 		state->initialized = 1;
 	}
+	/*
+	 * ssh_packet_send2() needs to queue packets until
+	 * we've done the initial key exchange.
+	 */
+	state->rekeying = 1;
 	return ssh;
  fail:
 	if (state->input)
