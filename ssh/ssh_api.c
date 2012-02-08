@@ -274,7 +274,7 @@ _ssh_read_banner(struct ssh *ssh, char **bannerp)
 	struct sshbuf *input;
 	char c, *s, buf[256], remote_version[256];	/* must be same size! */
 	int r, remote_major, remote_minor;
-	u_int i, n, j, len;
+	size_t i, n, j, len;
 
 	*bannerp = NULL;
 	input = ssh_packet_get_input(ssh);
@@ -300,7 +300,7 @@ _ssh_read_banner(struct ssh *ssh, char **bannerp)
 		if (strncmp(buf, "SSH-", 4) == 0)
 			break;
 		debug("ssh_exchange_identification: %s", buf);
-		if (++n > 65536)
+		if (ssh->kex->server || ++n > 65536)
 			return SSH_ERR_NO_PROTOCOL_VERSION;
 	}
 	if ((r = sshbuf_consume(input, j)) != 0)
