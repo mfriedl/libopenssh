@@ -43,7 +43,7 @@ sshbuf_dump(struct sshbuf *buf, FILE *f)
 			if (j < len)
 				fprintf(f, "%02x ", p[j]);
 			else
-				fprintf(f, "    ");
+				fprintf(f, "   ");
 		}
 		fprintf(f, " ");
 		for (j = i; j < i + 16; j++) {
@@ -52,8 +52,7 @@ sshbuf_dump(struct sshbuf *buf, FILE *f)
 					fprintf(f, "%c", p[j]);
 				else
 					fprintf(f, ".");
-			} else
-				fprintf(f, " ");
+			}
 		}
 		fprintf(f, "\n");
 	}
