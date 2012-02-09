@@ -104,32 +104,23 @@ ssh_free(struct ssh *ssh)
 
 /* Returns < 0 on error, 0 otherwise */
 int
-ssh_add_hostkey(struct ssh *ssh, char *key)
+ssh_add_hostkey(struct ssh *ssh, struct sshkey *key)
 {
-	struct sshkey *parsed_key = NULL, *pubkey = NULL;
-	struct sshbuf *key_buf = NULL;
+	struct sshkey *pubkey = NULL;
 	struct key_entry *k = NULL, *k_prv = NULL;
 	int r;
 
 	if (ssh->kex->server) {
-		/* Parse private key */
-		if ((key_buf = sshbuf_new()) == NULL)
-			return SSH_ERR_ALLOC_FAIL;
-		if ((r = sshbuf_put(key_buf, key, strlen(key))) != 0)
-			goto out;
-		if ((parsed_key = key_parse_private(key_buf, "hostkey", "",
-		    NULL)) == NULL) {
-			r = SSH_ERR_INVALID_FORMAT;
-			goto out;
-		}
-		if ((r = sshkey_from_private(parsed_key, &pubkey)) != 0)
-			goto out;
+		if ((r = sshkey_from_private(key, &pubkey)) != 0)
+			return r;
 		if ((k = malloc(sizeof(*k))) == NULL ||
 		    (k_prv = malloc(sizeof(*k_prv))) == NULL) {
-			r = SSH_ERR_ALLOC_FAIL;
-			goto out;
+			if (k)
+				free(k);
+			sshkey_free(pubkey);
+			return SSH_ERR_ALLOC_FAIL;
 		}
-		k_prv->key = parsed_key;
+		k_prv->key = key;
 		TAILQ_INSERT_TAIL(&ssh->private_keys, k_prv, next);
 
 		/* add the public key, too */
@@ -137,29 +128,13 @@ ssh_add_hostkey(struct ssh *ssh, char *key)
 		TAILQ_INSERT_TAIL(&ssh->public_keys, k, next);
 		r = 0;
 	} else {
-		/* Parse public key */
-		if ((parsed_key = sshkey_new(KEY_UNSPEC)) == NULL)
+		if ((k = malloc(sizeof(*k))) == NULL)
 			return SSH_ERR_ALLOC_FAIL;
-		if ((r = sshkey_read(parsed_key, &key)) != 0)
-			goto out;
-		if ((k = malloc(sizeof(*k))) == NULL) {
-			r = SSH_ERR_ALLOC_FAIL;
-			goto out;
-		}
-		k->key = parsed_key;
+		k->key = key;
 		TAILQ_INSERT_TAIL(&ssh->public_keys, k, next);
 		r = 0;
 	}
 
-out:
-	if (key_buf)
-		sshbuf_free(key_buf);
-	if (r != 0) {
-		if (parsed_key)
-			sshkey_free(parsed_key);
-		if (k)
-			free(k);
-	}
 	return r;
 }
 

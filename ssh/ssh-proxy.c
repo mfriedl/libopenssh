@@ -34,6 +34,7 @@
 #include "misc.h"
 #include "myproposal.h"
 #include "readconf.h"
+#include "authfile.h"
 #include "err.h"
 
 struct side {
@@ -66,8 +67,7 @@ int foreground;
 int dump_packets;
 
 #define BUFSZ 16*1024
-char keybuf[BUFSZ];
-char known_keybuf[BUFSZ];
+struct sshkey *hostkey, *known_hostkey;
 
 int
 do_listen(const char *addr, int port)
@@ -249,12 +249,12 @@ connect_cb(int fd, short type, void *arg)
 		error("could init server context: %s", ssh_err(r));
 		goto fail;
 	}
-	if ((r = ssh_add_hostkey(s->client.ssh, keybuf)) != 0) {
+	if ((r = ssh_add_hostkey(s->client.ssh, hostkey)) != 0) {
 		error("could not load server hostkey: %s", ssh_err(r));
 		goto fail;
 	}
-	if ((r = ssh_add_hostkey(s->server.ssh, known_keybuf)) !=  0) {
-		error("could not load client hostkey: %s", ssh_err(r));
+	if ((r = ssh_add_hostkey(s->server.ssh, known_hostkey)) !=  0) {
+		error("could not load client known hostkey: %s", ssh_err(r));
 		goto fail;
 	}
 	event_set(&s->client.input,  s->client.fd, EV_READ, input_cb, s);
@@ -418,7 +418,6 @@ main(int argc, char **argv)
 {
 	int ch, log_stderr = 1, fd;
 	struct event ev;
-	ssize_t len;
 	char *hostkey_file = NULL, *known_hostkey_file = NULL;
 	SyslogFacility log_facility = SYSLOG_FACILITY_AUTH;
 	LogLevel log_level = SYSLOG_LEVEL_VERBOSE;
@@ -461,24 +460,12 @@ main(int argc, char **argv)
 		}
 	}
 	log_init(__progname, log_level, log_facility, log_stderr);
-	if (hostkey_file) {
-		if ((fd = open(hostkey_file, O_RDONLY, 0)) < 0)
-			fatal("open: %s %s", hostkey_file, strerror(errno));
-		if ((len = read(fd, keybuf, sizeof(keybuf))) < 0)
-			fatal("read: %s %s", hostkey_file, strerror(errno));
-		keybuf[len] = '\0';
-		debug("hk: read %zd bytes", len);
-		close(fd);
-	}
-	if (known_hostkey_file) {
-		if ((fd = open(known_hostkey_file, O_RDONLY, 0)) < 0)
-			fatal("open: %s %s", hostkey_file, strerror(errno));
-		if ((len = read(fd, known_keybuf, sizeof(known_keybuf))) < 0)
-			fatal("kh: read: %s %s", hostkey_file, strerror(errno));
-		known_keybuf[len] = '\0';
-		debug("kh: read %zd bytes", len);
-		close(fd);
-	}
+	if (hostkey_file &&
+	    (hostkey = key_load_private(hostkey_file, "", NULL)) == NULL)
+		fatal("key_load_private: %s", hostkey_file);
+	if (known_hostkey_file &&
+	    (known_hostkey = key_load_public(known_hostkey_file, NULL)) == NULL)
+		fatal("key_load_public: %s", known_hostkey_file);
 	if (!foreground)
 		daemon(0, 0);
 	event_init();

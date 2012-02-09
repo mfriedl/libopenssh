@@ -33,14 +33,12 @@ void	ssh_free(struct ssh *);
 /*
  * ssh_add_hostkey() registers a private/public hostkey for an ssh
  * connection.
- * the key needs to be specified as a string in PEM format or OpenSSH
- * public key format.
  * ssh_add_hostkey() needs to be called before a key exchange is
  * initiated with ssh_packet_next().
  * private hostkeys are required if we need to act as a server.
  * public hostkeys are used to verify the servers hostkey.
  */
-int	ssh_add_hostkey(struct ssh *ssh, char *key);
+int	ssh_add_hostkey(struct ssh *ssh, struct sshkey *key);
 
 /*
  * ssh_set_verify_host_key_callback() registers a callback function
