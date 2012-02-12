@@ -307,21 +307,17 @@ process_sign_request2(SocketEntry *e)
 {
 	u_char *blob, *data, *signature = NULL;
 	u_int blen, dlen, slen = 0;
-	extern int datafellows;
-	int odatafellows;
+	u_int compat = 0;
 	int ok = -1, flags;
 	Buffer msg;
 	struct sshkey *key;
-
-	datafellows = 0;
 
 	blob = buffer_get_string(&e->request, &blen);
 	data = buffer_get_string(&e->request, &dlen);
 
 	flags = buffer_get_int(&e->request);
-	odatafellows = datafellows;
 	if (flags & SSH_AGENT_OLD_SIGNATURE)
-		datafellows = SSH_BUG_SIGBLOB;
+		compat = SSH_BUG_SIGBLOB;
 
 	if ((ok = sshkey_from_blob(blob, blen, &key)) != 0)
 		error("%s: cannot parse key blob: %s", __func__, ssh_err(ok));
@@ -329,7 +325,7 @@ process_sign_request2(SocketEntry *e)
 		Identity *id = lookup_identity(key, 2);
 		if (id != NULL && (!id->confirm || confirm_key(id) == 0)) {
 			if ((ok = sshkey_sign(id->key, &signature, &slen,
-			    data, dlen, 0)) != 0)
+			    data, dlen, compat)) != 0)
 				error("%s: sshkey_sign: %s",
 				    __func__, ssh_err(ok));
 		}
@@ -350,7 +346,6 @@ process_sign_request2(SocketEntry *e)
 	xfree(blob);
 	if (signature != NULL)
 		xfree(signature);
-	datafellows = odatafellows;
 }
 
 /* shared */
