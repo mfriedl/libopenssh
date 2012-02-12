@@ -390,7 +390,7 @@ chan_send_eow2(Channel *c)
 		    c->self);
 		return;
 	}
-	if (!(datafellows & SSH_NEW_OPENSSH))
+	if (!(active_state->compat & SSH_NEW_OPENSSH))
 		return;
 	packet_start(SSH2_MSG_CHANNEL_REQUEST);
 	packet_put_int(c->remote_id);
@@ -449,7 +449,7 @@ chan_is_dead(Channel *c, int do_send)
 		debug2("channel %d: is dead", c->self);
 		return 1;
 	}
-	if ((datafellows & SSH_BUG_EXTEOF) &&
+	if ((active_state->compat & SSH_BUG_EXTEOF) &&
 	    c->extended_usage == CHAN_EXTENDED_WRITE &&
 	    c->efd != -1 &&
 	    buffer_len(&c->extended) > 0) {

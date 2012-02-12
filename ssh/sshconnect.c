@@ -504,7 +504,7 @@ ssh_exchange_identification(struct ssh *ssh, int timeout_ms)
 	debug("Remote protocol version %d.%d, remote software version %.100s",
 	    remote_major, remote_minor, remote_version);
 
-	compat_datafellows(remote_version);
+	ssh->compat = compat_datafellows(remote_version);
 	mismatch = 0;
 
 	switch (remote_major) {
@@ -1167,12 +1167,12 @@ ssh_login(struct ssh *ssh, Sensitive *sensitive, const char *orighost,
 }
 
 void
-ssh_put_password(char *password)
+ssh_put_password(struct ssh *ssh, char *password)
 {
 	int size;
 	char *padded;
 
-	if (datafellows & SSH_BUG_PASSWORDPAD) {
+	if (ssh->compat & SSH_BUG_PASSWORDPAD) {
 		packet_put_cstring(password);
 		return;
 	}

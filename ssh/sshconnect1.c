@@ -422,7 +422,7 @@ try_challenge_response_authentication(void)
 			break;
 		}
 		packet_start(SSH_CMSG_AUTH_TIS_RESPONSE);
-		ssh_put_password(response);
+		ssh_put_password(active_state, response);
 		memset(response, 0, strlen(response));
 		xfree(response);
 		packet_send();
@@ -455,7 +455,7 @@ try_password_authentication(char *prompt)
 			error("Permission denied, please try again.");
 		password = read_passphrase(prompt, 0);
 		packet_start(SSH_CMSG_AUTH_PASSWORD);
-		ssh_put_password(password);
+		ssh_put_password(active_state, password);
 		memset(password, 0, strlen(password));
 		xfree(password);
 		packet_send();

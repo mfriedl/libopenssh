@@ -175,8 +175,8 @@ input_kex_dh_init(int type, u_int32_t seq, struct ssh *ssh)
 	}
 
 	/* sign H */
-	if ((r = PRIVSEP(sshkey_sign(server_host_private, &signature, &slen, hash,
-	    hashlen, ssh->datafellows))) < 0)
+	if ((r = PRIVSEP(sshkey_sign(server_host_private, &signature, &slen,
+	    hash, hashlen, ssh->compat))) < 0)
 		goto out;
 
 	/* destroy_sensitive_data(); */

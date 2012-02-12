@@ -35,7 +35,6 @@
 
 int compat13 = 0;
 int compat20 = 0;
-int datafellows = 0;
 
 void
 enable_compat20(void)
@@ -50,7 +49,7 @@ enable_compat13(void)
 	compat13 = 1;
 }
 /* datafellows bug compatibility */
-int
+u_int
 compat_datafellows(const char *version)
 {
 	int i;
@@ -165,12 +164,11 @@ compat_datafellows(const char *version)
 		if (match_pattern_list(version, check[i].pat,
 		    strlen(check[i].pat), 0) == 1) {
 			debug("match: %s pat %s", version, check[i].pat);
-			datafellows = check[i].bugs;
-			return (datafellows);
+			return check[i].bugs;
 		}
 	}
 	debug("no match: %s", version);
-	return (0);
+	return 0;
 }
 
 #define	SEP	","
@@ -205,12 +203,12 @@ proto_spec(const char *spec)
 }
 
 char *
-compat_cipher_proposal(char *cipher_prop)
+compat_cipher_proposal(char *cipher_prop, u_int compat)
 {
 	char *orig_prop, *fix_ciphers, *cp, *tmp;
 	size_t maxlen;
 
-	if (!(datafellows & SSH_BUG_BIGENDIANAES))
+	if (compat & SSH_BUG_BIGENDIANAES)
 		return cipher_prop;
 
 	tmp = orig_prop = strdup(cipher_prop);

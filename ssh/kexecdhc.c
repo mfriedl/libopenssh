@@ -183,7 +183,7 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 		goto out;
 
 	if ((r = sshkey_verify(server_host_key, signature, slen, hash,
-	    hashlen, ssh->datafellows)) != 0)
+	    hashlen, ssh->compat)) != 0)
 		goto out;
 
 	/* save session id */

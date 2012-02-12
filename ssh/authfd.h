@@ -88,6 +88,6 @@ int	 ssh_decrypt_challenge(AuthenticationConnection *, struct sshkey *,
 
 int
 ssh_agent_sign(AuthenticationConnection *, struct sshkey *,
-    u_char **, u_int *, u_char *, u_int);
+    u_char **, u_int *, u_char *, u_int, u_int);
 
 #endif				/* AUTHFD_H */

@@ -62,11 +62,10 @@
 
 void     enable_compat13(void);
 void     enable_compat20(void);
-int      compat_datafellows(const char *);
+u_int    compat_datafellows(const char *);
 int	 proto_spec(const char *);
-char	*compat_cipher_proposal(char *);
+char	*compat_cipher_proposal(char *, u_int);
 
 extern int compat13;
 extern int compat20;
-extern int datafellows;
 #endif

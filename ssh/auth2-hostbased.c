@@ -103,7 +103,7 @@ userauth_hostbased(struct ssh *ssh)
 		    "(received %d, expected %d)", __func__, key->type, pktype);
 		goto done;
 	}
-	service = datafellows & SSH_BUG_HBSERVICE ? "ssh-userauth" :
+	service = ssh->compat & SSH_BUG_HBSERVICE ? "ssh-userauth" :
 	    authctxt->service;
 	buffer_init(&b);
 	buffer_put_string(&b, session_id2, session_id2_len);
@@ -123,7 +123,7 @@ userauth_hostbased(struct ssh *ssh)
 	authenticated = 0;
 	if (PRIVSEP(hostbased_key_allowed(authctxt->pw, cuser, chost, key)) &&
 	    PRIVSEP(sshkey_verify(key, sig, slen,
-	    buffer_ptr(&b), buffer_len(&b), datafellows)) == 0)
+	    buffer_ptr(&b), buffer_len(&b), ssh->compat)) == 0)
 		authenticated = 1;
 
 	buffer_free(&b);

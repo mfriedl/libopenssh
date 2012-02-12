@@ -53,7 +53,7 @@ void	 ssh_kex2(struct ssh *, u_short);
 void	 ssh_userauth1(const char *, const char *, char *, Sensitive *);
 void	 ssh_userauth2(struct ssh *, const char *, const char *, Sensitive *);
 
-void	 ssh_put_password(char *);
+void	 ssh_put_password(struct ssh *, char *);
 int	 ssh_local_cmd(const char *);
 
 /*

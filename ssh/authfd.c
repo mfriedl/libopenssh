@@ -418,9 +418,8 @@ int
 ssh_agent_sign(AuthenticationConnection *auth,
     struct sshkey *key,
     u_char **sigp, u_int *lenp,
-    u_char *data, u_int datalen)
+    u_char *data, u_int datalen, u_int compat)
 {
-	extern int datafellows;
 	Buffer msg;
 	u_char *blob;
 	u_int blen;
@@ -432,7 +431,7 @@ ssh_agent_sign(AuthenticationConnection *auth,
 		return SSH_ERR_INVALID_ARGUMENT;
 	}
 
-	if (datafellows & SSH_BUG_SIGBLOB)
+	if (compat & SSH_BUG_SIGBLOB)
 		flags = SSH_AGENT_OLD_SIGNATURE;
 
 	buffer_init(&msg);

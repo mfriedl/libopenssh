@@ -632,7 +632,7 @@ mm_answer_sign(int sock, Buffer *m)
 	if ((key = get_hostkey_by_index(keyid)) == NULL)
 		fatal("%s: no hostkey from index %d", __func__, keyid);
 	if ((r = sshkey_sign(key, &signature, &siglen, p, datlen,
-	    datafellows)) != 0)
+	    active_state->compat)) != 0)
 		fatal("%s: sshkey_sign failed: %s", __func__, ssh_err(r));
 
 	debug3("%s: signature %p(%u)", __func__, signature, siglen);
@@ -947,7 +947,7 @@ monitor_valid_userblob(u_char *data, u_int datalen)
 	buffer_init(&b);
 	buffer_append(&b, data, datalen);
 
-	if (datafellows & SSH_OLD_SESSIONID) {
+	if (active_state->compat & SSH_OLD_SESSIONID) {
 		p = buffer_ptr(&b);
 		len = buffer_len(&b);
 		if ((session_id2 == NULL) ||
@@ -973,7 +973,7 @@ monitor_valid_userblob(u_char *data, u_int datalen)
 	}
 	xfree(p);
 	buffer_skip_string(&b);
-	if (datafellows & SSH_BUG_PKAUTH) {
+	if (active_state->compat & SSH_BUG_PKAUTH) {
 		if (!buffer_get_char(&b))
 			fail++;
 	} else {
@@ -1083,7 +1083,7 @@ mm_answer_keyverify(int sock, Buffer *m)
 		fatal("%s: bad signature data blob", __func__);
 
 	r = sshkey_verify(key, signature, signaturelen, data, datalen,
-	    datafellows);
+	    active_state->compat);
 	debug3("%s: key %p signature %s",
 	    __func__, key, (r == 0) ? "verified" : "unverified");
 

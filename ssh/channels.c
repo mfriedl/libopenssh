@@ -1353,7 +1353,7 @@ channel_post_x11_listener(Channel *c, fd_set *readset, fd_set *writeset)
 			packet_put_int(nc->local_maxpacket);
 			/* originator ipaddr and port */
 			packet_put_cstring(remote_ipaddr);
-			if (datafellows & SSH_BUG_X11FWD) {
+			if (active_state->compat & SSH_BUG_X11FWD) {
 				debug2("ssh2 x11 bug compat mode");
 			} else {
 				packet_put_int(remote_port);
@@ -1576,7 +1576,7 @@ channel_post_connecting(Channel *c, fd_set *readset, fd_set *writeset)
 				packet_start(SSH2_MSG_CHANNEL_OPEN_FAILURE);
 				packet_put_int(c->remote_id);
 				packet_put_int(SSH2_OPEN_CONNECT_FAILED);
-				if (!(datafellows & SSH_BUG_OPENFAILURE)) {
+				if (!(active_state->compat & SSH_BUG_OPENFAILURE)) {
 					packet_put_cstring(strerror(err));
 					packet_put_cstring("");
 				}
@@ -2324,7 +2324,7 @@ channel_input_extended_data(int type, u_int32_t seq, struct ssh *ssh)
 		return 0;
 	}
 	if (c->flags & CHAN_EOF_RCVD) {
-		if (datafellows & SSH_BUG_EXTEOF)
+		if (active_state->compat & SSH_BUG_EXTEOF)
 			debug("channel %d: accepting ext data after eof", id);
 		else
 			packet_disconnect("Received extended_data after EOF "
@@ -2513,7 +2513,7 @@ channel_input_open_failure(int type, u_int32_t seq, struct ssh *ssh)
 		    "non-opening channel %d.", id);
 	if (compat20) {
 		reason = packet_get_int();
-		if (!(datafellows & SSH_BUG_OPENFAILURE)) {
+		if (!(active_state->compat & SSH_BUG_OPENFAILURE)) {
 			msg  = packet_get_string(NULL);
 			lang = packet_get_string(NULL);
 		}
@@ -2657,7 +2657,7 @@ channel_fwd_bind_addr(const char *listen_addr, int *wildcardp,
 		if (gateway_ports)
 			wildcard = 1;
 	} else if (gateway_ports || is_client) {
-		if (((datafellows & SSH_OLD_FORWARD_ADDR) &&
+		if (((active_state->compat & SSH_OLD_FORWARD_ADDR) &&
 		    strcmp(listen_addr, "0.0.0.0") == 0 && is_client == 0) ||
 		    *listen_addr == '\0' || strcmp(listen_addr, "*") == 0 ||
 		    (!is_client && gateway_ports == 1))
@@ -2797,7 +2797,7 @@ channel_setup_fwd_listener(int type, const char *listen_addr,
 		c->host_port = port_to_connect;
 		c->listening_addr = addr == NULL ? NULL : xstrdup(addr);
 		if (listen_port == 0 && allocated_listen_port != NULL &&
-		    !(datafellows & SSH_BUG_DYNAMIC_RPORT))
+		    !(active_state->compat & SSH_BUG_DYNAMIC_RPORT))
 			c->listening_port = *allocated_listen_port;
 		else
 			c->listening_port = listen_port;
@@ -2893,12 +2893,12 @@ static const char *
 channel_rfwd_bind_host(const char *listen_host)
 {
 	if (listen_host == NULL) {
-		if (datafellows & SSH_BUG_RFWD_ADDR)
+		if (active_state->compat & SSH_BUG_RFWD_ADDR)
 			return "127.0.0.1";
 		else
 			return "localhost";
 	} else if (*listen_host == '\0' || strcmp(listen_host, "*") == 0) {
-		if (datafellows & SSH_BUG_RFWD_ADDR)
+		if (active_state->compat & SSH_BUG_RFWD_ADDR)
 			return "0.0.0.0";
 		else
 			return "";
@@ -3083,7 +3083,7 @@ channel_update_permitted_opens(int idx, int newport)
 	    permitted_opens[idx].port_to_connect);
 	if (newport >= 0)  {
 		permitted_opens[idx].listen_port = 
-		    (datafellows & SSH_BUG_DYNAMIC_RPORT) ? 0 : newport;
+		    (active_state->compat & SSH_BUG_DYNAMIC_RPORT) ? 0 : newport;
 	} else {
 		permitted_opens[idx].listen_port = 0;
 		permitted_opens[idx].port_to_connect = 0;

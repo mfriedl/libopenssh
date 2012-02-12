@@ -555,7 +555,7 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 	if (fderr != -1)
 		set_nonblock(fderr);
 
-	if (!(datafellows & SSH_BUG_IGNOREMSG) && isatty(fdin))
+	if (!(active_state->compat & SSH_BUG_IGNOREMSG) && isatty(fdin))
 		fdin_is_tty = 1;
 
 	connection_in = packet_get_connection_in();
@@ -1057,7 +1057,7 @@ server_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 		packet_start(SSH2_MSG_CHANNEL_OPEN_FAILURE);
 		packet_put_int(rchan);
 		packet_put_int(SSH2_OPEN_ADMINISTRATIVELY_PROHIBITED);
-		if (!(datafellows & SSH_BUG_OPENFAILURE)) {
+		if (!(ssh->compat & SSH_BUG_OPENFAILURE)) {
 			packet_put_cstring("open failed");
 			packet_put_cstring("");
 		}

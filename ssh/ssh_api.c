@@ -291,7 +291,7 @@ _ssh_read_banner(struct ssh *ssh, char **bannerp)
 	debug("Remote protocol version %d.%d, remote software version %.100s",
 	    remote_major, remote_minor, remote_version);
 
-	ssh->datafellows = compat_datafellows(remote_version);
+	ssh->compat = compat_datafellows(remote_version);
 	if  (remote_major == 1 && remote_minor == 99) {
 		remote_major = 2;
 		remote_minor = 0;
@@ -381,7 +381,7 @@ _ssh_host_private_key(int type, struct ssh *ssh)
 {
 	struct key_entry *k;
 
-	datafellows = ssh->datafellows;	/* XXX */
+	ssh->compat = ssh->compat;	/* XXX */
 	debug3("%s: need %d", __func__, type);
 	TAILQ_FOREACH(k, &ssh->private_keys, next) {
 		debug3("%s: check %s", __func__, sshkey_type(k->key));

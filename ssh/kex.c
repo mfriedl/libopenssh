@@ -366,7 +366,7 @@ choose_mac(struct ssh *ssh, Mac *mac, char *client, char *server)
 	if (mac_setup(mac, name) < 0)
 		return SSH_ERR_INTERNAL_ERROR;
 	/* truncate the key */
-	if (ssh->datafellows & SSH_BUG_HMAC)
+	if (ssh->compat & SSH_BUG_HMAC)
 		mac->key_len = 16;
 	mac->name = name;
 	mac->key = NULL;
@@ -541,7 +541,7 @@ kex_choose_conf(struct ssh *ssh)
 
 	/* ignore the next message if the proposals do not match */
 	if (first_kex_follows && !proposals_match(my, peer) &&
-	    !(ssh->datafellows & SSH_BUG_FIRSTKEX))
+	    !(ssh->compat & SSH_BUG_FIRSTKEX))
 		ssh->skip_packets = 1;
 	r = 0;
  out:
@@ -574,7 +574,7 @@ derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
 
 	/* K1 = HASH(K || H || "A" || session_id) */
 	if (EVP_DigestInit(&md, kex->evp_md) != 1 ||
-	    (!(ssh->datafellows & SSH_BUG_DERIVEKEY) &&
+	    (!(ssh->compat & SSH_BUG_DERIVEKEY) &&
 	    EVP_DigestUpdate(&md, sshbuf_ptr(b), sshbuf_len(b)) != 1) ||
 	    EVP_DigestUpdate(&md, hash, hashlen) != 1 ||
 	    EVP_DigestUpdate(&md, &c, 1) != 1 ||
@@ -591,7 +591,7 @@ derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
 	 */
 	for (have = mdsz; need > have; have += mdsz) {
 		if (EVP_DigestInit(&md, kex->evp_md) != 1 ||
-		    (!(ssh->datafellows & SSH_BUG_DERIVEKEY) &&
+		    (!(ssh->compat & SSH_BUG_DERIVEKEY) &&
 		    EVP_DigestUpdate(&md, sshbuf_ptr(b), sshbuf_len(b)) != 1) ||
 		    EVP_DigestUpdate(&md, hash, hashlen) != 1 ||
 		    EVP_DigestUpdate(&md, digest, have) != 1 ||

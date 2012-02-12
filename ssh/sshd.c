@@ -454,15 +454,15 @@ sshd_exchange_identification(int sock_in, int sock_out)
 	debug("Client protocol version %d.%d; client software version %.100s",
 	    remote_major, remote_minor, remote_version);
 
-	compat_datafellows(remote_version);
+	active_state->compat = compat_datafellows(remote_version);
 
-	if (datafellows & SSH_BUG_PROBE) {
+	if (active_state->compat & SSH_BUG_PROBE) {
 		logit("probed from %s with %s.  Don't panic.",
 		    get_remote_ipaddr(), client_version_string);
 		cleanup_exit(255);
 	}
 
-	if (datafellows & SSH_BUG_SCANNER) {
+	if (active_state->compat & SSH_BUG_SCANNER) {
 		logit("scanned from %s with %s.  Don't panic.",
 		    get_remote_ipaddr(), client_version_string);
 		cleanup_exit(255);
@@ -2177,9 +2177,11 @@ do_ssh2_kex(void)
 		myproposal[PROPOSAL_ENC_ALGS_STOC] = options.ciphers;
 	}
 	myproposal[PROPOSAL_ENC_ALGS_CTOS] =
-	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_CTOS]);
+	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_CTOS],
+	    active_state->compat);
 	myproposal[PROPOSAL_ENC_ALGS_STOC] =
-	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_STOC]);
+	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_STOC],
+	    active_state->compat);
 	if (myproposal[PROPOSAL_ENC_ALGS_CTOS] == NULL ||
 	    myproposal[PROPOSAL_ENC_ALGS_STOC] == NULL)
 		fatal("no compatible ciphers found");

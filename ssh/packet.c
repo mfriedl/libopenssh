@@ -1327,7 +1327,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	if (++state->p_send.seqnr == 0)
 		logit("outgoing seqnr wraps around");
 	if (++state->p_send.packets == 0)
-		if (!(ssh->datafellows & SSH_BUG_NOREKEY))
+		if (!(ssh->compat & SSH_BUG_NOREKEY))
 			return SSH_ERR_NEED_REKEY;
 	state->p_send.blocks += (packet_length + 4) / block_size;
 	state->p_send.bytes += packet_length + 4;
@@ -1766,7 +1766,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	if (++state->p_read.seqnr == 0)
 		logit("incoming seqnr wraps around");
 	if (++state->p_read.packets == 0)
-		if (!(ssh->datafellows & SSH_BUG_NOREKEY))
+		if (!(ssh->compat & SSH_BUG_NOREKEY))
 			return SSH_ERR_NEED_REKEY;
 	state->p_read.blocks += (state->packlen + 4) / block_size;
 	state->p_read.bytes += state->packlen + 4;
@@ -2078,7 +2078,7 @@ ssh_packet_send_debug(struct ssh *ssh, const char *fmt,...)
 	char buf[1024];
 	va_list args;
 
-	if (compat20 && (ssh->datafellows & SSH_BUG_DEBUG))
+	if (compat20 && (ssh->compat & SSH_BUG_DEBUG))
 		return;
 
 	va_start(args, fmt);
@@ -2379,7 +2379,7 @@ ssh_packet_need_rekeying(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
 
-	if (ssh->datafellows & SSH_BUG_NOREKEY)
+	if (ssh->compat & SSH_BUG_NOREKEY)
 		return 0;
 	return
 	    (state->p_send.packets > MAX_PACKETS) ||

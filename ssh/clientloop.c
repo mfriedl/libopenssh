@@ -1058,7 +1058,7 @@ process_escapes(struct ssh *ssh, Channel *c, Buffer *bin, Buffer *bout,
 
 			case 'R':
 				if (compat20) {
-					if (datafellows & SSH_BUG_NOREKEY)
+					if (ssh->compat & SSH_BUG_NOREKEY)
 						logit("Server does not "
 						    "support re-keying");
 					else
@@ -1790,7 +1790,7 @@ client_request_x11(struct ssh *ssh, const char *request_type, int rchan)
 		return NULL;
 	}
 	originator = ssh_packet_get_string(ssh, NULL);
-	if (datafellows & SSH_BUG_X11FWD) {
+	if (ssh->compat & SSH_BUG_X11FWD) {
 		debug2("buggy server: x11 request w/o originator_port");
 		originator_port = 0;
 	} else {
@@ -1916,7 +1916,7 @@ client_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 		ssh_packet_start(ssh, SSH2_MSG_CHANNEL_OPEN_FAILURE);
 		ssh_packet_put_int(ssh, rchan);
 		ssh_packet_put_int(ssh, SSH2_OPEN_ADMINISTRATIVELY_PROHIBITED);
-		if (!(datafellows & SSH_BUG_OPENFAILURE)) {
+		if (!(ssh->compat & SSH_BUG_OPENFAILURE)) {
 			ssh_packet_put_cstring(ssh, "open failed");
 			ssh_packet_put_cstring(ssh, "");
 		}

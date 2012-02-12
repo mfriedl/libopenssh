@@ -162,9 +162,9 @@ ssh_kex2(struct ssh *ssh, u_short port)
 		myproposal[PROPOSAL_ENC_ALGS_STOC] = options.ciphers;
 	}
 	myproposal[PROPOSAL_ENC_ALGS_CTOS] =
-	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_CTOS]);
+	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_CTOS], ssh->compat);
 	myproposal[PROPOSAL_ENC_ALGS_STOC] =
-	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_STOC]);
+	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_STOC], ssh->compat);
 	if (myproposal[PROPOSAL_ENC_ALGS_CTOS] == NULL ||
 	    myproposal[PROPOSAL_ENC_ALGS_STOC] == NULL)
 		fatal("no compatible ciphers found");
@@ -576,7 +576,7 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 
 	if (authctxt == NULL)
 		fatal("input_userauth_pk_ok: no authentication context");
-	if (datafellows & SSH_BUG_PKOK) {
+	if (ssh->compat & SSH_BUG_PKOK) {
 		/* this is similar to SSH_BUG_PKAUTH */
 		debug2("input_userauth_pk_ok: SSH_BUG_PKOK");
 		pkblob = ssh_packet_get_string(ssh, &blen);
@@ -1194,7 +1194,7 @@ input_userauth_jpake_server_confirm(int type, u_int32_t seq, struct ssh *ssh)
 
 static int
 identity_sign(Identity *id, u_char **sigp, u_int *lenp,
-    u_char *data, u_int datalen)
+    u_char *data, u_int datalen, u_int compat)
 {
 	struct sshkey *prv;
 	int ret;
@@ -1202,18 +1202,18 @@ identity_sign(Identity *id, u_char **sigp, u_int *lenp,
 	/* the agent supports this key */
 	if (id->ac)
 		return (ssh_agent_sign(id->ac, id->key, sigp, lenp,
-		    data, datalen));
+		    data, datalen, compat));
 	/*
 	 * we have already loaded the private key or
 	 * the private key is stored in external hardware
 	 */
 	if (id->isprivate || (id->key->flags & SSHKEY_FLAG_EXT))
 		return (sshkey_sign(id->key, sigp, lenp, data, datalen,
-		    datafellows));
+		    compat));
 	/* load the private key from the file */
 	if ((prv = load_identity_file(id->filename)) == NULL)
 		return (-1);
-	ret = sshkey_sign(prv, sigp, lenp, data, datalen, datafellows);
+	ret = sshkey_sign(prv, sigp, lenp, data, datalen, compat);
 	sshkey_free(prv);
 	return (ret);
 }
@@ -1241,7 +1241,7 @@ sign_and_send_pubkey(struct ssh *ssh, Identity *id)
 	}
 	/* data to be signed */
 	buffer_init(&b);
-	if (datafellows & SSH_OLD_SESSIONID) {
+	if (ssh->compat & SSH_OLD_SESSIONID) {
 		buffer_append(&b, ssh->kex->session_id,
 		    ssh->kex->session_id_len);
 		skip = ssh->kex->session_id_len;
@@ -1253,10 +1253,10 @@ sign_and_send_pubkey(struct ssh *ssh, Identity *id)
 	buffer_put_char(&b, SSH2_MSG_USERAUTH_REQUEST);
 	buffer_put_cstring(&b, authctxt->server_user);
 	buffer_put_cstring(&b,
-	    datafellows & SSH_BUG_PKSERVICE ?
+	    ssh->compat & SSH_BUG_PKSERVICE ?
 	    "ssh-userauth" :
 	    authctxt->service);
-	if (datafellows & SSH_BUG_PKAUTH) {
+	if (ssh->compat & SSH_BUG_PKAUTH) {
 		buffer_put_char(&b, have_sig);
 	} else {
 		buffer_put_cstring(&b, authctxt->method->name);
@@ -1267,7 +1267,7 @@ sign_and_send_pubkey(struct ssh *ssh, Identity *id)
 
 	/* generate signature */
 	if ((ret = identity_sign(id, &signature, &slen,
-	    buffer_ptr(&b), buffer_len(&b))) != 0) {
+	    buffer_ptr(&b), buffer_len(&b), ssh->compat)) != 0) {
 		error("signature failed: %s", ssh_err(ret));
 		xfree(blob);
 		buffer_free(&b);
@@ -1276,7 +1276,7 @@ sign_and_send_pubkey(struct ssh *ssh, Identity *id)
 #ifdef DEBUG_PK
 	buffer_dump(&b);
 #endif
-	if (datafellows & SSH_BUG_PKSERVICE) {
+	if (ssh->compat & SSH_BUG_PKSERVICE) {
 		buffer_clear(&b);
 		buffer_append(&b, ssh->kex->session_id,
 		    ssh->kex->session_id_len);
@@ -1286,7 +1286,7 @@ sign_and_send_pubkey(struct ssh *ssh, Identity *id)
 		buffer_put_cstring(&b, authctxt->service);
 		buffer_put_cstring(&b, authctxt->method->name);
 		buffer_put_char(&b, have_sig);
-		if (!(datafellows & SSH_BUG_PKAUTH))
+		if (!(ssh->compat & SSH_BUG_PKAUTH))
 			buffer_put_cstring(&b, sshkey_ssh_name(id->key));
 		buffer_put_string(&b, blob, bloblen);
 	}
@@ -1333,7 +1333,7 @@ send_pubkey_test(struct ssh *ssh, Identity *id)
 	ssh_packet_put_cstring(ssh, authctxt->service);
 	ssh_packet_put_cstring(ssh, authctxt->method->name);
 	ssh_packet_put_char(ssh, have_sig);
-	if (!(datafellows & SSH_BUG_PKAUTH))
+	if (!(ssh->compat & SSH_BUG_PKAUTH))
 		ssh_packet_put_cstring(ssh, sshkey_ssh_name(id->key));
 	ssh_packet_put_string(ssh, blob, bloblen);
 	xfree(blob);
@@ -1726,7 +1726,7 @@ userauth_hostbased(struct ssh *ssh)
 	debug2("userauth_hostbased: chost %s", chost);
 	xfree(p);
 
-	service = datafellows & SSH_BUG_HBSERVICE ? "ssh-userauth" :
+	service = ssh->compat & SSH_BUG_HBSERVICE ? "ssh-userauth" :
 	    authctxt->service;
 	pkalg = xstrdup(sshkey_ssh_name(private));
 	buffer_init(&b);
@@ -1748,7 +1748,7 @@ userauth_hostbased(struct ssh *ssh)
 		    buffer_ptr(&b), buffer_len(&b));
 	else
 		ok = sshkey_sign(private, &signature, &slen,
-		    buffer_ptr(&b), buffer_len(&b), datafellows);
+		    buffer_ptr(&b), buffer_len(&b), ssh->compat);
 	sshkey_free(private);
 	buffer_free(&b);
 	if (ok != 0) {

@@ -81,7 +81,7 @@ userauth_pubkey(struct ssh *ssh)
 		return 0;
 	}
 	have_sig = ssh_packet_get_char(ssh);
-	if (datafellows & SSH_BUG_PKAUTH) {
+	if (ssh->compat & SSH_BUG_PKAUTH) {
 		debug2("%s: SSH_BUG_PKAUTH", __func__);
 		/* no explicit pkalg given */
 		pkblob = ssh_packet_get_string(ssh, &blen);
@@ -118,7 +118,7 @@ userauth_pubkey(struct ssh *ssh)
 		sig = ssh_packet_get_string(ssh, &slen);
 		ssh_packet_check_eom(ssh);
 		buffer_init(&b);
-		if (datafellows & SSH_OLD_SESSIONID) {
+		if (ssh->compat & SSH_OLD_SESSIONID) {
 			buffer_append(&b, session_id2, session_id2_len);
 		} else {
 			buffer_put_string(&b, session_id2, session_id2_len);
@@ -127,10 +127,10 @@ userauth_pubkey(struct ssh *ssh)
 		buffer_put_char(&b, SSH2_MSG_USERAUTH_REQUEST);
 		buffer_put_cstring(&b, authctxt->user);
 		buffer_put_cstring(&b,
-		    datafellows & SSH_BUG_PKSERVICE ?
+		    ssh->compat & SSH_BUG_PKSERVICE ?
 		    "ssh-userauth" :
 		    authctxt->service);
-		if (datafellows & SSH_BUG_PKAUTH) {
+		if (ssh->compat & SSH_BUG_PKAUTH) {
 			buffer_put_char(&b, have_sig);
 		} else {
 			buffer_put_cstring(&b, "publickey");
@@ -145,7 +145,7 @@ userauth_pubkey(struct ssh *ssh)
 		authenticated = 0;
 		if (PRIVSEP(user_key_allowed(authctxt->pw, key)) &&
 		    PRIVSEP(sshkey_verify(key, sig, slen, buffer_ptr(&b),
-		    buffer_len(&b), datafellows)) == 0)
+		    buffer_len(&b), ssh->compat)) == 0)
 			authenticated = 1;
 		buffer_free(&b);
 		xfree(sig);

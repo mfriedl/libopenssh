@@ -59,7 +59,7 @@ struct ssh {
 	int skip_packets;
 
 	/* datafellows */
-	int datafellows;
+	int compat;
 
 	/* Lists for private and public keys */
 	TAILQ_HEAD(, key_entry) private_keys;

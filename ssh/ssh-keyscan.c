@@ -434,9 +434,9 @@ congreet(int s)
 	*cp = '\0';
 	if (sscanf(buf, "SSH-%d.%d-%[^\n]\n",
 	    &remote_major, &remote_minor, remote_version) == 3)
-		compat_datafellows(remote_version);
+		c->c_ssh->compat = compat_datafellows(remote_version);
 	else
-		datafellows = 0;
+		c->c_ssh->compat = 0;
 	if (c->c_keytype != KT_RSA1) {
 		if (!ssh2_capable(remote_major, remote_minor)) {
 			debug("%s doesn't support ssh2", c->c_name);

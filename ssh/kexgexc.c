@@ -58,7 +58,7 @@ kexgex_client(struct ssh *ssh)
 	kex->min = DH_GRP_MIN;
 	kex->max = DH_GRP_MAX;
 	kex->nbits = nbits;
-	if (ssh->datafellows & SSH_OLD_DHGEX) {
+	if (ssh->compat & SSH_OLD_DHGEX) {
 		/* Old GEX request */
 		if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_DH_GEX_REQUEST_OLD))
 		    != 0 ||
@@ -205,7 +205,7 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 #ifdef DEBUG_KEXDH
 	dump_digest("shared secret", kbuf, kout);
 #endif
-	if (ssh->datafellows & SSH_OLD_DHGEX)
+	if (ssh->compat & SSH_OLD_DHGEX)
 		kex->min = kex->max = -1;
 
 	/* calc and verify H */
@@ -225,7 +225,7 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 		goto out;
 
 	if ((r = sshkey_verify(server_host_key, signature, slen, hash,
-	    hashlen, ssh->datafellows)) != 0)
+	    hashlen, ssh->compat)) != 0)
 		goto out;
 
 	/* save session id */

@@ -136,7 +136,7 @@ userauth_banner(struct ssh *ssh)
 
 	if (options.banner == NULL ||
 	    strcasecmp(options.banner, "none") == 0 ||
-	    (datafellows & SSH_BUG_BANNER) != 0)
+	    (ssh->compat & SSH_BUG_BANNER) != 0)
 		return;
 
 	if ((banner = PRIVSEP(auth2_read_banner())) == NULL)
