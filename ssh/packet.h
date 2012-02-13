@@ -160,7 +160,9 @@ int	 ssh_packet_inc_alive_timeouts(struct ssh *);
 int	 ssh_packet_set_maxsize(struct ssh *, u_int);
 u_int	 ssh_packet_get_maxsize(struct ssh *);
 
-void	ssh_packet_set_postauth(struct ssh *);
+void	 ssh_packet_set_postauth(struct ssh *);
+int	 ssh_packet_state_serialize(struct ssh *, struct sshbuf *);
+int	 ssh_packet_state_deserialize(struct ssh *, struct sshbuf *);
 
 /* don't allow remaining bytes after the end of the message */
 #define ssh_packet_check_eom(active_state) \
@@ -325,6 +327,10 @@ void     packet_set_connection(int, int);
 	ssh_set_newkeys(active_state, (mode))
 #define packet_set_postauth() \
 	ssh_packet_set_postauth(active_state)
+#define packet_state_serialize(m) \
+	ssh_packet_state_serialize(active_state, m)
+#define packet_state_deserialize(m) \
+	ssh_packet_state_deserialize(active_state, m)
 #endif
 
 /* new API */

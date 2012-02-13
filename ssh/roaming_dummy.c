@@ -33,6 +33,17 @@ get_recv_bytes(void)
 	return 0;
 }
 
+u_int64_t
+get_sent_bytes(void)
+{
+	return 0;
+}
+
+void
+roam_set_bytes(u_int64_t sent, u_int64_t recvd)
+{
+}
+
 ssize_t
 roaming_write(int fd, const void *buf, size_t count, int *cont)
 {
