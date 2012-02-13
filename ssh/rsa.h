@@ -21,6 +21,6 @@
 
 void	 rsa_public_encrypt(BIGNUM *, BIGNUM *, RSA *);
 int	 rsa_private_decrypt(BIGNUM *, BIGNUM *, RSA *);
-void	 rsa_generate_additional_parameters(RSA *);
+int	 rsa_generate_additional_parameters(RSA *);
 
 #endif				/* RSA_H */

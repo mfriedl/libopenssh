@@ -67,6 +67,7 @@
 #include "xmalloc.h"
 #include "rsa.h"
 #include "log.h"
+#include "err.h"
 
 void
 rsa_public_encrypt(BIGNUM *out, BIGNUM *in, RSA *key)
@@ -125,24 +126,31 @@ rsa_private_decrypt(BIGNUM *out, BIGNUM *in, RSA *key)
 }
 
 /* calculate p-1 and q-1 */
-void
+int
 rsa_generate_additional_parameters(RSA *rsa)
 {
-	BIGNUM *aux;
-	BN_CTX *ctx;
+	BIGNUM *aux = NULL;
+	BN_CTX *ctx = NULL;
+	int r;
 
-	if ((aux = BN_new()) == NULL)
-		fatal("rsa_generate_additional_parameters: BN_new failed");
 	if ((ctx = BN_CTX_new()) == NULL)
-		fatal("rsa_generate_additional_parameters: BN_CTX_new failed");
+		return SSH_ERR_ALLOC_FAIL;
+	if ((aux = BN_new()) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
 
 	if ((BN_sub(aux, rsa->q, BN_value_one()) == 0) ||
 	    (BN_mod(rsa->dmq1, rsa->d, aux, ctx) == 0) ||
 	    (BN_sub(aux, rsa->p, BN_value_one()) == 0) ||
-	    (BN_mod(rsa->dmp1, rsa->d, aux, ctx) == 0))
-		fatal("rsa_generate_additional_parameters: BN_sub/mod failed");
-
+	    (BN_mod(rsa->dmp1, rsa->d, aux, ctx) == 0)) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
+	r = 0;
+ out:
 	BN_clear_free(aux);
 	BN_CTX_free(ctx);
+	return r;
 }
 

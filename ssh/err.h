@@ -60,6 +60,14 @@
 #define SSH_ERR_PROTOCOL_MISMATCH		-36
 #define SSH_ERR_NO_PROTOCOL_VERSION		-37
 #define SSH_ERR_NEED_REKEY			-38
+#define SSH_ERR_PASSPHRASE_TOO_SHORT		-39
+#define SSH_ERR_FILE_CHANGED			-40
+#define SSH_ERR_KEY_UNKNOWN_CIPHER		-41
+#define SSH_ERR_KEY_WRONG_PASSPHRASE		-42
+#define SSH_ERR_KEY_BAD_PERMISSIONS		-43
+#define SSH_ERR_KEY_CERT_MISMATCH		-44
+#define SSH_ERR_KEY_NOT_FOUND			-45
+
 
 /* Translate a numeric error code to a human-readable error string */
 const char *ssh_err(int n);

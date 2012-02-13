@@ -101,6 +101,20 @@ ssh_err(int n)
 		return "could not load host key";
 	case SSH_ERR_NEED_REKEY:
 		return "rekeying not supported by peer";
+	case SSH_ERR_PASSPHRASE_TOO_SHORT:
+		return "passphrase is too short (minimum four characters)";
+	case SSH_ERR_FILE_CHANGED:
+		return "file changed while reading";
+	case SSH_ERR_KEY_UNKNOWN_CIPHER:
+		return "key encrypted using unsupported cipher";
+	case SSH_ERR_KEY_WRONG_PASSPHRASE:
+		return "incorrect passphrase supplied to decrypt private key";
+	case SSH_ERR_KEY_BAD_PERMISSIONS:
+		return "bad permissions";
+	case SSH_ERR_KEY_CERT_MISMATCH:
+		return "certificate does not match key";
+	case SSH_ERR_KEY_NOT_FOUND:
+		return "key not found";
 	default:
 		return "unknown error";
 	}
