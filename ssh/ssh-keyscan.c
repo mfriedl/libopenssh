@@ -241,7 +241,6 @@ keygrab_ssh2(con *c)
 	int r;
 
 	enable_compat20();
-	c->c_ssh = ssh_packet_set_connection(NULL, c->c_fd, c->c_fd);
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = c->c_keytype == KT_DSA?
 	    "ssh-dss" : (c->c_keytype == KT_RSA ? "ssh-rsa" :
 	    "ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521");
@@ -261,9 +260,6 @@ keygrab_ssh2(con *c)
 	 * the key_print_wrapper() callback sets c_done.
 	 */
 	ssh_dispatch_run(c->c_ssh, DISPATCH_BLOCK, &c->c_done);
-	ssh_packet_close(c->c_ssh);
-	free(c->c_ssh);
-	c->c_ssh = NULL;
 }
 
 static void
@@ -365,6 +361,11 @@ confree(int s)
 		xfree(fdcon[s].c_data);
 	fdcon[s].c_status = CS_UNUSED;
 	fdcon[s].c_keytype = 0;
+	if (fdcon[s].c_ssh) {
+		ssh_packet_close(fdcon[s].c_ssh);
+		free(fdcon[s].c_ssh);
+		fdcon[s].c_ssh = NULL;
+	}
 	TAILQ_REMOVE(&tq, &fdcon[s], c_link);
 	FD_CLR(s, read_wait);
 	ncon--;
@@ -432,6 +433,7 @@ congreet(int s)
 		return;
 	}
 	*cp = '\0';
+	c->c_ssh = ssh_packet_set_connection(NULL, s, s);
 	if (sscanf(buf, "SSH-%d.%d-%[^\n]\n",
 	    &remote_major, &remote_minor, remote_version) == 3)
 		c->c_ssh->compat = compat_datafellows(remote_version);
