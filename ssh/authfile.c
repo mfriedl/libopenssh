@@ -292,6 +292,8 @@ sshkey_parse_public_rsa1(struct sshbuf *blob,
 	struct sshbuf *copy = NULL;
 
 	*keyp = NULL;
+	if (commentp != NULL)
+		*commentp = NULL;
 
 	/* Check that it is at least big enough to contain the ID string. */
 	if (buffer_len(blob) < sizeof(authfile_id_string))
@@ -397,6 +399,8 @@ sshkey_load_public_rsa1(int fd, const char *filename,
 	int r;
 
 	*keyp = NULL;
+	if (commentp != NULL)
+		*commentp = NULL;
 
 	if ((buffer = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
@@ -425,6 +429,8 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 	struct sshkey *prv = NULL;
 
 	*keyp = NULL;
+	if (commentp != NULL)
+		*commentp = NULL;
 
 	/* Check that it is at least big enough to contain the ID string. */
 	if (sshbuf_len(blob) < sizeof(authfile_id_string))
@@ -543,6 +549,8 @@ sshkey_parse_private_pem(struct sshbuf *blob, int type, const char *passphrase,
 	int r;
 
 	*keyp = NULL;
+	if (commentp != NULL)
+		*commentp = NULL;
 
 	if ((bio = BIO_new_mem_buf(sshbuf_ptr(blob), sshbuf_len(blob))) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
@@ -631,6 +639,8 @@ sshkey_load_private_pem(int fd, int type, const char *passphrase,
 	int r;
 
 	*keyp = NULL;
+	if (commentp != NULL)
+		*commentp = NULL;
 
 	if ((buffer = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
@@ -675,6 +685,10 @@ static int
 sshkey_parse_private_type(struct sshbuf *blob, int type, const char *passphrase,
     struct sshkey **keyp, char **commentp)
 {
+	*keyp = NULL;
+	if (commentp != NULL)
+		*commentp = NULL;
+
 	switch (type) {
 	case KEY_RSA1:
 		return sshkey_parse_private_rsa1(blob, passphrase,
@@ -699,6 +713,8 @@ sshkey_load_private_type(int type, const char *filename, const char *passphrase,
 	struct sshbuf *buffer = NULL;
 
 	*keyp = NULL;
+	if (commentp != NULL)
+		*commentp = NULL;
 
 	if ((fd = open(filename, O_RDONLY)) < 0) {
 		if (perm_ok != NULL)
@@ -739,6 +755,8 @@ sshkey_parse_private(struct sshbuf *buffer, const char *passphrase,
 	int r;
 
 	*keyp = NULL;
+	if (commentp != NULL)
+		*commentp = NULL;
 
 	/* it's a SSH v1 key if the public key part is readable */
 	if ((r = sshkey_parse_public_rsa1(buffer, &key, NULL)) == 0) {
@@ -767,6 +785,8 @@ sshkey_load_private(const char *filename, const char *passphrase,
 	int r, fd;
 
 	*keyp = NULL;
+	if (commentp != NULL)
+		*commentp = NULL;
 
 	if ((fd = open(filename, O_RDONLY)) < 0)
 		return SSH_ERR_SYSTEM_ERROR;
@@ -799,6 +819,8 @@ sshkey_try_load_public(struct sshkey *k, const char *filename, char **commentp)
 	char *cp;
 	u_long linenum = 0;
 
+	if (commentp != NULL)
+		*commentp = NULL;
 	if ((f = fopen(filename, "r")) == NULL)
 		return SSH_ERR_SYSTEM_ERROR;
 	while (read_keyfile_line(f, filename, line, sizeof(line),
@@ -840,6 +862,10 @@ sshkey_load_public(const char *filename, struct sshkey **keyp, char **commentp)
 	struct sshkey *pub;
 	char file[MAXPATHLEN];
 	int r, fd;
+
+	*keyp = NULL;
+	if (commentp != NULL)
+		*commentp = NULL;
 
 	/* try rsa1 private key */
 	if ((fd = open(filename, O_RDONLY)) < 0)
