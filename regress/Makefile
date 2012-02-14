@@ -76,9 +76,9 @@ TEST_ENV=      "MALLOC_OPTIONS=AFGJPRX"
 # use in-tree executables
 .include <bsd.obj.mk>
 .if exists(${.CURDIR}/../ssh/ssh/${__objdir}/)
-ODIR="/obj"
+ODIR=/obj
 .else
-ODIR=""
+ODIR=
 .endif
 TEST_ENV+=	"TEST_SSH_SCP=${.CURDIR}/../ssh/scp${ODIR}/scp"
 TEST_ENV+=	"TEST_SSH_SFTP=${.CURDIR}/../ssh/sftp${ODIR}/sftp"
@@ -144,7 +144,7 @@ t9: t9.out
 
 .for t in ${LTESTS} ${INTEROP_TESTS}
 t-${t}:
-	env SUDO="${SUDO}" ${TEST_ENV} \
+	@env SUDO="${SUDO}" ${TEST_ENV} \
 	    sh ${.CURDIR}/test-exec.sh ${.OBJDIR} ${.CURDIR}/${t}.sh
 .endfor
 
