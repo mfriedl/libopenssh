@@ -208,7 +208,7 @@ compat_cipher_proposal(char *cipher_prop, u_int compat)
 	char *orig_prop, *fix_ciphers, *cp, *tmp;
 	size_t maxlen;
 
-	if (compat & SSH_BUG_BIGENDIANAES)
+	if (!(compat & SSH_BUG_BIGENDIANAES))
 		return cipher_prop;
 
 	tmp = orig_prop = strdup(cipher_prop);
