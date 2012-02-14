@@ -202,6 +202,8 @@ struct session_state {
 	TAILQ_HEAD(, packet) outgoing;
 };
 
+static int _sshbuf_get_stringb(struct sshbuf *, struct sshbuf *);
+
 struct ssh *
 ssh_alloc_session_state(void)
 {
@@ -373,172 +375,59 @@ ssh_packet_connection_is_on_socket(struct ssh *ssh)
 	return 1;
 }
 
-/*
- * Exports an IV from the CipherContext required to export the key
- * state back from the unprivileged child to the privileged parent
- * process.
- */
-
 void
-ssh_packet_get_keyiv(struct ssh *ssh, int mode, u_char *iv,
-    u_int len)
+ssh_packet_get_bytes(struct ssh *ssh, u_int64_t *ibytes, u_int64_t *obytes)
 {
-	CipherContext *cc;
-	int r;
-
-	if (mode == MODE_OUT)
-		cc = &ssh->state->send_context;
-	else
-		cc = &ssh->state->receive_context;
-
-	if ((r = cipher_get_keyiv(cc, iv, len)) != 0)
-		fatal("%s: cipher_get_keyiv failed: %s", __func__, ssh_err(r));
-}
-
-int
-ssh_packet_get_keycontext(struct ssh *ssh, int mode, u_char *dat)
-{
-	CipherContext *cc;
-
-	if (mode == MODE_OUT)
-		cc = &ssh->state->send_context;
-	else
-		cc = &ssh->state->receive_context;
-
-	return (cipher_get_keycontext(cc, dat));
-}
-
-void
-ssh_packet_set_keycontext(struct ssh *ssh, int mode, u_char *dat)
-{
-	CipherContext *cc;
-
-	if (mode == MODE_OUT)
-		cc = &ssh->state->send_context;
-	else
-		cc = &ssh->state->receive_context;
-
-	cipher_set_keycontext(cc, dat);
-}
-
-int
-ssh_packet_get_keyiv_len(struct ssh *ssh, int mode)
-{
-	CipherContext *cc;
-
-	if (mode == MODE_OUT)
-		cc = &ssh->state->send_context;
-	else
-		cc = &ssh->state->receive_context;
-
-	return (cipher_get_keyiv_len(cc));
-}
-
-void
-ssh_packet_set_iv(struct ssh *ssh, int mode, u_char *dat)
-{
-	CipherContext *cc;
-	int r;
-
-	if (mode == MODE_OUT)
-		cc = &ssh->state->send_context;
-	else
-		cc = &ssh->state->receive_context;
-
-	if ((r = cipher_set_keyiv(cc, dat)) != 0)
-		fatal("%s: cipher_set_keyiv failed: %s", __func__, ssh_err(r));
-}
-
-int
-ssh_packet_get_ssh1_cipher(struct ssh *ssh)
-{
-	return (cipher_get_number(ssh->state->receive_context.cipher));
-}
-
-void
-ssh_packet_get_state(struct ssh *ssh, int mode, u_int32_t *seqnr, u_int64_t *blocks,
-    u_int32_t *packets, u_int64_t *bytes)
-{
-	struct packet_state *pstate;
-
-	pstate = (mode == MODE_IN) ?
-	    &ssh->state->p_read : &ssh->state->p_send;
-	if (seqnr)
-		*seqnr = pstate->seqnr;
-	if (blocks)
-		*blocks = pstate->blocks;
-	if (packets)
-		*packets = pstate->packets;
-	if (bytes)
-		*bytes = pstate->bytes;
-}
-
-void
-ssh_packet_set_state(struct ssh *ssh, int mode, u_int32_t seqnr, u_int64_t blocks, u_int32_t packets,
-    u_int64_t bytes)
-{
-	struct packet_state *pstate;
-
-	pstate = (mode == MODE_IN) ?
-	    &ssh->state->p_read : &ssh->state->p_send;
-	pstate->seqnr = seqnr;
-	pstate->blocks = blocks;
-	pstate->packets = packets;
-	pstate->bytes = bytes;
+	if (ibytes)
+		*ibytes = ssh->state->p_read.bytes;
+	if (obytes)
+		*obytes = ssh->state->p_send.bytes;
 }
 
 /* Serialise compression state into a blob for privsep */
-int
-ssh_packet_get_compress_state(struct ssh *ssh, u_char **blob, u_int *len)
+static int
+ssh_packet_get_compress_state(struct sshbuf *m, struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
-	struct sshbuf *m;
+	struct sshbuf *b;
 	int r;
 
-	*blob = NULL;
-	*len = 0;
-	if ((m = sshbuf_new()) == NULL)
+	if ((b = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	if (state->compression_in_started) {
-		if ((r = sshbuf_put_string(m, &state->compression_in_stream,
+		if ((r = sshbuf_put_string(b, &state->compression_in_stream,
 		    sizeof(state->compression_in_stream))) != 0)
 			goto out;
-	} else if ((r = sshbuf_put_string(m, NULL, 0)) != 0)
+	} else if ((r = sshbuf_put_string(b, NULL, 0)) != 0)
 		goto out;
 	if (state->compression_out_started) {
-		if ((r = sshbuf_put_string(m, &state->compression_out_stream,
+		if ((r = sshbuf_put_string(b, &state->compression_out_stream,
 		    sizeof(state->compression_out_stream))) != 0)
 			goto out;
-	} else if ((r = sshbuf_put_string(m, NULL, 0)) != 0)
+	} else if ((r = sshbuf_put_string(b, NULL, 0)) != 0)
 		goto out;
-	if ((*blob = malloc(sshbuf_len(m))) == NULL) {
-		r = SSH_ERR_ALLOC_FAIL;
-		goto out;
-	}
-	memcpy(*blob, sshbuf_ptr(m), sshbuf_len(m));
-	*len = sshbuf_len(m);
-	r = 0;
+	r = sshbuf_put_stringb(m, b);
  out:
-	sshbuf_free(m);
+	sshbuf_free(b);
 	return r;
 }
 
 /* Deserialise compression state from a blob for privsep */
-int
-ssh_packet_set_compress_state(struct ssh *ssh, u_char *blob, u_int len)
+static int
+ssh_packet_set_compress_state(struct ssh *ssh, struct sshbuf *m)
 {
 	struct session_state *state = ssh->state;
-	struct sshbuf *m;
+	struct sshbuf *b;
 	int r;
 	const u_char *inblob, *outblob;
 	size_t inl, outl;
 
-	if ((m = sshbuf_new()) == NULL)
+	if ((b = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
-	if ((r = sshbuf_put(m, blob, len)) != 0)
+	if ((r = _sshbuf_get_stringb(m, b)) != 0)
 		goto out;
-	if ((r = sshbuf_get_string_direct(m, &inblob, &inl)) != 0 ||
-	    (r = sshbuf_get_string_direct(m, &outblob, &outl)) != 0)
+	if ((r = sshbuf_get_string_direct(b, &inblob, &inl)) != 0 ||
+	    (r = sshbuf_get_string_direct(b, &outblob, &outl)) != 0)
 		goto out;
 	if (inl == 0)
 		state->compression_in_started = 0;
@@ -560,7 +449,7 @@ ssh_packet_set_compress_state(struct ssh *ssh, u_char *blob, u_int len)
 	}
 	r = 0;
  out:
-	sshbuf_free(m);
+	sshbuf_free(b);
 	return r;
 }
 
@@ -877,15 +766,6 @@ ssh_packet_set_encryption_key(struct ssh *ssh, const u_char *key, u_int keylen, 
 		error("Warning: %s", wmsg);
 		state->cipher_warning_done = 1;
 	}
-}
-
-u_int
-ssh_packet_get_encryption_key(struct ssh *ssh, u_char *key)
-{
-	if (key == NULL)
-		return (ssh->state->ssh1_keylen);
-	memcpy(key, ssh->state->ssh1_key, ssh->state->ssh1_keylen);
-	return (ssh->state->ssh1_keylen);
 }
 
 /* Start constructing a packet to send. */
@@ -2474,7 +2354,7 @@ ssh_packet_restore_state(struct ssh *ssh,
 }
 
 /* Reset after_authentication and reset compression in post-auth privsep */
-void
+static int
 ssh_packet_set_postauth(struct ssh *ssh)
 {
 	Comp *comp;
@@ -2488,399 +2368,341 @@ ssh_packet_set_postauth(struct ssh *ssh)
 		if (ssh->state->newkeys[mode] == NULL)
 			continue;
 		comp = &ssh->state->newkeys[mode]->comp;
-		if (comp && comp->enabled)
-			if ((r = ssh_packet_init_compression(ssh)) != 0)
-				fatal("%s: %s", __func__, ssh_err(r));
-	}
-}
-
-
-static void
-kex_to_blob(Buffer *m, Kex *kex)
-{
-	buffer_put_string(m, kex->session_id, kex->session_id_len);
-	buffer_put_int(m, kex->we_need);
-	buffer_put_int(m, kex->hostkey_type);
-	buffer_put_int(m, kex->kex_type);
-	buffer_put_string(m, buffer_ptr(kex->my), buffer_len(kex->my));
-	buffer_put_string(m, buffer_ptr(kex->peer), buffer_len(kex->peer));
-	buffer_put_int(m, kex->flags);
-	buffer_put_cstring(m, kex->client_version_string);
-	buffer_put_cstring(m, kex->server_version_string);
-}
-
-static int
-newkeys_to_blob(struct ssh *ssh, int mode, u_char **blobp, u_int *lenp)
-{
-	Buffer b;
-	int len;
-	Enc *enc;
-	Mac *mac;
-	Comp *comp;
-	Newkeys *newkey = ssh->state->newkeys[mode];
-
-	debug3("%s: converting %p", __func__, newkey);
-
-	if (newkey == NULL) {
-		error("%s: newkey == NULL", __func__);
-		return 0;
-	}
-	enc = &newkey->enc;
-	mac = &newkey->mac;
-	comp = &newkey->comp;
-
-	buffer_init(&b);
-	/* Enc structure */
-	buffer_put_cstring(&b, enc->name);
-	/* The cipher struct is constant and shared, you export pointer */
-	buffer_append(&b, &enc->cipher, sizeof(enc->cipher));
-	buffer_put_int(&b, enc->enabled);
-	buffer_put_int(&b, enc->block_size);
-	buffer_put_string(&b, enc->key, enc->key_len);
-	packet_get_keyiv(mode, enc->iv, enc->block_size);
-	buffer_put_string(&b, enc->iv, enc->block_size);
-
-	/* Mac structure */
-	buffer_put_cstring(&b, mac->name);
-	buffer_put_int(&b, mac->enabled);
-	buffer_put_string(&b, mac->key, mac->key_len);
-
-	/* Comp structure */
-	buffer_put_int(&b, comp->type);
-	buffer_put_int(&b, comp->enabled);
-	buffer_put_cstring(&b, comp->name);
-
-	len = buffer_len(&b);
-	if (lenp != NULL)
-		*lenp = len;
-	if (blobp != NULL) {
-		*blobp = xmalloc(len);
-		memcpy(*blobp, buffer_ptr(&b), len);
-	}
-	memset(buffer_ptr(&b), 0, len);
-	buffer_free(&b);
-	return len;
-}
-
-int
-ssh_packet_state_serialize(struct ssh *ssh, struct sshbuf *m)
-{
-	Buffer *input, *output;
-	u_char *blob, *p;
-	u_int bloblen, plen;
-	u_int32_t seqnr, packets;
-	u_int64_t blocks, bytes;
-	int r;
-
-	if (!compat20) {
-		u_char iv[24];
-		u_char *key;
-		u_int ivlen, keylen;
-
-		buffer_put_int(m, ssh_packet_get_protocol_flags(ssh));
-		buffer_put_int(m, ssh_packet_get_ssh1_cipher(ssh));
-
-		debug3("%s: Sending ssh1 KEY+IV", __func__);
-		keylen = ssh_packet_get_encryption_key(ssh, NULL);
-		key = xmalloc(keylen+1);	/* add 1 if keylen == 0 */
-		keylen = ssh_packet_get_encryption_key(ssh, key);
-		buffer_put_string(m, key, keylen);
-		memset(key, 0, keylen);
-		xfree(key);
-
-		ivlen = ssh_packet_get_keyiv_len(ssh, MODE_OUT);
-		ssh_packet_get_keyiv(ssh, MODE_OUT, iv, ivlen);
-		buffer_put_string(m, iv, ivlen);
-		ivlen = ssh_packet_get_keyiv_len(ssh, MODE_OUT);
-		ssh_packet_get_keyiv(ssh, MODE_IN, iv, ivlen);
-		buffer_put_string(m, iv, ivlen);
-	} else {
-		/* Kex for rekeying */
-		kex_to_blob(m, ssh->kex);
-
-		/* Keys from Kex */
-		if (!newkeys_to_blob(ssh, MODE_OUT, &blob, &bloblen))
-			fatal("%s: conversion of newkeys failed", __func__);
-
-		buffer_put_string(m, blob, bloblen);
-		xfree(blob);
-
-		if (!newkeys_to_blob(ssh, MODE_IN, &blob, &bloblen))
-			fatal("%s: conversion of newkeys failed", __func__);
-
-		buffer_put_string(m, blob, bloblen);
-		xfree(blob);
-
-		ssh_packet_get_state(ssh, MODE_OUT, &seqnr, &blocks, &packets, &bytes);
-		buffer_put_int(m, seqnr);
-		buffer_put_int64(m, blocks);
-		buffer_put_int(m, packets);
-		buffer_put_int64(m, bytes);
-		ssh_packet_get_state(ssh, MODE_IN, &seqnr, &blocks, &packets, &bytes);
-		buffer_put_int(m, seqnr);
-		buffer_put_int64(m, blocks);
-		buffer_put_int(m, packets);
-		buffer_put_int64(m, bytes);
-
-		debug3("%s: New keys have been sent", __func__);
-	}
-
-	/* More key context */
-	plen = ssh_packet_get_keycontext(ssh, MODE_OUT, NULL);
-	p = xmalloc(plen+1);
-	ssh_packet_get_keycontext(ssh, MODE_OUT, p);
-	buffer_put_string(m, p, plen);
-	xfree(p);
-
-	plen = ssh_packet_get_keycontext(ssh, MODE_IN, NULL);
-	p = xmalloc(plen+1);
-	ssh_packet_get_keycontext(ssh, MODE_IN, p);
-	buffer_put_string(m, p, plen);
-	xfree(p);
-
-	/* Compression state */
-	debug3("%s: Sending compression state", __func__);
-	if ((r = ssh_packet_get_compress_state(ssh, &p, &plen)) != 0)
-		fatal("%s: packet_get_compress_state: %s",
-		    __func__, ssh_err(r));
-	buffer_put_string(m, p, plen);
-	xfree(p);
-
-	/* Network I/O buffers */
-	input = (Buffer *)ssh_packet_get_input(ssh);
-	output = (Buffer *)ssh_packet_get_output(ssh);
-	buffer_put_string(m, buffer_ptr(input), buffer_len(input));
-	buffer_put_string(m, buffer_ptr(output), buffer_len(output));
-
-	/* Roaming */
-	if (compat20) {
-		buffer_put_int64(m, get_sent_bytes());
-		buffer_put_int64(m, get_recv_bytes());
+		if (comp && comp->enabled &&
+		    (r = ssh_packet_init_compression(ssh)) != 0)
+			return r;
 	}
 	return 0;
 }
 
-/* Export key state after authentication */
-static Newkeys *
-newkeys_from_blob(u_char *blob, int blen)
+/* Packet state (de-)serialization for privsep */
+
+/* turn kex into a blob for packet state serialization */
+static int
+kex_to_blob(Buffer *m, Kex *kex)
 {
-	Buffer b;
-	u_int len;
-	Newkeys *newkey = NULL;
+	int r;
+
+	if ((r = sshbuf_put_string(m, kex->session_id,
+	    kex->session_id_len)) != 0 ||
+	    (r = sshbuf_put_u32(m, kex->we_need)) != 0 ||
+	    (r = sshbuf_put_u32(m, kex->hostkey_type)) != 0 ||
+	    (r = sshbuf_put_u32(m, kex->kex_type)) != 0 ||
+	    (r = sshbuf_put_stringb(m, kex->my)) != 0 ||
+	    (r = sshbuf_put_stringb(m, kex->peer)) != 0 ||
+	    (r = sshbuf_put_u32(m, kex->flags)) != 0 ||
+	    (r = sshbuf_put_cstring(m, kex->client_version_string)) != 0 ||
+	    (r = sshbuf_put_cstring(m, kex->server_version_string)) != 0)
+		return r;
+	return 0;
+}
+
+/* turn key exchange results into a blob for packet state serialization */
+static int
+newkeys_to_blob(struct sshbuf *m, struct ssh *ssh, int mode)
+{
+	struct sshbuf *b;
+	CipherContext *cc;
+	Comp *comp;
 	Enc *enc;
 	Mac *mac;
+	Newkeys *newkey;
+	int r;
+
+	if ((newkey = ssh->state->newkeys[mode]) == NULL)
+		return SSH_ERR_INTERNAL_ERROR;
+	enc = &newkey->enc;
+	mac = &newkey->mac;
+	comp = &newkey->comp;
+	cc = (mode == MODE_OUT) ? &ssh->state->send_context :
+	    &ssh->state->receive_context;
+	if ((r = cipher_get_keyiv(cc, enc->iv, enc->block_size)) != 0)
+		return r;
+	if ((b = sshbuf_new()) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	/* The cipher struct is constant and shared, you export pointer */
+	if ((r = sshbuf_put_cstring(b, enc->name)) != 0 ||
+	    (r = sshbuf_put(b, &enc->cipher, sizeof(enc->cipher))) != 0 ||
+	    (r = sshbuf_put_u32(b, enc->enabled)) != 0 ||
+	    (r = sshbuf_put_u32(b, enc->block_size)) != 0 ||
+	    (r = sshbuf_put_string(b, enc->key, enc->key_len)) != 0 ||
+	    (r = sshbuf_put_string(b, enc->iv, enc->block_size)) != 0 ||
+	    (r = sshbuf_put_cstring(b, mac->name)) != 0 ||
+	    (r = sshbuf_put_u32(b, mac->enabled)) != 0 ||
+	    (r = sshbuf_put_string(b, mac->key, mac->key_len)) != 0 ||
+	    (r = sshbuf_put_u32(b, comp->type)) != 0 ||
+	    (r = sshbuf_put_u32(b, comp->enabled)) != 0 ||
+	    (r = sshbuf_put_cstring(b, comp->name)) != 0)
+		goto out;
+	r = sshbuf_put_stringb(m, b);
+ out:
+	if (b != NULL)
+		sshbuf_free(b);
+	return r;
+}
+
+/* serialize packet state into a blob */
+int
+ssh_packet_get_state(struct ssh *ssh, struct sshbuf *m)
+{
+	struct session_state *state = ssh->state;
+	u_char *p;
+	size_t slen, rlen;
+	int r, ssh1cipher;
+
+	if (!compat20) {
+		ssh1cipher = cipher_get_number(state->receive_context.cipher);
+		slen = cipher_get_keyiv_len(&state->send_context);
+		rlen = cipher_get_keyiv_len(&state->receive_context);
+		if ((r = sshbuf_put_u32(m, state->remote_protocol_flags)) != 0 ||
+		    (r = sshbuf_put_u32(m, ssh1cipher)) != 0 ||
+		    (r = sshbuf_put_string(m, state->ssh1_key, state->ssh1_keylen)) != 0 ||
+		    (r = sshbuf_put_u32(m, slen)) != 0 ||
+		    (r = sshbuf_reserve(m, slen, &p)) != 0 ||
+		    (r = cipher_get_keyiv(&state->send_context, p, slen)) != 0 ||
+		    (r = sshbuf_put_u32(m, rlen)) != 0 ||
+		    (r = sshbuf_reserve(m, rlen, &p)) != 0 ||
+		    (r = cipher_get_keyiv(&state->receive_context, p, rlen)) != 0)
+			return r;
+	} else {
+		if ((r = kex_to_blob(m, ssh->kex)) != 0 ||
+		    (r = newkeys_to_blob(m, ssh, MODE_OUT)) != 0 ||
+		    (r = newkeys_to_blob(m, ssh, MODE_IN)) != 0 ||
+		    (r = sshbuf_put_u32(m, state->p_send.seqnr)) != 0 ||
+		    (r = sshbuf_put_u64(m, state->p_send.blocks)) != 0 ||
+		    (r = sshbuf_put_u32(m, state->p_send.packets)) != 0 ||
+		    (r = sshbuf_put_u64(m, state->p_send.bytes)) != 0 ||
+		    (r = sshbuf_put_u32(m, state->p_read.seqnr)) != 0 ||
+		    (r = sshbuf_put_u64(m, state->p_read.blocks)) != 0 ||
+		    (r = sshbuf_put_u32(m, state->p_read.packets)) != 0 ||
+		    (r = sshbuf_put_u64(m, state->p_read.bytes)) != 0)
+			return r;
+	}
+
+	slen = cipher_get_keycontext(&state->send_context, NULL);
+	rlen = cipher_get_keycontext(&state->receive_context, NULL);
+	if ((r = sshbuf_put_u32(m, slen)) != 0 ||
+	    (r = sshbuf_reserve(m, slen, &p)) != 0)
+		return r;
+	if (cipher_get_keycontext(&state->send_context, p) != (int)slen)
+		return SSH_ERR_INTERNAL_ERROR;
+	if ((r = sshbuf_put_u32(m, rlen)) != 0 ||
+	    (r = sshbuf_reserve(m, rlen, &p)) != 0)
+		return r;
+	if (cipher_get_keycontext(&state->receive_context, p) != (int)rlen)
+		return SSH_ERR_INTERNAL_ERROR;
+
+	if ((r = ssh_packet_get_compress_state(m, ssh)) != 0 ||
+	    (r = sshbuf_put_stringb(m, state->input)) != 0 ||
+	    (r = sshbuf_put_stringb(m, state->output)) != 0)
+		return r;
+
+	if (compat20) {
+		if ((r = sshbuf_put_u64(m, get_sent_bytes())) != 0 ||
+		    (r = sshbuf_put_u64(m, get_recv_bytes())) != 0)
+			return r;
+	}
+	return 0;
+}
+
+static int
+_sshbuf_get_stringb(struct sshbuf *buf, struct sshbuf *v)
+{
+	u_char *p;
+	u_int32_t len;
+	int r;
+
+	/*
+	 * Use sshbuf_peek_string_direct() to figure out if there is
+	 * a complete string in 'buf' and copy the string directly
+	 * into 'v'.
+	 */
+	if ((r = sshbuf_peek_string_direct(buf, NULL, NULL)) != 0 ||
+	    (r = sshbuf_get_u32(buf, &len)) != 0 ||
+	    (r = sshbuf_reserve(v, len, &p)) != 0 ||
+	    (r = sshbuf_get(buf, p, len)) != 0)
+		return r;
+	return 0;
+}
+
+/* restore key exchange results from blob for packet state de-serialization */
+static int
+newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
+{
+	struct sshbuf *b = NULL;
 	Comp *comp;
+	Enc *enc;
+	Mac *mac;
+	Newkeys *newkey = NULL;
+	size_t keylen, ivlen, maclen;
+	int r;
 
-	debug3("%s: %p(%d)", __func__, blob, blen);
+	if ((b = sshbuf_new()) == NULL ||
+	    (newkey = calloc(1, sizeof(*newkey))) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
+	if ((r = _sshbuf_get_stringb(m, b)) != 0)
+		goto out;
 #ifdef DEBUG_PK
-	dump_base64(stderr, blob, blen);
+	sshbuf_dump(b, stderr);
 #endif
-	buffer_init(&b);
-	buffer_append(&b, blob, blen);
-
-	newkey = xmalloc(sizeof(*newkey));
 	enc = &newkey->enc;
 	mac = &newkey->mac;
 	comp = &newkey->comp;
 
-	/* Enc structure */
-	enc->name = buffer_get_string(&b, NULL);
-	buffer_get(&b, &enc->cipher, sizeof(enc->cipher));
-	enc->enabled = buffer_get_int(&b);
-	enc->block_size = buffer_get_int(&b);
-	enc->key = buffer_get_string(&b, &enc->key_len);
-	enc->iv = buffer_get_string(&b, &len);
-	if (len != enc->block_size)
-		fatal("%s: bad ivlen: expected %u != %u", __func__,
-		    enc->block_size, len);
-
-	if (enc->name == NULL || cipher_by_name(enc->name) != enc->cipher)
-		fatal("%s: bad cipher name %s or pointer %p", __func__,
-		    enc->name, enc->cipher);
-
-	/* Mac structure */
-	mac->name = buffer_get_string(&b, NULL);
-	if (mac->name == NULL || mac_setup(mac, mac->name) == -1)
-		fatal("%s: can not setup mac %s", __func__, mac->name);
-	mac->enabled = buffer_get_int(&b);
-	mac->key = buffer_get_string(&b, &len);
-	if (len > mac->key_len)
-		fatal("%s: bad mac key length: %u > %d", __func__, len,
-		    mac->key_len);
-	mac->key_len = len;
-
-	/* Comp structure */
-	comp->type = buffer_get_int(&b);
-	comp->enabled = buffer_get_int(&b);
-	comp->name = buffer_get_string(&b, NULL);
-
-	len = buffer_len(&b);
-	if (len != 0)
-		error("newkeys_from_blob: remaining bytes in blob %u", len);
-	buffer_free(&b);
-	return (newkey);
+	if ((r = sshbuf_get_cstring(b, &enc->name, NULL)) != 0 ||
+	    (r = sshbuf_get(b, &enc->cipher, sizeof(enc->cipher))) != 0 ||
+	    (r = sshbuf_get_u32(b, &enc->enabled)) != 0 ||
+	    (r = sshbuf_get_u32(b, &enc->block_size)) != 0 ||
+	    (r = sshbuf_get_string(b, &enc->key, &keylen)) != 0 ||
+	    (r = sshbuf_get_string(b, &enc->iv, &ivlen)) != 0 ||
+	    (r = sshbuf_get_cstring(b, &mac->name, NULL)) != 0 ||
+	    (r = sshbuf_get_u32(b, &mac->enabled)) != 0 ||
+	    (r = sshbuf_get_string(b, &mac->key, &maclen)) != 0 ||
+	    (r = sshbuf_get_u32(b, &comp->type)) != 0 ||
+	    (r = sshbuf_get_u32(b, &comp->enabled)) != 0 ||
+	    (r = sshbuf_get_cstring(b, &comp->name, NULL)) != 0)
+		goto out;
+	if (enc->name == NULL || mac->name == NULL ||
+	    ivlen != enc->block_size ||
+	    cipher_by_name(enc->name) != enc->cipher) {
+		r = SSH_ERR_INVALID_FORMAT;
+		goto out;
+	}
+	if ((r = mac_setup(mac, mac->name)) != 0)
+		goto out;
+	if (maclen > mac->key_len || sshbuf_len(b) != 0) {
+		r = SSH_ERR_INVALID_FORMAT;
+		goto out;
+	}
+	enc->key_len = keylen;
+	ssh->current_keys[mode] = newkey;
+	newkey = NULL;
+	r = 0;
+ out:
+	if (newkey != NULL)
+		free(newkey);
+	if (b != NULL)
+		sshbuf_free(b);
+	return r;
 }
 
-static Kex *
-kex_from_blob(Buffer *m)
+/* restore kex from blob for packet state de-serialization */
+static int
+kex_from_blob(Buffer *m, Kex **kexp)
 {
 	Kex *kex;
-	void *blob;
-	u_int bloblen;
-
-	kex = xcalloc(1, sizeof(Kex));
-	kex->session_id = buffer_get_string(m, &kex->session_id_len);
-	kex->we_need = buffer_get_int(m);
-	kex->server = 1;
-	kex->hostkey_type = buffer_get_int(m);
-	kex->kex_type = buffer_get_int(m);
-	blob = buffer_get_string(m, &bloblen);
-	if ((kex->my = sshbuf_new()) == NULL ||
-	    (kex->peer = sshbuf_new()) == NULL)
-		fatal("%s: sshbuf_new failed", __func__);
-	buffer_append(kex->my, blob, bloblen);
-	xfree(blob);
-	blob = buffer_get_string(m, &bloblen);
-	buffer_append(kex->peer, blob, bloblen);
-	xfree(blob);
-	kex->done = 1;
-	kex->flags = buffer_get_int(m);
-	kex->client_version_string = buffer_get_string(m, NULL);
-	kex->server_version_string = buffer_get_string(m, NULL);
-	return (kex);
-}
-
-int
-ssh_packet_state_deserialize(struct ssh *ssh, struct sshbuf *m)
-{
-	u_char *compstate;
-	u_int compstatelen;
-	u_char *keyin;
-	u_int keyinlen;
-	u_char *keyout;
-	u_int keyoutlen;
-	u_char *ivin = NULL;
-	u_int ivinlen;
-	u_char *ivout = NULL;
-	u_int ivoutlen;
-	u_char *ssh1key = NULL;
-	u_int ssh1keylen;
-	int ssh1cipher = 0;
-	int ssh1protoflags = 0;
-	u_char *input;
-	u_int ilen;
-	u_char *output;
-	u_int olen;
-	u_int64_t sent_bytes = 0;
-	u_int64_t recv_bytes = 0;
-	u_char *blob;
-	u_int bloblen;
-	u_int32_t seqnr, packets;
-	u_int64_t blocks, bytes;
 	int r;
 
-	if (!compat20) {
-		ssh1protoflags = buffer_get_int(m);
-		ssh1cipher = buffer_get_int(m);
-		ssh1key = buffer_get_string(m,
-		    &ssh1keylen);
-		ivout = buffer_get_string(m,
-		    &ivoutlen);
-		ivin = buffer_get_string(m, &ivinlen);
+	if ((kex = calloc(1, sizeof(Kex))) == NULL ||
+	    (kex->my = sshbuf_new()) == NULL ||
+	    (kex->peer = sshbuf_new()) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
+	if ((r = sshbuf_get_string(m, &kex->session_id, &kex->session_id_len)) != 0 ||
+	    (r = sshbuf_get_u32(m, &kex->we_need)) != 0 ||
+	    (r = sshbuf_get_u32(m, &kex->hostkey_type)) != 0 ||
+	    (r = sshbuf_get_u32(m, &kex->kex_type)) != 0 ||
+	    (r = _sshbuf_get_stringb(m, kex->my)) != 0 ||
+	    (r = _sshbuf_get_stringb(m, kex->peer)) != 0 ||
+	    (r = sshbuf_get_u32(m, &kex->flags)) != 0 ||
+	    (r = sshbuf_get_cstring(m, &kex->client_version_string, NULL)) != 0 ||
+	    (r = sshbuf_get_cstring(m, &kex->server_version_string, NULL)) != 0)
+		return r;
+	kex->server = 1;
+	kex->done = 1;
+	r = 0;
+ out:
+	if (r != 0 || kexp == NULL) {
+		if (kex != NULL) {
+			if (kex->my != NULL)
+				sshbuf_free(kex->my);
+			if (kex->peer != NULL)
+				sshbuf_free(kex->peer);
+			free(kex);
+		}
 	} else {
-		/* Get the Kex for rekeying */
-		ssh->kex = kex_from_blob(m);
-
-		blob = buffer_get_string(m, &bloblen);
-		ssh->current_keys[MODE_OUT] = newkeys_from_blob(blob, bloblen);
-		xfree(blob);
-
-		debug3("%s: Waiting for second key", __func__);
-		blob = buffer_get_string(m, &bloblen);
-		ssh->current_keys[MODE_IN] = newkeys_from_blob(blob, bloblen);
-		xfree(blob);
-
-		/* Now get sequence numbers for the packets */
-		seqnr = buffer_get_int(m);
-		blocks = buffer_get_int64(m);
-		packets = buffer_get_int(m);
-		bytes = buffer_get_int64(m);
-		ssh_packet_set_state(ssh, MODE_OUT, seqnr, blocks, packets, bytes);
-		seqnr = buffer_get_int(m);
-		blocks = buffer_get_int64(m);
-		packets = buffer_get_int(m);
-		bytes = buffer_get_int64(m);
-		ssh_packet_set_state(ssh, MODE_IN, seqnr, blocks, packets, bytes);
+		*kexp = kex;
 	}
+	return r;
+}
 
-	/* Get the key context */
-	keyout = buffer_get_string(m, &keyoutlen);
-	keyin  = buffer_get_string(m, &keyinlen);
+/*
+ * Restore packet state from content of blob 'm' (de-serialization).
+ * Note that 'm' will be partially consumed on parsing or any other errors.
+ */
+int
+ssh_packet_set_state(struct ssh *ssh, struct sshbuf *m)
+{
+	struct session_state *state = ssh->state;
+	const u_char *ssh1key, *ivin, *ivout, *keyin, *keyout, *input, *output;
+	size_t ssh1keylen, rlen, slen, ilen, olen;
+	int r, ssh1cipher = 0;
+	u_int64_t sent_bytes = 0, recv_bytes = 0;
 
-	debug3("%s: Getting compression state", __func__);
-	/* Get compression state */
-	compstate = buffer_get_string(m,
-	    &compstatelen);
-
-	/* Network I/O buffers */
-	debug3("%s: Getting Network I/O buffers", __func__);
-	input = buffer_get_string(m, &ilen);
-	output = buffer_get_string(m, &olen);
-
-	/* Roaming */
-	if (compat20) {
-		sent_bytes = buffer_get_int64(m);
-		recv_bytes = buffer_get_int64(m);
-	}
-
-	if (compat20) {
+	if (!compat20) {
+		if ((r = sshbuf_get_u32(m, &state->remote_protocol_flags)) != 0 ||
+		    (r = sshbuf_get_u32(m, &ssh1cipher)) != 0 ||
+		    (r = sshbuf_get_string_direct(m, &ssh1key, &ssh1keylen)) != 0 ||
+		    (r = sshbuf_get_string_direct(m, &ivout, &slen)) != 0 ||
+		    (r = sshbuf_get_string_direct(m, &ivin, &rlen)) != 0)
+			return r;
+		ssh_packet_set_encryption_key(ssh, ssh1key, ssh1keylen,
+		    ssh1cipher);
+		if (cipher_get_keyiv_len(&state->send_context) != (int)slen ||
+		    cipher_get_keyiv_len(&state->receive_context) != (int)rlen)
+			return SSH_ERR_INVALID_FORMAT;
+		if ((r = cipher_set_keyiv(&state->send_context, ivout)) != 0 ||
+		    (r = cipher_set_keyiv(&state->receive_context, ivin)) != 0)
+			return r;
+	} else {
+		if ((r = kex_from_blob(m, &ssh->kex)) != 0 ||
+		    (r = newkeys_from_blob(m, ssh, MODE_OUT)) != 0 ||
+		    (r = newkeys_from_blob(m, ssh, MODE_IN)) != 0 ||
+		    (r = sshbuf_get_u32(m, &state->p_send.seqnr)) != 0 ||
+		    (r = sshbuf_get_u64(m, &state->p_send.blocks)) != 0 ||
+		    (r = sshbuf_get_u32(m, &state->p_send.packets)) != 0 ||
+		    (r = sshbuf_get_u64(m, &state->p_send.bytes)) != 0 ||
+		    (r = sshbuf_get_u32(m, &state->p_read.seqnr)) != 0 ||
+		    (r = sshbuf_get_u64(m, &state->p_read.blocks)) != 0 ||
+		    (r = sshbuf_get_u32(m, &state->p_read.packets)) != 0 ||
+		    (r = sshbuf_get_u64(m, &state->p_read.bytes)) != 0)
+			return r;
 		if ((r = ssh_set_newkeys(ssh, MODE_IN)) != 0 ||
 		    (r = ssh_set_newkeys(ssh, MODE_OUT)) != 0)
-			fatal("%s: set_newkeys: %s", __func__, ssh_err(r));
-	} else {
-		ssh_packet_set_protocol_flags(ssh, ssh1protoflags);
-		ssh_packet_set_encryption_key(ssh, ssh1key,
-		    ssh1keylen, ssh1cipher);
-		xfree(ssh1key);
+			return r;
 	}
+	if ((r = sshbuf_get_string_direct(m, &keyout, &slen)) != 0 ||
+	    (r = sshbuf_get_string_direct(m, &keyin, &rlen)) != 0)
+		return r;
+	if (cipher_get_keycontext(&state->send_context, NULL) != (int)slen ||
+	    cipher_get_keycontext(&state->receive_context, NULL) != (int)rlen)
+		return SSH_ERR_INVALID_FORMAT;
+	cipher_set_keycontext(&state->send_context, keyout);
+	cipher_set_keycontext(&state->receive_context, keyin);
 
-	/* for rc4 and other stateful ciphers */
-	ssh_packet_set_keycontext(ssh, MODE_OUT, keyout);
-	xfree(keyout);
-	ssh_packet_set_keycontext(ssh, MODE_IN, keyin);
-	xfree(keyin);
+	if ((r = ssh_packet_set_compress_state(ssh, m)) != 0 ||
+	    (r = ssh_packet_set_postauth(ssh)) != 0)
+		return r;
 
-	if (!compat20) {
-		ssh_packet_set_iv(ssh, MODE_OUT, ivout);
-		xfree(ivout);
-		ssh_packet_set_iv(ssh, MODE_IN, ivin);
-		xfree(ivin);
-	}
+	sshbuf_reset(state->input);
+	sshbuf_reset(state->output);
+	if ((r = sshbuf_get_string_direct(m, &input, &ilen)) != 0 ||
+	    (r = sshbuf_get_string_direct(m, &output, &olen)) != 0 ||
+	    (r = sshbuf_put(state->input, input, ilen)) != 0 ||
+	    (r = sshbuf_put(state->output, output, olen)) != 0)
+		return r;
 
-	if ((r = ssh_packet_set_compress_state(ssh, compstate,
-	    compstatelen)) != 0)
-		fatal("%s: packet_set_compress_state: %s",
-		    __func__, ssh_err(r));
-	xfree(compstate);
-
-	ssh_packet_set_postauth(ssh); /* XXX merge into packet_set_compress_state? */
-
-	/* Network I/O buffers */
-	/* XXX inefficient for large buffers, need: buffer_init_from_string */
-	buffer_clear(ssh_packet_get_input(ssh));
-	buffer_append(ssh_packet_get_input(ssh), input, ilen);
-	memset(input, 0, ilen);
-	xfree(input);
-
-	buffer_clear(ssh_packet_get_output(ssh));
-	buffer_append(ssh_packet_get_output(ssh), output,
-		      olen);
-	memset(output, 0, olen);
-	xfree(output);
-
-	/* Roaming */
-	if (compat20)
+	if (compat20) {
+		if ((r = sshbuf_get_u64(m, &sent_bytes)) != 0 ||
+		    (r = sshbuf_get_u64(m, &recv_bytes)) != 0)
+			return r;
 		roam_set_bytes(sent_bytes, recv_bytes);
+	}
+	if (sshbuf_len(m))
+		return SSH_ERR_INVALID_FORMAT;
 	debug3("%s: done", __func__);
 	return 0;
 }

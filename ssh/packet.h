@@ -77,7 +77,6 @@ int      ssh_packet_get_connection_in(struct ssh *);
 int      ssh_packet_get_connection_out(struct ssh *);
 void     ssh_packet_close(struct ssh *);
 void	 ssh_packet_set_encryption_key(struct ssh *, const u_char *, u_int, int);
-u_int	 ssh_packet_get_encryption_key(struct ssh *, u_char *);
 void     ssh_packet_set_protocol_flags(struct ssh *, u_int);
 u_int	 ssh_packet_get_protocol_flags(struct ssh *);
 int      ssh_packet_start_compression(struct ssh *, int);
@@ -125,22 +124,12 @@ void     ssh_packet_disconnect(struct ssh *, const char *fmt, ...) __attribute__
 void     ssh_packet_send_debug(struct ssh *, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 
 int	 ssh_set_newkeys(struct ssh *, int mode);
-int	 ssh_packet_get_keyiv_len(struct ssh *, int);
-void	 ssh_packet_get_keyiv(struct ssh *, int, u_char *, u_int);
-int	 ssh_packet_get_keycontext(struct ssh *, int, u_char *);
-void	 ssh_packet_set_keycontext(struct ssh *, int, u_char *);
-void	 ssh_packet_get_state(struct ssh *, int, u_int32_t *, u_int64_t *, u_int32_t *, u_int64_t *);
-void	 ssh_packet_set_state(struct ssh *, int, u_int32_t, u_int64_t, u_int32_t, u_int64_t);
-int	 ssh_packet_get_ssh1_cipher(struct ssh *);
-void	 ssh_packet_set_iv(struct ssh *, int, u_char *);
-void	*ssh_packet_get_newkeys(struct ssh *, int);
+void	 ssh_packet_get_bytes(struct ssh *, u_int64_t *, u_int64_t *);
 
 typedef void *(ssh_packet_comp_alloc_func)(void *, u_int, u_int);
 typedef void (ssh_packet_comp_free_func)(void *, void *);
 void	 ssh_packet_set_compress_hooks(struct ssh *, void *,
     ssh_packet_comp_alloc_func *, ssh_packet_comp_free_func *);
-int	 ssh_packet_get_compress_state(struct ssh *, u_char **, u_int *);
-int	 ssh_packet_set_compress_state(struct ssh *, u_char *, u_int);
 
 void     ssh_packet_write_poll(struct ssh *);
 void     ssh_packet_write_wait(struct ssh *);
@@ -160,9 +149,8 @@ int	 ssh_packet_inc_alive_timeouts(struct ssh *);
 int	 ssh_packet_set_maxsize(struct ssh *, u_int);
 u_int	 ssh_packet_get_maxsize(struct ssh *);
 
-void	 ssh_packet_set_postauth(struct ssh *);
-int	 ssh_packet_state_serialize(struct ssh *, struct sshbuf *);
-int	 ssh_packet_state_deserialize(struct ssh *, struct sshbuf *);
+int	 ssh_packet_get_state(struct ssh *, struct sshbuf *);
+int	 ssh_packet_set_state(struct ssh *, struct sshbuf *);
 
 /* don't allow remaining bytes after the end of the message */
 #define ssh_packet_check_eom(active_state) \
@@ -198,22 +186,6 @@ void     packet_set_connection(int, int);
 	ssh_packet_set_timeout(active_state, (timeout), (count))
 #define packet_connection_is_on_socket() \
 	ssh_packet_connection_is_on_socket(active_state)
-#define packet_get_keyiv(mode, iv, len) \
-	ssh_packet_get_keyiv(active_state, (mode), (iv), (len))
-#define packet_get_keycontext(mode, dat) \
-	ssh_packet_get_keycontext(active_state, (mode), (dat))
-#define packet_set_keycontext(mode, dat) \
-	ssh_packet_set_keycontext(active_state, (mode), (dat))
-#define packet_get_keyiv_len(mode) \
-	ssh_packet_get_keyiv_len(active_state, (mode))
-#define packet_set_iv(mode, dat) \
-	ssh_packet_set_iv(active_state, (mode), (dat))
-#define packet_get_ssh1_cipher() \
-	ssh_packet_get_ssh1_cipher(active_state)
-#define packet_get_state(mode, seqnr, blocks, packets, bytes) \
-	ssh_packet_get_state(active_state, (mode), (seqnr), (blocks), (packets), (bytes))
-#define packet_set_state(mode, seqnr, blocks, packets, bytes) \
-	ssh_packet_set_state(active_state, (mode), (seqnr), (blocks), (packets), (bytes))
 #define packet_set_nonblocking() \
 	ssh_packet_set_nonblocking(active_state)
 #define packet_get_connection_in() \
@@ -230,8 +202,6 @@ void     packet_set_connection(int, int);
 	ssh_packet_start_compression(active_state, (level))
 #define packet_set_encryption_key(key, keylen, number) \
 	ssh_packet_set_encryption_key(active_state, (key), (keylen), (number))
-#define packet_get_encryption_key(key) \
-	ssh_packet_get_encryption_key(active_state, (key))
 #define packet_start(type) \
 	ssh_packet_start(active_state, (type))
 #define packet_put_char(value) \
@@ -312,12 +282,6 @@ void     packet_set_connection(int, int);
 	ssh_packet_get_input(active_state)
 #define packet_get_output() \
 	ssh_packet_get_output(active_state)
-#define packet_get_newkeys(mode) \
-	ssh_packet_get_newkeys(active_state, (mode))
-#define packet_get_compress_state(blobp, lenp) \
-	ssh_packet_get_compress_state(active_state, blobp, lenp)
-#define packet_set_compress_state(blob, len) \
-	ssh_packet_set_compress_state(active_state, blob, len)
 #define packet_set_compress_hooks(ctx, allocfunc, freefunc) \
 	ssh_packet_set_compress_hooks(active_state, ctx, \
 	    allocfunc, freefunc);
@@ -325,12 +289,10 @@ void     packet_set_connection(int, int);
 	ssh_packet_check_eom(active_state)
 #define set_newkeys(mode) \
 	ssh_set_newkeys(active_state, (mode))
-#define packet_set_postauth() \
-	ssh_packet_set_postauth(active_state)
-#define packet_state_serialize(m) \
-	ssh_packet_state_serialize(active_state, m)
-#define packet_state_deserialize(m) \
-	ssh_packet_state_deserialize(active_state, m)
+#define packet_get_state(m) \
+	ssh_packet_get_state(active_state, m)
+#define packet_set_state(m) \
+	ssh_packet_set_state(active_state, m)
 #endif
 
 /* new API */

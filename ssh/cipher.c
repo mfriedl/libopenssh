@@ -357,7 +357,7 @@ cipher_get_keyiv(struct sshcipher_ctx *cc, u_char *iv, u_int len)
 }
 
 int
-cipher_set_keyiv(struct sshcipher_ctx *cc, u_char *iv)
+cipher_set_keyiv(struct sshcipher_ctx *cc, const u_char *iv)
 {
 	struct sshcipher *c = cc->cipher;
 	int evplen = 0;
@@ -370,12 +370,12 @@ cipher_set_keyiv(struct sshcipher_ctx *cc, u_char *iv)
 		if (evplen <= 0)
 			return SSH_ERR_LIBCRYPTO_ERROR;
 		if (c->evptype == evp_aes_128_ctr)
-			ssh_aes_ctr_iv(&cc->evp, 1, iv, evplen);
+			ssh_aes_ctr_iv(&cc->evp, 1, (u_char *)iv, evplen);
 		else
 			memcpy(cc->evp.iv, iv, evplen);
 		break;
 	case SSH_CIPHER_3DES:
-		ssh1_3des_iv(&cc->evp, 1, iv, 24);
+		ssh1_3des_iv(&cc->evp, 1, (u_char *)iv, 24);
 		break;
 	default:
 		return SSH_ERR_INVALID_ARGUMENT;
@@ -402,7 +402,7 @@ cipher_get_keycontext(const struct sshcipher_ctx *cc, u_char *dat)
 }
 
 void
-cipher_set_keycontext(struct sshcipher_ctx *cc, u_char *dat)
+cipher_set_keycontext(struct sshcipher_ctx *cc, const u_char *dat)
 {
 	struct sshcipher *c = cc->cipher;
 	int plen;

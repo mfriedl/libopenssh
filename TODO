@@ -25,6 +25,6 @@
 
 8) figure out error-handling and remove fatal()
 
-9) Rework privsep's interaction with packet.c: factor everything into
-   packet_get_privsep_state and packet_set_privsep_state functions
+9) [DONE] Rework privsep's interaction with packet.c: factor everything into
+   packet_get_state() and packet_set_state() functions
 

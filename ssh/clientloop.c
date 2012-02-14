@@ -1649,8 +1649,7 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg, int ssh2_chan_id
 
 	/* Report bytes transferred, and transfer rates. */
 	total_time = get_current_time() - start_time;
-	ssh_packet_get_state(ssh, MODE_IN, NULL, NULL, NULL, &ibytes);
-	ssh_packet_get_state(ssh, MODE_OUT, NULL, NULL, NULL, &obytes);
+	ssh_packet_get_bytes(ssh, &ibytes, &obytes);
 	verbose("Transferred: sent %llu, received %llu bytes, in %.1f seconds",
 	    (unsigned long long)obytes, (unsigned long long)ibytes, total_time);
 	if (total_time > 0)

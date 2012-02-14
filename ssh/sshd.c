@@ -1929,8 +1929,7 @@ main(int ac, char **av)
 	do_authenticated(authctxt);
 
 	/* The connection has been terminated. */
-	packet_get_state(MODE_IN, NULL, NULL, NULL, &ibytes);
-	packet_get_state(MODE_OUT, NULL, NULL, NULL, &obytes);
+	ssh_packet_get_bytes(active_state, &ibytes, &obytes);
 	verbose("Transferred: sent %llu, received %llu bytes",
 	    (unsigned long long)obytes, (unsigned long long)ibytes);
 

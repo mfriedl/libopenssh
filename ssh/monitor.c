@@ -1405,22 +1405,24 @@ void
 monitor_apply_keystate(struct monitor *pmonitor)
 {
 	Kex *kex;
+	int r;
 
-	debug3("%s: packet_state_deserialize", __func__);
-	packet_state_deserialize(&child_state);
-	debug3("%s: DONE packet_state_deserialize", __func__);
+	debug3("%s: packet_set_state", __func__);
+	if ((r = packet_set_state(&child_state)) != 0)
+                fatal("%s: packet_set_state: %s", __func__, ssh_err(r));
 	buffer_free(&child_state);
 
-	/* XXX set callbacks */
-	kex = active_state->kex;
-	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
-	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
-	kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
-	kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
-	kex->kex[KEX_ECDH_SHA2] = kexecdh_server;
-	kex->load_host_public_key=&get_hostkey_public_by_type;
-	kex->load_host_private_key=&get_hostkey_private_by_type;
-	kex->host_key_index=&get_hostkey_index;
+	if ((kex = active_state->kex) != 0) {
+		/* XXX set callbacks */
+		kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
+		kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
+		kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
+		kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
+		kex->kex[KEX_ECDH_SHA2] = kexecdh_server;
+		kex->load_host_public_key=&get_hostkey_public_by_type;
+		kex->load_host_private_key=&get_hostkey_private_by_type;
+		kex->host_key_index=&get_hostkey_index;
+	}
 
 	/* Update with new address */
 	if (options.compression) {

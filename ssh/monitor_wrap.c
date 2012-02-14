@@ -150,7 +150,6 @@ mm_request_receive(int sock, Buffer *m)
 	buffer_append_space(m, msg_len);
 	if (atomicio(read, sock, buffer_ptr(m), msg_len) != msg_len)
 		fatal("%s: read: %s", __func__, strerror(errno));
-debug("%s: done", __func__);
 }
 
 void
@@ -462,9 +461,12 @@ void
 mm_send_keystate(struct monitor *monitor)
 {
 	Buffer m;
+	int r;
 
 	buffer_init(&m);
-	packet_state_serialize(&m);
+	if ((r = packet_get_state(&m)) != 0)
+		fatal("%s: get_state failed: %s",
+		    __func__, ssh_err(r));
 	mm_request_send(monitor->m_recvfd, MONITOR_REQ_KEYEXPORT, &m);
 	debug3("%s: Finished sending state", __func__);
 	buffer_free(&m);
