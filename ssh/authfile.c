@@ -289,6 +289,8 @@ sshkey_parse_public_rsa1(struct sshbuf *blob,
 	struct sshkey *pub = NULL;
 	struct sshbuf *copy = NULL;
 
+	*keyp = NULL;
+
 	/* Check that it is at least big enough to contain the ID string. */
 	if (buffer_len(blob) < sizeof(authfile_id_string))
 		return SSH_ERR_INVALID_FORMAT;
@@ -391,6 +393,8 @@ sshkey_load_public_rsa1(int fd, const char *filename,
 	struct sshbuf *buffer = NULL;
 	int r;
 
+	*keyp = NULL;
+
 	if ((buffer = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	if ((r = sshkey_load_file(fd, filename, buffer)) != 0)
@@ -416,6 +420,8 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 	CipherContext ciphercontext;
 	Cipher *cipher;
 	struct sshkey *prv = NULL;
+
+	*keyp = NULL;
 
 	/* Check that it is at least big enough to contain the ID string. */
 	if (sshbuf_len(blob) < sizeof(authfile_id_string))
@@ -531,6 +537,8 @@ sshkey_parse_private_pem(struct sshbuf *blob, int type, const char *passphrase,
 	BIO *bio = NULL;
 	int r;
 
+	*keyp = NULL;
+
 	if ((bio = BIO_new_mem_buf(sshbuf_ptr(blob), sshbuf_len(blob))) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	
@@ -617,6 +625,8 @@ sshkey_load_private_pem(int fd, int type, const char *passphrase,
 	struct sshbuf *buffer = NULL;
 	int r;
 
+	*keyp = NULL;
+
 	if ((buffer = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	if ((r = sshkey_load_file(fd, NULL, buffer)) != 0)
@@ -675,12 +685,15 @@ sshkey_parse_private_type(struct sshbuf *blob, int type, const char *passphrase,
 	}
 }
 
+/* XXX kill perm_ok now that we have SSH_ERR_KEY_BAD_PERMISSIONS? */
 int
 sshkey_load_private_type(int type, const char *filename, const char *passphrase,
     struct sshkey **keyp, char **commentp, int *perm_ok)
 {
 	int fd, r;
 	struct sshbuf *buffer = NULL;
+
+	*keyp = NULL;
 
 	if ((fd = open(filename, O_RDONLY)) < 0) {
 		if (perm_ok != NULL)
@@ -720,6 +733,8 @@ sshkey_parse_private(struct sshbuf *buffer, const char *passphrase,
 	struct sshkey *key;
 	int r;
 
+	*keyp = NULL;
+
 	/* it's a SSH v1 key if the public key part is readable */
 	if ((r = sshkey_parse_public_rsa1(buffer, &key, NULL)) == 0) {
 		sshkey_free(key);
@@ -745,6 +760,8 @@ sshkey_load_private(const char *filename, const char *passphrase,
 {
 	struct sshbuf *buffer = NULL;
 	int r, fd;
+
+	*keyp = NULL;
 
 	if ((fd = open(filename, O_RDONLY)) < 0)
 		return SSH_ERR_SYSTEM_ERROR;
@@ -866,6 +883,8 @@ sshkey_load_cert(const char *filename, struct sshkey **keyp)
 	char *file = NULL;
 	int r;
 
+	*keyp = NULL;
+
 	if (asprintf(&file, "%s-cert.pub", filename) == -1)
 		return SSH_ERR_ALLOC_FAIL;
 
@@ -895,6 +914,8 @@ sshkey_load_private_cert(int type, const char *filename, const char *passphrase,
 {
 	struct sshkey *key = NULL, *cert = NULL;
 	int r;
+
+	*keyp = NULL;
 
 	switch (type) {
 	case KEY_RSA:
