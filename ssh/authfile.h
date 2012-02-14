@@ -36,4 +36,3 @@ int sshkey_perm_ok(int, const char *);
 int sshkey_in_file(struct sshkey *, const char *, int);
 
 #endif
-

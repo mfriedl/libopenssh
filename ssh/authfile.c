@@ -125,8 +125,10 @@ sshkey_private_rsa1_to_blob(struct sshkey *key, struct sshbuf *blob,
 		goto out;
 
 	/* This buffer will be used to contain the data in the file. */
-	if ((encrypted = sshbuf_new()) == NULL)
+	if ((encrypted = sshbuf_new()) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
+	}
 
 	/* First store keyfile id string. */
 	if ((r = sshbuf_put(encrypted, authfile_id_string,
@@ -168,7 +170,7 @@ sshkey_private_rsa1_to_blob(struct sshkey *key, struct sshbuf *blob,
 	if (encrypted != NULL)
 		sshbuf_free(encrypted);
 
-	return 1;
+	return r;
 }
 
 /* convert SSH v2 key in OpenSSL PEM format */
@@ -319,7 +321,7 @@ sshkey_parse_public_rsa1(struct sshbuf *blob,
 	/* Read the public key from the buffer. */
 	if ((pub = sshkey_new(KEY_RSA1)) == NULL ||
 	    (r = sshbuf_get_bignum1(copy, pub->rsa->n)) != 0 ||
-	    (r = sshbuf_get_bignum1(copy, pub->rsa->e)))
+	    (r = sshbuf_get_bignum1(copy, pub->rsa->e)) != 0)
 		goto out;
 
 	/* Finally, the comment */
@@ -359,26 +361,27 @@ sshkey_load_file(int fd, const char *filename, struct sshbuf *blob)
 			if (errno == EPIPE)
 				break;
 			r = SSH_ERR_SYSTEM_ERROR;
- fail:
-			sshbuf_reset(blob);
-			bzero(buf, sizeof(buf));
-			return r;
+			goto out;
 		}
 		if ((r = sshbuf_put(blob, buf, len)) != 0)
-			goto fail;
+			goto out;
 		if (buffer_len(blob) > MAX_KEY_FILE_SIZE) {
 			r = SSH_ERR_INVALID_FORMAT;
-			goto fail;
+			goto out;
 		}
 	}
 	if ((st.st_mode & (S_IFSOCK|S_IFCHR|S_IFIFO)) == 0 &&
 	    st.st_size != buffer_len(blob)) {
 		r = SSH_ERR_FILE_CHANGED;
-		goto fail;
+		goto out;
 	}
+	r = 0;
 
+ out:
 	bzero(buf, sizeof(buf));
-	return 0;
+	if (r != 0)
+		sshbuf_reset(blob);
+	return r;
 }
 
 /*
@@ -412,7 +415,7 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
     struct sshkey **keyp, char **commentp)
 {
 	int r;
-	u_int16_t check1, check2;
+	u_int16_t check1, check2, check1b, check2b;
 	u_int8_t cipher_type;
 	struct sshbuf *decrypted = NULL, *copy = NULL;
 	u_char *cp;
@@ -483,9 +486,11 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 		goto out;
 
 	if ((r = sshbuf_get_u16(decrypted, &check1)) != 0 ||
-	    (r = sshbuf_get_u16(decrypted, &check2)) != 0)
+	    (r = sshbuf_get_u16(decrypted, &check2)) != 0 ||
+	    (r = sshbuf_get_u16(decrypted, &check1b)) != 0 ||
+	    (r = sshbuf_get_u16(decrypted, &check2b)) != 0)
 		goto out;
-	if (check1 != check2) {
+	if (check1 != check1b || check2 != check2b) {
 		r = (*passphrase == '\0') ?
 		    SSH_ERR_INVALID_FORMAT : SSH_ERR_KEY_WRONG_PASSPHRASE;
 		goto out;
@@ -926,7 +931,7 @@ sshkey_load_private_cert(int type, const char *filename, const char *passphrase,
 		return SSH_ERR_KEY_TYPE_UNKNOWN;
 	}
 
-	if ((r = sshkey_load_private_type(type, filename, 
+	if ((r = sshkey_load_private_type(type, filename,
 	    passphrase, &key, NULL, perm_ok)) != 0 ||
 	    (r = sshkey_load_cert(filename, &cert)) != 0)
 		goto out;
