@@ -933,6 +933,7 @@ recv_rexec_state(int fd, Buffer *conf)
 	Buffer m;
 	char *cp;
 	u_int len;
+	int r;
 
 	debug3("%s: entering fd = %d", __func__, fd);
 
@@ -960,8 +961,9 @@ recv_rexec_state(int fd, Buffer *conf)
 		buffer_get_bignum(&m, sensitive_data.server_key->rsa->iqmp);
 		buffer_get_bignum(&m, sensitive_data.server_key->rsa->p);
 		buffer_get_bignum(&m, sensitive_data.server_key->rsa->q);
-		rsa_generate_additional_parameters(
-		    sensitive_data.server_key->rsa);
+		if ((r = rsa_generate_additional_parameters(
+		    sensitive_data.server_key->rsa)) != 0)
+			fatal("generate RSA parameters failed: %s", ssh_err(r));
 	}
 	buffer_free(&m);
 
@@ -1295,7 +1297,7 @@ main(int ac, char **av)
 	int sock_in = -1, sock_out = -1, newsock = -1;
 	const char *remote_ip;
 	char *test_user = NULL, *test_host = NULL, *test_addr = NULL;
-	int remote_port;
+	int r, remote_port;
 	char *line, *p, *cp;
 	int config_s[2] = { -1 , -1 };
 	u_int64_t ibytes, obytes;
@@ -1517,14 +1519,14 @@ main(int ac, char **av)
 		sensitive_data.host_keys[i] = NULL;
 
 	for (i = 0; i < options.num_host_key_files; i++) {
-		key = key_load_private(options.host_key_files[i], "", NULL);
-		sensitive_data.host_keys[i] = key;
-		if (key == NULL) {
-			error("Could not load host key: %s",
-			    options.host_key_files[i]);
+		if ((r = sshkey_load_private(options.host_key_files[i], "",
+		    &key, NULL)) != 0) {
+			error("Could not load host key \"%s\": %s",
+			    options.host_key_files[i], ssh_err(r));
 			sensitive_data.host_keys[i] = NULL;
 			continue;
 		}
+		sensitive_data.host_keys[i] = key;
 		switch (key->type) {
 		case KEY_RSA1:
 			sensitive_data.ssh1_host_key = key;
@@ -1562,10 +1564,10 @@ main(int ac, char **av)
 		sensitive_data.host_certificates[i] = NULL;
 
 	for (i = 0; i < options.num_host_cert_files; i++) {
-		key = key_load_public(options.host_cert_files[i], NULL);
-		if (key == NULL) {
-			error("Could not load host certificate: %s",
-			    options.host_cert_files[i]);
+		if ((r = sshkey_load_public(options.host_cert_files[i],
+		    &key, NULL)) != 0) {
+			error("Could not load host certificate \"%s\": %s",
+			    options.host_cert_files[i], ssh_err(r));
 			continue;
 		}
 		if (!sshkey_is_cert(key)) {

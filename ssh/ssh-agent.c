@@ -487,7 +487,8 @@ process_add_identity(SocketEntry *e, int version)
 		buffer_get_bignum(&e->request, k->rsa->p);	/* q */
 
 		/* Generate additional parameters */
-		rsa_generate_additional_parameters(k->rsa);
+		if ((r = rsa_generate_additional_parameters(k->rsa)) != 0)
+			fatal("generate RSA parameters failed: %s", ssh_err(r));
 		break;
 	case 2:
 		type_name = buffer_get_string(&e->request, NULL);
@@ -585,7 +586,10 @@ process_add_identity(SocketEntry *e, int version)
 			buffer_get_bignum2(&e->request, k->rsa->q);
 
 			/* Generate additional parameters */
-			rsa_generate_additional_parameters(k->rsa);
+			if ((r = rsa_generate_additional_parameters(
+			    k->rsa)) != 0)
+				fatal("generate RSA parameters failed: %s",
+				    ssh_err(r));
 			break;
 		case KEY_RSA_CERT_V00:
 		case KEY_RSA_CERT:

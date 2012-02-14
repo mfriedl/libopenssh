@@ -1212,7 +1212,7 @@ identity_sign(Identity *id, u_char **sigp, u_int *lenp,
 		    compat));
 	/* load the private key from the file */
 	if ((prv = load_identity_file(id->filename)) == NULL)
-		return (-1);
+		return (-1); /* XXX return decent error code */
 	ret = sshkey_sign(prv, sigp, lenp, data, datalen, compat);
 	sshkey_free(prv);
 	return (ret);
@@ -1341,42 +1341,62 @@ send_pubkey_test(struct ssh *ssh, Identity *id)
 	return 1;
 }
 
+/* XXX merge with key loading from sshconnect1.c */
 static struct sshkey *
 load_identity_file(char *filename)
 {
-	struct sshkey *private;
+	struct sshkey *private = NULL;
 	char prompt[300], *passphrase;
-	int perm_ok = 0, quit, i;
+	int r, perm_ok = 0, quit, i;
 	struct stat st;
 
 	if (stat(filename, &st) < 0) {
 		debug3("no such identity: %s", filename);
 		return NULL;
 	}
-	private = key_load_private_type(KEY_UNSPEC, filename, "", NULL, &perm_ok);
-	if (!perm_ok)
-		return NULL;
-	if (private == NULL) {
-		if (options.batch_mode)
-			return NULL;
-		snprintf(prompt, sizeof prompt,
-		    "Enter passphrase for key '%.100s': ", filename);
-		for (i = 0; i < options.number_of_password_prompts; i++) {
+	snprintf(prompt, sizeof prompt,
+	    "Enter passphrase for key '%.100s': ", filename);
+	for (i = 0; i <= options.number_of_password_prompts; i++) {
+		if (i == 0)
+			passphrase = "";
+		else {
 			passphrase = read_passphrase(prompt, 0);
-			if (strcmp(passphrase, "") != 0) {
-				private = key_load_private_type(KEY_UNSPEC,
-				    filename, passphrase, NULL, NULL);
-				quit = 0;
-			} else {
+			if (*passphrase == '\0') {
 				debug2("no passphrase given, try next key");
-				quit = 1;
+				xfree(passphrase);
+				break;
 			}
+		}
+		switch ((r = sshkey_load_private_type(KEY_UNSPEC, filename,
+		    passphrase, &private, NULL, &perm_ok))) {
+		case 0:
+			break;
+		case SSH_ERR_KEY_WRONG_PASSPHRASE:
+			if (options.batch_mode) {
+				quit = 1;
+				break;
+			}
+			debug2("bad passphrase given, try again...");
+			break;
+		case SSH_ERR_SYSTEM_ERROR:
+			if (errno == ENOENT) {
+				debug2("Load key \"%s\": %s",
+				    filename, ssh_err(r));
+				quit = 1;
+				break;
+			}
+			/* FALLTHROUGH */
+		default:
+			error("Load key \"%s\": %s", filename, ssh_err(r));
+			quit = 1;
+			break;
+		}
+		if (i > 0) {
 			memset(passphrase, 0, strlen(passphrase));
 			xfree(passphrase);
-			if (private != NULL || quit)
-				break;
-			debug2("bad passphrase given, try again...");
 		}
+		if (private != NULL || quit)
+			break;
 	}
 	return private;
 }

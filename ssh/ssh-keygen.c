@@ -232,18 +232,21 @@ load_identity(char *filename)
 {
 	char *pass;
 	struct sshkey *prv;
+	int r;
 
-	prv = key_load_private(filename, "", NULL);
-	if (prv == NULL) {
-		if (identity_passphrase)
-			pass = xstrdup(identity_passphrase);
-		else
-			pass = read_passphrase("Enter passphrase: ",
-			    RP_ALLOW_STDIN);
-		prv = key_load_private(filename, pass, NULL);
-		memset(pass, 0, strlen(pass));
-		xfree(pass);
-	}
+	if ((r = sshkey_load_private(filename, "", &prv, NULL)) == 0)
+		return prv;
+	if (r != SSH_ERR_KEY_WRONG_PASSPHRASE)
+		fatal("Load key \"%s\": %s", filename, ssh_err(r));
+	if (identity_passphrase)
+		pass = xstrdup(identity_passphrase);
+	else
+		pass = read_passphrase("Enter passphrase: ", RP_ALLOW_STDIN);
+	r = sshkey_load_private(filename, pass, &prv, NULL);
+	memset(pass, 0, strlen(pass));
+	xfree(pass);
+	if (r != 0)
+		fatal("Load key \"%s\": %s", filename, ssh_err(r));
 	return prv;
 }
 
@@ -327,17 +330,14 @@ do_convert_to(struct passwd *pw)
 {
 	struct sshkey *k;
 	struct stat st;
+	int r;
 
 	if (!have_identity)
 		ask_filename(pw, "Enter file in which the key is");
 	if (stat(identity_file, &st) < 0)
 		fatal("%s: %s: %s", __progname, identity_file, strerror(errno));
-	if ((k = key_load_public(identity_file, NULL)) == NULL) {
-		if ((k = load_identity(identity_file)) == NULL) {
-			fprintf(stderr, "load failed\n");
-			exit(1);
-		}
-	}
+	if ((r = sshkey_load_public(identity_file, &k, NULL)) != 0)
+		k = load_identity(identity_file);
 	if (k->type == KEY_RSA1) {
 		fprintf(stderr, "version 1 keys are not supported\n");
 		exit(1);
@@ -380,7 +380,7 @@ do_convert_private_ssh2_from_blob(u_char *blob, u_int blen)
 	struct sshkey *key = NULL;
 	char *type, *cipher;
 	u_char *sig = NULL, data[] = "abcde12345";
-	int magic, rlen, ktype, i1, i2, i3, i4;
+	int r, magic, rlen, ktype, i1, i2, i3, i4;
 	u_int slen;
 	u_long e;
 
@@ -451,7 +451,8 @@ do_convert_private_ssh2_from_blob(u_char *blob, u_int blen)
 		buffer_get_bignum_bits(&b, key->rsa->iqmp);
 		buffer_get_bignum_bits(&b, key->rsa->q);
 		buffer_get_bignum_bits(&b, key->rsa->p);
-		rsa_generate_additional_parameters(key->rsa);
+		if ((r = rsa_generate_additional_parameters(key->rsa)) != 0)
+			fatal("generate RSA parameters failed: %s", ssh_err(r));
 		break;
 	}
 	rlen = buffer_len(&b);
@@ -703,10 +704,6 @@ do_print_public(struct passwd *pw)
 		exit(1);
 	}
 	prv = load_identity(identity_file);
-	if (prv == NULL) {
-		fprintf(stderr, "load failed\n");
-		exit(1);
-	}
 	if ((r = sshkey_write(prv, stdout)) != 0)
 		fprintf(stderr, "key_write failed: %s", ssh_err(r));
 	sshkey_free(prv);
@@ -758,8 +755,10 @@ do_fingerprint(struct passwd *pw)
 		perror(identity_file);
 		exit(1);
 	}
-	public = key_load_public(identity_file, &comment);
-	if (public != NULL) {
+	if ((r = sshkey_load_public(identity_file, &public, &comment)) != 0)
+		error("Error loading public key \"%s\": %s",
+		    identity_file, ssh_err(r));
+	else {
 		fp = sshkey_fingerprint(public, fptype, rep);
 		ra = sshkey_fingerprint(public, SSH_FP_MD5, SSH_FP_RANDOMART);
 		printf("%u %s %s (%s)\n", sshkey_size(public), fp, comment,
@@ -901,8 +900,10 @@ do_gen_all_hostkeys(struct passwd *pw)
 			fatal("sshkey_from_private failed: %s", ssh_err(r));
 		snprintf(comment, sizeof comment, "%s@%s", pw->pw_name,
 		    hostname);
-		if (!key_save_private(private, identity_file, "", comment)) {
-			printf("Saving the key failed: %s.\n", identity_file);
+		if ((r = sshkey_save_private(private, identity_file, "",
+		    comment)) != 0) {
+			printf("Saving key \"%s\" failed: %s\n", identity_file,
+			    ssh_err(r));
 			sshkey_free(private);
 			sshkey_free(public);
 			first = 0;
@@ -1188,6 +1189,7 @@ do_change_passphrase(struct passwd *pw)
 	char *old_passphrase, *passphrase1, *passphrase2;
 	struct stat st;
 	struct sshkey *private;
+	int r;
 
 	if (!have_identity)
 		ask_filename(pw, "Enter file in which the key is");
@@ -1196,22 +1198,25 @@ do_change_passphrase(struct passwd *pw)
 		exit(1);
 	}
 	/* Try to load the file with empty passphrase. */
-	private = key_load_private(identity_file, "", &comment);
-	if (private == NULL) {
+	r = sshkey_load_private(identity_file, "", &private, &comment);
+	if (r == SSH_ERR_KEY_WRONG_PASSPHRASE) {
 		if (identity_passphrase)
 			old_passphrase = xstrdup(identity_passphrase);
 		else
 			old_passphrase =
 			    read_passphrase("Enter old passphrase: ",
 			    RP_ALLOW_STDIN);
-		private = key_load_private(identity_file, old_passphrase,
-		    &comment);
+		r = sshkey_load_private(identity_file, old_passphrase,
+		    &private, &comment);
 		memset(old_passphrase, 0, strlen(old_passphrase));
 		xfree(old_passphrase);
-		if (private == NULL) {
-			printf("Bad passphrase.\n");
-			exit(1);
-		}
+		if (r != 0)
+			goto badkey;
+	} else if (r != 0) {
+ badkey:
+		fprintf(stderr, "Failed to load key \"%s\": %s\n",
+		    identity_file, ssh_err(r));
+		exit(1);
 	}
 	printf("Key has comment '%s'\n", comment);
 
@@ -1241,8 +1246,10 @@ do_change_passphrase(struct passwd *pw)
 	}
 
 	/* Save the file using the new passphrase. */
-	if (!key_save_private(private, identity_file, passphrase1, comment)) {
-		printf("Saving the key failed: %s.\n", identity_file);
+	if ((r = sshkey_save_private(private, identity_file, passphrase1,
+	    comment)) != 0) {
+		printf("Saving key \"%s\" failed: %s.\n",
+		    identity_file, ssh_err(r));
 		memset(passphrase1, 0, strlen(passphrase1));
 		xfree(passphrase1);
 		sshkey_free(private);
@@ -1268,6 +1275,7 @@ do_print_resource_record(struct passwd *pw, char *fname, char *hname)
 	struct sshkey *public;
 	char *comment = NULL;
 	struct stat st;
+	int r;
 
 	if (fname == NULL)
 		ask_filename(pw, "Enter file in which the key is");
@@ -1277,18 +1285,15 @@ do_print_resource_record(struct passwd *pw, char *fname, char *hname)
 		perror(fname);
 		exit(1);
 	}
-	public = key_load_public(fname, &comment);
-	if (public != NULL) {
-		export_dns_rr(hname, public, stdout, print_generic);
-		sshkey_free(public);
-		xfree(comment);
-		return 1;
+	if ((r = sshkey_load_public(fname, &public, &comment)) != 0) {
+		printf("Failed to read v2 public key from \"%s\": %s.\n",
+		    fname, ssh_err(r));
+		exit(1);
 	}
-	if (comment)
-		xfree(comment);
-
-	printf("failed to read v2 public key from %s.\n", fname);
-	exit(1);
+	export_dns_rr(hname, public, stdout, print_generic);
+	sshkey_free(public);
+	xfree(comment);
+	return 1;
 }
 
 /*
@@ -1310,8 +1315,14 @@ do_change_comment(struct passwd *pw)
 		perror(identity_file);
 		exit(1);
 	}
-	private = key_load_private(identity_file, "", &comment);
-	if (private == NULL) {
+	if ((r = sshkey_load_private(identity_file, "",
+	    &private, &comment)) == 0)
+		passphrase = xstrdup("");
+	else if (r != SSH_ERR_KEY_WRONG_PASSPHRASE) {
+		printf("Cannot load private key \"%s\": %s.\n",
+		    identity_file, ssh_err(r));
+		exit(1);
+	} else {
 		if (identity_passphrase)
 			passphrase = xstrdup(identity_passphrase);
 		else if (identity_new_passphrase)
@@ -1320,15 +1331,14 @@ do_change_comment(struct passwd *pw)
 			passphrase = read_passphrase("Enter passphrase: ",
 			    RP_ALLOW_STDIN);
 		/* Try to load using the passphrase. */
-		private = key_load_private(identity_file, passphrase, &comment);
-		if (private == NULL) {
+		if ((r = sshkey_load_private(identity_file, passphrase,
+		    &private, &comment)) != 0) {
 			memset(passphrase, 0, strlen(passphrase));
 			xfree(passphrase);
-			printf("Bad passphrase.\n");
+			printf("Cannot load private key \"%s\": %s.\n",
+			    identity_file, ssh_err(r));
 			exit(1);
 		}
-	} else {
-		passphrase = xstrdup("");
 	}
 	if (private->type != KEY_RSA1) {
 		fprintf(stderr, "Comments are only supported for RSA1 keys.\n");
@@ -1351,9 +1361,10 @@ do_change_comment(struct passwd *pw)
 	}
 
 	/* Save the file using the new passphrase. */
-	if (!key_save_private(private, identity_file, passphrase,
-	    new_comment)) {
-		printf("Saving the key failed: %s.\n", identity_file);
+	if ((r = sshkey_save_private(private, identity_file, passphrase,
+	    new_comment)) != 0) {
+		printf("Saving key \"%s\" failed: %s\n",
+		    identity_file, ssh_err(r));
 		memset(passphrase, 0, strlen(passphrase));
 		xfree(passphrase);
 		sshkey_free(private);
@@ -1484,10 +1495,11 @@ load_pkcs11_key(char *path)
 {
 #ifdef ENABLE_PKCS11
 	struct sshkey **keys = NULL, *public, *private = NULL;
-	int i, nkeys;
+	int r, i, nkeys;
 
-	if ((public = key_load_public(path, NULL)) == NULL)
-		fatal("Couldn't load CA public key \"%s\"", path);
+	if ((r = sshkey_load_public(path, &public, NULL)) != 0)
+		fatal("Couldn't load CA public key \"%s\": %s",
+		    path, ssh_err(r));
 
 	nkeys = pkcs11_add_provider(pkcs11provider, identity_passphrase, &keys);
 	debug3("%s: %d keys", __func__, nkeys);
@@ -1542,8 +1554,8 @@ do_ca_sign(struct passwd *pw, int argc, char **argv)
 	if (pkcs11provider != NULL) {
 		if ((ca = load_pkcs11_key(tmp)) == NULL)
 			fatal("No PKCS#11 key matching %s found", ca_key_path);
-	} else if ((ca = load_identity(tmp)) == NULL)
-		fatal("Couldn't load CA key \"%s\"", tmp);
+	} else
+		ca = load_identity(tmp);
 	xfree(tmp);
 
 	for (i = 0; i < argc; i++) {
@@ -1561,8 +1573,9 @@ do_ca_sign(struct passwd *pw, int argc, char **argv)
 		}
 	
 		tmp = tilde_expand_filename(argv[i], pw->pw_uid);
-		if ((public = key_load_public(tmp, &comment)) == NULL)
-			fatal("%s: unable to open \"%s\"", __func__, tmp);
+		if ((r = sshkey_load_public(tmp, &public, &comment)) != 0)
+			fatal("%s: unable to open \"%s\": %s",
+			    __func__, tmp, ssh_err(r));
 		if (public->type != KEY_RSA && public->type != KEY_DSA &&
 		    public->type != KEY_ECDSA)
 			fatal("%s: key \"%s\" type %s cannot be certified",
@@ -1819,13 +1832,15 @@ do_show_cert(struct passwd *pw)
 	struct stat st;
 	char *key_fp, *ca_fp;
 	u_int i, v00;
+	int r;
 
 	if (!have_identity)
 		ask_filename(pw, "Enter file in which the key is");
 	if (stat(identity_file, &st) < 0)
 		fatal("%s: %s: %s", __progname, identity_file, strerror(errno));
-	if ((key = key_load_public(identity_file, NULL)) == NULL)
-		fatal("%s is not a public key", identity_file);
+	if ((r = sshkey_load_public(identity_file, &key, NULL)) != 0)
+		fatal("Cannot load public key \"%s\": %s",
+		    identity_file, ssh_err(r));
 	if (!sshkey_is_cert(key))
 		fatal("%s is not a certificate", identity_file);
 	v00 = key->type == KEY_RSA_CERT_V00 || key->type == KEY_DSA_CERT_V00;
@@ -2339,8 +2354,10 @@ passphrase_again:
 	}
 
 	/* Save the key with the given passphrase and comment. */
-	if (!key_save_private(private, identity_file, passphrase1, comment)) {
-		printf("Saving the key failed: %s.\n", identity_file);
+	if ((r = sshkey_save_private(private, identity_file, passphrase1,
+	    comment)) != 0) {
+		printf("Saving key \"%s\" failed: %s\n",
+		    identity_file, ssh_err(r));
 		memset(passphrase1, 0, strlen(passphrase1));
 		xfree(passphrase1);
 		exit(1);

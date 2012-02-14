@@ -220,6 +220,30 @@ tilde_expand_paths(char **paths, u_int num_paths)
 }
 
 /*
+ * Check the result of hostkey loading, ignoring some errors and
+ * fatal()ing for others.
+ */
+static void
+check_load(int r, const char *path, const char *message)
+{
+	switch (r) {
+	case 0:
+		break;
+	case SSH_ERR_INTERNAL_ERROR:
+	case SSH_ERR_ALLOC_FAIL:
+		fatal("load %s \"%s\": %s", message, path, ssh_err(r));
+	case SSH_ERR_SYSTEM_ERROR:
+		/* Ignore missing files */
+		if (errno == ENOENT)
+			break;
+		/* FALLTHROUGH */
+	default:
+		error("load %s \"%s\": %s", message, path, ssh_err(r));
+		break;
+	}
+}
+
+/*
  * Main program for the ssh client.
  */
 int
@@ -793,20 +817,26 @@ main(int ac, char **av)
 		    sizeof(struct sshkey));
 
 		PRIV_START;
-		sensitive_data.keys[0] = key_load_private_type(KEY_RSA1,
-		    _PATH_HOST_KEY_FILE, "", NULL, NULL);
-		sensitive_data.keys[1] = key_load_private_cert(KEY_DSA,
-		    _PATH_HOST_DSA_KEY_FILE, "", NULL);
-		sensitive_data.keys[2] = key_load_private_cert(KEY_ECDSA,
-		    _PATH_HOST_ECDSA_KEY_FILE, "", NULL);
-		sensitive_data.keys[3] = key_load_private_cert(KEY_RSA,
-		    _PATH_HOST_RSA_KEY_FILE, "", NULL);
-		sensitive_data.keys[4] = key_load_private_type(KEY_DSA,
-		    _PATH_HOST_DSA_KEY_FILE, "", NULL, NULL);
-		sensitive_data.keys[5] = key_load_private_type(KEY_ECDSA,
-		    _PATH_HOST_ECDSA_KEY_FILE, "", NULL, NULL);
-		sensitive_data.keys[6] = key_load_private_type(KEY_RSA,
-		    _PATH_HOST_RSA_KEY_FILE, "", NULL, NULL);
+		/* XXX check errors? */
+#define L_KEY(t,p,o) \
+	check_load(sshkey_load_private_type(t, p, "", \
+	    &(sensitive_data.keys[o]), NULL, NULL), p, "key")
+#define L_KEYCERT(t,p,o) \
+	check_load(sshkey_load_private_cert(t, p, "", \
+	    &(sensitive_data.keys[o]), NULL), p, "cert and key")
+#define L_PUBKEY(p,o) \
+	check_load(sshkey_load_public(p, &(sensitive_data.keys[o]), NULL), \
+	    p, "pubkey")
+#define L_CERT(p,o) \
+	check_load(sshkey_load_cert(p, &(sensitive_data.keys[o])), p, "cert")
+
+		L_KEY(KEY_RSA1, _PATH_HOST_KEY_FILE, 0);
+		L_KEYCERT(KEY_DSA, _PATH_HOST_DSA_KEY_FILE, 1);
+		L_KEYCERT(KEY_ECDSA, _PATH_HOST_ECDSA_KEY_FILE, 2);
+		L_KEYCERT(KEY_RSA, _PATH_HOST_RSA_KEY_FILE, 3);
+		L_KEY(KEY_DSA, _PATH_HOST_DSA_KEY_FILE, 4);
+		L_KEY(KEY_ECDSA, _PATH_HOST_ECDSA_KEY_FILE, 5);
+		L_KEY(KEY_RSA, _PATH_HOST_RSA_KEY_FILE, 6);
 		PRIV_END;
 
 		if (options.hostbased_authentication == 1 &&
@@ -814,18 +844,12 @@ main(int ac, char **av)
 		    sensitive_data.keys[4] == NULL &&
 		    sensitive_data.keys[5] == NULL &&
 		    sensitive_data.keys[6] == NULL) {
-			sensitive_data.keys[1] = key_load_cert(
-			    _PATH_HOST_DSA_KEY_FILE);
-			sensitive_data.keys[2] = key_load_cert(
-			    _PATH_HOST_ECDSA_KEY_FILE);
-			sensitive_data.keys[3] = key_load_cert(
-			    _PATH_HOST_RSA_KEY_FILE);
-			sensitive_data.keys[4] = key_load_public(
-			    _PATH_HOST_DSA_KEY_FILE, NULL);
-			sensitive_data.keys[5] = key_load_public(
-			    _PATH_HOST_ECDSA_KEY_FILE, NULL);
-			sensitive_data.keys[6] = key_load_public(
-			    _PATH_HOST_RSA_KEY_FILE, NULL);
+			L_CERT(_PATH_HOST_DSA_KEY_FILE, 1);
+			L_CERT(_PATH_HOST_ECDSA_KEY_FILE, 2);
+			L_CERT(_PATH_HOST_RSA_KEY_FILE, 3);
+			L_PUBKEY(_PATH_HOST_DSA_KEY_FILE, 4);
+			L_PUBKEY(_PATH_HOST_ECDSA_KEY_FILE, 5);
+			L_PUBKEY(_PATH_HOST_RSA_KEY_FILE, 6);
 			sensitive_data.external_keysign = 1;
 		}
 	}
@@ -1506,7 +1530,8 @@ load_public_identity_files(void)
 		    "u", pwname, "l", thishost, "h", host,
 		    "r", options.user, (char *)NULL);
 		xfree(cp);
-		public = key_load_public(filename, NULL);
+		check_load(sshkey_load_public(filename, &public, NULL),
+		    filename, "pubkey");
 		debug("identity file %s type %d", filename,
 		    public ? public->type : -1);
 		xfree(options.identity_files[i]);
@@ -1517,8 +1542,10 @@ load_public_identity_files(void)
 			continue;
 
 		/* Try to add the certificate variant too */
+		/* XXX sshkey_load_cert()? */
 		xasprintf(&cp, "%s-cert", filename);
-		public = key_load_public(cp, NULL);
+		check_load(sshkey_load_public(cp, &public, NULL),
+		    filename, "pubkey");
 		debug("identity file %s type %d", cp,
 		    public ? public->type : -1);
 		if (public == NULL) {

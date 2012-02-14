@@ -19,6 +19,7 @@
 #include <openssl/bn.h>
 #include <openssl/md5.h>
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -206,7 +207,7 @@ try_rsa_authentication(int idx)
 	BIGNUM *challenge;
 	struct sshkey *public, *private;
 	char buf[300], *passphrase, *comment, *authfile;
-	int i, perm_ok = 1, type, quit;
+	int r, i, perm_ok = 1, type, quit;
 
 	public = options.identity_keys[idx];
 	authfile = options.identity_files[idx];
@@ -249,20 +250,50 @@ try_rsa_authentication(int idx)
 	 * load the private key.  Try first with empty passphrase; if it
 	 * fails, ask for a passphrase.
 	 */
-	if (public->flags & SSHKEY_FLAG_EXT)
+	if (public->flags & SSHKEY_FLAG_EXT) {
 		private = public;
-	else
-		private = key_load_private_type(KEY_RSA1, authfile, "", NULL,
-		    &perm_ok);
-	if (private == NULL && !options.batch_mode && perm_ok) {
+		r = 0;
+	} else {
+		r = sshkey_load_private_type(KEY_RSA1, authfile, "", &private,
+		    NULL, &perm_ok);
+	}
+	switch (r) {
+	case 0:
+		break;
+	case SSH_ERR_KEY_WRONG_PASSPHRASE:
+		if (options.batch_mode)
+			error("Key file \"%s\" requires passphrase", authfile);
+		break;
+	case SSH_ERR_SYSTEM_ERROR:
+		if (errno == ENOENT) {
+			debug2("Key file \"%s\" does not exist", authfile);
+			break;
+		}
+		/* FALLTHROUGH */
+	default:
+		error("Load RSA1 key \"%s\": %s", authfile, ssh_err(r));
+	}
+	if (r == SSH_ERR_KEY_WRONG_PASSPHRASE &&
+	    !options.batch_mode && perm_ok) {
 		snprintf(buf, sizeof(buf),
 		    "Enter passphrase for RSA key '%.100s': ", comment);
 		for (i = 0; i < options.number_of_password_prompts; i++) {
 			passphrase = read_passphrase(buf, 0);
+			r = 0;
 			if (strcmp(passphrase, "") != 0) {
-				private = key_load_private_type(KEY_RSA1,
-				    authfile, passphrase, NULL, NULL);
-				quit = 0;
+				switch ((r = sshkey_load_private_type(KEY_RSA1,
+				    authfile, passphrase, &private,
+				    NULL, NULL))) {
+				case SSH_ERR_KEY_WRONG_PASSPHRASE:
+				case 0:
+					quit = 0;
+					break;
+				default:
+					error("Load RSA1 key \"%s\": %s",
+					    authfile, ssh_err(r));
+					quit = 1;
+					break;
+				}
 			} else {
 				debug2("no passphrase given, try next key");
 				quit = 1;
@@ -279,7 +310,7 @@ try_rsa_authentication(int idx)
 
 	if (private == NULL) {
 		if (!options.batch_mode && perm_ok)
-			error("Bad passphrase.");
+			error("Bad passphrase."); /* XXX check r */
 
 		/* Send a dummy response packet to avoid protocol error. */
 		packet_start(SSH_CMSG_AUTH_RSA_RESPONSE);

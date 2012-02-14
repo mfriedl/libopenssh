@@ -95,11 +95,10 @@ delete_file(AuthenticationConnection *ac, const char *filename)
 {
 	struct sshkey *public;
 	char *comment = NULL;
-	int ret = -1;
+	int r, ret = -1;
 
-	public = key_load_public(filename, &comment);
-	if (public == NULL) {
-		printf("Bad key file %s\n", filename);
+	if ((r = sshkey_load_public(filename, &public,  &comment)) != 0) {
+		printf("Bad key file %s: %s\n", filename, ssh_err(r));
 		return -1;
 	}
 	if (ssh_remove_identity(ac, public)) {
@@ -155,14 +154,16 @@ add_file(AuthenticationConnection *ac, const char *filename, int key_only)
 	 * will occur multiple times, so check perms first and bail if wrong.
 	 */
 	if (fd != STDIN_FILENO) {
-		perms_ok = key_perm_ok(fd, filename);
+		perms_ok = sshkey_perm_ok(fd, filename);
 		if (!perms_ok) {
 			close(fd);
 			return -1;
 		}
 	}
 	buffer_init(&keyblob);
-	if (!key_load_file(fd, filename, &keyblob)) {
+	if ((r = sshkey_load_file(fd, filename, &keyblob)) != 0) {
+		fprintf(stderr, "Error loading key \"%s\": %s\n",
+		    filename, ssh_err(r));
 		buffer_free(&keyblob);
 		close(fd);
 		return -1;
@@ -170,12 +171,24 @@ add_file(AuthenticationConnection *ac, const char *filename, int key_only)
 	close(fd);
 
 	/* At first, try empty passphrase */
-	private = key_parse_private(&keyblob, filename, "", &comment);
+	r = sshkey_parse_private(&keyblob, filename, "", &private, &comment);
+	if (r != 0 && r != SSH_ERR_KEY_WRONG_PASSPHRASE) {
+		fprintf(stderr, "Error loading key \"%s\": %s\n",
+		    filename, ssh_err(r));
+		goto fail_load;
+	}
 	if (comment == NULL)
 		comment = xstrdup(filename);
 	/* try last */
-	if (private == NULL && pass != NULL)
-		private = key_parse_private(&keyblob, filename, pass, NULL);
+	if (private == NULL && pass != NULL) {
+		r = sshkey_parse_private(&keyblob, filename, pass,
+		    &private, NULL);
+		if (r != 0 && r != SSH_ERR_KEY_WRONG_PASSPHRASE) {
+			fprintf(stderr, "Error loading key \"%s\": %s\n",
+			    filename, ssh_err(r));
+			goto fail_load;
+		}
+	}
 	if (private == NULL) {
 		/* clear passphrase since it did not work */
 		clear_pass();
@@ -183,16 +196,21 @@ add_file(AuthenticationConnection *ac, const char *filename, int key_only)
 		    comment);
 		for (;;) {
 			pass = read_passphrase(msg, RP_ALLOW_STDIN);
-			if (strcmp(pass, "") == 0) {
+			if (strcmp(pass, "") == 0)
+				goto fail_load;
+			if ((r = sshkey_parse_private(&keyblob, filename, pass,
+			    &private, &comment)) == 0)
+				break;
+			else if (r != SSH_ERR_KEY_WRONG_PASSPHRASE) {
+				fprintf(stderr,
+				    "Error loading key \"%s\": %s\n",
+				    filename, ssh_err(r));
+ fail_load:
 				clear_pass();
 				xfree(comment);
 				buffer_free(&keyblob);
 				return -1;
 			}
-			private = key_parse_private(&keyblob, filename, pass,
-			    &comment);
-			if (private != NULL)
-				break;
 			clear_pass();
 			snprintf(msg, sizeof msg,
 			    "Bad passphrase, try again for %.200s: ", comment);
@@ -220,8 +238,11 @@ add_file(AuthenticationConnection *ac, const char *filename, int key_only)
 
 	/* Now try to add the certificate flavour too */
 	xasprintf(&certpath, "%s-cert.pub", filename);
-	if ((cert = key_load_public(certpath, NULL)) == NULL)
+	if ((r = sshkey_load_public(certpath, &cert, NULL)) != 0) {
+		error("Failed to load certificate \"%s\": %s",
+		    certpath, ssh_err(r));
 		goto out;
+	}
 
 	if (!sshkey_equal_public(cert, private)) {
 		error("Certificate %s does not match private key %s",

@@ -57,6 +57,7 @@
 #endif
 #include "authfile.h"
 #include "monitor_wrap.h"
+#include "err.h"
 
 /* import */
 extern ServerOptions options;
@@ -483,28 +484,30 @@ int
 auth_key_is_revoked(struct sshkey *key)
 {
 	char *key_fp;
+	int r;
 
 	if (options.revoked_keys_file == NULL)
 		return 0;
 
-	switch (key_in_file(key, options.revoked_keys_file, 0)) {
-	case 0:
+	switch ((r = sshkey_in_file(key, options.revoked_keys_file, 0))) {
+	case SSH_ERR_KEY_NOT_FOUND:
 		/* key not revoked */
 		return 0;
-	case -1:
+	default:
 		/* Error opening revoked_keys_file: refuse all keys */
-		error("Revoked keys file is unreadable: refusing public key "
-		    "authentication");
+		error("Error checking revoked keys file \"%s\": %s, "
+		    "refusing public key authentication",
+		    options.revoked_keys_file, ssh_err(r));
 		return 1;
-	case 1:
-		/* Key revoked */
+	case 0:
+		/* found: key revoked */
 		key_fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
 		error("WARNING: authentication attempt with a revoked "
 		    "%s key %s ", sshkey_type(key), key_fp);
 		xfree(key_fp);
 		return 1;
 	}
-	fatal("key_in_file returned junk");
+	/* NOTREACHED */
 }
 
 void

@@ -392,7 +392,7 @@ user_cert_trusted_ca(struct passwd *pw, struct sshkey *key)
 {
 	char *ca_fp, *principals_file = NULL;
 	const char *reason;
-	int ret = 0;
+	int r, ret = 0;
 
 	if (!sshkey_is_cert(key) || options.trusted_user_ca_keys == NULL)
 		return 0;
@@ -400,11 +400,18 @@ user_cert_trusted_ca(struct passwd *pw, struct sshkey *key)
 	ca_fp = sshkey_fingerprint(key->cert->signature_key,
 	    SSH_FP_MD5, SSH_FP_HEX);
 
-	if (key_in_file(key->cert->signature_key,
-	    options.trusted_user_ca_keys, 1) != 1) {
+	switch ((r = sshkey_in_file(key->cert->signature_key,
+	    options.trusted_user_ca_keys, 1))) {
+	case 0:
+		break;
+	case SSH_ERR_KEY_NOT_FOUND:
 		debug2("%s: CA %s %s is not listed in %s", __func__,
 		    sshkey_type(key->cert->signature_key), ca_fp,
 		    options.trusted_user_ca_keys);
+		goto out;
+	default:
+		error("%s: error checking TrustedUserCAKeys file \"%s\": %s",
+		    __func__, options.trusted_user_ca_keys, ssh_err(r));
 		goto out;
 	}
 	/*

@@ -296,14 +296,14 @@ sshkey_parse_public_rsa1(struct sshbuf *blob,
 		*commentp = NULL;
 
 	/* Check that it is at least big enough to contain the ID string. */
-	if (buffer_len(blob) < sizeof(authfile_id_string))
+	if (sshbuf_len(blob) < sizeof(authfile_id_string))
 		return SSH_ERR_INVALID_FORMAT;
 
 	/*
 	 * Make sure it begins with the id string.  Consume the id string
 	 * from the buffer.
 	 */
-	if (memcmp(buffer_ptr(blob), authfile_id_string,
+	if (memcmp(sshbuf_ptr(blob), authfile_id_string,
 	    sizeof(authfile_id_string)) != 0)
 		return SSH_ERR_INVALID_FORMAT;
 	if ((copy = sshbuf_new()) == NULL)
@@ -367,13 +367,13 @@ sshkey_load_file(int fd, const char *filename, struct sshbuf *blob)
 		}
 		if ((r = sshbuf_put(blob, buf, len)) != 0)
 			goto out;
-		if (buffer_len(blob) > MAX_KEY_FILE_SIZE) {
+		if (sshbuf_len(blob) > MAX_KEY_FILE_SIZE) {
 			r = SSH_ERR_INVALID_FORMAT;
 			goto out;
 		}
 	}
 	if ((st.st_mode & (S_IFSOCK|S_IFCHR|S_IFIFO)) == 0 &&
-	    st.st_size != buffer_len(blob)) {
+	    st.st_size != sshbuf_len(blob)) {
 		r = SSH_ERR_FILE_CHANGED;
 		goto out;
 	}
@@ -484,7 +484,7 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 	    CIPHER_DECRYPT)) != 0)
 		goto out;
 	if ((r = cipher_crypt(&ciphercontext, cp,
-	    buffer_ptr(copy), buffer_len(copy))) != 0) {
+	    sshbuf_ptr(copy), sshbuf_len(copy))) != 0) {
 		cipher_cleanup(&ciphercontext);
 		goto out;
 	}
