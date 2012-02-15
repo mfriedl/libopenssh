@@ -40,7 +40,7 @@ sshbuf_misc_tests(void)
 	ASSERT_INT_NE(feof(out), 0);
 	ASSERT_SIZE_T_GT(sz, 0);
 	tmp[sz] = '\0';
-	ASSERT_PTR_NE(strstr(tmp, "12345678"), NULL);
+	ASSERT_PTR_NE(strstr(tmp, "12 34 56 78"), NULL);
 	fclose(out);
 	sshbuf_free(p1);
 	TEST_DONE();
