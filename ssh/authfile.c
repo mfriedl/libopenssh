@@ -857,7 +857,7 @@ sshkey_try_load_public(struct sshkey *k, const char *filename, char **commentp)
 int
 sshkey_load_public(const char *filename, struct sshkey **keyp, char **commentp)
 {
-	struct sshkey *pub;
+	struct sshkey *pub = NULL;
 	char file[MAXPATHLEN];
 	int r, fd;
 
@@ -867,7 +867,7 @@ sshkey_load_public(const char *filename, struct sshkey **keyp, char **commentp)
 
 	/* try rsa1 private key */
 	if ((fd = open(filename, O_RDONLY)) < 0)
-		return SSH_ERR_SYSTEM_ERROR;
+		goto skip;
 	r = sshkey_load_public_rsa1(fd, filename, keyp, commentp);
 	close(fd);
 	switch (r) {
@@ -894,6 +894,12 @@ sshkey_load_public(const char *filename, struct sshkey **keyp, char **commentp)
 		*keyp = pub;
 		return 0;
 	}
+
+ skip:
+	/* try .pub suffix */
+	if (pub == NULL && (pub = sshkey_new(KEY_UNSPEC)) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	r = SSH_ERR_ALLOC_FAIL;	/* in case strlcpy or strlcat fail */
 	if ((strlcpy(file, filename, sizeof file) < sizeof(file)) &&
 	    (strlcat(file, ".pub", sizeof file) < sizeof(file)) &&
 	    (r = sshkey_try_load_public(pub, file, commentp)) == 0) {
