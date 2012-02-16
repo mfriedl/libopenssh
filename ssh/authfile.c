@@ -419,7 +419,7 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
     struct sshkey **keyp, char **commentp)
 {
 	int r;
-	u_int16_t check1, check2, check1b, check2b;
+	u_int16_t check1, check2;
 	u_int8_t cipher_type;
 	struct sshbuf *decrypted = NULL, *copy = NULL;
 	u_char *cp;
@@ -492,13 +492,10 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 		goto out;
 
 	if ((r = sshbuf_get_u16(decrypted, &check1)) != 0 ||
-	    (r = sshbuf_get_u16(decrypted, &check2)) != 0 ||
-	    (r = sshbuf_get_u16(decrypted, &check1b)) != 0 ||
-	    (r = sshbuf_get_u16(decrypted, &check2b)) != 0)
+	    (r = sshbuf_get_u16(decrypted, &check2)) != 0)
 		goto out;
-	if (check1 != check1b || check2 != check2b) {
-		r = (*passphrase == '\0') ?
-		    SSH_ERR_INVALID_FORMAT : SSH_ERR_KEY_WRONG_PASSPHRASE;
+	if (check1 != check2) {
+		r = SSH_ERR_KEY_WRONG_PASSPHRASE;
 		goto out;
 	}
 
@@ -557,7 +554,8 @@ sshkey_parse_private_pem(struct sshbuf *blob, int type, const char *passphrase,
 	
 	if ((pk = PEM_read_bio_PrivateKey(bio, NULL, NULL,
 	    (char *)passphrase)) == NULL) {
-		r = SSH_ERR_LIBCRYPTO_ERROR;
+		r = (*passphrase == '\0') ?
+		    SSH_ERR_KEY_WRONG_PASSPHRASE : SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
 	}
 	if (pk->type == EVP_PKEY_RSA &&
