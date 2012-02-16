@@ -416,7 +416,7 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	int ch, log_stderr = 1, fd;
+	int ch, log_stderr = 1, fd, r;
 	struct event ev;
 	char *hostkey_file = NULL, *known_hostkey_file = NULL;
 	SyslogFacility log_facility = SYSLOG_FACILITY_AUTH;
@@ -461,11 +461,13 @@ main(int argc, char **argv)
 	}
 	log_init(__progname, log_level, log_facility, log_stderr);
 	if (hostkey_file &&
-	    (hostkey = key_load_private(hostkey_file, "", NULL)) == NULL)
-		fatal("key_load_private: %s", hostkey_file);
+	    (r = sshkey_load_private(hostkey_file, "", &hostkey, NULL)) != 0)
+		fatal("sshkey_load_private: %s: %s", hostkey_file, ssh_err(r));
 	if (known_hostkey_file &&
-	    (known_hostkey = key_load_public(known_hostkey_file, NULL)) == NULL)
-		fatal("key_load_public: %s", known_hostkey_file);
+	    (r = sshkey_load_public(known_hostkey_file, &known_hostkey,
+	    NULL)) != 0)
+		fatal("sshkey_load_public: %s: %s", known_hostkey_file,
+		    ssh_err(r));
 	if (!foreground)
 		daemon(0, 0);
 	event_init();
