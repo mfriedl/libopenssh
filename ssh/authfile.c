@@ -53,7 +53,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "xmalloc.h"
 #include "cipher.h"
 #include "buffer.h"
 #include "key.h"
@@ -816,6 +815,7 @@ sshkey_try_load_public(struct sshkey *k, const char *filename, char **commentp)
 	char line[SSH_MAX_PUBKEY_BYTES];
 	char *cp;
 	u_long linenum = 0;
+	int r;
 
 	if (commentp != NULL)
 		*commentp = NULL;
@@ -838,14 +838,16 @@ sshkey_try_load_public(struct sshkey *k, const char *filename, char **commentp)
 		for (; *cp && (*cp == ' ' || *cp == '\t'); cp++)
 			;
 		if (*cp) {
-			if (sshkey_read(k, &cp) == 0) {
+			if ((r = sshkey_read(k, &cp)) == 0) {
 				cp[strcspn(cp, "\r\n")] = '\0';
 				if (commentp) {
-					*commentp = xstrdup(*cp ?
+					*commentp = strdup(*cp ?
 					    cp : filename);
+					if (*commentp == NULL)
+						r = SSH_ERR_ALLOC_FAIL;
 				}
 				fclose(f);
-				return 0;
+				return r;
 			}
 		}
 	}
