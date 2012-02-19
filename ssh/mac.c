@@ -30,7 +30,6 @@
 #include <string.h>
 #include <signal.h>
 
-#include "xmalloc.h"
 #include "log.h"
 #include "cipher.h"
 #include "buffer.h"
@@ -184,7 +183,7 @@ mac_valid(const char *names)
 
 	if (names == NULL || strcmp(names, "") == 0)
 		return 0;
-	if ((maclist = cp = xstrdup(names)) == NULL)
+	if ((maclist = cp = strdup(names)) == NULL)
 		return 0;
 	for ((p = strsep(&cp, MAC_SEP)); p && *p != '\0';
 	    (p = strsep(&cp, MAC_SEP))) {
