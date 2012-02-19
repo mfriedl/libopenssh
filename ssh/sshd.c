@@ -2242,6 +2242,8 @@ do_ssh2_kex(void)
 void
 cleanup_exit(int i)
 {
+	channel_close_all();
+
 	if (the_authctxt) {
 		do_cleanup(the_authctxt);
 		if (use_privsep && privsep_is_preauth && pmonitor->m_pid > 1) {

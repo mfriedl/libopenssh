@@ -2174,6 +2174,8 @@ client_stop_mux(void)
 void
 cleanup_exit(int i)
 {
+	channel_close_all();
+
 	leave_raw_mode(options.request_tty == REQUEST_TTY_FORCE);
 	leave_non_blocking();
 	if (options.control_path != NULL && muxserver_sock != -1)

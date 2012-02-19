@@ -61,7 +61,6 @@
 #include "buffer.h"
 #include "crc32.h"
 #include "deattack.h"
-#include "channels.h"
 #include "compat.h"
 #include "ssh1.h"
 #include "ssh2.h"
@@ -2024,9 +2023,6 @@ ssh_packet_disconnect(struct ssh *ssh, const char *fmt,...)
 	}
 	ssh_packet_send(ssh);
 	ssh_packet_write_wait(ssh);
-
-	/* Stop listening for connections. */
-	channel_close_all();
 
 	/* Close the connection. */
 	ssh_packet_close(ssh);
