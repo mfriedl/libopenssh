@@ -53,6 +53,9 @@ struct ssh {
 	char *host;
 	struct sockaddr *hostaddr;
 
+	/* cached remote ip address */
+	char *remote_ipaddr;
+
 	/* Dispatcher table */
 	dispatch_fn *dispatch[DISPATCH_MAX];
 	/* number of packets to ignore in the dispatcher */
@@ -151,6 +154,8 @@ u_int	 ssh_packet_get_maxsize(struct ssh *);
 
 int	 ssh_packet_get_state(struct ssh *, struct sshbuf *);
 int	 ssh_packet_set_state(struct ssh *, struct sshbuf *);
+
+const char *ssh_remote_ipaddr(struct ssh *);
 
 /* don't allow remaining bytes after the end of the message */
 #define ssh_packet_check_eom(active_state) \
@@ -293,6 +298,8 @@ void     packet_set_connection(int, int);
 	ssh_packet_get_state(active_state, m)
 #define packet_set_state(m) \
 	ssh_packet_set_state(active_state, m)
+#define get_remote_ipaddr() \
+	ssh_remote_ipaddr(active_state)
 #endif
 
 /* new API */

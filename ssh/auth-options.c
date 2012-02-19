@@ -23,6 +23,7 @@
 #include "match.h"
 #include "log.h"
 #include "canohost.h"
+#include "packet.h"
 #include "buffer.h"
 #include "channels.h"
 #include "servconf.h"

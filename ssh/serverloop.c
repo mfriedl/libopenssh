@@ -60,7 +60,6 @@
 #include "buffer.h"
 #include "log.h"
 #include "servconf.h"
-#include "canohost.h"
 #include "sshpty.h"
 #include "channels.h"
 #include "compat.h"

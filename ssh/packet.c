@@ -320,7 +320,7 @@ ssh_packet_stop_discard(struct ssh *ssh)
 		    sshbuf_ptr(state->incoming_packet), PACKET_MAX_SIZE,
 		    NULL, 0);
 	}
-	logit("Finished discarding for %.200s", get_remote_ipaddr());
+	logit("Finished discarding for %.200s", ssh_remote_ipaddr(ssh));
 	return SSH_ERR_MAC_INVALID;
 }
 
@@ -507,6 +507,24 @@ ssh_packet_get_connection_out(struct ssh *ssh)
 	return ssh->state->connection_out;
 }
 
+/*
+ * Returns the IP-address of the remote host as a string.  The returned
+ * string must not be freed.
+ */
+
+const char *
+ssh_remote_ipaddr(struct ssh *ssh)
+{
+	/* Check whether we have cached the ipaddr. */
+	if (ssh->remote_ipaddr == NULL)
+		ssh->remote_ipaddr = ssh_packet_connection_is_on_socket(ssh) ?
+		    get_peer_ipaddr(ssh->state->connection_in) :
+		    strdup("UNKNOWN");
+	if (ssh->remote_ipaddr == NULL)
+		return "UNKNOWN";
+	return ssh->remote_ipaddr;
+}
+
 /* Closes the connection and clears and frees internal data structures. */
 
 void
@@ -558,6 +576,10 @@ ssh_packet_close(struct ssh *ssh)
 		error("%s: cipher_cleanup failed: %s", __func__, ssh_err(r));
 	if ((r = cipher_cleanup(&state->receive_context)) != 0)
 		error("%s: cipher_cleanup failed: %s", __func__, ssh_err(r));
+	if (ssh->remote_ipaddr) {
+		free(ssh->remote_ipaddr);
+		ssh->remote_ipaddr = NULL;
+	}
 }
 
 /* Sets remote side protocol flags. */
@@ -1364,7 +1386,7 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		}
 		if (r == 0) {
 			logit("Connection to %.200s timed out while "
-			    "waiting to read", get_remote_ipaddr());
+			    "waiting to read", ssh_remote_ipaddr(ssh));
 			cleanup_exit(255);
 		}
 		/* Read data from the socket. */
@@ -1374,7 +1396,8 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 			    sizeof(buf), &cont);
 		} while (len == 0 && cont);
 		if (len == 0) {
-			logit("Connection closed by %.200s", get_remote_ipaddr());
+			logit("Connection closed by %.200s",
+			    ssh_remote_ipaddr(ssh));
 			cleanup_exit(255);
 		}
 		if (len < 0)
@@ -1745,7 +1768,7 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 				    (r = sshpkt_get_string(ssh, &msg, NULL)) != 0)
 					return r;
 				logit("Received disconnect from %s: %u: %.400s",
-				    get_remote_ipaddr(), reason, msg);
+				    ssh_remote_ipaddr(ssh), reason, msg);
 				free(msg);
 				return SSH_ERR_DISCONNECTED;
 			case SSH2_MSG_UNIMPLEMENTED:
@@ -1772,7 +1795,7 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 				if ((r = sshpkt_get_string(ssh, &msg, NULL)) != 0)
 					return r;
 				logit("Received disconnect from %s: %.400s",
-				    get_remote_ipaddr(), msg);
+				    ssh_remote_ipaddr(ssh), msg);
 				free(msg);
 				return SSH_ERR_DISCONNECTED;
 				break;
@@ -2101,7 +2124,7 @@ ssh_packet_write_wait(struct ssh *ssh)
 		}
 		if (ret == 0) {
 			logit("Connection to %.200s timed out while "
-			    "waiting to write", get_remote_ipaddr());
+			    "waiting to write", ssh_remote_ipaddr(ssh));
 			cleanup_exit(255);
 		}
 		ssh_packet_write_poll(ssh);

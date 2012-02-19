@@ -33,7 +33,6 @@
 #include "misc.h"
 
 static void check_ip_options(int, char *);
-static char *canonical_host_ip = NULL;
 static int cached_port = -1;
 
 /*
@@ -281,35 +280,9 @@ get_local_name(int fd)
 void
 clear_cached_addr(void)
 {
-	if (canonical_host_ip != NULL) {
-		xfree(canonical_host_ip);
-		canonical_host_ip = NULL;
-	}
 	cached_port = -1;
 }
 
-/*
- * Returns the IP-address of the remote host as a string.  The returned
- * string must not be freed.
- */
-
-const char *
-get_remote_ipaddr(void)
-{
-	/* Check whether we have cached the ipaddr. */
-	if (canonical_host_ip == NULL) {
-		if (packet_connection_is_on_socket()) {
-			canonical_host_ip =
-			    get_peer_ipaddr(packet_get_connection_in());
-			if (canonical_host_ip == NULL)
-				cleanup_exit(255);
-		} else {
-			/* If not on socket, return UNKNOWN. */
-			canonical_host_ip = xstrdup("UNKNOWN");
-		}
-	}
-	return canonical_host_ip;
-}
 
 const char *
 get_remote_name_or_ip(u_int utmp_len, int use_dns)

@@ -13,7 +13,6 @@
  */
 
 const char	*get_canonical_hostname(int);
-const char	*get_remote_ipaddr(void);
 const char	*get_remote_name_or_ip(u_int, int);
 
 char		*get_peer_ipaddr(int);
