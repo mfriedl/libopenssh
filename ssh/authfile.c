@@ -372,7 +372,7 @@ sshkey_load_file(int fd, const char *filename, struct sshbuf *blob)
 		}
 	}
 	if ((st.st_mode & (S_IFSOCK|S_IFCHR|S_IFIFO)) == 0 &&
-	    st.st_size != sshbuf_len(blob)) {
+	    st.st_size != (off_t)sshbuf_len(blob)) {
 		r = SSH_ERR_FILE_CHANGED;
 		goto out;
 	}
