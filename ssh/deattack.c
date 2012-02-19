@@ -18,17 +18,14 @@
  * <http://www.core-sdi.com>
  */
 
-#include <sys/types.h>
-
+#include <sys/param.h>
 #include <string.h>
 #include <stdio.h>
-#include <stdarg.h>
+#include <stdlib.h>
 
-#include "xmalloc.h"
 #include "deattack.h"
-#include "log.h"
 #include "crc32.h"
-#include "misc.h"
+#include "sshbuf.h"
 
 /*
  * CRC attack detection has a worst-case behaviour that is O(N^3) over
@@ -64,7 +61,7 @@
 
 
 /* Hash function (Input keys are cipher results) */
-#define HASH(x)		get_u32(x)
+#define HASH(x)		PEEK_U32(x)
 
 #define CMP(a, b)	(memcmp(a, b, SSH_BLOCKSIZE))
 
@@ -92,7 +89,7 @@ check_crc(u_char *S, u_char *buf, u_int32_t len)
 			crc_update(&crc, 0);
 		}
 	}
-	return (crc == 0);
+	return crc == 0;
 }
 
 
@@ -100,27 +97,30 @@ check_crc(u_char *S, u_char *buf, u_int32_t len)
 int
 detect_attack(u_char *buf, u_int32_t len)
 {
-	static u_int16_t *h = (u_int16_t *) NULL;
+	static u_int16_t *h = NULL;
 	static u_int32_t n = HASH_MINSIZE / HASH_ENTRYSIZE;
-	u_int32_t i, j;
-	u_int32_t l, same;
-	u_char *c;
-	u_char *d;
+	u_int16_t *tmp;
+	u_int32_t i, j, l, same;
+	u_char *c, *d;
 
 	if (len > (SSH_MAXBLOCKS * SSH_BLOCKSIZE) ||
-	    len % SSH_BLOCKSIZE != 0) {
-		fatal("detect_attack: bad length %d", len);
-	}
+	    len % SSH_BLOCKSIZE != 0)
+		return DEATTACK_ERROR;
 	for (l = n; l < HASH_FACTOR(len / SSH_BLOCKSIZE); l = l << 2)
 		;
 
 	if (h == NULL) {
-		debug("Installing crc compensation attack detector.");
-		h = (u_int16_t *) xcalloc(l, HASH_ENTRYSIZE);
+		if ((h = calloc(l, HASH_ENTRYSIZE)) == NULL)
+			return DEATTACK_ERROR;
 		n = l;
 	} else {
 		if (l > n) {
-			h = (u_int16_t *)xrealloc(h, l, HASH_ENTRYSIZE);
+			if (l == 0 || SIZE_T_MAX / l < HASH_ENTRYSIZE ||
+			   (tmp = realloc(h, l * HASH_ENTRYSIZE)) == NULL) {
+				free(h);
+				return DEATTACK_ERROR;
+			}
+			h = tmp;
 			n = l;
 		}
 	}
@@ -130,13 +130,13 @@ detect_attack(u_char *buf, u_int32_t len)
 			for (d = buf; d < c; d += SSH_BLOCKSIZE) {
 				if (!CMP(c, d)) {
 					if ((check_crc(c, buf, len)))
-						return (DEATTACK_DETECTED);
+						return DEATTACK_DETECTED;
 					else
 						break;
 				}
 			}
 		}
-		return (DEATTACK_OK);
+		return DEATTACK_OK;
 	}
 	memset(h, HASH_UNUSEDCHAR, n * HASH_ENTRYSIZE);
 
@@ -145,14 +145,14 @@ detect_attack(u_char *buf, u_int32_t len)
 		    i = (i + 1) & (n - 1)) {
 			if (!CMP(c, buf + h[i] * SSH_BLOCKSIZE)) {
 				if (++same > MAX_IDENTICAL)
-					return (DEATTACK_DOS_DETECTED);
+					return DEATTACK_DOS_DETECTED;
 				if (check_crc(c, buf, len))
-					return (DEATTACK_DETECTED);
+					return DEATTACK_DETECTED;
 				else
 					break;
 			}
 		}
 		h[i] = j;
 	}
-	return (DEATTACK_OK);
+	return DEATTACK_OK;
 }

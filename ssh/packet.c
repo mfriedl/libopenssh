@@ -1463,6 +1463,8 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 	if (!state->receive_context.plaintext) {
 		switch (detect_attack(sshbuf_ptr(state->input),
 		    padded_len)) {
+		case DEATTACK_OK:
+			break;
 		case DEATTACK_DETECTED:
 			ssh_packet_disconnect(ssh,
 			    "crc32 compensation attack: network attack detected"
@@ -1470,6 +1472,9 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 		case DEATTACK_DOS_DETECTED:
 			ssh_packet_disconnect(ssh,
 			    "deattack denial of service detected");
+		default:
+			ssh_packet_disconnect(ssh,
+			    "deattack error");
 		}
 	}
 
