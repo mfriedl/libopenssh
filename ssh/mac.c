@@ -30,7 +30,6 @@
 #include <string.h>
 #include <signal.h>
 
-#include "log.h"
 #include "cipher.h"
 #include "buffer.h"
 #include "key.h"

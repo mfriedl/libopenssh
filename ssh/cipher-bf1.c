@@ -24,13 +24,9 @@
  */
 
 #include <sys/types.h>
-
+#include <string.h>
 #include <openssl/evp.h>
 
-#include <string.h>
-
-#include "xmalloc.h"
-#include "log.h"
 /*
  * SSH1 uses a variation on Blowfish, all bytes must be swapped before
  * and after encryption/decryption. Thus the swap_bytes stuff (yuk).
