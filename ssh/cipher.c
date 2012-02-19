@@ -47,9 +47,9 @@
 
 extern const EVP_CIPHER *evp_ssh1_bf(void);
 extern const EVP_CIPHER *evp_ssh1_3des(void);
-extern void ssh1_3des_iv(EVP_CIPHER_CTX *, int, u_char *, int);
 extern const EVP_CIPHER *evp_aes_128_ctr(void);
-extern void ssh_aes_ctr_iv(EVP_CIPHER_CTX *, int, u_char *, u_int);
+extern int ssh1_3des_iv(EVP_CIPHER_CTX *, int, u_char *, int);
+extern int ssh_aes_ctr_iv(EVP_CIPHER_CTX *, int, u_char *, u_int);
 
 struct sshcipher {
 	char	*name;
@@ -337,23 +337,21 @@ cipher_get_keyiv(struct sshcipher_ctx *cc, u_char *iv, u_int len)
 	case SSH_CIPHER_BLOWFISH:
 		evplen = EVP_CIPHER_CTX_iv_length(&cc->evp);
 		if (evplen == 0)
-			break;
+			return 0;
 		else if (evplen < 0)
 			return SSH_ERR_LIBCRYPTO_ERROR;
 		if ((u_int)evplen != len)
 			return SSH_ERR_INVALID_ARGUMENT;
 		if (c->evptype == evp_aes_128_ctr)
-			ssh_aes_ctr_iv(&cc->evp, 0, iv, len);
+			return ssh_aes_ctr_iv(&cc->evp, 0, iv, len);
 		else
 			memcpy(iv, cc->evp.iv, len);
-		break;
+		return 0;
 	case SSH_CIPHER_3DES:
-		ssh1_3des_iv(&cc->evp, 0, iv, 24);
-		break;
+		return ssh1_3des_iv(&cc->evp, 0, iv, 24);
 	default:
 		return SSH_ERR_INVALID_ARGUMENT;
 	}
-	return 0;
 }
 
 int
@@ -370,17 +368,15 @@ cipher_set_keyiv(struct sshcipher_ctx *cc, const u_char *iv)
 		if (evplen <= 0)
 			return SSH_ERR_LIBCRYPTO_ERROR;
 		if (c->evptype == evp_aes_128_ctr)
-			ssh_aes_ctr_iv(&cc->evp, 1, (u_char *)iv, evplen);
+			return ssh_aes_ctr_iv(&cc->evp, 1, (u_char *)iv, evplen);
 		else
 			memcpy(cc->evp.iv, iv, evplen);
-		break;
+		return 0;
 	case SSH_CIPHER_3DES:
-		ssh1_3des_iv(&cc->evp, 1, (u_char *)iv, 24);
-		break;
+		return ssh1_3des_iv(&cc->evp, 1, (u_char *)iv, 24);
 	default:
 		return SSH_ERR_INVALID_ARGUMENT;
 	}
-	return 0;
 }
 
 #define EVP_X_STATE(evp)	(evp).cipher_data

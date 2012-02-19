@@ -16,17 +16,14 @@
  */
 
 #include <sys/types.h>
-
 #include <string.h>
-
 #include <openssl/evp.h>
 #include <openssl/aes.h>
 
-#include "xmalloc.h"
-#include "log.h"
+#include "err.h"
 
 const EVP_CIPHER *evp_aes_128_ctr(void);
-void ssh_aes_ctr_iv(EVP_CIPHER_CTX *, int, u_char *, size_t);
+int ssh_aes_ctr_iv(EVP_CIPHER_CTX *, int, u_char *, size_t);
 
 struct ssh_aes_ctr_ctx
 {
@@ -58,9 +55,9 @@ ssh_aes_ctr(EVP_CIPHER_CTX *ctx, u_char *dest, const u_char *src,
 	u_char buf[AES_BLOCK_SIZE];
 
 	if (len == 0)
-		return (1);
+		return 1;
 	if ((c = EVP_CIPHER_CTX_get_app_data(ctx)) == NULL)
-		return (0);
+		return 0;
 
 	while ((len--) > 0) {
 		if (n == 0) {
@@ -70,7 +67,7 @@ ssh_aes_ctr(EVP_CIPHER_CTX *ctx, u_char *dest, const u_char *src,
 		*(dest++) = *(src++) ^ buf[n];
 		n = (n + 1) % AES_BLOCK_SIZE;
 	}
-	return (1);
+	return 1;
 }
 
 static int
@@ -80,15 +77,19 @@ ssh_aes_ctr_init(EVP_CIPHER_CTX *ctx, const u_char *key, const u_char *iv,
 	struct ssh_aes_ctr_ctx *c;
 
 	if ((c = EVP_CIPHER_CTX_get_app_data(ctx)) == NULL) {
-		c = xmalloc(sizeof(*c));
+		if ((c = calloc(1, sizeof(*c))) == NULL)
+			return 0;
 		EVP_CIPHER_CTX_set_app_data(ctx, c);
 	}
 	if (key != NULL)
-		AES_set_encrypt_key(key, EVP_CIPHER_CTX_key_length(ctx) * 8,
-		    &c->aes_ctx);
+		if (AES_set_encrypt_key(key, EVP_CIPHER_CTX_key_length(ctx) * 8,
+		    &c->aes_ctx) < 0) {
+			free(c);
+			EVP_CIPHER_CTX_set_app_data(ctx, NULL);
+		}
 	if (iv != NULL)
 		memcpy(c->aes_counter, iv, AES_BLOCK_SIZE);
-	return (1);
+	return 1;
 }
 
 static int
@@ -97,24 +98,25 @@ ssh_aes_ctr_cleanup(EVP_CIPHER_CTX *ctx)
 	struct ssh_aes_ctr_ctx *c;
 
 	if ((c = EVP_CIPHER_CTX_get_app_data(ctx)) != NULL) {
-		memset(c, 0, sizeof(*c));
-		xfree(c);
+		bzero(c, sizeof(*c));
+		free(c);
 		EVP_CIPHER_CTX_set_app_data(ctx, NULL);
 	}
-	return (1);
+	return 1;
 }
 
-void
+int
 ssh_aes_ctr_iv(EVP_CIPHER_CTX *evp, int doset, u_char * iv, size_t len)
 {
 	struct ssh_aes_ctr_ctx *c;
 
 	if ((c = EVP_CIPHER_CTX_get_app_data(evp)) == NULL)
-		fatal("ssh_aes_ctr_iv: no context");
+		return SSH_ERR_INTERNAL_ERROR;
 	if (doset)
 		memcpy(c->aes_counter, iv, len);
 	else
 		memcpy(iv, c->aes_counter, len);
+	return 0;
 }
 
 const EVP_CIPHER *
@@ -122,7 +124,7 @@ evp_aes_128_ctr(void)
 {
 	static EVP_CIPHER aes_ctr;
 
-	memset(&aes_ctr, 0, sizeof(EVP_CIPHER));
+	bzero(&aes_ctr, sizeof(aes_ctr));
 	aes_ctr.nid = NID_undef;
 	aes_ctr.block_size = AES_BLOCK_SIZE;
 	aes_ctr.iv_len = AES_BLOCK_SIZE;
