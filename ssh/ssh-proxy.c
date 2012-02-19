@@ -29,7 +29,6 @@
 #include <ctype.h>
 
 #include "ssh_api.h"
-#include "xmalloc.h"
 #include "log.h"
 #include "misc.h"
 #include "myproposal.h"
@@ -182,33 +181,34 @@ session_close(struct session *s)
 		TAILQ_REMOVE(&sessions, s, next);
 	}
 	debug2("closing session %p", s);
-	xfree(s);
+	free(s);
 }
 
 void
 accept_cb(int fd, short type, void *arg)
 {
 	struct event *ev = arg;
-	struct session *s;
+	struct session *s = NULL;
 	socklen_t addrlen;
 	struct sockaddr addr;
+	int acceptfd = -1;
 
-	s = xcalloc(1, sizeof(struct session));
-	s->connected = 0;
-	s->server.fd = -1;
-	s->client.fd = -1;
-	s->server.ssh = NULL;
-	s->client.ssh = NULL;
-	event_add(ev, NULL);
-	addrlen = sizeof(addr);
-	if ((s->client.fd = accept(fd, &addr, &addrlen)) < 0) {
+	if ((acceptfd = accept(fd, &addr, &addrlen)) < 0) {
 		fatal("accept: %s", strerror(errno));
 		goto fail;
 	}
-	if (fcntl(s->client.fd, F_SETFL, O_NONBLOCK) < 0) {
+	if (fcntl(acceptfd, F_SETFL, O_NONBLOCK) < 0) {
 		error("fcntl accepted F_SETFL: %s", strerror(errno));
 		goto fail;
 	}
+	if ((s = calloc(1, sizeof(struct session))) == NULL) {
+		error("calloc: %s", strerror(errno));
+		goto fail;
+	}
+	s->server.fd = -1;
+	s->client.fd = acceptfd;
+	event_add(ev, NULL);
+	addrlen = sizeof(addr);
 	if ((s->server.fd = do_connect(fwd.connect_host, fwd.connect_port)) < 0) {
 		error("do_connect() failed");
 		goto fail;
@@ -218,11 +218,10 @@ accept_cb(int fd, short type, void *arg)
 	debug2("new session %p", s);
 	return;
 fail:
-	if (s) {
-		if (s->client.fd != -1)
-			close(s->client.fd);
-		xfree(s);
-	}
+	if (acceptfd != -1)
+		close(acceptfd);
+	if (s)
+		free(s);
 }
 
 void
