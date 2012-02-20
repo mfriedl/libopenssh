@@ -2634,7 +2634,7 @@ kex_from_blob(Buffer *m, Kex **kexp)
 	    (r = sshbuf_get_u32(m, &kex->flags)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &kex->client_version_string, NULL)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &kex->server_version_string, NULL)) != 0)
-		return r;
+		goto out;
 	kex->server = 1;
 	kex->done = 1;
 	r = 0;
