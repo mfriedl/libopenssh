@@ -2647,6 +2647,8 @@ kex_from_blob(Buffer *m, Kex **kexp)
 				sshbuf_free(kex->peer);
 			free(kex);
 		}
+		if (kexp != NULL)
+			*kexp = NULL;
 	} else {
 		*kexp = kex;
 	}
