@@ -380,7 +380,6 @@ _ssh_host_private_key(int type, struct ssh *ssh)
 {
 	struct key_entry *k;
 
-	ssh->compat = ssh->compat;	/* XXX */
 	debug3("%s: need %d", __func__, type);
 	TAILQ_FOREACH(k, &ssh->private_keys, next) {
 		debug3("%s: check %s", __func__, sshkey_type(k->key));
