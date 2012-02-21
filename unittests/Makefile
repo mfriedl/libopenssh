@@ -1,5 +1,5 @@
 #	$OpenBSD$
 
-SUBDIR=	test_helper sshbuf sshkey
+SUBDIR=	test_helper sshbuf sshkey kex
 
 .include <bsd.subdir.mk>
