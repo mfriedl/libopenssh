@@ -193,6 +193,26 @@ sshbuf_get_cstring(struct sshbuf *buf, char **valp, size_t *lenp)
 }
 
 int
+sshbuf_get_stringb(struct sshbuf *buf, struct sshbuf *v)
+{
+	u_int32_t len;
+	u_char *p;
+	int r;
+
+	/*
+	 * Use sshbuf_peek_string_direct() to figure out if there is
+	 * a complete string in 'buf' and copy the string directly
+	 * into 'v'.
+	 */
+	if ((r = sshbuf_peek_string_direct(buf, NULL, NULL)) != 0 ||
+	    (r = sshbuf_get_u32(buf, &len)) != 0 ||
+	    (r = sshbuf_reserve(v, len, &p)) != 0 ||
+	    (r = sshbuf_get(buf, p, len)) != 0)
+		return r;
+	return 0;
+}
+
+int
 sshbuf_put(struct sshbuf *buf, const void *v, size_t len)
 {
 	u_char *p;

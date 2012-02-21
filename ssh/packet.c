@@ -201,8 +201,6 @@ struct session_state {
 	TAILQ_HEAD(, packet) outgoing;
 };
 
-static int _sshbuf_get_stringb(struct sshbuf *, struct sshbuf *);
-
 struct ssh *
 ssh_alloc_session_state(void)
 {
@@ -423,7 +421,7 @@ ssh_packet_set_compress_state(struct ssh *ssh, struct sshbuf *m)
 
 	if ((b = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
-	if ((r = _sshbuf_get_stringb(m, b)) != 0)
+	if ((r = sshbuf_get_stringb(m, b)) != 0)
 		goto out;
 	if ((r = sshbuf_get_string_direct(b, &inblob, &inl)) != 0 ||
 	    (r = sshbuf_get_string_direct(b, &outblob, &outl)) != 0)
@@ -2529,26 +2527,6 @@ ssh_packet_get_state(struct ssh *ssh, struct sshbuf *m)
 	return 0;
 }
 
-static int
-_sshbuf_get_stringb(struct sshbuf *buf, struct sshbuf *v)
-{
-	u_char *p;
-	u_int32_t len;
-	int r;
-
-	/*
-	 * Use sshbuf_peek_string_direct() to figure out if there is
-	 * a complete string in 'buf' and copy the string directly
-	 * into 'v'.
-	 */
-	if ((r = sshbuf_peek_string_direct(buf, NULL, NULL)) != 0 ||
-	    (r = sshbuf_get_u32(buf, &len)) != 0 ||
-	    (r = sshbuf_reserve(v, len, &p)) != 0 ||
-	    (r = sshbuf_get(buf, p, len)) != 0)
-		return r;
-	return 0;
-}
-
 /* restore key exchange results from blob for packet state de-serialization */
 static int
 newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
@@ -2566,7 +2544,7 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-	if ((r = _sshbuf_get_stringb(m, b)) != 0)
+	if ((r = sshbuf_get_stringb(m, b)) != 0)
 		goto out;
 #ifdef DEBUG_PK
 	sshbuf_dump(b, stderr);
@@ -2629,8 +2607,8 @@ kex_from_blob(Buffer *m, Kex **kexp)
 	    (r = sshbuf_get_u32(m, &kex->we_need)) != 0 ||
 	    (r = sshbuf_get_u32(m, &kex->hostkey_type)) != 0 ||
 	    (r = sshbuf_get_u32(m, &kex->kex_type)) != 0 ||
-	    (r = _sshbuf_get_stringb(m, kex->my)) != 0 ||
-	    (r = _sshbuf_get_stringb(m, kex->peer)) != 0 ||
+	    (r = sshbuf_get_stringb(m, kex->my)) != 0 ||
+	    (r = sshbuf_get_stringb(m, kex->peer)) != 0 ||
 	    (r = sshbuf_get_u32(m, &kex->flags)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &kex->client_version_string, NULL)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &kex->server_version_string, NULL)) != 0)

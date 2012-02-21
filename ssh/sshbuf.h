@@ -146,6 +146,7 @@ int	sshbuf_put_u8(struct sshbuf *buf, u_char val);
  */
 int	sshbuf_get_string(struct sshbuf *buf, u_char **valp, size_t *lenp);
 int	sshbuf_get_cstring(struct sshbuf *buf, char **valp, size_t *lenp);
+int	sshbuf_get_stringb(struct sshbuf *buf, struct sshbuf *v);
 int	sshbuf_put_string(struct sshbuf *buf, const void *v, size_t len);
 int	sshbuf_put_cstring(struct sshbuf *buf, const char *v);
 int	sshbuf_put_stringb(struct sshbuf *buf, const struct sshbuf *v);
