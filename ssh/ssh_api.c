@@ -247,7 +247,7 @@ int
 _ssh_read_banner(struct ssh *ssh, char **bannerp)
 {
 	struct sshbuf *input;
-	char c, *s, buf[256], remote_version[256];	/* must be same size! */
+	char *s, buf[256], remote_version[256];	/* must be same size! */
 	int r, remote_major, remote_minor;
 	size_t i, n, j, len;
 
@@ -259,17 +259,16 @@ _ssh_read_banner(struct ssh *ssh, char **bannerp)
 		for (i = 0; i < sizeof(buf) - 1; i++) {
 			if (j >= len)
 				return (0);
-			c = s[j++];
-			if (c == '\r') {
+			buf[i] = s[j++];
+			if (buf[i] == '\r') {
 				buf[i] = '\n';
 				buf[i + 1] = 0;
 				continue;		/**XXX wait for \n */
 			}
-			if (c == '\n') {
+			if (buf[i] == '\n') {
 				buf[i + 1] = 0;
 				break;
 			}
-			buf[i] = c;
 		}
 		buf[sizeof(buf) - 1] = 0;
 		if (strncmp(buf, "SSH-", 4) == 0)
