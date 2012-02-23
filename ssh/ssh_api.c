@@ -248,6 +248,7 @@ _ssh_read_banner(struct ssh *ssh, char **bannerp)
 {
 	struct sshbuf *input;
 	char *s, buf[256], remote_version[256];	/* must be same size! */
+	const char *mismatch = "Protocol mismatch.\r\n";
 	int r, remote_major, remote_minor;
 	size_t i, n, j, len;
 
@@ -274,8 +275,12 @@ _ssh_read_banner(struct ssh *ssh, char **bannerp)
 		if (strncmp(buf, "SSH-", 4) == 0)
 			break;
 		debug("ssh_exchange_identification: %s", buf);
-		if (ssh->kex->server || ++n > 65536)
+		if (ssh->kex->server || ++n > 65536) {
+			if ((r = sshbuf_put(ssh_packet_get_output(ssh),
+			   mismatch, strlen(mismatch))) != 0)
+				return r;
 			return SSH_ERR_NO_PROTOCOL_VERSION;
+		}
 	}
 	if ((r = sshbuf_consume(input, j)) != 0)
 		return r;
