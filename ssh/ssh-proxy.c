@@ -292,8 +292,9 @@ ssh_prepare_output(struct side *side)
 int
 ssh_packet_fwd(struct side *from, struct side *to)
 {
+	struct sshbuf *b;
 	u_char *data, type;
-	u_int len, i;
+	u_int len;
 	int ret;
 
 	if (!from->ssh || !to->ssh)
@@ -310,15 +311,11 @@ ssh_packet_fwd(struct side *from, struct side *to)
 		    from->fd, to->fd, type, len);
 		if ((dump_packets && type != 50) ||
 		    dump_packets > 1) {
-			for (i = 0; i < len; i++) {
-				char c = data[i];
-				if (isascii(c) && isprint(c)) {
-					fputc(c, stderr);
-				} else {
-					fputc('.', stderr);
-				}
+			if ((b = sshbuf_new()) != NULL) {
+				if (sshbuf_put(b, data, len) == 0)
+					sshbuf_dump(b, stderr);
+				sshbuf_free(b);
 			}
-			fputc('\n', stderr);
 		}
 		if ((ret = ssh_packet_put(to->ssh, type, data, len)) != 0)
 			return ret;
