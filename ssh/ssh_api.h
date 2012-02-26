@@ -70,7 +70,7 @@ int	ssh_packet_next(struct ssh *ssh, u_char *typep);
  * the current input packet and the length of this payload.
  * the payload is accessible until ssh_packet_next() is called again.
  */
-void	*ssh_packet_payload(struct ssh *ssh, size_t *len);
+u_char	*ssh_packet_payload(struct ssh *ssh, size_t *lenp);
 
 /*
  * ssh_packet_put() creates an encrypted packet with the given type

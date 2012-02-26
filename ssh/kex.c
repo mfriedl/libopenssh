@@ -246,15 +246,16 @@ int
 kex_input_kexinit(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
-	char *ptr;
-	u_int i, dlen;
+	u_char *ptr;
+	u_int i;
+	size_t dlen;
 	int r;
 
 	debug("SSH2_MSG_KEXINIT received");
 	if (kex == NULL)
 		return SSH_ERR_INVALID_ARGUMENT;
 
-	ptr = ssh_packet_get_raw(ssh, &dlen);
+	ptr = sshpkt_ptr(ssh, &dlen);
 	if ((r = sshbuf_put(kex->peer, ptr, dlen)) != 0)
 		return r;
 

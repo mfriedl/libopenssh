@@ -26,7 +26,7 @@ static int
 do_send_and_receive(struct ssh *from, struct ssh *to)
 {
 	u_char type;
-	u_int len;
+	size_t len;
 	char *buf;
 	int r;
 
@@ -37,9 +37,9 @@ do_send_and_receive(struct ssh *from, struct ssh *to)
 		}
 		if (type != 0)
 			return 0;
-		buf = ssh_output_ptr(from, (u_int *)&len);
+		buf = ssh_output_ptr(from, &len);
 		if (do_debug)
-			printf("%u", len);
+			printf("%zu", len);
 		if (len == 0)
 			return 0;
 		if ((r = ssh_output_consume(from, len)) != 0 ||

@@ -119,7 +119,6 @@ u_int64_t ssh_packet_get_int64(struct ssh *);
 void     ssh_packet_get_bignum(struct ssh *, BIGNUM * value);
 void     ssh_packet_get_bignum2(struct ssh *, BIGNUM * value);
 void	 ssh_packet_get_ecpoint(struct ssh *, const EC_GROUP *, EC_POINT *);
-void	*ssh_packet_get_raw(struct ssh *, u_int *length_ptr);
 void	*ssh_packet_get_string(struct ssh *, u_int *length_ptr);
 char	*ssh_packet_get_cstring(struct ssh *, u_int *length_ptr);
 const void *ssh_packet_get_string_ptr(struct ssh *, u_int *length_ptr);
@@ -327,5 +326,6 @@ int	sshpkt_get_ec(struct ssh *ssh, EC_POINT *v, const EC_GROUP *g);
 int	sshpkt_get_bignum1(struct ssh *ssh, BIGNUM *v);
 int	sshpkt_get_bignum2(struct ssh *ssh, BIGNUM *v);
 int	sshpkt_get_end(struct ssh *ssh);
+u_char	*sshpkt_ptr(struct ssh *, size_t *lenp);
 
 #endif				/* PACKET_H */

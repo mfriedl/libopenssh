@@ -197,10 +197,10 @@ ssh_packet_next(struct ssh *ssh, u_char *typep)
 	}
 }
 
-void *
-ssh_packet_payload(struct ssh *ssh, size_t *len)
+u_char *
+ssh_packet_payload(struct ssh *ssh, size_t *lenp)
 {
-	return (ssh_packet_get_raw(ssh, (u_int *)len));
+	return sshpkt_ptr(ssh, lenp);
 }
 
 int

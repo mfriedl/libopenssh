@@ -1902,16 +1902,6 @@ ssh_packet_get_ecpoint(struct ssh *ssh, const EC_GROUP *curve, EC_POINT *point)
 		fatal("%s: %s", __func__, ssh_err(r));
 }
 
-void *
-ssh_packet_get_raw(struct ssh *ssh, u_int *length_ptr)
-{
-        u_int bytes = sshbuf_len(ssh->state->incoming_packet);
-
-        if (length_ptr != NULL)
-                *length_ptr = bytes;
-        return sshbuf_ptr(ssh->state->incoming_packet);
-}
-
 int
 ssh_packet_remaining(struct ssh *ssh)
 {
@@ -2832,6 +2822,15 @@ sshpkt_get_end(struct ssh *ssh)
 		return SSH_ERR_UNEXPECTED_TRAILING_DATA;
 	return 0;
 }
+
+u_char *
+sshpkt_ptr(struct ssh *ssh, size_t *lenp)
+{
+        if (lenp != NULL)
+                *lenp = sshbuf_len(ssh->state->incoming_packet);
+        return sshbuf_ptr(ssh->state->incoming_packet);
+}
+
 
 /* start a new packet */
 
