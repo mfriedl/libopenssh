@@ -151,7 +151,7 @@ ssh_set_verify_host_key_callback(struct ssh *ssh,
 }
 
 int
-ssh_input_append(struct ssh *ssh, const char *data, u_int len)
+ssh_input_append(struct ssh *ssh, const char *data, size_t len)
 {
 	return sshbuf_put(ssh_packet_get_input(ssh), data, len);
 }
@@ -198,13 +198,13 @@ ssh_packet_next(struct ssh *ssh, u_char *typep)
 }
 
 void *
-ssh_packet_payload(struct ssh *ssh, u_int *len)
+ssh_packet_payload(struct ssh *ssh, size_t *len)
 {
-	return (ssh_packet_get_raw(ssh, len));
+	return (ssh_packet_get_raw(ssh, (u_int *)len));
 }
 
 int
-ssh_packet_put(struct ssh *ssh, int type, const char *data, u_int len)
+ssh_packet_put(struct ssh *ssh, int type, const char *data, size_t len)
 {
 	int r;
 
@@ -216,7 +216,7 @@ ssh_packet_put(struct ssh *ssh, int type, const char *data, u_int len)
 }
 
 void *
-ssh_output_ptr(struct ssh *ssh, u_int *len)
+ssh_output_ptr(struct ssh *ssh, size_t *len)
 {
 	struct sshbuf *output = ssh_packet_get_output(ssh);
 
@@ -225,19 +225,19 @@ ssh_output_ptr(struct ssh *ssh, u_int *len)
 }
 
 int
-ssh_output_consume(struct ssh *ssh, u_int len)
+ssh_output_consume(struct ssh *ssh, size_t len)
 {
 	return sshbuf_consume(ssh_packet_get_output(ssh), len);
 }
 
 int
-ssh_output_space(struct ssh *ssh, u_int len)
+ssh_output_space(struct ssh *ssh, size_t len)
 {
 	return (0 == sshbuf_check_reserve(ssh_packet_get_output(ssh), len));
 }
 
 int
-ssh_input_space(struct ssh *ssh, u_int len)
+ssh_input_space(struct ssh *ssh, size_t len)
 {
 	return (0 == sshbuf_check_reserve(ssh_packet_get_input(ssh), len));
 }

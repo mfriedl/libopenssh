@@ -279,11 +279,11 @@ connect_cb(int fd, short type, void *arg)
 int
 ssh_prepare_output(struct side *side)
 {
-	u_int len;
+	size_t len;
 
 	ssh_output_ptr(side->ssh, &len);
 	if (len) {
-		debug3("output %d for %d", len, side->fd);
+		debug3("output %zd for %d", len, side->fd);
 		event_add(&side->output, NULL);
 	}
 	return len > 0;
@@ -294,7 +294,7 @@ ssh_packet_fwd(struct side *from, struct side *to)
 {
 	struct sshbuf *b;
 	u_char *data, type;
-	u_int len;
+	size_t len;
 	int ret;
 
 	if (!from->ssh || !to->ssh)
@@ -307,7 +307,7 @@ ssh_packet_fwd(struct side *from, struct side *to)
 			return 0;
 		}
 		data = ssh_packet_payload(from->ssh, &len);
-		debug("ssh_packet_fwd %d->%d type %d len %d",
+		debug("ssh_packet_fwd %d->%d type %d len %zd",
 		    from->fd, to->fd, type, len);
 		if ((dump_packets && type != 50) ||
 		    dump_packets > 1) {
@@ -386,7 +386,7 @@ output_cb(int fd, short type, void *arg)
 		r = &s->client;
 	}
 	debug2("output_cb %s fd %d", tag, fd);
-	obuf = ssh_output_ptr(w->ssh, (u_int *)&olen);
+	obuf = ssh_output_ptr(w->ssh, &olen);
 	if (olen > 0) {
 		len = write(fd, obuf, olen);
 		if (len < 0 && (errno == EINTR || errno == EAGAIN)) {
