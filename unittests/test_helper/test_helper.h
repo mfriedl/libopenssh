@@ -41,7 +41,7 @@ void test_done(void);
 void ssl_err_check(const char *file, int line);
 void assert_bignum(const char *file, int line,
     const char *a1, const char *a2,
-    BIGNUM *aa1, BIGNUM *aa2, enum test_predicate pred);
+    const BIGNUM *aa1, const BIGNUM *aa2, enum test_predicate pred);
 void assert_string(const char *file, int line,
     const char *a1, const char *a2,
     const char *aa1, const char *aa2, enum test_predicate pred);
