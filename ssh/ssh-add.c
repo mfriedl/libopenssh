@@ -171,7 +171,7 @@ add_file(AuthenticationConnection *ac, const char *filename, int key_only)
 	close(fd);
 
 	/* At first, try empty passphrase */
-	r = sshkey_parse_private(&keyblob, filename, "", &private, &comment);
+	r = sshkey_parse_private(&keyblob, "", filename, &private, &comment);
 	if (r != 0 && r != SSH_ERR_KEY_WRONG_PASSPHRASE) {
 		fprintf(stderr, "Error loading key \"%s\": %s\n",
 		    filename, ssh_err(r));
@@ -181,7 +181,7 @@ add_file(AuthenticationConnection *ac, const char *filename, int key_only)
 		comment = xstrdup(filename);
 	/* try last */
 	if (private == NULL && pass != NULL) {
-		r = sshkey_parse_private(&keyblob, filename, pass,
+		r = sshkey_parse_private(&keyblob, pass, filename,
 		    &private, NULL);
 		if (r != 0 && r != SSH_ERR_KEY_WRONG_PASSPHRASE) {
 			fprintf(stderr, "Error loading key \"%s\": %s\n",
@@ -198,7 +198,7 @@ add_file(AuthenticationConnection *ac, const char *filename, int key_only)
 			pass = read_passphrase(msg, RP_ALLOW_STDIN);
 			if (strcmp(pass, "") == 0)
 				goto fail_load;
-			if ((r = sshkey_parse_private(&keyblob, filename, pass,
+			if ((r = sshkey_parse_private(&keyblob, pass, filename,
 			    &private, &comment)) == 0)
 				break;
 			else if (r != SSH_ERR_KEY_WRONG_PASSPHRASE) {
@@ -207,7 +207,8 @@ add_file(AuthenticationConnection *ac, const char *filename, int key_only)
 				    filename, ssh_err(r));
  fail_load:
 				clear_pass();
-				xfree(comment);
+				if (comment)
+					xfree(comment);
 				buffer_free(&keyblob);
 				return -1;
 			}
