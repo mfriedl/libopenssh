@@ -45,6 +45,10 @@
 /* For brevity later */
 typedef unsigned long long fuzz_ullong;
 
+/* For base-64 fuzzing */
+static const char fuzz_b64chars[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
 struct fuzz {
 	/* Fuzz method currently in use */
 	int strategy;
@@ -81,6 +85,8 @@ fuzz_ntop(u_int n)
 		return "FUZZ_TRUNCATE_START";
 	case FUZZ_TRUNCATE_END:
 		return "FUZZ_TRUNCATE_END";
+	case FUZZ_BASE64:
+		return "FUZZ_BASE64";
 	default:
 		abort();
 	}
@@ -126,6 +132,14 @@ fuzz_dump(struct fuzz *fuzz)
 		fprintf(stderr, "%s case %zu of %zu (offset: %zu)\n",
 		    fuzz_ntop(fuzz->strategy),
 		    fuzz->o1, fuzz->slen, fuzz->o1);
+		break;
+	case FUZZ_BASE64:
+		assert(fuzz->o2 < sizeof(fuzz_b64chars) - 1);
+		fprintf(stderr, "%s case %llu of %llu (offset: %zu char: %c)\n",
+		    fuzz_ntop(fuzz->strategy),
+		    (fuzz->o1 * (fuzz_ullong)64) + fuzz->o2,
+		    fuzz->slen * (fuzz_ullong)64, fuzz->o1,
+		    fuzz_b64chars[fuzz->o2]);
 		break;
 	default:
 		abort();
@@ -198,12 +212,12 @@ fuzz_strategy_done(struct fuzz *fuzz)
 		return fuzz->o1 >= fuzz->slen * 8;
 	case FUZZ_2_BIT_FLIP:
 		return fuzz->o2 >= fuzz->slen * 8;
-	case FUZZ_1_BYTE_FLIP:
-		return fuzz->o1 >= fuzz->slen;
 	case FUZZ_2_BYTE_FLIP:
 		return fuzz->o2 >= fuzz->slen;
+	case FUZZ_1_BYTE_FLIP:
 	case FUZZ_TRUNCATE_START:
 	case FUZZ_TRUNCATE_END:
+	case FUZZ_BASE64:
 		return fuzz->o1 >= fuzz->slen;
 	default:
 		abort();
@@ -287,6 +301,17 @@ fuzz_next(struct fuzz *fuzz)
 		memcpy(fuzz->fuzzed, fuzz->seed, fuzz->slen);
 		fuzz->o1++;
 		break;
+	case FUZZ_BASE64:
+		assert(fuzz->o1 < fuzz->slen);
+		assert(fuzz->o2 < sizeof(fuzz_b64chars) - 1);
+		memcpy(fuzz->fuzzed, fuzz->seed, fuzz->slen);
+		fuzz->fuzzed[fuzz->o1] = fuzz_b64chars[fuzz->o2];
+		fuzz->o2++;
+		if (fuzz->o2 >= sizeof(fuzz_b64chars) - 1) {
+			fuzz->o2 = 0;
+			fuzz->o1++;
+		}
+		break;
 	default:
 		abort();
 	}
@@ -314,6 +339,7 @@ fuzz_len(struct fuzz *fuzz)
 	case FUZZ_2_BIT_FLIP:
 	case FUZZ_1_BYTE_FLIP:
 	case FUZZ_2_BYTE_FLIP:
+	case FUZZ_BASE64:
 		return fuzz->slen;
 	case FUZZ_TRUNCATE_START:
 	case FUZZ_TRUNCATE_END:
@@ -333,6 +359,7 @@ fuzz_ptr(struct fuzz *fuzz)
 	case FUZZ_2_BIT_FLIP:
 	case FUZZ_1_BYTE_FLIP:
 	case FUZZ_2_BYTE_FLIP:
+	case FUZZ_BASE64:
 		return fuzz->fuzzed;
 	case FUZZ_TRUNCATE_START:
 		assert(fuzz->o1 <= fuzz->slen);

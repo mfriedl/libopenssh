@@ -264,7 +264,8 @@ struct fuzz;
 #define FUZZ_2_BYTE_FLIP	0x00000008	/* Flip two bytes at a time */
 #define FUZZ_TRUNCATE_START	0x00000010	/* Truncate from beginning */
 #define FUZZ_TRUNCATE_END	0x00000020	/* Truncate from end */
-#define FUZZ_MAX		FUZZ_TRUNCATE_END
+#define FUZZ_BASE64		0x00000040	/* Try all base64 chars */
+#define FUZZ_MAX		FUZZ_BASE64
 
 /* Start fuzzing a blob of data with selected strategies (bitmask) */
 struct fuzz *fuzz_begin(u_int strategies, void *p, size_t l);
