@@ -255,4 +255,35 @@ void assert_u64(const char *file, int line,
 #define ASSERT_U64_GE(a1, a2) \
 	assert_u64(__FILE__, __LINE__, #a1, #a2, a1, a2, TEST_GE)
 
+/* Fuzzing support */
+
+struct fuzz;
+enum fuzz_strategy {
+	FUZZ_1_BIT_FLIP,		/* Flip one bit at a time */
+	FUZZ_2_BIT_FLIP,		/* Flip two bits at a time */
+	FUZZ_1_BYTE_FLIP,		/* Flip one byte at a time */
+	FUZZ_2_BYTE_FLIP,		/* Flip two bytes at a time */
+	FUZZ_TRUNCATE_START,		/* Truncate from beginning */
+	FUZZ_TRUNCATE_END,		/* Truncate from end */
+	FUZZ_MAX
+};
+
+/* Start fuzzing a blob of data */
+struct fuzz *fuzz_begin(int strategy, void *p, size_t l);
+
+/* Free a fuzz context */
+void fuzz_cleanup(struct fuzz *fuzz);
+
+/* Prepare the next fuzz case in the series */
+void fuzz_next(struct fuzz *fuzz);
+
+/* Determine whether the current fuzz sequence is exhausted (nonzero = yes) */
+int fuzz_done(struct fuzz *fuzz);
+
+/* Return the length and a pointer to the current fuzzed case */
+size_t fuzz_len(struct fuzz *fuzz);
+u_char *fuzz_buf(struct fuzz *fuzz);
+
+/* Dump the current fuzz case to stderr */
+void fuzz_dump(struct fuzz *fuzz);
 #endif /* _TEST_HELPER_H */

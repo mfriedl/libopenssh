@@ -1,7 +1,7 @@
 #	$OpenBSD$
 
 LIB=	test_helper
-SRCS=	test_helper.c
+SRCS=	test_helper.c fuzz.c
 
 DEBUGLIBS= no
 NOPROFILE= yes
