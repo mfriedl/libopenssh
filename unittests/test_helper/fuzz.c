@@ -29,6 +29,9 @@
 
 #include "test_helper.h"
 
+/* For brevity later */
+typedef unsigned long long fuzz_ullong;
+
 struct fuzz {
 	/* Fuzz method in use */
 	int strategy;
@@ -53,30 +56,34 @@ fuzz_dump(struct fuzz *fuzz)
 
 	switch (fuzz->strategy) {
 	case FUZZ_1_BIT_FLIP:
-		fprintf(stderr, "FUZZ_1_BIT_FLIP case %zu of %zu\n",
-		    fuzz->o1, fuzz->flen * 8);
+		fprintf(stderr, "FUZZ_1_BIT_FLIP case %zu of %zu (bit: %zu)\n",
+		    fuzz->o1, fuzz->flen * 8, fuzz->o1);
 		break;
 	case FUZZ_2_BIT_FLIP:
-		fprintf(stderr, "FUZZ_2_BIT_FLIP case %llu of %llu\n",
-		    ((unsigned long long)fuzz->o1) * fuzz->o2,
-		    ((unsigned long long)fuzz->flen * 8) * fuzz->flen * 8);
+		fprintf(stderr, "FUZZ_2_BIT_FLIP case %llu of %llu "
+		    "(bits: %zu, %zu)\n",
+		    (((fuzz_ullong)fuzz->o2) * fuzz->flen * 8) + fuzz->o1,
+		    ((fuzz_ullong)fuzz->flen * 8) * fuzz->flen * 8,
+		    fuzz->o1, fuzz->o2);
 		break;
 	case FUZZ_1_BYTE_FLIP:
-		fprintf(stderr, "FUZZ_1_BYTE_FLIP case %zu of %zu\n",
-		    fuzz->o1, fuzz->flen);
+		fprintf(stderr, "FUZZ_1_BYTE_FLIP case %zu of %zu "
+		    "(byte: %zu)\n", fuzz->o1, fuzz->flen, fuzz->o1);
 		break;
 	case FUZZ_2_BYTE_FLIP:
-		fprintf(stderr, "FUZZ_2_BYTE_FLIP case %llu of %llu\n",
-		    ((unsigned long long)fuzz->o1) * fuzz->o2,
-		    ((unsigned long long)fuzz->flen) * fuzz->flen);
+		fprintf(stderr, "FUZZ_2_BYTE_FLIP case %llu of %llu "
+		    "(bytes: %zu, %zu)\n",
+		    (((fuzz_ullong)fuzz->o2) * fuzz->flen) + fuzz->o1,
+		    ((fuzz_ullong)fuzz->flen) * fuzz->flen,
+		    fuzz->o1, fuzz->o2);
 		break;
 	case FUZZ_TRUNCATE_START:
-		fprintf(stderr, "FUZZ_TRUNCATE_START case %zu of %zu\n",
-		    fuzz->o1, fuzz->flen);
+		fprintf(stderr, "FUZZ_TRUNCATE_START case %zu of %zu "
+		    "(offset: %zu)\n", fuzz->o1, fuzz->flen, fuzz->o1);
 		break;
 	case FUZZ_TRUNCATE_END:
-		fprintf(stderr, "FUZZ_TRUNCATE_END case %zu of %zu\n",
-		    fuzz->o1, fuzz->flen);
+		fprintf(stderr, "FUZZ_TRUNCATE_END case %zu of %zu "
+		    "(offset: %zu)\n", fuzz->o1, fuzz->flen, fuzz->o1);
 		break;
 	default:
 		abort();
@@ -107,11 +114,14 @@ fuzz_dump(struct fuzz *fuzz)
 struct fuzz *
 fuzz_begin(int strategy, void *p, size_t l)
 {
-	struct fuzz *ret = calloc(sizeof(ret), 1);
+	struct fuzz *ret = calloc(sizeof(*ret), 1);
 
+	assert(p != NULL);
 	assert(ret != NULL);
+	ret->seed = malloc(l);
+	assert(ret->seed != NULL);
 	ret->strategy = strategy;
-	ret->seed = p;
+	memcpy(ret->seed, p, l);
 	ret->slen = l;
 
 	switch (ret->strategy) {
@@ -125,12 +135,24 @@ fuzz_begin(int strategy, void *p, size_t l)
 	case FUZZ_TRUNCATE_END:
 		ret->fuzzed = calloc(ret->slen, 1);
 		assert(ret->fuzzed != NULL);
+		ret->flen = ret->slen;
 		break;
 	default:
 		abort();
 	}
 	fuzz_next(ret);
 	return ret;
+}
+
+void
+fuzz_cleanup(struct fuzz *fuzz)
+{
+	assert(fuzz != NULL);
+	assert(fuzz->seed != NULL);
+	assert(fuzz->fuzzed != NULL);
+	free(fuzz->seed);
+	free(fuzz->fuzzed);
+	free(fuzz);
 }
 
 void
@@ -175,6 +197,7 @@ fuzz_next(struct fuzz *fuzz)
 		memcpy(fuzz->fuzzed, fuzz->seed, fuzz->flen);
 		fuzz->fuzzed[fuzz->o1] ^= 0xff;
 		fuzz->fuzzed[fuzz->o2] ^= 0xff;
+		fuzz->o1++;
 		if (fuzz->o1 >= fuzz->flen) {
 			fuzz->o1 = 0;
 			fuzz->o2++;
@@ -225,7 +248,7 @@ fuzz_len(struct fuzz *fuzz)
 		return fuzz->flen;
 	case FUZZ_TRUNCATE_START:
 	case FUZZ_TRUNCATE_END:
-		assert(fuzz->o1 < fuzz->flen);
+		assert(fuzz->o1 <= fuzz->flen);
 		return fuzz->flen - fuzz->o1;
 	default:
 		abort();
@@ -243,10 +266,10 @@ fuzz_ptr(struct fuzz *fuzz)
 	case FUZZ_2_BYTE_FLIP:
 		return fuzz->fuzzed;
 	case FUZZ_TRUNCATE_START:
-		assert(fuzz->o1 < fuzz->flen);
+		assert(fuzz->o1 <= fuzz->flen);
 		return fuzz->fuzzed + fuzz->o1;
 	case FUZZ_TRUNCATE_END:
-		assert(fuzz->o1 < fuzz->flen);
+		assert(fuzz->o1 <= fuzz->flen);
 		return fuzz->fuzzed;
 	default:
 		abort();
