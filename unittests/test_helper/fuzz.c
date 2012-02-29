@@ -233,7 +233,7 @@ fuzz_len(struct fuzz *fuzz)
 }
 
 u_char *
-fuzz_buf(struct fuzz *fuzz)
+fuzz_ptr(struct fuzz *fuzz)
 {
 	assert(fuzz->fuzzed != NULL);
 	switch (fuzz->strategy) {

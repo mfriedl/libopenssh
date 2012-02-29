@@ -282,7 +282,7 @@ int fuzz_done(struct fuzz *fuzz);
 
 /* Return the length and a pointer to the current fuzzed case */
 size_t fuzz_len(struct fuzz *fuzz);
-u_char *fuzz_buf(struct fuzz *fuzz);
+u_char *fuzz_ptr(struct fuzz *fuzz);
 
 /* Dump the current fuzz case to stderr */
 void fuzz_dump(struct fuzz *fuzz);
