@@ -238,7 +238,7 @@ test_header(const char *file, int line, const char *a1, const char *a2,
 
 void
 assert_bignum(const char *file, int line, const char *a1, const char *a2,
-    BIGNUM *aa1, BIGNUM *aa2, enum test_predicate pred)
+    const BIGNUM *aa1, const BIGNUM *aa2, enum test_predicate pred)
 {
 	int r = BN_cmp(aa1, aa2);
 
