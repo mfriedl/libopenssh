@@ -98,7 +98,7 @@ rsa_params rsa_1 rsa_1.param
 rsa_params rsa_2 rsa_2.param
 dsa_params dsa_1 dsa_1.param
 dsa_params dsa_1 dsa_1.param
-ecdsa_params ecdsa_2 ecdsa_2.param
+ecdsa_params ecdsa_1 ecdsa_1.param
 ecdsa_params ecdsa_2 ecdsa_2.param
 
 ssh-keygen -s rsa_2 -I hugo -n user1,user2 \
