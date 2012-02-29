@@ -48,7 +48,7 @@ struct fuzz {
 void
 fuzz_dump(struct fuzz *fuzz)
 {
-	u_char *p = fuzz_buf(fuzz);
+	u_char *p = fuzz_ptr(fuzz);
 	size_t i, j, len = fuzz_len(fuzz);
 
 	switch (fuzz->strategy) {
