@@ -1,7 +1,7 @@
 #	$OpenBSD$
 
 PROG=test_sshkey
-SRCS=tests.c test_sshkey.c
+SRCS=tests.c test_sshkey.c test_file.c
 REGRESS_TARGETS=run-regress-${PROG}
 
 run-regress-${PROG}: ${PROG}
