@@ -2,6 +2,23 @@
 
 PW=mekmitasdigoat
 
+rsa1_params() {
+	_in="$1"
+	_outbase="$2"
+	set -e
+	ssh-keygen -f $_in -e -m pkcs8 | \
+	    openssl rsa -noout -text -pubin | \
+	    awk '/^Modulus:$/,/^Exponent:/' | \
+	    grep -v '^[a-zA-Z]' | tr -d ' \n:' > ${_outbase}.n
+	# XXX need conversion support in ssh-keygen for the other params
+	for x in n ; do
+		echo "" >> ${_outbase}.$x
+		echo ============ ${_outbase}.$x
+		cat ${_outbase}.$x
+		echo ============
+	done
+}
+
 rsa_params() {
 	_in="$1"
 	_outbase="$2"
@@ -94,6 +111,8 @@ ssh-keygen -pf rsa_1_pw -N "$PW"
 ssh-keygen -pf dsa_1_pw -N "$PW"
 ssh-keygen -pf ecdsa_1_pw -N "$PW"
 
+rsa1_params rsa1_1 rsa1_1.param
+rsa1_params rsa1_2 rsa1_2.param
 rsa_params rsa_1 rsa_1.param
 rsa_params rsa_2 rsa_2.param
 dsa_params dsa_1 dsa_1.param
