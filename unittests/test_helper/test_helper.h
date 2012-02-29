@@ -258,18 +258,16 @@ void assert_u64(const char *file, int line,
 /* Fuzzing support */
 
 struct fuzz;
-enum fuzz_strategy {
-	FUZZ_1_BIT_FLIP,		/* Flip one bit at a time */
-	FUZZ_2_BIT_FLIP,		/* Flip two bits at a time */
-	FUZZ_1_BYTE_FLIP,		/* Flip one byte at a time */
-	FUZZ_2_BYTE_FLIP,		/* Flip two bytes at a time */
-	FUZZ_TRUNCATE_START,		/* Truncate from beginning */
-	FUZZ_TRUNCATE_END,		/* Truncate from end */
-	FUZZ_MAX
-};
+#define FUZZ_1_BIT_FLIP		0x00000001	/* Flip one bit at a time */
+#define FUZZ_2_BIT_FLIP		0x00000002	/* Flip two bits at a time */
+#define FUZZ_1_BYTE_FLIP	0x00000004	/* Flip one byte at a time */
+#define FUZZ_2_BYTE_FLIP	0x00000008	/* Flip two bytes at a time */
+#define FUZZ_TRUNCATE_START	0x00000010	/* Truncate from beginning */
+#define FUZZ_TRUNCATE_END	0x00000020	/* Truncate from end */
+#define FUZZ_MAX		FUZZ_TRUNCATE_END
 
-/* Start fuzzing a blob of data */
-struct fuzz *fuzz_begin(int strategy, void *p, size_t l);
+/* Start fuzzing a blob of data with selected strategies (bitmask) */
+struct fuzz *fuzz_begin(u_int strategies, void *p, size_t l);
 
 /* Free a fuzz context */
 void fuzz_cleanup(struct fuzz *fuzz);

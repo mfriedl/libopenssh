@@ -29,12 +29,28 @@
 
 #include "test_helper.h"
 
+/* #define FUZZ_DEBUG */
+
+#ifdef FUZZ_DEBUG
+# define FUZZ_DBG(x) do { \
+		printf("%s:%d %s: ", __FILE__, __LINE__, __func__); \
+		printf x; \
+		printf("\n"); \
+		fflush(stdout); \
+	} while (0)
+#else
+# define FUZZ_DBG(x)
+#endif
+
 /* For brevity later */
 typedef unsigned long long fuzz_ullong;
 
 struct fuzz {
-	/* Fuzz method in use */
+	/* Fuzz method currently in use */
 	int strategy;
+
+	/* Fuzz methods remaining */
+	int strategies;
 
 	/* Original seed data blob */
 	void *seed;
@@ -42,11 +58,33 @@ struct fuzz {
 
 	/* Current working copy of seed with fuzz mutations applied */
 	u_char *fuzzed;
-	size_t flen;
 
 	/* Used by fuzz methods */
 	size_t o1, o2;
 };
+
+static const char *
+fuzz_ntop(u_int n)
+{
+	switch (n) {
+	case 0:
+		return "NONE";
+	case FUZZ_1_BIT_FLIP:
+		return "FUZZ_1_BIT_FLIP";
+	case FUZZ_2_BIT_FLIP:
+		return "FUZZ_2_BIT_FLIP";
+	case FUZZ_1_BYTE_FLIP:
+		return "FUZZ_1_BYTE_FLIP";
+	case FUZZ_2_BYTE_FLIP:
+		return "FUZZ_2_BYTE_FLIP";
+	case FUZZ_TRUNCATE_START:
+		return "FUZZ_TRUNCATE_START";
+	case FUZZ_TRUNCATE_END:
+		return "FUZZ_TRUNCATE_END";
+	default:
+		abort();
+	}
+}
 
 void
 fuzz_dump(struct fuzz *fuzz)
@@ -56,34 +94,38 @@ fuzz_dump(struct fuzz *fuzz)
 
 	switch (fuzz->strategy) {
 	case FUZZ_1_BIT_FLIP:
-		fprintf(stderr, "FUZZ_1_BIT_FLIP case %zu of %zu (bit: %zu)\n",
-		    fuzz->o1, fuzz->flen * 8, fuzz->o1);
+		fprintf(stderr, "%s case %zu of %zu (bit: %zu)\n",
+		    fuzz_ntop(fuzz->strategy),
+		    fuzz->o1, fuzz->slen * 8, fuzz->o1);
 		break;
 	case FUZZ_2_BIT_FLIP:
-		fprintf(stderr, "FUZZ_2_BIT_FLIP case %llu of %llu "
-		    "(bits: %zu, %zu)\n",
-		    (((fuzz_ullong)fuzz->o2) * fuzz->flen * 8) + fuzz->o1,
-		    ((fuzz_ullong)fuzz->flen * 8) * fuzz->flen * 8,
+		fprintf(stderr, "%s case %llu of %llu (bits: %zu, %zu)\n",
+		    fuzz_ntop(fuzz->strategy),
+		    (((fuzz_ullong)fuzz->o2) * fuzz->slen * 8) + fuzz->o1,
+		    ((fuzz_ullong)fuzz->slen * 8) * fuzz->slen * 8,
 		    fuzz->o1, fuzz->o2);
 		break;
 	case FUZZ_1_BYTE_FLIP:
-		fprintf(stderr, "FUZZ_1_BYTE_FLIP case %zu of %zu "
-		    "(byte: %zu)\n", fuzz->o1, fuzz->flen, fuzz->o1);
+		fprintf(stderr, "%s case %zu of %zu (byte: %zu)\n",
+		    fuzz_ntop(fuzz->strategy),
+		    fuzz->o1, fuzz->slen, fuzz->o1);
 		break;
 	case FUZZ_2_BYTE_FLIP:
-		fprintf(stderr, "FUZZ_2_BYTE_FLIP case %llu of %llu "
-		    "(bytes: %zu, %zu)\n",
-		    (((fuzz_ullong)fuzz->o2) * fuzz->flen) + fuzz->o1,
-		    ((fuzz_ullong)fuzz->flen) * fuzz->flen,
+		fprintf(stderr, "%s case %llu of %llu (bytes: %zu, %zu)\n",
+		    fuzz_ntop(fuzz->strategy),
+		    (((fuzz_ullong)fuzz->o2) * fuzz->slen) + fuzz->o1,
+		    ((fuzz_ullong)fuzz->slen) * fuzz->slen,
 		    fuzz->o1, fuzz->o2);
 		break;
 	case FUZZ_TRUNCATE_START:
-		fprintf(stderr, "FUZZ_TRUNCATE_START case %zu of %zu "
-		    "(offset: %zu)\n", fuzz->o1, fuzz->flen, fuzz->o1);
+		fprintf(stderr, "%s case %zu of %zu (offset: %zu)\n",
+		    fuzz_ntop(fuzz->strategy),
+		    fuzz->o1, fuzz->slen, fuzz->o1);
 		break;
 	case FUZZ_TRUNCATE_END:
-		fprintf(stderr, "FUZZ_TRUNCATE_END case %zu of %zu "
-		    "(offset: %zu)\n", fuzz->o1, fuzz->flen, fuzz->o1);
+		fprintf(stderr, "%s case %zu of %zu (offset: %zu)\n",
+		    fuzz_ntop(fuzz->strategy),
+		    fuzz->o1, fuzz->slen, fuzz->o1);
 		break;
 	default:
 		abort();
@@ -112,7 +154,7 @@ fuzz_dump(struct fuzz *fuzz)
 }
 
 struct fuzz *
-fuzz_begin(int strategy, void *p, size_t l)
+fuzz_begin(u_int strategies, void *p, size_t l)
 {
 	struct fuzz *ret = calloc(sizeof(*ret), 1);
 
@@ -120,26 +162,15 @@ fuzz_begin(int strategy, void *p, size_t l)
 	assert(ret != NULL);
 	ret->seed = malloc(l);
 	assert(ret->seed != NULL);
-	ret->strategy = strategy;
 	memcpy(ret->seed, p, l);
 	ret->slen = l;
+	ret->strategies = strategies;
 
-	switch (ret->strategy) {
-	case FUZZ_1_BIT_FLIP:
-	case FUZZ_2_BIT_FLIP:
-		assert(ret->slen < SIZE_MAX / 8);
-		/* FALLTHROUGH */
-	case FUZZ_1_BYTE_FLIP:
-	case FUZZ_2_BYTE_FLIP:
-	case FUZZ_TRUNCATE_START:
-	case FUZZ_TRUNCATE_END:
-		ret->fuzzed = calloc(ret->slen, 1);
-		assert(ret->fuzzed != NULL);
-		ret->flen = ret->slen;
-		break;
-	default:
-		abort();
-	}
+	assert(ret->slen < SIZE_MAX / 8);
+	assert(ret->strategies <= (FUZZ_MAX|(FUZZ_MAX-1)));
+
+	FUZZ_DBG(("begin, ret = %p", ret));
+
 	fuzz_next(ret);
 	return ret;
 }
@@ -147,6 +178,7 @@ fuzz_begin(int strategy, void *p, size_t l)
 void
 fuzz_cleanup(struct fuzz *fuzz)
 {
+	FUZZ_DBG(("cleanup, fuzz = %p", fuzz));
 	assert(fuzz != NULL);
 	assert(fuzz->seed != NULL);
 	assert(fuzz->fuzzed != NULL);
@@ -155,85 +187,122 @@ fuzz_cleanup(struct fuzz *fuzz)
 	free(fuzz);
 }
 
-void
-fuzz_next(struct fuzz *fuzz)
+static int
+fuzz_strategy_done(struct fuzz *fuzz)
 {
+	FUZZ_DBG(("fuzz = %p, strategy = %s, o1 = %zu, o2 = %zu, slen = %zu",
+	    fuzz, fuzz_ntop(fuzz->strategy), fuzz->o1, fuzz->o2, fuzz->slen));
+
 	switch (fuzz->strategy) {
 	case FUZZ_1_BIT_FLIP:
-		assert(fuzz->flen == fuzz->slen);
-		assert(fuzz->fuzzed != NULL);
-		assert(fuzz->o1 / 8 < fuzz->flen);
-		memcpy(fuzz->fuzzed, fuzz->seed, fuzz->flen);
-		fuzz->fuzzed[fuzz->o1 / 8] ^= 1 << (fuzz->o1 % 8);
-		fuzz->o1++;
-		break;
+		return fuzz->o1 >= fuzz->slen * 8;
 	case FUZZ_2_BIT_FLIP:
-		assert(fuzz->flen == fuzz->slen);
-		assert(fuzz->fuzzed != NULL);
-		assert(fuzz->o1 / 8 < fuzz->flen);
-		assert(fuzz->o2 / 8 < fuzz->flen);
-		memcpy(fuzz->fuzzed, fuzz->seed, fuzz->flen);
-		fuzz->fuzzed[fuzz->o1 / 8] ^= 1 << (fuzz->o1 % 8);
-		fuzz->fuzzed[fuzz->o2 / 8] ^= 1 << (fuzz->o2 % 8);
-		fuzz->o1++;
-		if (fuzz->o1 >= fuzz->flen * 8) {
-			fuzz->o1 = 0;
-			fuzz->o2++;
-		}
-		break;
+		return fuzz->o2 >= fuzz->slen * 8;
 	case FUZZ_1_BYTE_FLIP:
-		assert(fuzz->flen == fuzz->slen);
-		assert(fuzz->fuzzed != NULL);
-		assert(fuzz->o1 < fuzz->flen);
-		memcpy(fuzz->fuzzed, fuzz->seed, fuzz->flen);
-		fuzz->fuzzed[fuzz->o1] ^= 0xff;
-		fuzz->o1++;
-		break;
+		return fuzz->o1 >= fuzz->slen;
 	case FUZZ_2_BYTE_FLIP:
-		assert(fuzz->flen == fuzz->slen);
-		assert(fuzz->fuzzed != NULL);
-		assert(fuzz->o1 < fuzz->flen);
-		assert(fuzz->o2 < fuzz->flen);
-		memcpy(fuzz->fuzzed, fuzz->seed, fuzz->flen);
-		fuzz->fuzzed[fuzz->o1] ^= 0xff;
-		fuzz->fuzzed[fuzz->o2] ^= 0xff;
-		fuzz->o1++;
-		if (fuzz->o1 >= fuzz->flen) {
-			fuzz->o1 = 0;
-			fuzz->o2++;
-		}
-		break;
+		return fuzz->o2 >= fuzz->slen;
 	case FUZZ_TRUNCATE_START:
 	case FUZZ_TRUNCATE_END:
-		assert(fuzz->flen == fuzz->slen);
-		assert(fuzz->fuzzed != NULL);
-		assert(fuzz->o1 < fuzz->flen);
-		memcpy(fuzz->fuzzed, fuzz->seed, fuzz->flen);
-		fuzz->o1++;
-		break;
+		return fuzz->o1 >= fuzz->slen;
 	default:
 		abort();
 	}
 }
 
-int
-fuzz_done(struct fuzz *fuzz)
+void
+fuzz_next(struct fuzz *fuzz)
 {
+	u_int i;
+
+	FUZZ_DBG(("start, fuzz = %p, strategy = %s, strategies = 0x%lx, "
+	    "o1 = %zu, o2 = %zu, slen = %zu", fuzz, fuzz_ntop(fuzz->strategy),
+	    (u_long)fuzz->strategies, fuzz->o1, fuzz->o2, fuzz->slen));
+
+	if (fuzz->strategy == 0 || fuzz_strategy_done(fuzz)) {
+		/* If we are just starting out, we need to allocate too */
+		if (fuzz->fuzzed == NULL) {
+			FUZZ_DBG(("alloc"));
+			fuzz->fuzzed = calloc(fuzz->slen, 1);
+		}
+		/* Pick next strategy */
+		FUZZ_DBG(("advance"));
+		for (i = 1; i <= FUZZ_MAX; i <<= 1) {
+			if ((fuzz->strategies & i) != 0) {
+				fuzz->strategy = i;
+				break;
+			}
+		}
+		FUZZ_DBG(("selected = %u", fuzz->strategy));
+		if (fuzz->strategy == 0) {
+			FUZZ_DBG(("done, no more strategies"));
+			return;
+		}
+		fuzz->strategies &= ~(fuzz->strategy);
+		fuzz->o1 = fuzz->o2 = 0;
+	}
+
+	assert(fuzz->fuzzed != NULL);
+
 	switch (fuzz->strategy) {
 	case FUZZ_1_BIT_FLIP:
-		return fuzz->o1 >= fuzz->flen * 8;
+		assert(fuzz->o1 / 8 < fuzz->slen);
+		memcpy(fuzz->fuzzed, fuzz->seed, fuzz->slen);
+		fuzz->fuzzed[fuzz->o1 / 8] ^= 1 << (fuzz->o1 % 8);
+		fuzz->o1++;
+		break;
 	case FUZZ_2_BIT_FLIP:
-		return fuzz->o2 >= fuzz->flen * 8;
+		assert(fuzz->o1 / 8 < fuzz->slen);
+		assert(fuzz->o2 / 8 < fuzz->slen);
+		memcpy(fuzz->fuzzed, fuzz->seed, fuzz->slen);
+		fuzz->fuzzed[fuzz->o1 / 8] ^= 1 << (fuzz->o1 % 8);
+		fuzz->fuzzed[fuzz->o2 / 8] ^= 1 << (fuzz->o2 % 8);
+		fuzz->o1++;
+		if (fuzz->o1 >= fuzz->slen * 8) {
+			fuzz->o1 = 0;
+			fuzz->o2++;
+		}
+		break;
 	case FUZZ_1_BYTE_FLIP:
-		return fuzz->o1 >= fuzz->flen;
+		assert(fuzz->o1 < fuzz->slen);
+		memcpy(fuzz->fuzzed, fuzz->seed, fuzz->slen);
+		fuzz->fuzzed[fuzz->o1] ^= 0xff;
+		fuzz->o1++;
+		break;
 	case FUZZ_2_BYTE_FLIP:
-		return fuzz->o2 >= fuzz->flen;
+		assert(fuzz->o1 < fuzz->slen);
+		assert(fuzz->o2 < fuzz->slen);
+		memcpy(fuzz->fuzzed, fuzz->seed, fuzz->slen);
+		fuzz->fuzzed[fuzz->o1] ^= 0xff;
+		fuzz->fuzzed[fuzz->o2] ^= 0xff;
+		fuzz->o1++;
+		if (fuzz->o1 >= fuzz->slen) {
+			fuzz->o1 = 0;
+			fuzz->o2++;
+		}
+		break;
 	case FUZZ_TRUNCATE_START:
 	case FUZZ_TRUNCATE_END:
-		return fuzz->o1 >= fuzz->flen;
+		assert(fuzz->o1 < fuzz->slen);
+		memcpy(fuzz->fuzzed, fuzz->seed, fuzz->slen);
+		fuzz->o1++;
+		break;
 	default:
 		abort();
 	}
+
+	FUZZ_DBG(("done, fuzz = %p, strategy = %s, strategies = 0x%lx, "
+	    "o1 = %zu, o2 = %zu, slen = %zu", fuzz, fuzz_ntop(fuzz->strategy),
+	    (u_long)fuzz->strategies, fuzz->o1, fuzz->o2, fuzz->slen));
+}
+
+int
+fuzz_done(struct fuzz *fuzz)
+{
+	FUZZ_DBG(("fuzz = %p, strategies = 0x%lx", fuzz,
+	    (u_long)fuzz->strategies));
+
+	return fuzz_strategy_done(fuzz) && fuzz->strategies == 0;
 }
 
 size_t
@@ -245,11 +314,11 @@ fuzz_len(struct fuzz *fuzz)
 	case FUZZ_2_BIT_FLIP:
 	case FUZZ_1_BYTE_FLIP:
 	case FUZZ_2_BYTE_FLIP:
-		return fuzz->flen;
+		return fuzz->slen;
 	case FUZZ_TRUNCATE_START:
 	case FUZZ_TRUNCATE_END:
-		assert(fuzz->o1 <= fuzz->flen);
-		return fuzz->flen - fuzz->o1;
+		assert(fuzz->o1 <= fuzz->slen);
+		return fuzz->slen - fuzz->o1;
 	default:
 		abort();
 	}
@@ -266,10 +335,10 @@ fuzz_ptr(struct fuzz *fuzz)
 	case FUZZ_2_BYTE_FLIP:
 		return fuzz->fuzzed;
 	case FUZZ_TRUNCATE_START:
-		assert(fuzz->o1 <= fuzz->flen);
+		assert(fuzz->o1 <= fuzz->slen);
 		return fuzz->fuzzed + fuzz->o1;
 	case FUZZ_TRUNCATE_END:
-		assert(fuzz->o1 <= fuzz->flen);
+		assert(fuzz->o1 <= fuzz->slen);
 		return fuzz->fuzzed;
 	default:
 		abort();
