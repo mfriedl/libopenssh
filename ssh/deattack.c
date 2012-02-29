@@ -26,6 +26,7 @@
 #include "deattack.h"
 #include "crc32.h"
 #include "sshbuf.h"
+#include "misc.h"
 
 /*
  * CRC attack detection has a worst-case behaviour that is O(N^3) over
@@ -115,8 +116,7 @@ detect_attack(u_char *buf, u_int32_t len)
 		n = l;
 	} else {
 		if (l > n) {
-			if (l == 0 || SIZE_T_MAX / l < HASH_ENTRYSIZE ||
-			   (tmp = realloc(h, l * HASH_ENTRYSIZE)) == NULL) {
+			if ((tmp = reallocn(h, l, HASH_ENTRYSIZE)) == NULL) {
 				free(h);
 				return DEATTACK_ERROR;
 			}

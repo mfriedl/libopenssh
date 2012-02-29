@@ -977,3 +977,19 @@ iptos2str(int iptos)
 	snprintf(iptos_str, sizeof iptos_str, "0x%02x", iptos);
 	return iptos_str;
 }
+
+void *
+reallocn(void *ptr, size_t nmemb, size_t size)
+{
+	void *new_ptr;
+	size_t new_size = nmemb * size;
+
+	if (new_size == 0 ||
+	    SIZE_T_MAX / nmemb < size)
+		return NULL;
+	if (ptr == NULL)
+		new_ptr = malloc(new_size);
+	else
+		new_ptr = realloc(ptr, new_size);
+	return new_ptr;
+}
