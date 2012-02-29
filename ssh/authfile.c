@@ -282,7 +282,7 @@ sshkey_save_private(struct sshkey *key, const char *filename,
 /*
  * Parse the public, unencrypted portion of a RSA1 key.
  */
-static int
+int
 sshkey_parse_public_rsa1(struct sshbuf *blob,
     struct sshkey **keyp, char **commentp)
 {

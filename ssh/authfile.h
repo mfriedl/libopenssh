@@ -24,6 +24,8 @@ int sshkey_load_file(int, const char *, struct sshbuf *);
 int sshkey_load_cert(const char *, struct sshkey **);
 int sshkey_load_public(const char *, struct sshkey **, char **);
 int sshkey_load_public_type(int, const char *, struct sshkey **, char **);
+int sshkey_parse_public_rsa1(struct sshbuf *blob, struct sshkey **keyp,
+    char **commentp);
 int sshkey_parse_private(struct sshbuf *, const char *, const char *,
     struct sshkey **, char **);
 int sshkey_load_private(const char *, const char *, struct sshkey **, char **);
