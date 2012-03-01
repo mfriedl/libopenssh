@@ -31,6 +31,12 @@ int	ssh_init(struct ssh **, int is_server, struct kex_params *kex_params);
 void	ssh_free(struct ssh *);
 
 /*
+ * attach application specific data to the connection state
+ */
+void	ssh_set_app_data(struct ssh *, void *);
+void	*ssh_get_app_data(struct ssh *);
+
+/*
  * ssh_add_hostkey() registers a private/public hostkey for an ssh
  * connection.
  * ssh_add_hostkey() needs to be called before a key exchange is

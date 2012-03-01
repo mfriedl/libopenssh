@@ -45,6 +45,9 @@ struct ssh {
 	/* Authentication context */
 	void *authctxt;
 
+	/* Application specific data */
+	void *app_data;
+
 	/* Key exchange */
 	Kex *kex;
 	Newkeys *current_keys[MODE_MAX];

@@ -102,6 +102,18 @@ ssh_free(struct ssh *ssh)
 	free(ssh);
 }
 
+void
+ssh_set_app_data(struct ssh *ssh, void *app_data)
+{
+	ssh->app_data = app_data;
+}
+
+void *
+ssh_get_app_data(struct ssh *ssh)
+{
+	return ssh->app_data;
+}
+
 /* Returns < 0 on error, 0 otherwise */
 int
 ssh_add_hostkey(struct ssh *ssh, struct sshkey *key)

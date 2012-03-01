@@ -40,6 +40,7 @@
 #include "misc.h"
 #include "hostfile.h"
 #include "err.h"
+#include "ssh_api.h"
 
 /* Flag indicating whether IPv4 or IPv6.  This can be set on the command line.
    Default value is AF_UNSPEC means both IPv4 and IPv6. */
@@ -208,13 +209,8 @@ key_print_wrapper(struct sshkey *hostkey, struct ssh *ssh)
 {
 	con *c;
 
-	TAILQ_FOREACH(c, &tq, c_link) {
-		if (c->c_ssh == ssh) {
-			keyprint(c, hostkey);
-			c->c_done = 1;
-			break;
-		}
-	}
+	if ((c = ssh_get_app_data(ssh)) != NULL)
+		keyprint(c, hostkey);
 	/* always abort key exchange */
 	return -1;
 }
@@ -254,7 +250,7 @@ keygrab_ssh2(con *c)
 	c->c_ssh->kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
 	c->c_ssh->kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
 	c->c_ssh->kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
-	c->c_ssh->kex->verify_host_key = key_print_wrapper;
+	ssh_set_verify_host_key_callback(c->c_ssh, key_print_wrapper);
 	/*
 	 * do the key-exchange until an error occurs or until
 	 * the key_print_wrapper() callback sets c_done.
@@ -434,6 +430,7 @@ congreet(int s)
 	}
 	*cp = '\0';
 	c->c_ssh = ssh_packet_set_connection(NULL, s, s);
+	ssh_set_app_data(c->c_ssh, c);	/* back link */
 	if (sscanf(buf, "SSH-%d.%d-%[^\n]\n",
 	    &remote_major, &remote_minor, remote_version) == 3)
 		c->c_ssh->compat = compat_datafellows(remote_version);
