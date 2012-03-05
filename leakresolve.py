@@ -83,8 +83,14 @@ class LeakTracker:
 	def __str__(self):
 		s = "Memory leaks\n"
 		s+= "------------\n"
+		total_leaks = 0
+		total_bytes = 0
 		for trace in sorted(self.leaks.keys(), cmp=self._leakcmp):
 			s += str(self.leaks[trace]) + "\n"
+			total_leaks += 1
+			total_bytes += self.leaks[trace].nbytes
+		s+= "\nTotal: %d leaks containing %d bytes\n" % \
+		    (total_leaks, total_bytes)
 		return s
 
 def main():
