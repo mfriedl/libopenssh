@@ -99,6 +99,7 @@
 extern char *__progname;
 
 static int verbose_mode = 0;
+static int quiet_mode = 0;
 static char *active_test_name = NULL;
 static u_int test_number = 0;
 static test_onerror_func_t *test_onerror = NULL;
@@ -110,13 +111,18 @@ main(int argc, char **argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "vd:")) != -1) {
+	while ((ch = getopt(argc, argv, "vqd:")) != -1) {
 		switch (ch) {
 		case 'd':
 			data_dir = optarg;
 			break;
+		case 'q':
+			verbose_mode = 0;
+			quiet_mode = 1;
+			break;
 		case 'v':
 			verbose_mode = 1;
+			quiet_mode = 0;
 			break;
 		default:
 			fprintf(stderr, "Unrecognised command line option\n");
@@ -125,13 +131,15 @@ main(int argc, char **argv)
 		}
 	}
 	setvbuf(stdout, NULL, _IONBF, 0);
-	printf("%s: ", __progname);
+	if (!quiet_mode)
+		printf("%s: ", __progname);
 	if (verbose_mode)
 		printf("\n");
 
 	tests();
 
-	printf(" %u tests ok\n", test_number);
+	if (!quiet_mode)
+		printf(" %u tests ok\n", test_number);
 	return 0;
 }
 
@@ -177,7 +185,7 @@ test_done(void)
 	active_test_name = NULL;
 	if (verbose_mode)
 		printf("OK\n");
-	else {
+	else if (!quiet_mode) {
 		printf(".");
 		fflush(stdout);
 	}
