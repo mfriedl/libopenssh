@@ -116,7 +116,7 @@ __record_leak(void *addr, size_t len, void *oaddr)
 		 * and fill in the trace.
 		 */
 		if (addr == NULL)
-			return;		/* alloc failed */
+			return;		/* alloc failed or free(NULL) */
 		alloc = new_alloc(addr, len);
 		if (RB_INSERT(alloc_tree, &alloc_tree, alloc) != NULL) {
 			internal_error(alloc);
