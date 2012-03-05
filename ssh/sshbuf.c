@@ -46,7 +46,8 @@ sshbuf_maybe_pack(struct sshbuf *buf, int force)
 {
 	SSHBUF_DBG(("force %d", force));
 	SSHBUF_TELL("pre-pack");
-	if (force || (buf->off >= SSHBUF_PACK_MIN && buf->off >= buf->size / 2)) {
+	if (force ||
+	    (buf->off >= SSHBUF_PACK_MIN && buf->off >= buf->size / 2)) {
 		memmove(buf->d, buf->d + buf->off, buf->size - buf->off);
 		buf->size -= buf->off;
 		buf->off = 0;
@@ -63,6 +64,7 @@ sshbuf_new(void)
 		return NULL;
 	ret->alloc = SSHBUF_SIZE_INIT;
 	ret->max_size = SSHBUF_SIZE_MAX;
+	ret->freeme = 1;
 	if ((ret->d = calloc(1, ret->alloc)) == NULL) {
 		free(ret);
 		return NULL;
