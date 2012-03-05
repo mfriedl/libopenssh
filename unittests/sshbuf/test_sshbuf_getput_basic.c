@@ -284,6 +284,7 @@ sshbuf_getput_basic_tests(void)
 	ASSERT_SIZE_T_EQ(s, sizeof(x));
 	ASSERT_MEM_EQ(d, x, sizeof(x));
 	ASSERT_SIZE_T_EQ(sshbuf_len(p1), 4);
+	free(d);
 	sshbuf_free(p1);
 	TEST_DONE();
 
