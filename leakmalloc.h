@@ -18,6 +18,8 @@
 #define _LEAKMALLOC_H
 
 #include <sys/types.h>
+#include <stdlib.h>
+#include <string.h>
 
 char *leak_strdup(const char *s);
 void *leak_malloc(size_t len);
