@@ -40,55 +40,89 @@ struct alloc {
 static int
 alloc_cmp(struct alloc *a, struct alloc *b)
 {
-	return (a->addr == b->addr) ? 0 : (a->addr < b->addr ? -1 : 1);
+	if (a->addr == b->addr)
+		return 0;
+	if (a->addr > b->addr)
+		return 1;
+	else
+		return -1;
 }
 
 RB_HEAD(alloc_tree, alloc);
 RB_GENERATE_STATIC(alloc_tree, alloc, entry, alloc_cmp);
 static struct alloc_tree alloc_tree = RB_INITIALIZER(&alloc_tree);
 
+static void
+dump_leak(struct alloc *alloc)
+{
+	int i;
+
+	printf("LEAK %p %zu TRACE", alloc->addr, alloc->len);
+	for (i = 1; i < alloc->depth; i++)
+		printf(" %p", alloc->bt[i]);
+	printf("\n");
+}
+
 /* Called atexit to dump unfreed leak objects */
 static void
 dump_leaks(void)
 {
 	struct alloc *alloc;
-	int i;
 
-	RB_FOREACH(alloc, alloc_tree, &alloc_tree) {
-		printf("LEAK %p %zu TRACE", alloc->addr, alloc->len);
-		for (i = 0; i < alloc->depth; i++)
-			printf(" %p", alloc->bt[i]);
-		printf("\n");
-	}
+	if (initialised != 1)
+		return;
+	RB_FOREACH(alloc, alloc_tree, &alloc_tree)
+		dump_leak(alloc);
 }
 
-void __record_leak(void *addr, size_t len, void *oaddr);
-void
+static void
+internal_error(struct alloc *alloc)
+{
+	alloc->addr = NULL;
+	alloc->len = -1;
+	dump_leak(alloc);
+	initialised = -1;
+}
+
+static struct alloc *
+new_alloc(void *addr, size_t len)
+{
+	struct alloc *alloc;
+
+	if ((alloc = calloc(1, sizeof(*alloc))) == NULL)
+		errx(1, "%s: calloc failed", __func__);	
+	alloc->addr = addr;
+	alloc->len = len;
+	if ((alloc->depth = backtrace(alloc->bt, BT_MAX_DEPTH)) == -1)
+		errx(1, "%s: backtrace failed", __func__);
+	return alloc;
+}
+
+static void
 __record_leak(void *addr, size_t len, void *oaddr)
 {
 	struct alloc oalloc, *alloc;
 
-	if (!initialised) {
+	if (initialised == -1)
+		return;
+	else if (initialised == 0) {
 		atexit(dump_leaks);
 		initialised = 1;
 	}
 
-	if (addr == NULL || addr == oaddr)
-		return;
 	if (oaddr == NULL) {
 		/*
-		 * malloc/calloc: allocate a leak object and fill in the
-		 * trace.
+		 * malloc/calloc/realloc(NULL,...): allocate a leak object
+		 * and fill in the trace.
 		 */
-		if ((alloc = calloc(1, sizeof(*alloc))) == NULL)
-			errx(1, "%s: calloc failed", __func__);	
-		alloc->addr = addr;
-		alloc->len = len;
-		if ((alloc->depth = backtrace(alloc->bt, BT_MAX_DEPTH)) == -1)
-			errx(1, "%s: backtrace failed", __func__);
-		if (RB_INSERT(alloc_tree, &alloc_tree, alloc) != NULL)
+		if (addr == NULL)
+			return;		/* alloc failed */
+		alloc = new_alloc(addr, len);
+		if (RB_INSERT(alloc_tree, &alloc_tree, alloc) != NULL) {
+			internal_error(alloc);
 			errx(1, "%s: alloc for %p already exists",
 			    __func__, addr);
+		}
 	} else {
 		oalloc.addr = oaddr;
 		alloc = RB_FIND(alloc_tree, &alloc_tree, &oalloc);
@@ -105,10 +139,20 @@ __record_leak(void *addr, size_t len, void *oaddr)
 			 * realloc: update the original address so we can 
 			 * trace it when it is freed.
 			 */
-			if (alloc == NULL)
-				errx(1, "%s: original addr missing", __func__);
+			if (alloc == NULL) {
+				alloc = new_alloc(NULL, -1);
+				internal_error(alloc);
+				errx(1, "%s: realloc original addr %p missing",
+				    __func__, oaddr);
+			}
+			RB_REMOVE(alloc_tree, &alloc_tree, alloc);
 			alloc->addr = addr;
 			alloc->len = len;
+			if (RB_INSERT(alloc_tree, &alloc_tree, alloc) != NULL) {
+				internal_error(alloc);
+				errx(1, "%s: alloc for %p already exists",
+				    __func__, addr);
+			}
 		}
 	}
 }
