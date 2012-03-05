@@ -530,6 +530,7 @@ ssh_packet_close(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
 	int r;
+	u_int mode;
 
 	if (!state->initialized)
 		return;
@@ -545,6 +546,8 @@ ssh_packet_close(struct ssh *ssh)
 	sshbuf_free(state->output);
 	sshbuf_free(state->outgoing_packet);
 	sshbuf_free(state->incoming_packet);
+	for (mode = 0; mode < MODE_MAX; mode++)
+		kex_free_newkeys(state->newkeys[mode]);
 	if (state->compression_buffer) {
 		sshbuf_free(state->compression_buffer);
 		if (ssh->state->compression_out_started) {

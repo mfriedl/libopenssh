@@ -101,7 +101,7 @@ do_kex_with_key(char *kex, int key_type, int bits)
 	ASSERT_INT_EQ(ssh_add_hostkey(client, public), 0);
 	TEST_DONE();
 
-	TEST_START(kex);
+	TEST_START("kex");
 	run_kex(client, server);
 	TEST_DONE();
 
@@ -147,6 +147,12 @@ do_kex_with_key(char *kex, int key_type, int bits)
 	run_kex(client, server2);
 	ASSERT_INT_EQ(kex_send_kexinit(client), 0);
 	run_kex(client, server2);
+	TEST_DONE();
+
+	TEST_START("cleanup");
+	ssh_free(client);
+	ssh_free(server);
+	ssh_free(server2);
 	TEST_DONE();
 }
 

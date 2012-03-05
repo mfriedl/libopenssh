@@ -311,8 +311,41 @@ kex_new(struct ssh *ssh, char *proposal[PROPOSAL_MAX], Kex **kexp)
 }
 
 void
+kex_free_newkeys(Newkeys *newkeys)
+{
+	if (newkeys == NULL)
+		return;
+	if (newkeys->enc.key) {
+		bzero(newkeys->enc.key, newkeys->enc.key_len);
+		free(newkeys->enc.key);
+		newkeys->enc.key = NULL;
+	}
+	if (newkeys->enc.iv) {
+		bzero(newkeys->enc.iv, newkeys->enc.block_size);
+		free(newkeys->enc.iv);
+		newkeys->enc.iv = NULL;
+	}
+	free(newkeys->enc.name);
+	bzero(&newkeys->enc, sizeof(newkeys->enc));
+	free(newkeys->comp.name);
+	bzero(&newkeys->comp, sizeof(newkeys->comp));
+	mac_clear(&newkeys->mac);
+	if (newkeys->mac.key) {
+		bzero(newkeys->mac.key, newkeys->mac.key_len);
+		free(newkeys->mac.key);
+		newkeys->mac.key = NULL;
+	}
+	free(newkeys->mac.name);
+	bzero(&newkeys->mac, sizeof(newkeys->mac));
+	bzero(newkeys, sizeof(*newkeys));
+	free(newkeys);
+}
+
+void
 kex_free(Kex *kex)
 {
+	u_int mode;
+
 	if (kex->peer != NULL)
 		sshbuf_free(kex->peer);
 	if (kex->my != NULL)
@@ -321,6 +354,10 @@ kex_free(Kex *kex)
 		DH_free(kex->dh);
 	if (kex->ec_client_key)
 		EC_KEY_free(kex->ec_client_key);
+	for (mode = 0; mode < MODE_MAX; mode++) {
+		kex_free_newkeys(kex->newkeys[mode]);
+		kex->newkeys[mode] = NULL;
+	}
 	free(kex);
 }
 
@@ -610,7 +647,7 @@ derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
 	r = 0;
  out:
 	if (digest)
-		free (digest);
+		free(digest);
 	if (b)
 		sshbuf_free(b);
 	return r;
@@ -635,6 +672,7 @@ kex_derive_keys(struct ssh *ssh, u_char *hash, u_int hashlen,
 		}
 	}
 	for (mode = 0; mode < MODE_MAX; mode++) {
+		kex_free_newkeys(ssh->current_keys[mode]);
 		ssh->current_keys[mode] = kex->newkeys[mode];
 		kex->newkeys[mode] = NULL;
 		ctos = (!kex->server && mode == MODE_OUT) ||

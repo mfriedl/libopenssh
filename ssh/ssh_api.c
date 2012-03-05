@@ -96,9 +96,15 @@ ssh_init(struct ssh **sshp, int is_server, struct kex_params *kex_params)
 void
 ssh_free(struct ssh *ssh)
 {
+	u_int mode;
+
 	ssh_packet_close(ssh);
-	if (ssh->kex);
+	if (ssh->kex)
 		kex_free(ssh->kex);
+	for (mode = 0; mode < MODE_MAX; mode++) {
+		kex_free_newkeys(ssh->current_keys[mode]);
+		ssh->current_keys[mode] = NULL;
+	}
 	free(ssh);
 }
 
