@@ -76,6 +76,9 @@ class LeakTracker:
 			self.leaks[trace] = leak
 		self.leaks[trace].leak(nbytes)
 	def _leakcmp(self, a, b):
+		r = cmp(self.leaks[a].nleaks, self.leaks[b].nleaks)
+		if r:
+			return r
 		return cmp(self.leaks[a].nbytes, self.leaks[b].nbytes)
 	def __str__(self):
 		s = "Memory leaks\n"
