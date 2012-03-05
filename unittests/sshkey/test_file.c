@@ -78,6 +78,7 @@ sshkey_file_tests(void)
 	ASSERT_PTR_NE(cp, NULL);
 	ASSERT_STRING_EQ(cp, sshbuf_ptr(buf));
 	sshbuf_free(buf);
+	free(cp);
 	TEST_DONE();
 
 	TEST_START("RSA key bubblebabble fingerprint");
@@ -86,6 +87,7 @@ sshkey_file_tests(void)
 	ASSERT_PTR_NE(cp, NULL);
 	ASSERT_STRING_EQ(cp, sshbuf_ptr(buf));
 	sshbuf_free(buf);
+	free(cp);
 	TEST_DONE();
 
 	sshkey_free(k1);
@@ -130,6 +132,7 @@ sshkey_file_tests(void)
 	ASSERT_PTR_NE(cp, NULL);
 	ASSERT_STRING_EQ(cp, sshbuf_ptr(buf));
 	sshbuf_free(buf);
+	free(cp);
 	TEST_DONE();
 
 	TEST_START("RSA key bubblebabble fingerprint");
@@ -138,6 +141,7 @@ sshkey_file_tests(void)
 	ASSERT_PTR_NE(cp, NULL);
 	ASSERT_STRING_EQ(cp, sshbuf_ptr(buf));
 	sshbuf_free(buf);
+	free(cp);
 	TEST_DONE();
 
 	sshkey_free(k1);
@@ -182,6 +186,7 @@ sshkey_file_tests(void)
 	ASSERT_PTR_NE(cp, NULL);
 	ASSERT_STRING_EQ(cp, sshbuf_ptr(buf));
 	sshbuf_free(buf);
+	free(cp);
 	TEST_DONE();
 
 	TEST_START("DSA key bubblebabble fingerprint");
@@ -190,6 +195,7 @@ sshkey_file_tests(void)
 	ASSERT_PTR_NE(cp, NULL);
 	ASSERT_STRING_EQ(cp, sshbuf_ptr(buf));
 	sshbuf_free(buf);
+	free(cp);
 	TEST_DONE();
 
 	sshkey_free(k1);
@@ -239,6 +245,7 @@ sshkey_file_tests(void)
 	ASSERT_PTR_NE(cp, NULL);
 	ASSERT_STRING_EQ(cp, sshbuf_ptr(buf));
 	sshbuf_free(buf);
+	free(cp);
 	TEST_DONE();
 
 	TEST_START("ECDSA key bubblebabble fingerprint");
@@ -247,6 +254,7 @@ sshkey_file_tests(void)
 	ASSERT_PTR_NE(cp, NULL);
 	ASSERT_STRING_EQ(cp, sshbuf_ptr(buf));
 	sshbuf_free(buf);
+	free(cp);
 	TEST_DONE();
 
 	sshkey_free(k1);
