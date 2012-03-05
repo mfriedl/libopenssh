@@ -1552,11 +1552,6 @@ sshkey_from_blob(const u_char *blob, u_int blen, struct sshkey **keyp)
 		if (sshbuf_get_bignum2(b, key->rsa->e) == -1 ||
 		    sshbuf_get_bignum2(b, key->rsa->n) == -1) {
 			ret = SSH_ERR_INVALID_FORMAT;
- badkey:
-			if (key != NULL) {
-				sshkey_free(key);
-				key = NULL;
-			}
 			goto out;
 		}
 #ifdef DEBUG_PK
@@ -1577,7 +1572,7 @@ sshkey_from_blob(const u_char *blob, u_int blen, struct sshkey **keyp)
 		    sshbuf_get_bignum2(b, key->dsa->g) == -1 ||
 		    sshbuf_get_bignum2(b, key->dsa->pub_key) == -1) {
 			ret = SSH_ERR_INVALID_FORMAT;
-			goto badkey;
+			goto out;
 		}
 #ifdef DEBUG_PK
 		DSA_print_fp(stderr, key->dsa, 8);
@@ -1594,36 +1589,36 @@ sshkey_from_blob(const u_char *blob, u_int blen, struct sshkey **keyp)
 		key->ecdsa_nid = nid;
 		if (sshbuf_get_cstring(b, &curve, NULL) != 0) {
 			ret = SSH_ERR_INVALID_FORMAT;
-			goto badkey;
+			goto out;
 		}
 		if (key->ecdsa_nid != sshkey_curve_name_to_nid(curve)) {
 			ret = SSH_ERR_EC_CURVE_MISMATCH;
-			goto badkey;
+			goto out;
 		}
 		if (key->ecdsa != NULL)
 			EC_KEY_free(key->ecdsa);
 		if ((key->ecdsa = EC_KEY_new_by_curve_name(key->ecdsa_nid))
 		    == NULL) {
 			ret = SSH_ERR_EC_CURVE_INVALID;
-			goto badkey;
+			goto out;
 		}
 		if ((q = EC_POINT_new(EC_KEY_get0_group(key->ecdsa))) == NULL) {
 			ret = SSH_ERR_ALLOC_FAIL;
-			goto badkey;
+			goto out;
 		}
 		if (sshbuf_get_ec(b, q, EC_KEY_get0_group(key->ecdsa)) != 0) {
 			ret = SSH_ERR_INVALID_FORMAT;
-			goto badkey;
+			goto out;
 		}
 		if (sshkey_ec_validate_public(EC_KEY_get0_group(key->ecdsa),
 		    q) != 0) {
 			ret = SSH_ERR_KEY_INVALID_EC_VALUE;
-			goto badkey;
+			goto out;
 		}
 		if (EC_KEY_set_public_key(key->ecdsa, q) != 1) {
 			/* XXX assume it is a allocation error */
 			ret = SSH_ERR_ALLOC_FAIL;
-			goto badkey;
+			goto out;
 		}
 #ifdef DEBUG_PK
 		sshkey_dump_ec_point(EC_KEY_get0_group(key->ecdsa), q);
@@ -1640,7 +1635,7 @@ sshkey_from_blob(const u_char *blob, u_int blen, struct sshkey **keyp)
 	/* Parse certificate potion */
 	if (sshkey_is_cert(key) &&
 	   (ret = cert_parse(b, key, blob, blen)) != 0)
-		goto badkey;
+		goto out;
 
 	if (key != NULL && sshbuf_len(b) != 0) {
 		ret = SSH_ERR_INVALID_FORMAT;
@@ -1649,6 +1644,8 @@ sshkey_from_blob(const u_char *blob, u_int blen, struct sshkey **keyp)
 	ret = 0;
 	*keyp = key;
  out:
+	if (ret != 0 && key != NULL)
+		sshkey_free(key);
 	if (ktype != NULL)
 		free(ktype);
 	if (curve != NULL)
