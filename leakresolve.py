@@ -40,8 +40,8 @@ class LineResolver:
 		if addr not in self.cache:
 			self.resolver.stdin.write(addr + "\n")
 			func = self.resolver.stdout.readline()
-			fileline = self.resolver.stdout.readline()
-			result = fileline.strip() + " in " + func.strip() + "()"
+			loc = self.resolver.stdout.readline()
+			result = "%s: in %s()" % (loc.strip(), func.strip())
 			self.cache[addr] = result
 		return self.cache[addr]
 
@@ -56,10 +56,9 @@ class Leak:
 		self.nbytes += nbytes
 		self.nleaks += 1
 	def __str__(self):
-		s = "memory leak: %d objects totalling %d bytes\n" % \
+		s = "Leaked %d objects totalling %d bytes\n" % \
 		    (self.nleaks, self.nbytes)
-		for addr in self.backtrace:
-			s += "    " + self.resolver.resolve(addr) + "\n"
+		s += "\n".join(map(self.resolver.resolve, self.backtrace))
 		return s
 
 class LeakTracker:
@@ -86,10 +85,10 @@ class LeakTracker:
 		total_leaks = 0
 		total_bytes = 0
 		for trace in sorted(self.leaks.keys(), cmp=self._leakcmp):
-			s += str(self.leaks[trace]) + "\n"
+			s += str(self.leaks[trace]) + "\n\n"
 			total_leaks += 1
 			total_bytes += self.leaks[trace].nbytes
-		s+= "\nTotal: %d leaks containing %d bytes\n" % \
+		s+= "Total: %d leaks containing %d bytes\n" % \
 		    (total_leaks, total_bytes)
 		return s
 
