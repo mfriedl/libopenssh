@@ -97,8 +97,23 @@ void
 ssh_free(struct ssh *ssh)
 {
 	u_int mode;
+	struct key_entry *k;
 
 	ssh_packet_close(ssh);
+	/*
+	 * we've only created the public keys variants in case we
+	 * are a acting as a server.
+	 */
+	while ((k = TAILQ_FIRST(&ssh->public_keys)) != NULL) {
+		TAILQ_REMOVE(&ssh->public_keys, k, next);
+		if (ssh->kex && ssh->kex->server)
+			sshkey_free(k->key);
+		free(k);
+	}
+	while ((k = TAILQ_FIRST(&ssh->private_keys)) != NULL) {
+		TAILQ_REMOVE(&ssh->private_keys, k, next);
+		free(k);
+	}
 	if (ssh->kex)
 		kex_free(ssh->kex);
 	for (mode = 0; mode < MODE_MAX; mode++) {
