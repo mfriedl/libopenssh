@@ -550,7 +550,7 @@ ssh_packet_close(struct ssh *ssh)
 		kex_free_newkeys(state->newkeys[mode]);
 	if (state->compression_buffer) {
 		sshbuf_free(state->compression_buffer);
-		if (ssh->state->compression_out_started) {
+		if (state->compression_out_started) {
 			z_streamp stream = &state->compression_out_stream;
 			debug("compress outgoing: "
 			    "raw data %llu, compressed %llu, factor %.2f",
@@ -558,10 +558,10 @@ ssh_packet_close(struct ssh *ssh)
 		    		(unsigned long long)stream->total_out,
 		    		stream->total_in == 0 ? 0.0 :
 		    		(double) stream->total_out / stream->total_in);
-			if (ssh->state->compression_out_failures == 0)
+			if (state->compression_out_failures == 0)
 				deflateEnd(stream);
 		}
-		if (ssh->state->compression_in_started) {
+		if (state->compression_in_started) {
 			z_streamp stream = &state->compression_out_stream;
 			debug("compress incoming: "
 			    "raw data %llu, compressed %llu, factor %.2f",
@@ -569,7 +569,7 @@ ssh_packet_close(struct ssh *ssh)
 			    (unsigned long long)stream->total_in,
 			    stream->total_out == 0 ? 0.0 :
 			    (double) stream->total_in / stream->total_out);
-			if (ssh->state->compression_in_failures == 0)
+			if (state->compression_in_failures == 0)
 				inflateEnd(stream);
 		}
 	}
@@ -581,6 +581,8 @@ ssh_packet_close(struct ssh *ssh)
 		free(ssh->remote_ipaddr);
 		ssh->remote_ipaddr = NULL;
 	}
+	free(ssh->state);
+	ssh->state = NULL;
 }
 
 /* Sets remote side protocol flags. */
