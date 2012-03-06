@@ -127,10 +127,10 @@ do_kex_with_key(char *kex, int key_type, int bits)
 	ASSERT_INT_EQ(ssh_init(&server2, 1, NULL), 0);
 	ASSERT_PTR_NE(server2, NULL);
 	ASSERT_INT_EQ(ssh_add_hostkey(server2, private), 0);
+	kex_free(server2->kex);	/* XXX or should ssh_packet_set_state()? */
 	ASSERT_INT_EQ(ssh_packet_set_state(server2, state), 0);
 	ASSERT_INT_EQ(sshbuf_len(state), 0);
 	sshbuf_free(state);
-	ASSERT_PTR_NE(server->kex, NULL);
 	ASSERT_PTR_NE(server2->kex, NULL);
 	/* XXX we need to set the callbacks */
 	server2->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
@@ -150,6 +150,8 @@ do_kex_with_key(char *kex, int key_type, int bits)
 	TEST_DONE();
 
 	TEST_START("cleanup");
+	sshkey_free(private);
+	sshkey_free(public);
 	ssh_free(client);
 	ssh_free(server);
 	ssh_free(server2);
