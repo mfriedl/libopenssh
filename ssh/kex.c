@@ -358,6 +358,12 @@ kex_free(Kex *kex)
 		kex_free_newkeys(kex->newkeys[mode]);
 		kex->newkeys[mode] = NULL;
 	}
+	if (kex->session_id)
+		free(kex->session_id);
+	if (kex->client_version_string)
+		free(kex->client_version_string);
+	if (kex->server_version_string)
+		free(kex->server_version_string);
 	free(kex);
 }
 
