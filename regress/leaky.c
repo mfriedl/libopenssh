@@ -5,21 +5,21 @@
 
 static void *a, *b, *c, *d, *e, *f;
 
-void
+static void
 f6(void)
 {
 	d = strdup("hello");
 	e = malloc(789);
 }
 
-void
+static void
 f5(void)
 {
 	c = calloc(1, 678);
 	f6();
 }
 
-void
+static void
 f4(void)
 {
 	b = malloc(456);
@@ -27,21 +27,21 @@ f4(void)
 	free(e);
 }
 
-void
+static void
 f3(void)
 {
 	a = malloc(123);
 	f = realloc(NULL, 321);
 }
 
-void
+static void
 f2(void)
 {
 	f4();
 	b = realloc(b, 567);
 }
 
-void
+static void
 f1(void)
 {
 	int i;
