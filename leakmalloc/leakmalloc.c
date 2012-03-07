@@ -27,7 +27,13 @@
 #define LEAKMALLOC_NO_REDIRECT
 #include "leakmalloc.h"
 
+#define OPT_EXIT_ON_LEAKS	0x01
+#define OPT_DUMP_TO_FILE	0x02
+#define OPT_QUIET		0x04
+
+u_int leakmalloc_options = 0;
 static int initialised;
+static FILE *dumpfile;
 
 struct alloc {
 	RB_ENTRY(alloc) entry;
@@ -53,14 +59,14 @@ RB_GENERATE_STATIC(alloc_tree, alloc, entry, alloc_cmp);
 static struct alloc_tree alloc_tree = RB_INITIALIZER(&alloc_tree);
 
 static void
-dump_leak(struct alloc *alloc)
+dump_leak(FILE *f, const char *tag, struct alloc *alloc)
 {
 	int i;
 
-	printf("LEAK %p %zu TRACE", alloc->addr, alloc->len);
+	fprintf(f, "%s %p %zu TRACE", tag, alloc->addr, alloc->len);
 	for (i = 1; i < alloc->depth; i++)
-		printf(" %p", alloc->bt[i]);
-	printf("\n");
+		fprintf(f, " %p", alloc->bt[i]);
+	fprintf(f, "\n");
 }
 
 /* Called atexit to dump unfreed leak objects */
@@ -68,11 +74,19 @@ static void
 dump_leaks(void)
 {
 	struct alloc *alloc;
+	int i = 0;
 
 	if (initialised != 1)
 		return;
-	RB_FOREACH(alloc, alloc_tree, &alloc_tree)
-		dump_leak(alloc);
+	RB_FOREACH(alloc, alloc_tree, &alloc_tree) {
+		if ((leakmalloc_options & OPT_QUIET) == 0)
+			dump_leak(dumpfile ? dumpfile : stdout, "LEAK", alloc);
+		i++;
+	}
+	if (dumpfile)
+		fclose(dumpfile);
+	if ((leakmalloc_options & OPT_EXIT_ON_LEAKS) != 0)
+		_exit(99);
 }
 
 static void
@@ -80,7 +94,7 @@ internal_error(struct alloc *alloc)
 {
 	alloc->addr = NULL;
 	alloc->len = -1;
-	dump_leak(alloc);
+	dump_leak(stderr, "ERROR", alloc);
 	initialised = -1;
 }
 
@@ -102,11 +116,24 @@ static void
 __record_leak(void *addr, size_t len, void *oaddr)
 {
 	struct alloc oalloc, *alloc;
+	char *cp;
 
 	if (initialised == -1)
 		return;
 	else if (initialised == 0) {
 		atexit(dump_leaks);
+		if (!issetugid() &&
+		    (cp = getenv("LEAKMALLOC_OPTIONS")) != NULL) {
+			if (strchr(cp, 'X') != NULL)
+				leakmalloc_options |= OPT_EXIT_ON_LEAKS;
+			if (strchr(cp, 'D') != NULL)
+				leakmalloc_options |= OPT_DUMP_TO_FILE;
+			if (strchr(cp, 'Q') != NULL)
+				leakmalloc_options |= OPT_QUIET;
+		}
+		if ((leakmalloc_options & OPT_DUMP_TO_FILE) != 0 &&
+		    (dumpfile = fopen("leakmalloc.out", "w+")) == NULL)
+			err(1, "fopen(\"leakmalloc.out\")");
 		initialised = 1;
 	}
 
