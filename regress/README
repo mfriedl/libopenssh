@@ -1,4 +1,4 @@
 Here's how you do it:
 
-gcc -Wall -O0 -ggdb3 -I.. -c example.c && gcc -ggdb3 -Wall -I.. -c example.c && gcc -L ../obj -L /usr/local/lib example.o  -lleakmalloc -lexecinfo
+gcc -Wall -O0 -ggdb3 -I.. -c leaky.c && gcc -ggdb3 -Wall -I.. -c leaky.c && gcc -L ../obj -L /usr/local/lib leaky.o  -lleakmalloc -lexecinfo
 ./a.out  | ../leakresolve.py -p a.out
