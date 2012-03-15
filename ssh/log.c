@@ -45,7 +45,6 @@
 #include <errno.h>
 #include <vis.h>
 
-#include "xmalloc.h"
 #include "log.h"
 
 static LogLevel log_level = SYSLOG_LEVEL_INFO;
