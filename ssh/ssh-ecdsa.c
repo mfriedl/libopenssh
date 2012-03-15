@@ -116,7 +116,7 @@ ssh_ecdsa_verify(const struct sshkey *key,
 	u_int dlen;
 	int ret = SSH_ERR_INTERNAL_ERROR;
 	struct sshbuf *b = NULL, *bb = NULL;
-	char *ktype;
+	char *ktype = NULL;
 
 	if (key == NULL || key->ecdsa == NULL ||
 	    (key->type != KEY_ECDSA && key->type != KEY_ECDSA_CERT))
