@@ -39,6 +39,30 @@ onerror(void *fuzz)
 	fuzz_dump((struct fuzz *)fuzz);
 }
 
+static void
+public_fuzz(struct sshkey *k)
+{
+	struct sshkey *k1;
+	struct sshbuf *buf;
+	struct fuzz *fuzz;
+
+	ASSERT_PTR_NE(buf = sshbuf_new(), NULL);
+	ASSERT_INT_EQ(sshkey_to_blob_buf(k, buf), 0);
+	fuzz = fuzz_begin(FUZZ_1_BIT_FLIP | FUZZ_1_BYTE_FLIP |
+	    FUZZ_TRUNCATE_START | FUZZ_TRUNCATE_END,
+	    sshbuf_ptr(buf), sshbuf_len(buf));
+	ASSERT_INT_EQ(sshkey_from_blob(sshbuf_ptr(buf), sshbuf_len(buf),
+	    &k1), 0);
+	sshkey_free(k1);
+	sshbuf_free(buf);
+	TEST_ONERROR(onerror, fuzz);
+	for(; !fuzz_done(fuzz); fuzz_next(fuzz)) {
+		if (sshkey_from_blob(fuzz_ptr(fuzz), fuzz_len(fuzz), &k1) == 0)
+			sshkey_free(k1);
+	}
+	fuzz_cleanup(fuzz);
+}
+
 void
 sshkey_fuzz_tests(void)
 {
@@ -149,64 +173,42 @@ sshkey_fuzz_tests(void)
 	TEST_START("fuzz RSA public");
 	buf = load_file("rsa_1");
 	ASSERT_INT_EQ(sshkey_parse_private(buf, "", "key", &k1, NULL), 0);
-	sshbuf_reset(buf);
-	ASSERT_INT_EQ(sshkey_to_blob_buf(k1, buf), 0);
-	sshkey_free(k1);
-	fuzz = fuzz_begin(FUZZ_1_BIT_FLIP | FUZZ_1_BYTE_FLIP |
-	    FUZZ_TRUNCATE_START | FUZZ_TRUNCATE_END,
-	    sshbuf_ptr(buf), sshbuf_len(buf));
-	ASSERT_INT_EQ(sshkey_from_blob(sshbuf_ptr(buf), sshbuf_len(buf),
-	    &k1), 0);
-	sshkey_free(k1);
 	sshbuf_free(buf);
-	TEST_ONERROR(onerror, fuzz);
-	for(; !fuzz_done(fuzz); fuzz_next(fuzz)) {
-		if (sshkey_from_blob(fuzz_ptr(fuzz), fuzz_len(fuzz), &k1) == 0)
-			sshkey_free(k1);
-	}
-	fuzz_cleanup(fuzz);
+	public_fuzz(k1);
+	sshkey_free(k1);
+	TEST_DONE();
+
+	TEST_START("fuzz RSA cert");
+	ASSERT_INT_EQ(sshkey_load_cert(test_data_file("rsa_1"), &k1), 0);
+	public_fuzz(k1);
+	sshkey_free(k1);
 	TEST_DONE();
 
 	TEST_START("fuzz DSA public");
 	buf = load_file("dsa_1");
 	ASSERT_INT_EQ(sshkey_parse_private(buf, "", "key", &k1, NULL), 0);
-	sshbuf_reset(buf);
-	ASSERT_INT_EQ(sshkey_to_blob_buf(k1, buf), 0);
-	sshkey_free(k1);
-	fuzz = fuzz_begin(FUZZ_1_BIT_FLIP | FUZZ_1_BYTE_FLIP |
-	    FUZZ_TRUNCATE_START | FUZZ_TRUNCATE_END,
-	    sshbuf_ptr(buf), sshbuf_len(buf));
-	ASSERT_INT_EQ(sshkey_from_blob(sshbuf_ptr(buf), sshbuf_len(buf),
-	    &k1), 0);
-	sshkey_free(k1);
 	sshbuf_free(buf);
-	TEST_ONERROR(onerror, fuzz);
-	for(; !fuzz_done(fuzz); fuzz_next(fuzz)) {
-		if (sshkey_from_blob(fuzz_ptr(fuzz), fuzz_len(fuzz), &k1) == 0)
-			sshkey_free(k1);
-	}
-	fuzz_cleanup(fuzz);
+	public_fuzz(k1);
+	sshkey_free(k1);
+	TEST_DONE();
+
+	TEST_START("fuzz DSA cert");
+	ASSERT_INT_EQ(sshkey_load_cert(test_data_file("dsa_1"), &k1), 0);
+	public_fuzz(k1);
+	sshkey_free(k1);
 	TEST_DONE();
 
 	TEST_START("fuzz ECDSA public");
 	buf = load_file("ecdsa_1");
 	ASSERT_INT_EQ(sshkey_parse_private(buf, "", "key", &k1, NULL), 0);
-	sshbuf_reset(buf);
-	ASSERT_INT_EQ(sshkey_to_blob_buf(k1, buf), 0);
-	sshkey_free(k1);
-	fuzz = fuzz_begin(FUZZ_1_BIT_FLIP | FUZZ_1_BYTE_FLIP |
-	    FUZZ_TRUNCATE_START | FUZZ_TRUNCATE_END,
-	    sshbuf_ptr(buf), sshbuf_len(buf));
-	ASSERT_INT_EQ(sshkey_from_blob(sshbuf_ptr(buf), sshbuf_len(buf),
-	    &k1), 0);
-	sshkey_free(k1);
 	sshbuf_free(buf);
-	TEST_ONERROR(onerror, fuzz);
-	for(; !fuzz_done(fuzz); fuzz_next(fuzz)) {
-		if (sshkey_from_blob(fuzz_ptr(fuzz), fuzz_len(fuzz), &k1) == 0)
-			sshkey_free(k1);
-	}
-	fuzz_cleanup(fuzz);
+	public_fuzz(k1);
+	sshkey_free(k1);
 	TEST_DONE();
 
+	TEST_START("fuzz ECDSA cert");
+	ASSERT_INT_EQ(sshkey_load_cert(test_data_file("ecdsa_1"), &k1), 0);
+	public_fuzz(k1);
+	sshkey_free(k1);
+	TEST_DONE();
 }
