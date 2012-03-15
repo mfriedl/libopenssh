@@ -54,7 +54,7 @@ sshkey_file_tests(void)
 	BN_free(a);
 	TEST_DONE();
 
-	TEST_START("parse RSA from private w/ passphrase");
+	TEST_START("parse RSA1 from private w/ passphrase");
 	buf = load_file("rsa1_1_pw");
 	ASSERT_INT_EQ(sshkey_parse_private(buf, sshbuf_ptr(pw), "rsa1_1_pw",
 	    &k2, NULL), 0);
@@ -64,7 +64,7 @@ sshkey_file_tests(void)
 	sshkey_free(k2);
 	TEST_DONE();
 
-	TEST_START("load RSA from public");
+	TEST_START("load RSA1 from public");
 	ASSERT_INT_EQ(sshkey_load_public(test_data_file("rsa1_1.pub"), &k2,
 	    NULL), 0);
 	ASSERT_PTR_NE(k2, NULL);
@@ -72,7 +72,7 @@ sshkey_file_tests(void)
 	sshkey_free(k2);
 	TEST_DONE();
 
-	TEST_START("RSA key hex fingerprint");
+	TEST_START("RSA1 key hex fingerprint");
 	buf = load_text_file("rsa1_1.fp");
 	cp = sshkey_fingerprint(k1, SSH_FP_MD5, SSH_FP_HEX);
 	ASSERT_PTR_NE(cp, NULL);
@@ -81,7 +81,7 @@ sshkey_file_tests(void)
 	free(cp);
 	TEST_DONE();
 
-	TEST_START("RSA key bubblebabble fingerprint");
+	TEST_START("RSA1 key bubblebabble fingerprint");
 	buf = load_text_file("rsa1_1.fp.bb");
 	cp = sshkey_fingerprint(k1, SSH_FP_SHA1, SSH_FP_BUBBLEBABBLE);
 	ASSERT_PTR_NE(cp, NULL);
