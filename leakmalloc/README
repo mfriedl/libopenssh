@@ -1,0 +1,19 @@
+This is a very simple memory leak detector using libexecinfo (in
+OpenBSD ports as devel/libexecinfo). It could be adapted to use the
+backtrace function in glibc too.
+
+It tracks memory allocations by redirecting malloc/free and friends
+to its own functions using preprocessor defines. When an allocation
+is made, leakmalloc grabs the call chain from the stack and stores it.
+When the program exits, leakmalloc dumps all unfreed allocations.
+
+leakresolve.py consumes one of these dumps and produces a fairly
+readable report with leaks coalesced by stack trace and sorted by
+number of leak instances. Usually the last entry on this report is
+the one to care most about.
+
+leaky.c in regress/ shows how you might use it (run 'make' in that directory
+and run it manually, or look at the Makefile for tips).
+
+Note that everything needs to be compiled without optimisation and with
+debugging symbols.
