@@ -8,7 +8,6 @@ WARNINGS=Yes
 CDIAGFLAGS=	-Wall
 CDIAGFLAGS+=	-Werror
 CDIAGFLAGS+=	-Wpointer-arith
-CDIAGFLAGS+=	-Wuninitialized
 CDIAGFLAGS+=	-Wstrict-prototypes
 CDIAGFLAGS+=	-Wmissing-prototypes
 CDIAGFLAGS+=	-Wunused
@@ -39,3 +38,22 @@ DPADD+=         ${.CURDIR}/../lib/shlib_version
 LDADD+=         -lcrypto -lz
 DPADD+=         ${LIBCRYPTO} ${LIBZ}
 .endif
+
+.if defined(LEAKMALLOC)
+DEBUG=		-g
+COPTS=		-O0
+LEAKMALLOC_DIR=	${.CURDIR}/../../leakmalloc/leakmalloc
+CFLAGS+=	-I${LEAKMALLOC_DIR} -DWITH_LEAKMALLOC 
+LDFLAGS+=	-L/usr/local/lib
+LDADD+=		-lleakmalloc -lexecinfo
+. if exists(${LEAKMALLOC_DIR}/${__objdir})
+LDADD+=         -L${LEAKMALLOC_DIR}/${__objdir}
+DPADD+=         ${LEAKMALLOC_DIR}/${__objdir}/libleakmalloc.a
+. else
+LDADD+=         -L${LEAKMALLOC_DIR}
+DPADD+=         ${LEAKMALLOC_DIR}/libleakmalloc.a
+. endif
+.else
+CDIAGFLAGS+=	-Wuninitialized
+.endif
+

@@ -32,6 +32,10 @@
 #include <openssl/dsa.h>
 #include <openssl/ec.h>
 
+#ifdef WITH_LEAKMALLOC
+#include "leakmalloc.h"
+#endif
+
 #define SSH_RSA_MINIMUM_MODULUS_SIZE	768
 
 /* XXX compat, remove when we can */

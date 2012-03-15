@@ -15,6 +15,10 @@
 #ifndef AUTHFILE_H
 #define AUTHFILE_H
 
+#ifdef WITH_LEAKMALLOC
+#include "leakmalloc.h"
+#endif
+
 struct sshbuf;
 struct sshkey;
 

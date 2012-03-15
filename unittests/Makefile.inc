@@ -6,11 +6,9 @@
 CDIAGFLAGS=	-Wall
 CDIAGFLAGS+=	-Werror
 CDIAGFLAGS+=	-Wpointer-arith
-CDIAGFLAGS+=	-Wuninitialized
 CDIAGFLAGS+=	-Wstrict-prototypes
 CDIAGFLAGS+=	-Wmissing-prototypes
 CDIAGFLAGS+=	-Wunused
-CDIAGFLAGS+=	-Wuninitialized
 CDIAGFLAGS+=	-Wsign-compare
 CDIAGFLAGS+=	-Wshadow
 CDIAGFLAGS+=	-Wformat
@@ -40,3 +38,22 @@ DPADD+=${.CURDIR}/../../ssh/lib/libssh.a
 
 LDADD+= -lcrypto
 DPADD+= ${LIBCRYPTO}
+
+.if defined(LEAKMALLOC)
+DEBUG=		-g
+COPTS=		-O0
+LEAKMALLOC_DIR=	${.CURDIR}/../../leakmalloc/leakmalloc
+CFLAGS+=	-I${LEAKMALLOC_DIR} -DWITH_LEAKMALLOC 
+LDFLAGS+=	-L/usr/local/lib
+LDADD+=		-lleakmalloc -lexecinfo
+. if exists(${LEAKMALLOC_DIR}/${__objdir})
+LDADD+=         -L${LEAKMALLOC_DIR}/${__objdir}
+DPADD+=         ${LEAKMALLOC_DIR}/${__objdir}/libleakmalloc.a
+. else
+LDADD+=         -L${LEAKMALLOC_DIR}
+DPADD+=         ${LEAKMALLOC_DIR}/libleakmalloc.a
+. endif
+.else
+CDIAGFLAGS+=	-Wuninitialized
+.endif
+
