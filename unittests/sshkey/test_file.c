@@ -126,6 +126,15 @@ sshkey_file_tests(void)
 	sshkey_free(k2);
 	TEST_DONE();
 
+	TEST_START("load RSA cert");
+	ASSERT_INT_EQ(sshkey_load_cert(test_data_file("rsa_1"), &k2), 0);
+	ASSERT_PTR_NE(k2, NULL);
+	ASSERT_INT_EQ(k2->type, KEY_RSA_CERT);
+	ASSERT_INT_EQ(sshkey_equal(k1, k2), 0);
+	ASSERT_INT_EQ(sshkey_equal_public(k1, k2), 1);
+	sshkey_free(k2);
+	TEST_DONE();
+
 	TEST_START("RSA key hex fingerprint");
 	buf = load_text_file("rsa_1.fp");
 	cp = sshkey_fingerprint(k1, SSH_FP_MD5, SSH_FP_HEX);
@@ -177,6 +186,15 @@ sshkey_file_tests(void)
 	    NULL), 0);
 	ASSERT_PTR_NE(k2, NULL);
 	ASSERT_INT_EQ(sshkey_equal(k1, k2), 1);
+	sshkey_free(k2);
+	TEST_DONE();
+
+	TEST_START("load DSA cert");
+	ASSERT_INT_EQ(sshkey_load_cert(test_data_file("dsa_1"), &k2), 0);
+	ASSERT_PTR_NE(k2, NULL);
+	ASSERT_INT_EQ(k2->type, KEY_DSA_CERT);
+	ASSERT_INT_EQ(sshkey_equal(k1, k2), 0);
+	ASSERT_INT_EQ(sshkey_equal_public(k1, k2), 1);
 	sshkey_free(k2);
 	TEST_DONE();
 
@@ -236,6 +254,15 @@ sshkey_file_tests(void)
 	    NULL), 0);
 	ASSERT_PTR_NE(k2, NULL);
 	ASSERT_INT_EQ(sshkey_equal(k1, k2), 1);
+	sshkey_free(k2);
+	TEST_DONE();
+
+	TEST_START("load ECDSA cert");
+	ASSERT_INT_EQ(sshkey_load_cert(test_data_file("ecdsa_1"), &k2), 0);
+	ASSERT_PTR_NE(k2, NULL);
+	ASSERT_INT_EQ(k2->type, KEY_ECDSA_CERT);
+	ASSERT_INT_EQ(sshkey_equal(k1, k2), 0);
+	ASSERT_INT_EQ(sshkey_equal_public(k1, k2), 1);
 	sshkey_free(k2);
 	TEST_DONE();
 
