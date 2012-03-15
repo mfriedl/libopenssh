@@ -30,6 +30,9 @@
 #include <openssl/ec.h>
 
 #include "mac.h"
+#ifdef WITH_LEAKMALLOC
+#include "leakmalloc.h"
+#endif
 
 #define KEX_COOKIE_LEN	16
 

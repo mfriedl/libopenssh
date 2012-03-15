@@ -51,7 +51,7 @@ summary: ${PROG}
 	      grep "^Total:" | cut -d' ' -f 2` -eq 22
 
 clean:
-	rm ${PROG} *.o *.core leakmalloc.out
+	rm -f ${PROG} *.o *.core leakmalloc.out
 
 .include <bsd.regress.mk>
 

@@ -23,6 +23,10 @@
 #include <openssl/bn.h>
 #include <openssl/ec.h>
 
+#ifdef WITH_LEAKMALLOC
+#include "leakmalloc.h"
+#endif
+
 #define SSHBUF_SIZE_MAX		0x20000000	/* Hard maximum size */
 #define SSHBUF_MAX_BIGNUM		(8192 / 8)	/* Max bignum *bytes* */
 #define SSHBUF_MAX_ECPOINT	((528 * 2 / 8) + 1) /* Max EC point *bytes* */
