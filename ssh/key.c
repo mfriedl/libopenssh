@@ -395,6 +395,7 @@ cert_free(struct sshkey_cert *cert)
 	if (cert->signature_key != NULL)
 		sshkey_free(cert->signature_key);
 	bzero(cert, sizeof(*cert));
+	free(cert);
 }
 
 void
