@@ -31,6 +31,10 @@
 #define OPT_DUMP_TO_FILE	0x02
 #define OPT_QUIET		0x04
 
+#ifndef BT_MAX_DEPTH
+#define BT_MAX_DEPTH 127
+#endif
+
 u_int leakmalloc_options = 0;
 static int initialised;
 static FILE *dumpfile;
