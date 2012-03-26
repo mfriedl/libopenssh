@@ -41,6 +41,7 @@
 
 #include <openssl/evp.h>
 
+#include <errno.h>
 #include <fcntl.h>
 #include <pwd.h>
 #include <stdio.h>
@@ -243,8 +244,9 @@ add_file(int agent_fd, const char *filename, int key_only)
 	/* Now try to add the certificate flavour too */
 	xasprintf(&certpath, "%s-cert.pub", filename);
 	if ((r = sshkey_load_public(certpath, &cert, NULL)) != 0) {
-		error("Failed to load certificate \"%s\": %s",
-		    certpath, ssh_err(r));
+		if (r != SSH_ERR_SYSTEM_ERROR || errno != ENOENT)
+			error("Failed to load certificate \"%s\": %s",
+			    certpath, ssh_err(r));
 		goto out;
 	}
 
