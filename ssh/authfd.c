@@ -399,7 +399,7 @@ ssh_decrypt_challenge(int sock, struct sshkey* key, BIGNUM *challenge,
 	    (r = sshbuf_put_bignum1(msg, key->rsa->e)) != 0 ||
 	    (r = sshbuf_put_bignum1(msg, key->rsa->n)) != 0 ||
 	    (r = sshbuf_put_bignum1(msg, challenge)) != 0 ||
-	    (r = sshbuf_put(msg, session_id, sizeof(session_id))) != 0 ||
+	    (r = sshbuf_put(msg, session_id, 16)) != 0 ||
 	    (r = sshbuf_put_u32(msg, 1)) != 0) /* Response type for proto 1.1 */
 		goto out;
 	if ((r = ssh_request_reply(sock, msg, msg)) != 0)
@@ -413,7 +413,7 @@ ssh_decrypt_challenge(int sock, struct sshkey* key, BIGNUM *challenge,
 		r = SSH_ERR_INVALID_FORMAT;
 		goto out;
 	}
-	if ((r = sshbuf_get(msg, response, sizeof(response))) != 0)
+	if ((r = sshbuf_get(msg, response, 16)) != 0)
 		goto out;
 	r = 0;
  out:
@@ -613,6 +613,7 @@ ssh_add_identity_constrained(int sock, struct sshkey *key, const char *comment,
 		if ((r = sshbuf_put_u8(msg, type)) != 0 ||
 		    (r = ssh_encode_identity_ssh2(msg, key, comment)) != 0)
 			goto out;
+		break;
 	default:
 		r = SSH_ERR_INVALID_ARGUMENT;
 		goto out;
