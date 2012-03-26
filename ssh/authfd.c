@@ -332,7 +332,7 @@ ssh_fetch_identitylist(int sock, int version, struct ssh_identitylist **idlp)
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-	for (i = 0; i < num; i++) {
+	for (i = 0; i < num;) {
 		switch (version) {
 		case 1:
 			if ((r = deserialise_identity1(msg,
@@ -341,10 +341,17 @@ ssh_fetch_identitylist(int sock, int version, struct ssh_identitylist **idlp)
 			break;
 		case 2:
 			if ((r = deserialise_identity2(msg,
-			    &(idl->keys[i]), &(idl->comments[i]))) != 0)
-				goto out;
+			    &(idl->keys[i]), &(idl->comments[i]))) != 0) {
+				if (r == SSH_ERR_KEY_TYPE_UNKNOWN) {
+					/* Gracefully skip unknown key types */
+					num--;
+					continue;
+				} else
+					goto out;
+			}
 			break;
 		}
+		i++;
 	}
 	idl->nkeys = num;
 	*idlp = idl;
