@@ -87,6 +87,8 @@ sshbuf_free(struct sshbuf *buf)
 {
 	int freeme;
 
+	if (buf == NULL)
+		return;
 	if (sshbuf_check_sanity(buf) == 0)
 		bzero(buf->d, buf->alloc);
 	free(buf->d);
