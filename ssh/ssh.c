@@ -1129,10 +1129,16 @@ ssh_init_forwarding(struct ssh *ssh)
 static void
 check_agent_present(void)
 {
+	int r;
+
 	if (options.forward_agent) {
 		/* Clear agent forwarding if we don't have an agent. */
-		if (!ssh_agent_present())
+		if ((r = ssh_get_authentication_socket(NULL)) != 0) {
 			options.forward_agent = 0;
+			if (r != SSH_ERR_AGENT_NOT_PRESENT)
+				debug("ssh_get_authentication_socket: %s",
+				    ssh_err(r));
+		}
 	}
 }
 

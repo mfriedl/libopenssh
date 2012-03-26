@@ -236,7 +236,7 @@ typedef struct idlist Idlist;
 
 struct identity {
 	TAILQ_ENTRY(identity) next;
-	AuthenticationConnection *ac;	/* set if agent supports key */
+	int	agent_fd;		/* >=0 if agent supports key */
 	struct sshkey	*key;		/* public/private key */
 	char	*filename;		/* comment for agent-only keys */
 	int	tried;
@@ -255,7 +255,7 @@ struct Authctxt {
 	int attempt;
 	/* pubkey */
 	Idlist keys;
-	AuthenticationConnection *agent;
+	int agent_fd;
 	/* hostbased */
 	Sensitive *sensitive;
 	/* kbd-interactive */
@@ -1200,9 +1200,9 @@ identity_sign(Identity *id, u_char **sigp, u_int *lenp,
 	int ret;
 
 	/* the agent supports this key */
-	if (id->ac)
-		return (ssh_agent_sign(id->ac, id->key, sigp, lenp,
-		    data, datalen, compat));
+	if (id->agent_fd)
+		return ssh_agent_sign(id->agent_fd, id->key, sigp, lenp,
+		    data, datalen, compat);
 	/*
 	 * we have already loaded the private key or
 	 * the private key is stored in external hardware
@@ -1414,9 +1414,9 @@ pubkey_prepare(struct ssh *ssh)
 	Identity *id;
 	Idlist agent, files, *preferred;
 	struct sshkey *key;
-	AuthenticationConnection *ac;
-	char *comment;
-	int i, found;
+	int agent_fd, i, r, found;
+	size_t j;
+	struct ssh_identitylist *idlist;
 
 	TAILQ_INIT(&agent);	/* keys from the agent */
 	TAILQ_INIT(&files);	/* keys from the config file */
@@ -1437,37 +1437,48 @@ pubkey_prepare(struct ssh *ssh)
 		TAILQ_INSERT_TAIL(&files, id, next);
 	}
 	/* list of keys supported by the agent */
-	if ((ac = ssh_get_authentication_connection())) {
-		for (key = ssh_get_first_identity(ac, &comment, 2);
-		    key != NULL;
-		    key = ssh_get_next_identity(ac, &comment, 2)) {
+	if ((r = ssh_get_authentication_socket(&agent_fd)) != 0) {
+		if (r != SSH_ERR_AGENT_NOT_PRESENT)
+			debug("%s: ssh_get_authentication_socket: %s",
+			    __func__, ssh_err(r));
+	} else if ((r = ssh_fetch_identitylist(agent_fd, 2, &idlist)) != 0) {
+		if (r != SSH_ERR_AGENT_NO_IDENTITIES)
+			debug("%s: ssh_fetch_identitylist: %s",
+			    __func__, ssh_err(r));
+	} else {
+		for (j = 0; j < idlist->nkeys; j++) {
 			found = 0;
 			TAILQ_FOREACH(id, &files, next) {
-				/* agent keys from the config file are preferred */
-				if (sshkey_equal(key, id->key)) {
-					sshkey_free(key);
-					xfree(comment);
+				/*
+				 * agent keys from the config file are
+				 * preferred
+				 */
+				if (sshkey_equal(idlist->keys[j], id->key)) {
 					TAILQ_REMOVE(&files, id, next);
 					TAILQ_INSERT_TAIL(preferred, id, next);
-					id->ac = ac;
+					id->agent_fd = agent_fd;
 					found = 1;
 					break;
 				}
 			}
 			if (!found && !options.identities_only) {
 				id = xcalloc(1, sizeof(*id));
-				id->key = key;
-				id->filename = comment;
-				id->ac = ac;
+				/* XXX "steals" key/comment from idlist */
+				id->key = idlist->keys[j];
+				id->filename = idlist->comments[j];
+				idlist->keys[j] = NULL;
+				idlist->comments[j] = NULL;
+				id->agent_fd = agent_fd;
 				TAILQ_INSERT_TAIL(&agent, id, next);
 			}
 		}
+		ssh_free_identitylist(idlist);
 		/* append remaining agent keys */
 		for (id = TAILQ_FIRST(&agent); id; id = TAILQ_FIRST(&agent)) {
 			TAILQ_REMOVE(&agent, id, next);
 			TAILQ_INSERT_TAIL(preferred, id, next);
 		}
-		authctxt->agent = ac;
+		authctxt->agent_fd = agent_fd;
 	}
 	/* append remaining keys from the config file */
 	for (id = TAILQ_FIRST(&files); id; id = TAILQ_FIRST(&files)) {
@@ -1485,8 +1496,8 @@ pubkey_cleanup(struct ssh *ssh)
 	Authctxt *authctxt = ssh->authctxt;
 	Identity *id;
 
-	if (authctxt->agent != NULL)
-		ssh_close_authentication_connection(authctxt->agent);
+	if (authctxt->agent_fd != -1)
+		ssh_close_authentication_socket(authctxt->agent_fd);
 	for (id = TAILQ_FIRST(&authctxt->keys); id;
 	    id = TAILQ_FIRST(&authctxt->keys)) {
 		TAILQ_REMOVE(&authctxt->keys, id, next);

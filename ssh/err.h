@@ -67,6 +67,8 @@
 #define SSH_ERR_KEY_BAD_PERMISSIONS		-43
 #define SSH_ERR_KEY_CERT_MISMATCH		-44
 #define SSH_ERR_KEY_NOT_FOUND			-45
+#define SSH_ERR_AGENT_NOT_PRESENT		-46
+#define SSH_ERR_AGENT_NO_IDENTITIES		-47
 
 
 /* Translate a numeric error code to a human-readable error string */

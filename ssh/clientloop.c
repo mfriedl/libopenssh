@@ -1705,7 +1705,7 @@ static int
 client_input_agent_open(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
-	int remote_id, sock;
+	int remote_id, sock, r;
 
 	/* Read the remote channel number from the message. */
 	remote_id = ssh_packet_get_int(ssh);
@@ -1715,7 +1715,10 @@ client_input_agent_open(int type, u_int32_t seq, struct ssh *ssh)
 	 * Get a connection to the local authentication agent (this may again
 	 * get forwarded).
 	 */
-	sock = ssh_get_authentication_socket();
+	if ((r = ssh_get_authentication_socket(&sock)) != 0 &&
+	    r != SSH_ERR_AGENT_NOT_PRESENT)
+		debug("%s: ssh_get_authentication_socket: %s",
+		    __func__, ssh_err(r));
 
 	/*
 	 * If we could not connect the agent, send an error message back to
@@ -1723,7 +1726,7 @@ client_input_agent_open(int type, u_int32_t seq, struct ssh *ssh)
 	 * because authentication forwarding is only enabled if we have an
 	 * agent.
 	 */
-	if (sock >= 0) {
+	if (r == 0) {
 		c = channel_new("", SSH_CHANNEL_OPEN, sock, sock,
 		    -1, 0, 0, 0, "authentication agent connection", 1);
 		c->remote_id = remote_id;
@@ -1814,7 +1817,7 @@ static Channel *
 client_request_agent(struct ssh *ssh, const char *request_type, int rchan)
 {
 	Channel *c = NULL;
-	int sock;
+	int r, sock;
 
 	if (!options.forward_agent) {
 		error("Warning: ssh server tried agent forwarding.");
@@ -1822,9 +1825,12 @@ client_request_agent(struct ssh *ssh, const char *request_type, int rchan)
 		    "malicious server.");
 		return NULL;
 	}
-	sock = ssh_get_authentication_socket();
-	if (sock < 0)
+	if ((r = ssh_get_authentication_socket(&sock)) != 0) {
+		if (r != SSH_ERR_AGENT_NOT_PRESENT)
+			debug("%s: ssh_get_authentication_socket: %s",
+			    __func__, ssh_err(r));
 		return NULL;
+	}
 	c = channel_new("authentication agent connection",
 	    SSH_CHANNEL_OPEN, sock, sock, -1,
 	    CHAN_X11_WINDOW_DEFAULT, CHAN_TCP_PACKET_DEFAULT, 0,

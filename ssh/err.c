@@ -115,6 +115,10 @@ ssh_err(int n)
 		return "certificate does not match key";
 	case SSH_ERR_KEY_NOT_FOUND:
 		return "key not found";
+	case SSH_ERR_AGENT_NOT_PRESENT:
+		return "agent not present";
+	case SSH_ERR_AGENT_NO_IDENTITIES:
+		return "agent contains no identities";
 	default:
 		return "unknown error";
 	}

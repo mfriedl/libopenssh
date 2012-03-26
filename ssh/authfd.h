@@ -16,6 +16,33 @@
 #ifndef AUTHFD_H
 #define AUTHFD_H
 
+/* List of identities returned by ssh_fetch_identitylist() */
+struct ssh_identitylist {
+	size_t nkeys;
+	struct sshkey **keys;
+	char **comments;
+};
+
+int	ssh_get_authentication_socket(int *fdp);
+void	ssh_close_authentication_socket(int sock);
+
+int	ssh_lock_agent(int sock, int lock, const char *password);
+int	ssh_fetch_identitylist(int sock, int version,
+	    struct ssh_identitylist **idlp);
+void	ssh_free_identitylist(struct ssh_identitylist *idl);
+int	ssh_add_identity_constrained(int sock, struct sshkey *key,
+	    const char *comment, u_int life, u_int confirm);
+int	ssh_remove_identity(int sock, struct sshkey *key);
+int	ssh_update_card(int sock, int add, const char *reader_id,
+	    const char *pin, u_int life, u_int confirm);
+int	ssh_remove_all_identities(int sock, int version);
+
+int	ssh_decrypt_challenge(int sock, struct sshkey* key, BIGNUM *challenge,
+	    u_char session_id[16], u_char response[16]);
+int	ssh_agent_sign(int sock, struct sshkey *key,
+	    u_char **sigp, u_int *lenp,
+	    u_char *data, u_int datalen, u_int compat);
+
 /* Messages for the authentication agent connection. */
 #define SSH_AGENTC_REQUEST_RSA_IDENTITIES	1
 #define SSH_AGENT_RSA_IDENTITIES_ANSWER		2
@@ -59,35 +86,5 @@
 #define SSH_COM_AGENT2_FAILURE			102
 
 #define	SSH_AGENT_OLD_SIGNATURE			0x01
-
-typedef struct {
-	int	fd;
-	Buffer	identities;
-	int	howmany;
-}	AuthenticationConnection;
-
-int	ssh_agent_present(void);
-int	ssh_get_authentication_socket(void);
-void	ssh_close_authentication_socket(int);
-
-AuthenticationConnection *ssh_get_authentication_connection(void);
-void	ssh_close_authentication_connection(AuthenticationConnection *);
-int	 ssh_get_num_identities(AuthenticationConnection *, int);
-struct sshkey *ssh_get_first_identity(AuthenticationConnection *, char **, int);
-struct sshkey *ssh_get_next_identity(AuthenticationConnection *, char **, int);
-int	 ssh_add_identity_constrained(AuthenticationConnection *,
-    struct sshkey *, const char *, u_int, u_int);
-int	 ssh_remove_identity(AuthenticationConnection *, struct sshkey *);
-int	 ssh_remove_all_identities(AuthenticationConnection *, int);
-int	 ssh_lock_agent(AuthenticationConnection *, int, const char *);
-int	 ssh_update_card(AuthenticationConnection *, int, const char *,
-    const char *, u_int, u_int);
-
-int	 ssh_decrypt_challenge(AuthenticationConnection *, struct sshkey *,
-    BIGNUM *, u_char[16], u_int, u_char[16]);
-
-int
-ssh_agent_sign(AuthenticationConnection *, struct sshkey *,
-    u_char **, u_int *, u_char *, u_int, u_int);
 
 #endif				/* AUTHFD_H */
