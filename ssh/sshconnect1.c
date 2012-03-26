@@ -126,8 +126,8 @@ try_agent_authentication(void)
 			 * although it advertised it supports this.  Just
 			 * return a wrong value.
 			 */
-			logit("Authentication agent failed to decrypt i"
-			    "challenge.");
+			logit("Authentication agent failed to decrypt "
+			    "challenge: %s", ssh_err(r));
 			memset(response, 0, sizeof(response));
 		}
 		debug("Sending response to RSA challenge.");
