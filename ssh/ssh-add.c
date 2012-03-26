@@ -382,7 +382,7 @@ lock_agent(int agent_fd, int lock)
 			fprintf(stderr, "Agent %slocked.\n", lock ? "" : "un");
 			ret = 0;
 		} else {
-			fprintf(stderr, "Failed to %slock agent: %sn",
+			fprintf(stderr, "Failed to %slock agent: %s\n",
 			    lock ? "" : "un", ssh_err(r));
 		}
 	}

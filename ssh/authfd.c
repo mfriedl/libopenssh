@@ -242,10 +242,10 @@ deserialise_identity2(struct sshbuf *ids, struct sshkey **keyp, char **commentp)
 {
 	int r;
 	char *comment = NULL;
-	u_char *blob = NULL;
+	const u_char *blob;
 	size_t blen;
 
-	if ((r = sshbuf_get_string(ids, &blob, &blen)) != 0 ||
+	if ((r = sshbuf_get_string_direct(ids, &blob, &blen)) != 0 ||
 	    (r = sshbuf_get_cstring(ids, &comment, NULL)) != 0)
 		goto out;
 	if ((r = sshkey_from_blob(blob, blen, keyp)) != 0)
@@ -256,10 +256,6 @@ deserialise_identity2(struct sshbuf *ids, struct sshkey **keyp, char **commentp)
 	}
 	r = 0;
  out:
-	if (blob != NULL) {
-		bzero(blob, blen);
-		free(blob);
-	}
 	free(comment);
 	return r;
 }

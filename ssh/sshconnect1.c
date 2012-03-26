@@ -149,14 +149,13 @@ try_agent_authentication(void)
 		if (type == SSH_SMSG_SUCCESS) {
 			debug("RSA authentication accepted by server.");
 			ret = 1;
-			goto out;
-		}
-		/* Otherwise it should return failure. */
-		if (type != SSH_SMSG_FAILURE)
+			break;
+		} else if (type != SSH_SMSG_FAILURE)
 			packet_disconnect("Protocol error waiting RSA auth "
 			    "response: %d", type);
 	}
-	debug("RSA authentication using agent refused.");
+	if (ret != 1)
+		debug("RSA authentication using agent refused.");
  out:
 	ssh_free_identitylist(idlist);
 	ssh_close_authentication_socket(agent_fd);
