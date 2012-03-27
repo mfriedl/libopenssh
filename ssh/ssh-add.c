@@ -202,7 +202,7 @@ add_file(int agent_fd, const char *filename, int key_only)
 			if (strcmp(pass, "") == 0)
 				goto fail_load;
 			if ((r = sshkey_parse_private(&keyblob, pass, filename,
-			    &private, &comment)) == 0)
+			    &private, NULL)) == 0)
 				break;
 			else if (r != SSH_ERR_KEY_WRONG_PASSPHRASE) {
 				fprintf(stderr,
