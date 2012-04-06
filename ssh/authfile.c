@@ -553,8 +553,7 @@ sshkey_parse_private_pem(struct sshbuf *blob, int type, const char *passphrase,
 	
 	if ((pk = PEM_read_bio_PrivateKey(bio, NULL, NULL,
 	    (char *)passphrase)) == NULL) {
-		r = (*passphrase == '\0') ?
-		    SSH_ERR_KEY_WRONG_PASSPHRASE : SSH_ERR_LIBCRYPTO_ERROR;
+		r = SSH_ERR_KEY_WRONG_PASSPHRASE;
 		goto out;
 	}
 	if (pk->type == EVP_PKEY_RSA &&
