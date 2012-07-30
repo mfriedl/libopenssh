@@ -1,4 +1,4 @@
-/* $OpenBSD: authfile.c,v 1.92 2011/06/14 22:49:18 markus Exp $ */
+/* $OpenBSD: authfile.c,v 1.93 2012/01/25 19:36:31 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland

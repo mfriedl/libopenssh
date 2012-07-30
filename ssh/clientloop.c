@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.237 2011/09/10 22:26:34 markus Exp $ */
+/* $OpenBSD: clientloop.c,v 1.240 2012/06/20 04:42:58 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -273,6 +273,23 @@ set_control_persist_exit_time(void)
 	/* else we are already counting down to the timeout */
 }
 
+#define SSH_X11_VALID_DISPLAY_CHARS ":/.-_"
+static int
+client_x11_display_valid(const char *display)
+{
+	size_t i, dlen;
+
+	dlen = strlen(display);
+	for (i = 0; i < dlen; i++) {
+		if (!isalnum(display[i]) &&
+		    strchr(SSH_X11_VALID_DISPLAY_CHARS, display[i]) == NULL) {
+			debug("Invalid character '%c' in DISPLAY", display[i]);
+			return 0;
+		}
+	}
+	return 1;
+}
+
 #define SSH_X11_PROTO "MIT-MAGIC-COOKIE-1"
 void
 client_x11_get_proto(const char *display, const char *xauth_path,
@@ -295,6 +312,9 @@ client_x11_get_proto(const char *display, const char *xauth_path,
 
 	if (xauth_path == NULL ||(stat(xauth_path, &st) == -1)) {
 		debug("No xauth program.");
+	} else if (!client_x11_display_valid(display)) {
+		logit("DISPLAY '%s' invalid, falling back to fake xauth data",
+		    display);
 	} else {
 		if (display == NULL) {
 			debug("x11_get_proto: DISPLAY not set");
@@ -557,10 +577,12 @@ client_wait_until_can_do_something(struct ssh *ssh,
 {
 	struct timeval tv, *tvp;
 	int timeout_secs;
+	time_t minwait_secs = 0;
 	int ret;
 
 	/* Add any selections by the channel mechanism. */
-	channel_prepare_select(readsetp, writesetp, maxfdp, nallocp, rekeying);
+	channel_prepare_select(readsetp, writesetp, maxfdp, nallocp,
+	    &minwait_secs, rekeying);
 
 	if (!compat20) {
 		/* Read from the connection, unless our buffers are full. */
@@ -613,6 +635,8 @@ client_wait_until_can_do_something(struct ssh *ssh,
 		if (timeout_secs < 0)
 			timeout_secs = 0;
 	}
+	if (minwait_secs != 0)
+		timeout_secs = MIN(timeout_secs, (int)minwait_secs);
 	if (timeout_secs == INT_MAX)
 		tvp = NULL;
 	else {

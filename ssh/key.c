@@ -1,4 +1,4 @@
-/* $OpenBSD: key.c,v 1.97 2011/05/17 07:13:31 djm Exp $ */
+/* $OpenBSD: key.c,v 1.99 2012/05/23 03:28:28 djm Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Alexander von Gernler.  All rights reserved.
@@ -535,6 +535,9 @@ sshkey_fingerprint_raw(struct sshkey *k, enum sshkey_fp_type dgst_type,
 		break;
 	case SSH_FP_SHA1:
 		md = EVP_sha1();
+		break;
+	case SSH_FP_SHA256:
+		md = EVP_sha256();
 		break;
 	default:
 		return NULL;
