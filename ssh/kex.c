@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.c,v 1.86 2010/09/22 05:01:29 djm Exp $ */
+/* $OpenBSD: kex.c,v 1.87 2012/08/17 01:22:56 djm Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  *
@@ -266,8 +266,18 @@ kex_input_kexinit(int type, u_int32_t seq, struct ssh *ssh)
 	for (i = 0; i < PROPOSAL_MAX; i++)
 		if ((r = sshpkt_get_string(ssh, NULL, NULL)) != 0)
 			return r;
-	if ((r = sshpkt_get_u8(ssh, NULL)) != 0 ||
-	    (r = sshpkt_get_u32(ssh, NULL)) != 0 ||
+	/*
+	 * XXX RFC4253 sec 7: "each side MAY guess" - currently no supported
+	 * KEX method has the server move first, but a server might be using
+	 * a custom method or one that we otherwise don't support. We should
+	 * be prepared to remember first_kex_follows here so we can eat a
+	 * packet later.
+	 * XXX2 - RFC4253 is kind of ambiguous on what first_kex_follows means
+	 * for cases where the server *doesn't* go first. I guess we should
+	 * ignore it when it is set for these cases, which is what we do now.
+	 */
+	if ((r = sshpkt_get_u8(ssh, NULL)) != 0 ||	/* first_kex_follows */
+	    (r = sshpkt_get_u32(ssh, NULL)) != 0 ||	/* reserved */
 	    (r = sshpkt_get_end(ssh)) != 0)
 			return r;
 

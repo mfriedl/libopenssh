@@ -1,7 +1,6 @@
 /Makefile/1.58/Thu Jan  6 22:46:21 2011//
 /host-expand.sh/1.1/Thu Jan  6 22:46:21 2011//
 /sshd-log-wrapper.sh/1.2/Sun Feb 27 11:40:30 2005//
-/addrmatch.sh/1.4/Mon Jul 30 18:36:24 2012//
 /agent-getpeereid.sh/1.4/Mon Mar 26 21:06:58 2012//
 /agent-pkcs11.sh/1.1/Mon Mar 26 21:06:58 2012//
 /agent-ptrace.sh/1.1/Mon Mar 26 21:06:58 2012//
@@ -13,9 +12,7 @@
 /cert-hostkey.sh/1.6/Mon Mar 26 21:06:58 2012//
 /cert-userkey.sh/1.8/Mon Mar 26 21:06:58 2012//
 /cfgmatch.sh/1.6/Mon Mar 26 21:06:58 2012//
-/cipher-speed.sh/1.5/Mon Jul 30 18:36:24 2012//
 /conch-ciphers.sh/1.2/Mon Mar 26 21:06:58 2012//
-/connect-privsep.sh/1.4/Mon Jul 30 18:36:24 2012//
 /connect.sh/1.4/Mon Mar 26 21:06:58 2012//
 /dsa_ssh2.prv/1.1/Mon Mar 26 21:06:58 2012//
 /dsa_ssh2.pub/1.1/Mon Mar 26 21:06:58 2012//
@@ -23,7 +20,6 @@
 /envpass.sh/1.4/Mon Mar 26 21:06:58 2012//
 /exit-status.sh/1.6/Mon Mar 26 21:06:58 2012//
 /forcecommand.sh/1.1/Mon Mar 26 21:06:58 2012//
-/forwarding.sh/1.8/Mon Jul 30 18:36:24 2012//
 /kextype.sh/1.1/Mon Mar 26 21:06:58 2012//
 /key-options.sh/1.2/Mon Mar 26 21:06:58 2012//
 /keygen-change.sh/1.2/Mon Mar 26 21:06:58 2012//
@@ -32,7 +28,6 @@
 /keytype.sh/1.1/Mon Mar 26 21:06:58 2012//
 /localcommand.sh/1.1/Mon Mar 26 21:06:58 2012//
 /login-timeout.sh/1.4/Mon Mar 26 21:06:58 2012//
-/multiplex.sh/1.13/Mon Jul 30 18:36:24 2012//
 /portnum.sh/1.1/Mon Mar 26 21:06:58 2012//
 /proto-mismatch.sh/1.3/Mon Mar 26 21:06:58 2012//
 /proto-version.sh/1.3/Mon Mar 26 21:06:58 2012//
@@ -50,7 +45,6 @@
 /scp.sh/1.7/Mon Mar 26 21:06:58 2012//
 /sftp-badcmds.sh/1.4/Mon Mar 26 21:06:58 2012//
 /sftp-batch.sh/1.4/Mon Mar 26 21:06:58 2012//
-/sftp-cmds.sh/1.12/Mon Jul 30 18:36:24 2012//
 /sftp-glob.sh/1.4/Mon Mar 26 21:06:58 2012//
 /sftp.sh/1.3/Mon Mar 26 21:06:58 2012//
 /ssh-com-client.sh/1.6/Mon Mar 26 21:06:58 2012//
@@ -64,6 +58,12 @@
 /t5.ok/1.1/Mon Mar 26 21:06:58 2012//
 /test-exec.sh/1.37/Mon Mar 26 21:06:58 2012//
 /transfer.sh/1.1/Mon Mar 26 21:06:58 2012//
-/try-ciphers.sh/1.13/Mon Jul 30 18:36:24 2012//
 /yes-head.sh/1.4/Mon Mar 26 21:06:58 2012//
+/addrmatch.sh/1.4/Thu Aug  9 18:41:57 2012//
+/cipher-speed.sh/1.5/Thu Aug  9 18:41:57 2012//
+/connect-privsep.sh/1.4/Thu Aug  9 18:41:57 2012//
+/forwarding.sh/1.8/Thu Aug  9 18:41:57 2012//
+/multiplex.sh/1.16/Fri Sep 14 16:58:13 2012//
+/sftp-cmds.sh/1.12/Thu Aug  9 18:41:57 2012//
+/try-ciphers.sh/1.14/Fri Sep 14 16:58:13 2012//
 D
