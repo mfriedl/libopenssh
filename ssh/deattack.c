@@ -93,13 +93,17 @@ check_crc(u_char *S, u_char *buf, u_int32_t len)
 	return crc == 0;
 }
 
+void
+deattack_init(struct deattack_ctx *dctx)
+{
+	bzero(dctx, sizeof(*dctx));
+	dctx->n = HASH_MINSIZE / HASH_ENTRYSIZE;
+}
 
 /* Detect a crc32 compensation attack on a packet */
 int
-detect_attack(u_char *buf, u_int32_t len)
+detect_attack(struct deattack_ctx *dctx, u_char *buf, u_int32_t len)
 {
-	static u_int16_t *h = NULL;
-	static u_int32_t n = HASH_MINSIZE / HASH_ENTRYSIZE;
 	u_int16_t *tmp;
 	u_int32_t i, j, l, same;
 	u_char *c, *d;
@@ -107,21 +111,23 @@ detect_attack(u_char *buf, u_int32_t len)
 	if (len > (SSH_MAXBLOCKS * SSH_BLOCKSIZE) ||
 	    len % SSH_BLOCKSIZE != 0)
 		return DEATTACK_ERROR;
-	for (l = n; l < HASH_FACTOR(len / SSH_BLOCKSIZE); l = l << 2)
+	for (l = dctx->n; l < HASH_FACTOR(len / SSH_BLOCKSIZE); l = l << 2)
 		;
 
-	if (h == NULL) {
-		if ((h = calloc(l, HASH_ENTRYSIZE)) == NULL)
+	if (dctx->h == NULL) {
+		if ((dctx->h = calloc(l, HASH_ENTRYSIZE)) == NULL)
 			return DEATTACK_ERROR;
-		n = l;
+		dctx->n = l;
 	} else {
-		if (l > n) {
-			if ((tmp = reallocn(h, l, HASH_ENTRYSIZE)) == NULL) {
-				free(h);
+		if (l > dctx->n) {
+			if ((tmp = reallocn(dctx->h, l,
+			    HASH_ENTRYSIZE)) == NULL) {
+				free(dctx->h);
+				dctx->h = NULL;
 				return DEATTACK_ERROR;
 			}
-			h = tmp;
-			n = l;
+			dctx->h = tmp;
+			dctx->n = l;
 		}
 	}
 
@@ -138,12 +144,12 @@ detect_attack(u_char *buf, u_int32_t len)
 		}
 		return DEATTACK_OK;
 	}
-	memset(h, HASH_UNUSEDCHAR, n * HASH_ENTRYSIZE);
+	memset(dctx->h, HASH_UNUSEDCHAR, dctx->n * HASH_ENTRYSIZE);
 
 	for (c = buf, same = j = 0; c < (buf + len); c += SSH_BLOCKSIZE, j++) {
-		for (i = HASH(c) & (n - 1); h[i] != HASH_UNUSED;
-		    i = (i + 1) & (n - 1)) {
-			if (!CMP(c, buf + h[i] * SSH_BLOCKSIZE)) {
+		for (i = HASH(c) & (dctx->n - 1); dctx->h[i] != HASH_UNUSED;
+		    i = (i + 1) & (dctx->n - 1)) {
+			if (!CMP(c, buf + dctx->h[i] * SSH_BLOCKSIZE)) {
 				if (++same > MAX_IDENTICAL)
 					return DEATTACK_DOS_DETECTED;
 				if (check_crc(c, buf, len))
@@ -152,7 +158,7 @@ detect_attack(u_char *buf, u_int32_t len)
 					break;
 			}
 		}
-		h[i] = j;
+		dctx->h[i] = j;
 	}
 	return DEATTACK_OK;
 }

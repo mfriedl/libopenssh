@@ -198,6 +198,9 @@ struct session_state {
 	/* One-off warning about weak ciphers */
 	int cipher_warning_done;
 
+	/* SSH1 CRC compensation attack detector */
+	struct deattack_ctx deattack;
+
 	TAILQ_HEAD(, packet) outgoing;
 };
 
@@ -279,7 +282,7 @@ ssh_packet_set_connection(struct ssh *ssh, int fd_in, int fd_out)
 	    (const u_char *)"", 0, NULL, 0, CIPHER_DECRYPT)) != 0)
 		fatal("%s: cipher_init failed: %s", __func__, ssh_err(r));
 	state->newkeys[MODE_IN] = state->newkeys[MODE_OUT] = NULL;
-
+	deattack_init(&state->deattack);
 	return ssh;
 }
 
@@ -1486,8 +1489,8 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 	 * Ariel Futoransky(futo@core-sdi.com)
 	 */
 	if (!state->receive_context.plaintext) {
-		switch (detect_attack(sshbuf_ptr(state->input),
-		    padded_len)) {
+		switch (detect_attack(&state->deattack,
+		    sshbuf_ptr(state->input), padded_len)) {
 		case DEATTACK_OK:
 			break;
 		case DEATTACK_DETECTED:
@@ -1498,8 +1501,7 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 			ssh_packet_disconnect(ssh,
 			    "deattack denial of service detected");
 		default:
-			ssh_packet_disconnect(ssh,
-			    "deattack error");
+			ssh_packet_disconnect(ssh, "deattack error");
 		}
 	}
 
