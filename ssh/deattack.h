@@ -28,5 +28,11 @@
 #define DEATTACK_DOS_DETECTED	2
 #define DEATTACK_ERROR		3
 
-int	 detect_attack(u_char *, u_int32_t);
+struct deattack_ctx {
+	u_int16_t *h;
+	u_int32_t n;
+};
+
+void	 deattack_init(struct deattack_ctx *);
+int	 detect_attack(struct deattack_ctx *, u_char *, u_int32_t);
 #endif
