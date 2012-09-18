@@ -64,65 +64,94 @@
 
 #include <string.h>
 
-#include "xmalloc.h"
 #include "rsa.h"
 #include "log.h"
 #include "err.h"
 
-void
+int
 rsa_public_encrypt(BIGNUM *out, BIGNUM *in, RSA *key)
 {
-	u_char *inbuf, *outbuf;
-	int len, ilen, olen;
+	u_char *inbuf = NULL, *outbuf = NULL;
+	int len, ilen, olen, r = SSH_ERR_INTERNAL_ERROR;
 
 	if (BN_num_bits(key->e) < 2 || !BN_is_odd(key->e))
-		fatal("rsa_public_encrypt() exponent too small or not odd");
+		return SSH_ERR_INVALID_ARGUMENT;
 
 	olen = BN_num_bytes(key->n);
-	outbuf = xmalloc(olen);
+	if ((outbuf = malloc(olen)) == NULL) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
 
 	ilen = BN_num_bytes(in);
-	inbuf = xmalloc(ilen);
+	if ((inbuf = malloc(ilen)) == NULL) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
 	BN_bn2bin(in, inbuf);
 
 	if ((len = RSA_public_encrypt(ilen, inbuf, outbuf, key,
-	    RSA_PKCS1_PADDING)) <= 0)
-		fatal("rsa_public_encrypt() failed");
+	    RSA_PKCS1_PADDING)) <= 0) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
 
-	if (BN_bin2bn(outbuf, len, out) == NULL)
-		fatal("rsa_public_encrypt: BN_bin2bn failed");
+	if (BN_bin2bn(outbuf, len, out) == NULL) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
+	r = 0;
 
-	memset(outbuf, 0, olen);
-	memset(inbuf, 0, ilen);
-	xfree(outbuf);
-	xfree(inbuf);
+ out:
+	if (outbuf != NULL) {
+		memset(outbuf, 0, olen);
+		free(outbuf);
+	}
+	if (inbuf != NULL) {
+		memset(inbuf, 0, ilen);
+		free(inbuf);
+	}
+	return r;
 }
 
 int
 rsa_private_decrypt(BIGNUM *out, BIGNUM *in, RSA *key)
 {
-	u_char *inbuf, *outbuf;
-	int len, ilen, olen;
+	u_char *inbuf = NULL, *outbuf = NULL;
+	int len, ilen, olen, r = SSH_ERR_INTERNAL_ERROR;
 
 	olen = BN_num_bytes(key->n);
-	outbuf = xmalloc(olen);
+	if ((outbuf = malloc(olen)) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
 
 	ilen = BN_num_bytes(in);
-	inbuf = xmalloc(ilen);
+	if ((inbuf = malloc(ilen)) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
 	BN_bn2bin(in, inbuf);
 
 	if ((len = RSA_private_decrypt(ilen, inbuf, outbuf, key,
 	    RSA_PKCS1_PADDING)) <= 0) {
-		error("rsa_private_decrypt() failed");
-	} else {
-		if (BN_bin2bn(outbuf, len, out) == NULL)
-			fatal("rsa_private_decrypt: BN_bin2bn failed");
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	} else if (BN_bin2bn(outbuf, len, out) == NULL) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
 	}
-	memset(outbuf, 0, olen);
-	memset(inbuf, 0, ilen);
-	xfree(outbuf);
-	xfree(inbuf);
-	return len;
+	r = 0;
+ out:
+	if (outbuf != NULL) {
+		memset(outbuf, 0, olen);
+		free(outbuf);
+	}
+	if (inbuf != NULL) {
+		memset(inbuf, 0, ilen);
+		free(inbuf);
+	}
+	return r;
 }
 
 /* calculate p-1 and q-1 */
