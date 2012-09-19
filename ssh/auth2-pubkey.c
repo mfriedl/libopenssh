@@ -145,17 +145,17 @@ userauth_pubkey(struct ssh *ssh)
 		if (ssh->compat & SSH_BUG_PKAUTH) {
 			if ((r = sshbuf_put_u8(b, have_sig)) != 0)
 				fatal("%s: build packet failed: %s",
-			    	    __func__, ssh_err(r));
+				    __func__, ssh_err(r));
 		} else {
 			if ((r = sshbuf_put_cstring(b, "publickey")) != 0 ||
 			    (r = sshbuf_put_u8(b, have_sig)) != 0 ||
 			    (r = sshbuf_put_cstring(b, pkalg) != 0))
 				fatal("%s: build packet failed: %s",
-			    	    __func__, ssh_err(r));
+				    __func__, ssh_err(r));
 		}
 		if ((r = sshbuf_put_string(b, pkblob, blen)) != 0)
 			fatal("%s: build packet failed: %s",
-		    	    __func__, ssh_err(r));
+			    __func__, ssh_err(r));
 #ifdef DEBUG_PK
 		sshbuf_dump(b, stderr);
 #endif
@@ -262,7 +262,7 @@ match_principals_file(char *file, struct passwd *pw, struct sshkey_cert *cert)
 			if (strcmp(cp, cert->principals[i]) == 0) {
 				debug3("matched principal \"%.100s\" "
 				    "from file \"%s\" on line %lu",
-			    	    cert->principals[i], file, linenum);
+				    cert->principals[i], file, linenum);
 				if (auth_parse_options(pw, line_opts,
 				    file, linenum) != 1)
 					continue;
