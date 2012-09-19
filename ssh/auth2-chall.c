@@ -35,8 +35,11 @@
 #include "hostfile.h"
 #include "auth.h"
 #include "buffer.h"
+#define PACKET_SKIP_COMPAT
+#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "dispatch.h"
+#include "err.h"
 #include "log.h"
 
 static int auth2_challenge_start(struct ssh *);
@@ -207,22 +210,25 @@ send_userauth_info_request(struct ssh *ssh)
 	Authctxt *authctxt = ssh->authctxt;
 	KbdintAuthctxt *kbdintctxt = authctxt->kbdintctxt;
 	char *name, *instr, **prompts;
-	u_int i, *echo_on;
+	u_int r, i, *echo_on;
 
 	if (kbdintctxt->device->query(kbdintctxt->ctxt,
 	    &name, &instr, &kbdintctxt->nreq, &prompts, &echo_on))
 		return 0;
 
-	ssh_packet_start(ssh, SSH2_MSG_USERAUTH_INFO_REQUEST);
-	ssh_packet_put_cstring(ssh, name);
-	ssh_packet_put_cstring(ssh, instr);
-	ssh_packet_put_cstring(ssh, "");		/* language not used */
-	ssh_packet_put_int(ssh, kbdintctxt->nreq);
+	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_INFO_REQUEST)) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, name)) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, instr)) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, "")) != 0 ||	/* language not used */
+	    (r = sshpkt_put_u32(ssh, kbdintctxt->nreq)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	for (i = 0; i < kbdintctxt->nreq; i++) {
-		ssh_packet_put_cstring(ssh, prompts[i]);
-		ssh_packet_put_char(ssh, echo_on[i]);
+		if ((r = sshpkt_put_cstring(ssh, prompts[i])) != 0 ||
+		    (r = sshpkt_put_u8(ssh, echo_on[i])) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 	}
-	ssh_packet_send(ssh);
+	if ((r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	ssh_packet_write_wait(ssh);
 
 	for (i = 0; i < kbdintctxt->nreq; i++)
@@ -240,7 +246,7 @@ input_userauth_info_response(int type, u_int32_t seq, struct ssh *ssh)
 	Authctxt *authctxt = ssh->authctxt;
 	KbdintAuthctxt *kbdintctxt;
 	int authenticated = 0, res;
-	u_int i, nresp;
+	u_int r, i, nresp;
 	char **response = NULL, *method;
 
 	if (authctxt == NULL)
@@ -252,7 +258,8 @@ input_userauth_info_response(int type, u_int32_t seq, struct ssh *ssh)
 		fatal("input_userauth_info_response: no device");
 
 	authctxt->postponed = 0;	/* reset */
-	nresp = ssh_packet_get_int(ssh);
+	if ((r = sshpkt_get_u32(ssh, &nresp)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	if (nresp != kbdintctxt->nreq)
 		fatal("input_userauth_info_response: wrong number of replies");
 	if (nresp > 100)
@@ -260,9 +267,12 @@ input_userauth_info_response(int type, u_int32_t seq, struct ssh *ssh)
 	if (nresp > 0) {
 		response = xcalloc(nresp, sizeof(char *));
 		for (i = 0; i < nresp; i++)
-			response[i] = ssh_packet_get_string(ssh, NULL);
+			if ((r = sshpkt_get_cstring(ssh, &response[i],
+			    NULL)) != 0)
+				fatal("%s: %s", __func__, ssh_err(r));
 	}
-	ssh_packet_check_eom(ssh);
+	if ((r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	res = kbdintctxt->device->respond(kbdintctxt->ctxt, nresp, response);
 
