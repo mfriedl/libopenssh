@@ -38,6 +38,8 @@
 #include "sshbuf.h"
 #include "err.h"
 #include "servconf.h"
+#define PACKET_SKIP_COMPAT
+#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "ssh-gss.h"
 #include "monitor_wrap.h"
@@ -59,17 +61,18 @@ userauth_gssapi(struct ssh *ssh)
 	Authctxt *authctxt = ssh->authctxt;
 	gss_OID_desc goid = {0, NULL};
 	Gssctxt *ctxt = NULL;
-	int mechs;
+	int r, mechs, present;
 	gss_OID_set supported;
-	int present;
 	OM_uint32 ms;
-	u_int len;
+	size_t len;
 	u_char *doid = NULL;
 
 	if (!authctxt->valid || authctxt->user == NULL)
 		return (0);
 
-	mechs = ssh_packet_get_int(ssh);
+	if ((r = sshpkt_get_u32(ssh, &mechs)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+
 	if (mechs == 0) {
 		debug("Mechanism negotiation is not supported");
 		return (0);
@@ -83,7 +86,8 @@ userauth_gssapi(struct ssh *ssh)
 			xfree(doid);
 
 		present = 0;
-		doid = ssh_packet_get_string(ssh, &len);
+		if ((r = sshpkt_get_string(ssh, &doid, &len)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 
 		if (len > 2 && doid[0] == SSH_GSS_OIDTYPE &&
 		    doid[1] == len - 2) {
@@ -114,12 +118,12 @@ userauth_gssapi(struct ssh *ssh)
 
 	authctxt->methoddata = (void *)ctxt;
 
-	ssh_packet_start(ssh, SSH2_MSG_USERAUTH_GSSAPI_RESPONSE);
-
 	/* Return the OID that we received */
-	ssh_packet_put_string(ssh, doid, len);
+	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_GSSAPI_RESPONSE)) != 0 ||
+	    (r = sshpkt_put_string(ssh, doid, len)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
-	ssh_packet_send(ssh);
 	xfree(doid);
 
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_TOKEN, &input_gssapi_token);
@@ -137,36 +141,45 @@ input_gssapi_token(int type, u_int32_t plen, struct ssh *ssh)
 	gss_buffer_desc send_tok = GSS_C_EMPTY_BUFFER;
 	gss_buffer_desc recv_tok;
 	OM_uint32 maj_status, min_status, flags;
-	u_int len;
+	u_char *p;
+	size_t len;
+	int r;
 
 	if (authctxt == NULL || (authctxt->methoddata == NULL && !use_privsep))
 		fatal("No authentication or GSSAPI context");
 
 	gssctxt = authctxt->methoddata;
-	recv_tok.value = ssh_packet_get_string(ssh, &len);
-	recv_tok.length = len; /* u_int vs. size_t */
+	if ((r = sshpkt_get_string(ssh, &p, &len)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
-	ssh_packet_check_eom(ssh);
-
+	recv_tok.value = p;
+	recv_tok.length = len;
 	maj_status = PRIVSEP(ssh_gssapi_accept_ctx(gssctxt, &recv_tok,
 	    &send_tok, &flags));
 
-	xfree(recv_tok.value);
+	xfree(p);
 
 	if (GSS_ERROR(maj_status)) {
 		if (send_tok.length != 0) {
-			ssh_packet_start(ssh, SSH2_MSG_USERAUTH_GSSAPI_ERRTOK);
-			ssh_packet_put_string(ssh, send_tok.value, send_tok.length);
-			ssh_packet_send(ssh);
+			if ((r = sshpkt_start(ssh,
+			    SSH2_MSG_USERAUTH_GSSAPI_ERRTOK)) != 0 ||
+			    (r = sshpkt_put_string(ssh, send_tok.value,
+			    send_tok.length)) != 0 ||
+			    (r = sshpkt_send(ssh)) != 0)
+				fatal("%s: %s", __func__, ssh_err(r));
 		}
 		authctxt->postponed = 0;
 		ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
 		userauth_finish(ssh, 0, "gssapi-with-mic");
 	} else {
 		if (send_tok.length != 0) {
-			ssh_packet_start(ssh, SSH2_MSG_USERAUTH_GSSAPI_TOKEN);
-			ssh_packet_put_string(ssh, send_tok.value, send_tok.length);
-			ssh_packet_send(ssh);
+			if ((r = sshpkt_start(ssh,
+			    SSH2_MSG_USERAUTH_GSSAPI_TOKEN)) != 0 ||
+			    (r = sshpkt_put_string(ssh, send_tok.value,
+			    send_tok.length)) != 0 ||
+			    (r = sshpkt_send(ssh)) != 0)
+				fatal("%s: %s", __func__, ssh_err(r));
 		}
 		if (maj_status == GSS_S_COMPLETE) {
 			ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
@@ -192,22 +205,25 @@ input_gssapi_errtok(int type, u_int32_t plen, struct ssh *ssh)
 	gss_buffer_desc send_tok = GSS_C_EMPTY_BUFFER;
 	gss_buffer_desc recv_tok;
 	OM_uint32 maj_status;
-	u_int len;
+	size_t len;
+	u_char *p;
+	int r;
 
 	if (authctxt == NULL || (authctxt->methoddata == NULL && !use_privsep))
 		fatal("No authentication or GSSAPI context");
 
 	gssctxt = authctxt->methoddata;
-	recv_tok.value = ssh_packet_get_string(ssh, &len);
-	recv_tok.length = len;
-
-	ssh_packet_check_eom(ssh);
+	if ((r = sshpkt_get_string(ssh, &p, &len)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	/* Push the error token into GSSAPI to see what it says */
+	recv_tok.value = p;
+	recv_tok.length = len;
 	maj_status = PRIVSEP(ssh_gssapi_accept_ctx(gssctxt, &recv_tok,
 	    &send_tok, NULL));
 
-	xfree(recv_tok.value);
+	xfree(p);
 
 	/* We can't return anything to the client, even if we wanted to */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
@@ -230,7 +246,7 @@ input_gssapi_exchange_complete(int type, u_int32_t plen, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
 	Gssctxt *gssctxt;
-	int authenticated;
+	int r, authenticated;
 
 	if (authctxt == NULL || (authctxt->methoddata == NULL && !use_privsep))
 		fatal("No authentication or GSSAPI context");
@@ -242,7 +258,8 @@ input_gssapi_exchange_complete(int type, u_int32_t plen, struct ssh *ssh)
 	 * the dispatcher once the exchange is complete
 	 */
 
-	ssh_packet_check_eom(ssh);
+	if ((r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	authenticated = PRIVSEP(ssh_gssapi_userok(authctxt->user));
 
@@ -260,19 +277,21 @@ input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
 	Gssctxt *gssctxt;
-	int authenticated = 0;
+	int r, authenticated = 0;
 	struct sshbuf *b;
 	gss_buffer_desc mic, gssbuf;
-	u_int len;
+	u_char *p;
+	size_t len;
 
 	if (authctxt == NULL || (authctxt->methoddata == NULL && !use_privsep))
 		fatal("No authentication or GSSAPI context");
 
 	gssctxt = authctxt->methoddata;
 
-	mic.value = ssh_packet_get_string(ssh, &len);
+	if ((r = sshpkt_get_string(ssh, &p, &len)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	mic.value = p;
 	mic.length = len;
-
 	if ((b = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
 	ssh_gssapi_buildmic(b, authctxt->user, authctxt->service,
@@ -287,7 +306,7 @@ input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh)
 		logit("GSSAPI MIC check failed");
 
 	sshbuf_free(b);
-	xfree(mic.value);
+	xfree(p);
 
 	authctxt->postponed = 0;
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
