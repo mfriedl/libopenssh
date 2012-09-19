@@ -11,7 +11,6 @@ CDIAGFLAGS+=	-Wpointer-arith
 CDIAGFLAGS+=	-Wstrict-prototypes
 CDIAGFLAGS+=	-Wmissing-prototypes
 CDIAGFLAGS+=	-Wunused
-CDIAGFLAGS+=	-Wuninitialized
 CDIAGFLAGS+=	-Wsign-compare
 CDIAGFLAGS+=	-Wshadow
 
@@ -47,6 +46,9 @@ LEAKMALLOC_DIR=	${.CURDIR}/../../leakmalloc/leakmalloc
 CFLAGS+=	-I${LEAKMALLOC_DIR} -DWITH_LEAKMALLOC 
 LDFLAGS+=	-L/usr/local/lib
 LDADD+=		-lleakmalloc -lexecinfo
+CFLAGS+=	-Dmalloc=leak_malloc -Dstrdup=leak_strdup
+CFLAGS+=	-Dcalloc=leak_calloc -Drealloc=leak_realloc
+CFLAGS+=	-Dfree=leak_free
 . if exists(${LEAKMALLOC_DIR}/${__objdir})
 LDADD+=         -L${LEAKMALLOC_DIR}/${__objdir}
 DPADD+=         ${LEAKMALLOC_DIR}/${__objdir}/libleakmalloc.a

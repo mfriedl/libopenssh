@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 #include <err.h>
 
 #include <execinfo.h>
@@ -94,11 +95,16 @@ dump_leaks(void)
 }
 
 static void
-internal_error(struct alloc *alloc)
+internal_error(const char *tag, struct alloc *alloc)
 {
+	char buf[256];
+
+	snprintf(buf, sizeof(buf), "ERROR/%s", tag);
+#if 0
 	alloc->addr = NULL;
 	alloc->len = -1;
-	dump_leak(stderr, "ERROR", alloc);
+#endif
+	dump_leak(stderr, buf, alloc);
 	initialised = -1;
 }
 
@@ -119,7 +125,7 @@ new_alloc(void *addr, size_t len)
 static void
 __record_leak(void *addr, size_t len, void *oaddr)
 {
-	struct alloc oalloc, *alloc;
+	struct alloc oalloc, *alloc, *ealloc;
 	char *cp;
 
 	if (initialised == -1)
@@ -149,10 +155,13 @@ __record_leak(void *addr, size_t len, void *oaddr)
 		if (addr == NULL)
 			return;		/* alloc failed or free(NULL) */
 		alloc = new_alloc(addr, len);
-		if (RB_INSERT(alloc_tree, &alloc_tree, alloc) != NULL) {
-			internal_error(alloc);
-			errx(1, "%s: alloc for %p already exists",
+		ealloc = RB_INSERT(alloc_tree, &alloc_tree, alloc);
+		if (ealloc != NULL) {
+			internal_error("original", ealloc);
+			internal_error("new", alloc);
+			warnx("%s: alloc for fresh alloc %p already exists",
 			    __func__, addr);
+			raise(SIGABRT);
 		}
 	} else {
 		oalloc.addr = oaddr;
@@ -172,17 +181,21 @@ __record_leak(void *addr, size_t len, void *oaddr)
 			 */
 			if (alloc == NULL) {
 				alloc = new_alloc(NULL, -1);
-				internal_error(alloc);
-				errx(1, "%s: realloc original addr %p missing",
+				internal_error("new", alloc);
+				warnx("%s: realloc original addr %p missing",
 				    __func__, oaddr);
+				raise(SIGABRT);
 			}
 			RB_REMOVE(alloc_tree, &alloc_tree, alloc);
 			alloc->addr = addr;
 			alloc->len = len;
-			if (RB_INSERT(alloc_tree, &alloc_tree, alloc) != NULL) {
-				internal_error(alloc);
-				errx(1, "%s: alloc for %p already exists",
+			ealloc = RB_INSERT(alloc_tree, &alloc_tree, alloc);
+			if (ealloc != NULL) {
+				internal_error("original", ealloc);
+				internal_error("new", alloc);
+				warnx("%s: alloc for realloc %p already exists",
 				    __func__, addr);
+				raise(SIGABRT);
 			}
 		}
 	}
