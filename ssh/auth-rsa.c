@@ -134,7 +134,7 @@ auth_rsa_challenge_dialog(struct sshkey *key)
 	struct ssh *ssh = active_state;
 	BIGNUM *challenge, *encrypted_challenge;
 	u_char response[16];
-	int r, i, success;
+	int r, success;
 
 	if ((encrypted_challenge = BN_new()) == NULL)
 		fatal("auth_rsa_challenge_dialog: BN_new() failed");
@@ -156,9 +156,8 @@ auth_rsa_challenge_dialog(struct sshkey *key)
 
 	/* Wait for a response. */
 	ssh_packet_read_expect(ssh, SSH_CMSG_AUTH_RSA_RESPONSE);
-	for (i = 0; i < 16; i++)
-		if ((r = sshpkt_get_u8(ssh, &response[i])) != 0)
-			fatal("%s: %s", __func__, ssh_err(r));
+	if ((r = sshpkt_get(ssh, &response, sizeof(response))) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	ssh_packet_check_eom(ssh);
 
 	success = PRIVSEP(auth_rsa_verify_response(key, challenge, response));

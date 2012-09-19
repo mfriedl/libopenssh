@@ -325,6 +325,7 @@ int	sshpkt_put_ec(struct ssh *ssh, const EC_POINT *v, const EC_GROUP *g);
 int	sshpkt_put_bignum1(struct ssh *ssh, const BIGNUM *v);
 int	sshpkt_put_bignum2(struct ssh *ssh, const BIGNUM *v);
 
+int	sshpkt_get(struct ssh *ssh, void *valp, size_t len);
 int	sshpkt_get_u8(struct ssh *ssh, u_char *valp);
 int	sshpkt_get_u32(struct ssh *ssh, u_int32_t *valp);
 int	sshpkt_get_u64(struct ssh *ssh, u_int64_t *valp);

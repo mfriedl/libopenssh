@@ -2769,6 +2769,12 @@ sshpkt_put_bignum2(struct ssh *ssh, const BIGNUM *v)
 /* fetch data from the incoming packet */
 
 int
+sshpkt_get(struct ssh *ssh, void *valp, size_t len)
+{
+	return sshbuf_get(ssh->state->incoming_packet, valp, len);
+}
+
+int
 sshpkt_get_u8(struct ssh *ssh, u_char *valp)
 {
 	return sshbuf_get_u8(ssh->state->incoming_packet, valp);
