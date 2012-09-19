@@ -156,9 +156,9 @@ auth_rsa_challenge_dialog(struct sshkey *key)
 
 	/* Wait for a response. */
 	ssh_packet_read_expect(ssh, SSH_CMSG_AUTH_RSA_RESPONSE);
-	if ((r = sshpkt_get(ssh, &response, sizeof(response))) != 0)
+	if ((r = sshpkt_get(ssh, &response, sizeof(response))) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
-	ssh_packet_check_eom(ssh);
 
 	success = PRIVSEP(auth_rsa_verify_response(key, challenge, response));
 	BN_clear_free(challenge);

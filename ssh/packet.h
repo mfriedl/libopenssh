@@ -165,6 +165,7 @@ int	 ssh_packet_set_state(struct ssh *, struct sshbuf *);
 
 const char *ssh_remote_ipaddr(struct ssh *);
 
+#ifndef PACKET_SKIP_COMPAT2
 /* don't allow remaining bytes after the end of the message */
 #define ssh_packet_check_eom(active_state) \
 do { \
@@ -176,6 +177,7 @@ do { \
 		    "Packet integrity error."); \
 	} \
 } while (0)
+#endif
 
 int	 ssh_packet_need_rekeying(struct ssh *);
 void	 ssh_packet_set_rekey_limit(struct ssh *, u_int32_t);

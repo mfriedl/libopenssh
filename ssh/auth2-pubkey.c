@@ -122,9 +122,9 @@ userauth_pubkey(struct ssh *ssh)
 		goto done;
 	}
 	if (have_sig) {
-		if ((r = sshpkt_get_string(ssh, &sig, &slen)) != 0)
+		if ((r = sshpkt_get_string(ssh, &sig, &slen)) != 0 ||
+		    (r = sshpkt_get_end(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
-		ssh_packet_check_eom(ssh);
 		if ((b = sshbuf_new()) == NULL)
 			fatal("%s: sshbuf_new failed", __func__);
 		if (ssh->compat & SSH_OLD_SESSIONID) {
@@ -172,7 +172,8 @@ userauth_pubkey(struct ssh *ssh)
 		xfree(sig);
 	} else {
 		debug("test whether pkalg/pkblob are acceptable");
-		ssh_packet_check_eom(ssh);
+		if ((r = sshpkt_get_end(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 
 		/* XXX fake reply and always send PK_OK ? */
 		/*

@@ -1775,9 +1775,9 @@ client_input_stdout_data(int type, u_int32_t seq, struct ssh *ssh)
 	size_t data_len;
 	int r;
 
-	if ((r = sshpkt_get_string(ssh, &data, &data_len)) != 0)
+	if ((r = sshpkt_get_string(ssh, &data, &data_len)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
-	ssh_packet_check_eom(ssh);
 	buffer_append(&stdout_buffer, data, data_len);
 	memset(data, 0, data_len);
 	free(data);
@@ -1790,9 +1790,9 @@ client_input_stderr_data(int type, u_int32_t seq, struct ssh *ssh)
 	size_t data_len;
 	int r;
 
-	if ((r = sshpkt_get_string(ssh, &data, &data_len)) != 0)
+	if ((r = sshpkt_get_string(ssh, &data, &data_len)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
-	ssh_packet_check_eom(ssh);
 	buffer_append(&stderr_buffer, data, data_len);
 	memset(data, 0, data_len);
 	free(data);
@@ -1803,9 +1803,9 @@ client_input_exit_status(int type, u_int32_t seq, struct ssh *ssh)
 {
 	int r;
 
-	if ((r = sshpkt_get_u32(ssh, &exit_status)) != 0)
+	if ((r = sshpkt_get_u32(ssh, &exit_status)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
-	ssh_packet_check_eom(ssh);
 	/* Acknowledge the exit. */
 	if ((r = sshpkt_start(ssh, SSH_CMSG_EXIT_CONFIRMATION)) != 0 ||
 	    (r = sshpkt_send(ssh)) != 0)
@@ -1826,9 +1826,9 @@ client_input_agent_open(int type, u_int32_t seq, struct ssh *ssh)
 	int remote_id, sock, r;
 
 	/* Read the remote channel number from the message. */
-	if ((r = sshpkt_get_u32(ssh, &remote_id)) != 0)
+	if ((r = sshpkt_get_u32(ssh, &remote_id)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
-	ssh_packet_check_eom(ssh);
 
 	/*
 	 * Get a connection to the local authentication agent (this may again
@@ -1882,9 +1882,9 @@ client_request_forwarded_tcpip(struct ssh *ssh, const char *request_type, int rc
 	if ((r = sshpkt_get_cstring(ssh, &listen_address, NULL)) != 0 ||
 	    (r = sshpkt_get_u32(ssh, &listen_port)) != 0 ||
 	    (r = sshpkt_get_cstring(ssh, &originator_address, NULL)) != 0 ||
-	    (r = sshpkt_get_u32(ssh, &originator_port)) != 0)
+	    (r = sshpkt_get_u32(ssh, &originator_port)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
-	ssh_packet_check_eom(ssh);
 
 	debug("client_request_forwarded_tcpip: listen %s port %d, "
 	    "originator %s port %d", listen_address, listen_port,
@@ -1924,7 +1924,8 @@ client_request_x11(struct ssh *ssh, const char *request_type, int rchan)
 		originator_port = 0;
 	} else if ((r = sshpkt_get_u32(ssh, &originator_port)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
-	ssh_packet_check_eom(ssh);
+	if ((r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	/* XXX check permission */
 	debug("client_request_x11: request from %s %d", originator,
 	    originator_port);
@@ -2089,7 +2090,8 @@ client_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 		error("client_input_channel_req: channel %d: "
 		    "unknown channel", id);
 	} else if (strcmp(rtype, "eow@openssh.com") == 0) {
-		ssh_packet_check_eom(ssh);
+		if ((r = sshpkt_get_end(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		chan_rcvd_eow(c);
 	} else if (strcmp(rtype, "exit-status") == 0) {
 		if ((r = sshpkt_get_u32(ssh, &exitval)) != 0)
@@ -2106,7 +2108,8 @@ client_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 			debug("%s: no sink for exit-status on channel %d",
 			    __func__, id);
 		}
-		ssh_packet_check_eom(ssh);
+		if ((r = sshpkt_get_end(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 	}
 	if (reply && c != NULL) {
 		if ((r = sshpkt_start(ssh, success ?
