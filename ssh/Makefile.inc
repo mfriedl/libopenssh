@@ -11,6 +11,7 @@ CDIAGFLAGS+=	-Wpointer-arith
 CDIAGFLAGS+=	-Wstrict-prototypes
 CDIAGFLAGS+=	-Wmissing-prototypes
 CDIAGFLAGS+=	-Wunused
+CDIAGFLAGS+=	-Wuninitialized
 CDIAGFLAGS+=	-Wsign-compare
 CDIAGFLAGS+=	-Wshadow
 
