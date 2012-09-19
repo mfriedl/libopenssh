@@ -27,7 +27,8 @@
 #include "xmalloc.h"
 #include "err.h"
 #include "rsa.h"
-#define PACKET_SKIP_COMPAT 1
+#define PACKET_SKIP_COMPAT
+#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "ssh1.h"
 #include "uidswap.h"

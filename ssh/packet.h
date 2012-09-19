@@ -92,6 +92,7 @@ int      ssh_packet_is_interactive(struct ssh *);
 void     ssh_packet_set_server(struct ssh *);
 void     ssh_packet_set_authenticated(struct ssh *);
 
+#ifndef PACKET_SKIP_COMPAT2
 void     ssh_packet_start(struct ssh *, u_char);
 void     ssh_packet_put_char(struct ssh *, int ch);
 void     ssh_packet_put_int(struct ssh *, u_int value);
@@ -103,6 +104,8 @@ void     ssh_packet_put_string(struct ssh *, const void *buf, u_int len);
 void     ssh_packet_put_cstring(struct ssh *, const char *str);
 void     ssh_packet_put_raw(struct ssh *, const void *buf, u_int len);
 void     ssh_packet_send(struct ssh *);
+#endif
+
 int	 ssh_packet_send1(struct ssh *);
 int	 ssh_packet_send2_wrapped(struct ssh *);
 int	 ssh_packet_send2(struct ssh *);
@@ -116,6 +119,7 @@ void     ssh_packet_process_incoming(struct ssh *, const char *buf, u_int len);
 int      ssh_packet_read_seqnr(struct ssh *, u_char *, u_int32_t *seqnr_p);
 int      ssh_packet_read_poll_seqnr(struct ssh *, u_char *, u_int32_t *seqnr_p);
 
+#ifndef PACKET_SKIP_COMPAT2
 u_int	 ssh_packet_get_char(struct ssh *);
 u_int	 ssh_packet_get_int(struct ssh *);
 u_int64_t ssh_packet_get_int64(struct ssh *);
@@ -124,6 +128,8 @@ void     ssh_packet_get_bignum2(struct ssh *, BIGNUM * value);
 void	 ssh_packet_get_ecpoint(struct ssh *, const EC_GROUP *, EC_POINT *);
 void	*ssh_packet_get_string(struct ssh *, u_int *length_ptr);
 char	*ssh_packet_get_cstring(struct ssh *, u_int *length_ptr);
+#endif
+
 const void *ssh_packet_get_string_ptr(struct ssh *, u_int *length_ptr);
 void     ssh_packet_disconnect(struct ssh *, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 void     ssh_packet_send_debug(struct ssh *, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
