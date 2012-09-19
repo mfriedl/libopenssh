@@ -172,13 +172,14 @@ respond_to_rsa_challenge(BIGNUM * challenge, RSA * prv)
 {
 	u_char buf[32], response[16];
 	MD5_CTX md;
-	int i, len;
+	int r, i, len;
 
 	/* Decrypt the challenge using the private key. */
 	/* XXX think about Bleichenbacher, too */
-	if (rsa_private_decrypt(challenge, challenge, prv) <= 0)
-		packet_disconnect(
-		    "respond_to_rsa_challenge: rsa_private_decrypt failed");
+	if ((r = rsa_private_decrypt(challenge, challenge, prv)) != 0) {
+		packet_disconnect( "%s: rsa_private_decrypt: %s",
+		    __func__, ssh_err(r));
+	}
 
 	/* Compute the response. */
 	/* The response is MD5 of decrypted challenge plus session id. */
@@ -637,8 +638,10 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 			    BN_num_bits(server_key->rsa->n),
 			    SSH_KEY_BITS_RESERVED);
 		}
-		rsa_public_encrypt(key, key, server_key->rsa);
-		rsa_public_encrypt(key, key, host_key->rsa);
+		if ((r = rsa_public_encrypt(key, key, server_key->rsa)) != 0 ||
+		    (r = rsa_public_encrypt(key, key, host_key->rsa)) != 0)
+			fatal("%s: rsa_public_encrypt: %s", __func__,
+			    ssh_err(r));
 	} else {
 		/* Host key has smaller modulus (or they are equal). */
 		if (BN_num_bits(server_key->rsa->n) <
@@ -649,8 +652,10 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 			    BN_num_bits(host_key->rsa->n),
 			    SSH_KEY_BITS_RESERVED);
 		}
-		rsa_public_encrypt(key, key, host_key->rsa);
-		rsa_public_encrypt(key, key, server_key->rsa);
+		if ((r = rsa_public_encrypt(key, key, host_key->rsa)) != 0 ||
+		    (r = rsa_public_encrypt(key, key, server_key->rsa)) != 0)
+			fatal("%s: rsa_public_encrypt: %s", __func__,
+			    ssh_err(r));
 	}
 
 	/* Destroy the public keys since we no longer need them. */

@@ -1939,7 +1939,7 @@ main(int ac, char **av)
 int
 ssh1_session_key(BIGNUM *session_key_int)
 {
-	int rsafail = 0;
+	int r, rsafail = 0;
 
 	if (BN_cmp(sensitive_data.server_key->rsa->n,
 	    sensitive_data.ssh1_host_key->rsa->n) > 0) {
@@ -1954,12 +1954,18 @@ ssh1_session_key(BIGNUM *session_key_int)
 			    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n),
 			    SSH_KEY_BITS_RESERVED);
 		}
-		if (rsa_private_decrypt(session_key_int, session_key_int,
-		    sensitive_data.server_key->rsa) <= 0)
+		if ((r = rsa_private_decrypt(session_key_int, session_key_int,
+		    sensitive_data.server_key->rsa) != 0)) {
+			error("%s: rsa_private_decrypt: %s",
+			    __func__, ssh_err(r));
 			rsafail++;
-		if (rsa_private_decrypt(session_key_int, session_key_int,
-		    sensitive_data.ssh1_host_key->rsa) <= 0)
+		}
+		if ((r = rsa_private_decrypt(session_key_int, session_key_int,
+		    sensitive_data.ssh1_host_key->rsa) != 0)) {
+			error("%s: rsa_private_decrypt: %s",
+			    __func__, ssh_err(r));
 			rsafail++;
+		}
 	} else {
 		/* Host key has bigger modulus (or they are equal). */
 		if (BN_num_bits(sensitive_data.ssh1_host_key->rsa->n) <
@@ -1972,15 +1978,22 @@ ssh1_session_key(BIGNUM *session_key_int)
 			    BN_num_bits(sensitive_data.server_key->rsa->n),
 			    SSH_KEY_BITS_RESERVED);
 		}
-		if (rsa_private_decrypt(session_key_int, session_key_int,
-		    sensitive_data.ssh1_host_key->rsa) < 0)
+		if ((r = rsa_private_decrypt(session_key_int, session_key_int,
+		    sensitive_data.ssh1_host_key->rsa)) != 0) {
+			error("%s: rsa_private_decrypt: %s",
+			    __func__, ssh_err(r));
 			rsafail++;
-		if (rsa_private_decrypt(session_key_int, session_key_int,
-		    sensitive_data.server_key->rsa) < 0)
+		}
+		if ((r = rsa_private_decrypt(session_key_int, session_key_int,
+		    sensitive_data.server_key->rsa)) != 0) {
+			error("%s: rsa_private_decrypt: %s",
+			    __func__, ssh_err(r));
 			rsafail++;
+		}
 	}
 	return (rsafail);
 }
+
 /*
  * SSH1 key exchange
  */

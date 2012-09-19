@@ -239,7 +239,7 @@ process_authentication_challenge1(SocketEntry *e)
 	u_int response_type;
 	BIGNUM *challenge;
 	Identity *id;
-	int i, len;
+	int r, i, len;
 	Buffer msg;
 	MD5_CTX md;
 	struct sshkey *key;
@@ -267,10 +267,14 @@ process_authentication_challenge1(SocketEntry *e)
 	if (id != NULL && (!id->confirm || confirm_key(id) == 0)) {
 		struct sshkey *private = id->key;
 		/* Decrypt the challenge using the private key. */
-		if (rsa_private_decrypt(challenge, challenge, private->rsa) <= 0)
+		if ((r = rsa_private_decrypt(challenge, challenge,
+		    private->rsa) != 0)) {
+			fatal("%s: rsa_public_encrypt: %s", __func__,
+			    ssh_err(r));
 			goto failure;
+		}
 
-		/* The response is MD5 of decrypted challenge plus session id. */
+		/* The response is MD5 of decrypted challenge plus session id */
 		len = BN_num_bytes(challenge);
 		if (len <= 0 || len > 32) {
 			logit("%s: bad challenge length %d", __func__, len);

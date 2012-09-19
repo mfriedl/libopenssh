@@ -25,6 +25,7 @@
 #include <string.h>
 
 #include "xmalloc.h"
+#include "err.h"
 #include "rsa.h"
 #include "packet.h"
 #include "ssh1.h"
@@ -130,7 +131,7 @@ auth_rsa_challenge_dialog(struct sshkey *key)
 {
 	BIGNUM *challenge, *encrypted_challenge;
 	u_char response[16];
-	int i, success;
+	int r, i, success;
 
 	if ((encrypted_challenge = BN_new()) == NULL)
 		fatal("auth_rsa_challenge_dialog: BN_new() failed");
@@ -138,7 +139,9 @@ auth_rsa_challenge_dialog(struct sshkey *key)
 	challenge = PRIVSEP(auth_rsa_generate_challenge(key));
 
 	/* Encrypt the challenge with the public key. */
-	rsa_public_encrypt(encrypted_challenge, challenge, key->rsa);
+	if ((r = rsa_public_encrypt(encrypted_challenge, challenge,
+	    key->rsa)) != 0)
+		fatal("%s: rsa_public_encrypt: %s", __func__, ssh_err(r));
 
 	/* Send the encrypted challenge to the client. */
 	packet_start(SSH_SMSG_AUTH_RSA_CHALLENGE);
