@@ -79,13 +79,13 @@ rsa_public_encrypt(BIGNUM *out, BIGNUM *in, RSA *key)
 
 	olen = BN_num_bytes(key->n);
 	if ((outbuf = malloc(olen)) == NULL) {
-		r = SSH_ERR_LIBCRYPTO_ERROR;
+		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
 
 	ilen = BN_num_bytes(in);
 	if ((inbuf = malloc(ilen)) == NULL) {
-		r = SSH_ERR_LIBCRYPTO_ERROR;
+		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
 	BN_bn2bin(in, inbuf);
