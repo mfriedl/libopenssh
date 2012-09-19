@@ -85,8 +85,6 @@ static Gssctxt *gsscontext = NULL;
 extern ServerOptions options;
 extern u_int utmp_len;
 extern u_char session_id[];
-extern Buffer auth_debug;
-extern int auth_debug_init;
 extern Buffer loginmsg;
 
 /* State exported from the child */

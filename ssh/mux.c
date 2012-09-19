@@ -608,7 +608,7 @@ mux_confirm_remote_forward(int type, u_int32_t seq, void *ctxt)
 	buffer_put_cstring(&out, failmsg);
 	xfree(failmsg);
  out:
-	buffer_put_string(&c->output, buffer_ptr(&out), buffer_len(&out));
+	buffer_put_string(c->output, buffer_ptr(&out), buffer_len(&out));
 	buffer_free(&out);
 	if (c->mux_pause <= 0)
 		fatal("%s: mux_pause %d", __func__, c->mux_pause);
@@ -1022,7 +1022,7 @@ mux_master_read_cb(Channel *c)
 		buffer_put_int(&out, MUX_MSG_HELLO);
 		buffer_put_int(&out, SSHMUX_VER);
 		/* no extensions */
-		buffer_put_string(&c->output, buffer_ptr(&out),
+		buffer_put_string(c->output, buffer_ptr(&out),
 		    buffer_len(&out));
 		buffer_free(&out);
 		debug3("%s: channel %d: hello sent", __func__, c->self);
@@ -1033,7 +1033,7 @@ mux_master_read_cb(Channel *c)
 	buffer_init(&out);
 
 	/* Channel code ensures that we receive whole packets */
-	if ((ptr = buffer_get_string_ptr_ret(&c->input, &have)) == NULL) {
+	if ((ptr = buffer_get_string_ptr_ret(c->input, &have)) == NULL) {
  malf:
 		error("%s: malformed message", __func__);
 		goto out;
@@ -1072,7 +1072,7 @@ mux_master_read_cb(Channel *c)
 	}
 	/* Enqueue reply packet */
 	if (buffer_len(&out) != 0) {
-		buffer_put_string(&c->output, buffer_ptr(&out),
+		buffer_put_string(c->output, buffer_ptr(&out),
 		    buffer_len(&out));
 	}
  out:
@@ -1100,7 +1100,7 @@ mux_exit_message(Channel *c, int exitval)
 	buffer_put_int(&m, c->self);
 	buffer_put_int(&m, exitval);
 
-	buffer_put_string(&mux_chan->output, buffer_ptr(&m), buffer_len(&m));
+	buffer_put_string(mux_chan->output, buffer_ptr(&m), buffer_len(&m));
 	buffer_free(&m);
 }
 
@@ -1121,7 +1121,7 @@ mux_tty_alloc_failed(Channel *c)
 	buffer_put_int(&m, MUX_S_TTY_ALLOC_FAIL);
 	buffer_put_int(&m, c->self);
 
-	buffer_put_string(&mux_chan->output, buffer_ptr(&m), buffer_len(&m));
+	buffer_put_string(mux_chan->output, buffer_ptr(&m), buffer_len(&m));
 	buffer_free(&m);
 }
 
@@ -1287,7 +1287,7 @@ mux_session_confirm(int id, int success, void *arg)
 
  done:
 	/* Send reply */
-	buffer_put_string(&cc->output, buffer_ptr(&reply), buffer_len(&reply));
+	buffer_put_string(cc->output, buffer_ptr(&reply), buffer_len(&reply));
 	buffer_free(&reply);
 
 	if (cc->mux_pause <= 0)

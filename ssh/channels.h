@@ -59,6 +59,7 @@
 
 #define CHANNEL_CANCEL_PORT_STATIC	-1
 
+struct sshbuf;
 struct ssh;
 struct Channel;
 typedef struct Channel Channel;
@@ -67,7 +68,7 @@ typedef void channel_open_fn(int, int, void *);
 typedef void channel_callback_fn(int, void *);
 typedef int channel_infilter_fn(struct Channel *, char *, int);
 typedef void channel_filter_cleanup_fn(int, void *);
-typedef u_char *channel_outfilter_fn(struct Channel *, u_char **, u_int *);
+typedef u_char *channel_outfilter_fn(struct Channel *, u_char **, size_t *);
 
 /* Channel success/failure callbacks */
 typedef void channel_confirm_cb(int, struct Channel *, void *);
@@ -111,11 +112,11 @@ struct Channel {
 				 * to a matching pre-select handler. 
 				 * this way post-select handlers are not
 				 * accidenly called if a FD gets reused */
-	Buffer  input;		/* data read from socket, to be sent over
+	struct sshbuf *input;	/* data read from socket, to be sent over
 				 * encrypted connection */
-	Buffer  output;		/* data received over encrypted connection for
+	struct sshbuf *output;	/* data received over encrypted connection for
 				 * send on socket */
-	Buffer  extended;
+	struct sshbuf *extended;
 	char    *path;
 		/* path for unix domain sockets, or host name for forwards */
 	int     listening_port;	/* port being listened for forwards */
@@ -195,11 +196,13 @@ struct Channel {
 #define CHANNEL_EFD_INPUT_ACTIVE(c) \
 	(compat20 && c->extended_usage == CHAN_EXTENDED_READ && \
 	(c->efd != -1 || \
-	buffer_len(&c->extended) > 0))
+	sshbuf_len(c->extended) > 0))
 #define CHANNEL_EFD_OUTPUT_ACTIVE(c) \
 	(compat20 && c->extended_usage == CHAN_EXTENDED_WRITE && \
 	c->efd != -1 && (!(c->flags & (CHAN_EOF_RCVD|CHAN_CLOSE_RCVD)) || \
-	buffer_len(&c->extended) > 0))
+	sshbuf_len(c->extended) > 0))
+
+#define CHANNEL_BUFFER_ERROR(c, r) channel_buffer_error(c, r, __func__)
 
 /* channel management */
 
@@ -211,6 +214,7 @@ void	 channel_free(Channel *);
 void	 channel_free_all(void);
 void	 channel_stop_listening(void);
 
+void	 channel_buffer_error(Channel *, int, const char *);
 void	 channel_send_open(int);
 void	 channel_request_start(int, char *, int);
 void	 channel_register_cleanup(int, channel_callback_fn *, int);

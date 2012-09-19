@@ -87,6 +87,7 @@
 #include "ssh2.h"
 #include "packet.h"
 #include "buffer.h"
+#include "sshbuf.h"
 #include "compat.h"
 #include "channels.h"
 #include "dispatch.h"
@@ -755,7 +756,7 @@ client_status_confirm(int type, Channel *c, void *ctx)
 {
 	struct channel_reply_ctx *cr = (struct channel_reply_ctx *)ctx;
 	char errmsg[256];
-	int tochan;
+	int tochan, r;
 
 	/*
 	 * If a TTY was explicitly requested, then a failure to allocate
@@ -790,8 +791,9 @@ client_status_confirm(int type, Channel *c, void *ctx)
 		 * their stderr.
 		 */
 		if (tochan) {
-			buffer_append(&c->extended, errmsg,
-			    strlen(errmsg));
+			if ((r = sshbuf_put(c->extended, errmsg,
+			    strlen(errmsg))) != 0)
+				CHANNEL_BUFFER_ERROR(c, r);
 		} else
 			error("%s", errmsg);
 		if (cr->action == CONFIRM_TTY) {
@@ -1050,8 +1052,8 @@ print_escape_help(Buffer *b, int escape_char, int protocol2, int mux_client,
  * Process the characters one by one, call with c==NULL for proto1 case.
  */
 static int
-process_escapes(struct ssh *ssh, Channel *c, Buffer *bin, Buffer *bout,
-    Buffer *berr, char *buf, int len)
+process_escapes(struct ssh *ssh, Channel *c, struct sshbuf *bin,
+    struct sshbuf *bout, struct sshbuf *berr, char *buf, int len)
 {
 	char string[1024];
 	pid_t pid;
@@ -1439,7 +1441,7 @@ client_simple_escape_filter(Channel *c, char *buf, int len)
 	if (c->extended_usage != CHAN_EXTENDED_WRITE)
 		return 0;
 
-	return process_escapes(ssh, c, &c->input, &c->output, &c->extended,
+	return process_escapes(ssh, c, c->input, c->output, c->extended,
 	    buf, len);
 }
 

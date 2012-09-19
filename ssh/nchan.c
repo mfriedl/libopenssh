@@ -151,7 +151,7 @@ void
 chan_ibuf_empty(Channel *c)
 {
 	debug2("channel %d: ibuf empty", c->self);
-	if (buffer_len(&c->input)) {
+	if (sshbuf_len(c->input)) {
 		error("channel %d: chan_ibuf_empty for non empty buffer",
 		    c->self);
 		return;
@@ -215,7 +215,7 @@ void
 chan_obuf_empty(Channel *c)
 {
 	debug2("channel %d: obuf empty", c->self);
-	if (buffer_len(&c->output)) {
+	if (sshbuf_len(c->output)) {
 		error("channel %d: chan_obuf_empty for non empty buffer",
 		    c->self);
 		return;
@@ -257,7 +257,7 @@ chan_send_oclose1(Channel *c)
 	switch (c->ostate) {
 	case CHAN_OUTPUT_OPEN:
 	case CHAN_OUTPUT_WAIT_DRAIN:
-		buffer_clear(&c->output);
+		sshbuf_reset(c->output);
 		packet_start(SSH_MSG_CHANNEL_OUTPUT_CLOSE);
 		packet_put_int(c->remote_id);
 		packet_send();
@@ -409,7 +409,7 @@ chan_rcvd_ieof(Channel *c)
 	else
 		chan_rcvd_ieof1(c);
 	if (c->ostate == CHAN_OUTPUT_WAIT_DRAIN &&
-	    buffer_len(&c->output) == 0 &&
+	    sshbuf_len(c->output) == 0 &&
 	    !CHANNEL_EFD_OUTPUT_ACTIVE(c))
 		chan_obuf_empty(c);
 }
@@ -452,9 +452,9 @@ chan_is_dead(Channel *c, int do_send)
 	if ((active_state->compat & SSH_BUG_EXTEOF) &&
 	    c->extended_usage == CHAN_EXTENDED_WRITE &&
 	    c->efd != -1 &&
-	    buffer_len(&c->extended) > 0) {
-		debug2("channel %d: active efd: %d len %d",
-		    c->self, c->efd, buffer_len(&c->extended));
+	    sshbuf_len(c->extended) > 0) {
+		debug2("channel %d: active efd: %d len %zu",
+		    c->self, c->efd, sshbuf_len(c->extended));
 		return 0;
 	}
 	if (c->flags & CHAN_LOCAL) {
@@ -485,7 +485,7 @@ chan_is_dead(Channel *c, int do_send)
 static void
 chan_shutdown_write(Channel *c)
 {
-	buffer_clear(&c->output);
+	sshbuf_reset(c->output);
 	if (compat20 && c->type == SSH_CHANNEL_LARVAL)
 		return;
 	/* shutdown failure is allowed if write failed already */

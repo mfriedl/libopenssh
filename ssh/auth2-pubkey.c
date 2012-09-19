@@ -39,7 +39,7 @@
 #include "ssh.h"
 #include "ssh2.h"
 #include "packet.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "log.h"
 #include "servconf.h"
 #include "compat.h"
@@ -68,7 +68,7 @@ static int
 userauth_pubkey(struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
-	Buffer b;
+	struct sshbuf *b;
 	struct sshkey *key = NULL;
 	char *pkalg;
 	u_char *pkblob, *sig;
@@ -85,11 +85,16 @@ userauth_pubkey(struct ssh *ssh)
 		debug2("%s: SSH_BUG_PKAUTH", __func__);
 		/* no explicit pkalg given */
 		pkblob = ssh_packet_get_string(ssh, &blen);
-		buffer_init(&b);
-		buffer_append(&b, pkblob, blen);
+		if ((b = sshbuf_new()) == NULL)
+			fatal("%s: sshbuf_new failed", __func__);
+		if ((r = sshbuf_put(b, pkblob, blen)) != 0)
+			fatal("%s: sshbuf_put failed: %s",
+			    __func__, ssh_err(r));
 		/* so we have to extract the pkalg from the pkblob */
-		pkalg = buffer_get_string(&b, &alen);
-		buffer_free(&b);
+		if ((r = sshbuf_get_cstring(b, &pkalg, NULL)) != 0)
+			fatal("%s: sshbuf_get_cstring failed: %s",
+			    __func__, ssh_err(r));
+		sshbuf_free(b);
 	} else {
 		pkalg = ssh_packet_get_string(ssh, &alen);
 		pkblob = ssh_packet_get_string(ssh, &blen);
@@ -117,37 +122,50 @@ userauth_pubkey(struct ssh *ssh)
 	if (have_sig) {
 		sig = ssh_packet_get_string(ssh, &slen);
 		ssh_packet_check_eom(ssh);
-		buffer_init(&b);
+		if ((b = sshbuf_new()) == NULL)
+			fatal("%s: sshbuf_new failed", __func__);
 		if (ssh->compat & SSH_OLD_SESSIONID) {
-			buffer_append(&b, session_id2, session_id2_len);
+			if ((r = sshbuf_put(b, session_id2,
+			    session_id2_len)) != 0)
+				fatal("%s: sshbuf_put session id: %s",
+				    __func__, ssh_err(r));
 		} else {
-			buffer_put_string(&b, session_id2, session_id2_len);
+			if ((r = sshbuf_put_string(b, session_id2,
+			    session_id2_len)) != 0)
+				fatal("%s: sshbuf_put_string session id: %s",
+				    __func__, ssh_err(r));
 		}
 		/* reconstruct packet */
-		buffer_put_char(&b, SSH2_MSG_USERAUTH_REQUEST);
-		buffer_put_cstring(&b, authctxt->user);
-		buffer_put_cstring(&b,
-		    ssh->compat & SSH_BUG_PKSERVICE ?
-		    "ssh-userauth" :
-		    authctxt->service);
+		if ((r = sshbuf_put_u8(b, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
+		    (r = sshbuf_put_cstring(b, authctxt->user)) != 0 ||
+		    (r = sshbuf_put_cstring(b, ssh->compat & SSH_BUG_PKSERVICE ?
+		    "ssh-userauth" : authctxt->service)) != 0)
+			fatal("%s: build packet failed: %s",
+			    __func__, ssh_err(r));
 		if (ssh->compat & SSH_BUG_PKAUTH) {
-			buffer_put_char(&b, have_sig);
+			if ((r = sshbuf_put_u8(b, have_sig)) != 0)
+				fatal("%s: build packet failed: %s",
+			    	    __func__, ssh_err(r));
 		} else {
-			buffer_put_cstring(&b, "publickey");
-			buffer_put_char(&b, have_sig);
-			buffer_put_cstring(&b, pkalg);
+			if ((r = sshbuf_put_cstring(b, "publickey")) != 0 ||
+			    (r = sshbuf_put_u8(b, have_sig)) != 0 ||
+			    (r = sshbuf_put_cstring(b, pkalg) != 0))
+				fatal("%s: build packet failed: %s",
+			    	    __func__, ssh_err(r));
 		}
-		buffer_put_string(&b, pkblob, blen);
+		if ((r = sshbuf_put_string(b, pkblob, blen)) != 0)
+			fatal("%s: build packet failed: %s",
+		    	    __func__, ssh_err(r));
 #ifdef DEBUG_PK
-		buffer_dump(&b);
+		sshbuf_dump(b, stderr);
 #endif
 		/* test for correct signature */
 		authenticated = 0;
 		if (PRIVSEP(user_key_allowed(authctxt->pw, key)) &&
-		    PRIVSEP(sshkey_verify(key, sig, slen, buffer_ptr(&b),
-		    buffer_len(&b), ssh->compat)) == 0)
+		    PRIVSEP(sshkey_verify(key, sig, slen, sshbuf_ptr(b),
+		    sshbuf_len(b), ssh->compat)) == 0)
 			authenticated = 1;
-		buffer_free(&b);
+		sshbuf_free(b);
 		xfree(sig);
 	} else {
 		debug("test whether pkalg/pkblob are acceptable");

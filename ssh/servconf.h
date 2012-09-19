@@ -197,13 +197,15 @@ struct connection_info {
 		M_CP_STRARRAYOPT(accept_env, num_accept_env); \
 	} while (0)
 
+struct sshbuf;
+
 struct connection_info *get_connection_info(int, int);
 void	 initialize_server_options(ServerOptions *);
 void	 fill_default_server_options(ServerOptions *);
 int	 process_server_config_line(ServerOptions *, char *, const char *, int,
 	     int *, struct connection_info *);
-void	 load_server_config(const char *, Buffer *);
-void	 parse_server_config(ServerOptions *, const char *, Buffer *,
+void	 load_server_config(const char *, struct sshbuf *);
+void	 parse_server_config(ServerOptions *, const char *, struct sshbuf *,
 	     struct connection_info *);
 void	 parse_server_match_config(ServerOptions *, struct connection_info *);
 int	 parse_server_match_testspec(struct connection_info *, char *);
