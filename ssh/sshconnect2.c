@@ -45,7 +45,7 @@
 #include "xmalloc.h"
 #include "ssh.h"
 #include "ssh2.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "packet.h"
 #include "compat.h"
 #include "cipher.h"
@@ -567,7 +567,6 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 	Authctxt *authctxt = ssh->authctxt;
 	struct sshkey *key = NULL;
 	Identity *id = NULL;
-	Buffer b;
 	int pktype, sent = 0;
 	u_int alen, blen;
 	char *pkalg, *fp;
@@ -577,13 +576,17 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 	if (authctxt == NULL)
 		fatal("input_userauth_pk_ok: no authentication context");
 	if (ssh->compat & SSH_BUG_PKOK) {
+		struct sshbuf *b;
+
 		/* this is similar to SSH_BUG_PKAUTH */
 		debug2("input_userauth_pk_ok: SSH_BUG_PKOK");
 		pkblob = ssh_packet_get_string(ssh, &blen);
-		buffer_init(&b);
-		buffer_append(&b, pkblob, blen);
-		pkalg = buffer_get_string(&b, &alen);
-		buffer_free(&b);
+		if ((b = sshbuf_new()) == NULL)
+			fatal("%s: sshbuf_new failed", __func__);
+		if ((r = sshbuf_put(b, pkblob, blen)) != 0 ||
+		    (r = sshbuf_get_cstring(b, &pkalg, NULL)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
+		sshbuf_free(b);
 	} else {
 		pkalg = ssh_packet_get_string(ssh, &alen);
 		pkblob = ssh_packet_get_string(ssh, &blen);
@@ -699,7 +702,6 @@ process_gssapi_token(struct ssh *ssh, gss_buffer_t recv_tok)
 	gss_buffer_desc mic = GSS_C_EMPTY_BUFFER;
 	gss_buffer_desc gssbuf;
 	OM_uint32 status, ms, flags;
-	Buffer b;
 
 	status = ssh_gssapi_init_ctx(gssctxt, options.gss_deleg_creds,
 	    recv_tok, &send_tok, &flags);
@@ -721,11 +723,15 @@ process_gssapi_token(struct ssh *ssh, gss_buffer_t recv_tok)
 			ssh_packet_start(ssh, SSH2_MSG_USERAUTH_GSSAPI_EXCHANGE_COMPLETE);
 			ssh_packet_send(ssh);
 		} else {
-			ssh_gssapi_buildmic(&b, authctxt->server_user,
+			struct sshbuf *b;
+
+			if ((b = sshbuf_new()) == NULL)
+				fatal("%s: sshbuf_new failed", __func__);
+			ssh_gssapi_buildmic(b, authctxt->server_user,
 			    authctxt->service, "gssapi-with-mic");
 
-			gssbuf.value = buffer_ptr(&b);
-			gssbuf.length = buffer_len(&b);
+			gssbuf.value = sshbuf_ptr(b);
+			gssbuf.length = sshbuf_len(b);
 
 			status = ssh_gssapi_sign(gssctxt, &gssbuf, &mic);
 
@@ -736,7 +742,7 @@ process_gssapi_token(struct ssh *ssh, gss_buffer_t recv_tok)
 				ssh_packet_send(ssh);
 			}
 
-			buffer_free(&b);
+			sshbuf_free(b);
 			gss_release_buffer(&ms, &mic);
 		}
 	}
@@ -1222,7 +1228,7 @@ static int
 sign_and_send_pubkey(struct ssh *ssh, Identity *id)
 {
 	Authctxt *authctxt = ssh->authctxt;
-	Buffer b;
+	struct sshbuf *b;
 	u_char *blob, *signature;
 	u_int bloblen, slen;
 	u_int skip = 0;
@@ -1240,71 +1246,82 @@ sign_and_send_pubkey(struct ssh *ssh, Identity *id)
 		return 0;
 	}
 	/* data to be signed */
-	buffer_init(&b);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	if (ssh->compat & SSH_OLD_SESSIONID) {
-		buffer_append(&b, ssh->kex->session_id,
-		    ssh->kex->session_id_len);
+		if ((r = sshbuf_put(b, ssh->kex->session_id,
+		    ssh->kex->session_id_len)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		skip = ssh->kex->session_id_len;
 	} else {
-		buffer_put_string(&b, ssh->kex->session_id,
-		    ssh->kex->session_id_len);
-		skip = buffer_len(&b);
+		if ((r = sshbuf_put_string(b, ssh->kex->session_id,
+		    ssh->kex->session_id_len)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
+		skip = sshbuf_len(b);
 	}
-	buffer_put_char(&b, SSH2_MSG_USERAUTH_REQUEST);
-	buffer_put_cstring(&b, authctxt->server_user);
-	buffer_put_cstring(&b,
-	    ssh->compat & SSH_BUG_PKSERVICE ?
-	    "ssh-userauth" :
-	    authctxt->service);
+	if ((r = sshbuf_put_u8(b, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
+	    (r = sshbuf_put_cstring(b, authctxt->server_user)) != 0 ||
+	    (r = sshbuf_put_cstring(b, ssh->compat & SSH_BUG_PKSERVICE ?
+	    "ssh-userauth" : authctxt->service)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (ssh->compat & SSH_BUG_PKAUTH) {
-		buffer_put_char(&b, have_sig);
+		if ((r = sshbuf_put_u8(b, have_sig)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	} else {
-		buffer_put_cstring(&b, authctxt->method->name);
-		buffer_put_char(&b, have_sig);
-		buffer_put_cstring(&b, sshkey_ssh_name(id->key));
+		if ((r = sshbuf_put_cstring(b, authctxt->method->name)) != 0 ||
+		    (r = sshbuf_put_u8(b, have_sig)) != 0 ||
+		    (r = sshbuf_put_cstring(b, sshkey_ssh_name(id->key))) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
-	buffer_put_string(&b, blob, bloblen);
+	if ((r = sshbuf_put_string(b, blob, bloblen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	/* generate signature */
 	if ((ret = identity_sign(id, &signature, &slen,
-	    buffer_ptr(&b), buffer_len(&b), ssh->compat)) != 0) {
+	    sshbuf_ptr(b), sshbuf_len(b), ssh->compat)) != 0) {
 		error("signature failed: %s", ssh_err(ret));
 		xfree(blob);
-		buffer_free(&b);
+		sshbuf_free(b);
 		return 0;
 	}
 #ifdef DEBUG_PK
-	buffer_dump(&b);
+	sshbuf_dump(b, stderr);
 #endif
 	if (ssh->compat & SSH_BUG_PKSERVICE) {
-		buffer_clear(&b);
-		buffer_append(&b, ssh->kex->session_id,
-		    ssh->kex->session_id_len);
+		sshbuf_reset(b);
+		if ((r = sshbuf_put(b, ssh->kex->session_id,
+		    ssh->kex->session_id_len)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		skip = ssh->kex->session_id_len;
-		buffer_put_char(&b, SSH2_MSG_USERAUTH_REQUEST);
-		buffer_put_cstring(&b, authctxt->server_user);
-		buffer_put_cstring(&b, authctxt->service);
-		buffer_put_cstring(&b, authctxt->method->name);
-		buffer_put_char(&b, have_sig);
+		if ((r = sshbuf_put_u8(b, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
+		    (r = sshbuf_put_cstring(b, authctxt->server_user)) != 0 ||
+		    (r = sshbuf_put_cstring(b, authctxt->service)) != 0 ||
+		    (r = sshbuf_put_cstring(b, authctxt->method->name)) != 0 ||
+		    (r = sshbuf_put_u8(b, have_sig)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		if (!(ssh->compat & SSH_BUG_PKAUTH))
-			buffer_put_cstring(&b, sshkey_ssh_name(id->key));
-		buffer_put_string(&b, blob, bloblen);
+			if ((r = sshbuf_put_cstring(b,
+			    sshkey_ssh_name(id->key))) != 0 ||
+			    (r = sshbuf_put_string(b, blob, bloblen)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
 	xfree(blob);
 
 	/* append signature */
-	buffer_put_string(&b, signature, slen);
+	if ((r = sshbuf_put_string(b, signature, slen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	xfree(signature);
 
 	/* skip session id and packet type */
-	if (buffer_len(&b) < skip + 1)
-		fatal("userauth_pubkey: internal error");
-	buffer_consume(&b, skip + 1);
+	if (sshbuf_len(b) < skip + 1)
+		fatal("%s: internal error", __func__);
+	if ((r = sshbuf_consume(b, skip + 1)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	/* put remaining data from buffer into packet */
 	ssh_packet_start(ssh, SSH2_MSG_USERAUTH_REQUEST);
-	ssh_packet_put_raw(ssh, buffer_ptr(&b), buffer_len(&b));
-	buffer_free(&b);
+	ssh_packet_put_raw(ssh, sshbuf_ptr(b), sshbuf_len(b));
+	sshbuf_free(b);
 	ssh_packet_send(ssh);
 
 	return 1;
@@ -1638,31 +1655,33 @@ input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 
 static int
 ssh_keysign(struct ssh *ssh, struct sshkey *key, u_char **sigp, u_int *lenp,
-    u_char *data, u_int datalen)
+    u_char *data, size_t datalen)
 {
-	Buffer b;
+	struct sshbuf *b;
 	struct stat st;
 	pid_t pid;
-	int to[2], from[2], status, version = 2;
+	int r, to[2], from[2], status;
+	u_char rversion, version = 2;
+	size_t len;
 
-	debug2("ssh_keysign called");
+	debug2("%s called", __func__);
 
 	if (stat(_PATH_SSH_KEY_SIGN, &st) < 0) {
-		error("ssh_keysign: not installed: %s", strerror(errno));
+		error("%s: not installed: %s", __func__, strerror(errno));
 		return -1;
 	}
 	if (fflush(stdout) != 0)
-		error("ssh_keysign: fflush: %s", strerror(errno));
+		error("%s: fflush: %s", __func__, strerror(errno));
 	if (pipe(to) < 0) {
-		error("ssh_keysign: pipe: %s", strerror(errno));
+		error("%s: pipe: %s", __func__, strerror(errno));
 		return -1;
 	}
 	if (pipe(from) < 0) {
-		error("ssh_keysign: pipe: %s", strerror(errno));
+		error("%s: pipe: %s", __func__, strerror(errno));
 		return -1;
 	}
 	if ((pid = fork()) < 0) {
-		error("ssh_keysign: fork: %s", strerror(errno));
+		error("%s: fork: %s", __func__, strerror(errno));
 		return -1;
 	}
 	if (pid == 0) {
@@ -1671,28 +1690,34 @@ ssh_keysign(struct ssh *ssh, struct sshkey *key, u_char **sigp, u_int *lenp,
 		permanently_drop_suid(getuid());
 		close(from[0]);
 		if (dup2(from[1], STDOUT_FILENO) < 0)
-			fatal("ssh_keysign: dup2: %s", strerror(errno));
+			fatal("%s: dup2: %s", __func__, strerror(errno));
 		close(to[1]);
 		if (dup2(to[0], STDIN_FILENO) < 0)
-			fatal("ssh_keysign: dup2: %s", strerror(errno));
+			fatal("%s: dup2: %s", __func__, strerror(errno));
 		close(from[1]);
 		close(to[0]);
 		execl(_PATH_SSH_KEY_SIGN, _PATH_SSH_KEY_SIGN, (char *) 0);
-		fatal("ssh_keysign: exec(%s): %s", _PATH_SSH_KEY_SIGN,
+		fatal("%s: exec(%s): %s", __func__, _PATH_SSH_KEY_SIGN,
 		    strerror(errno));
 	}
 	close(from[1]);
 	close(to[0]);
 
-	buffer_init(&b);
-	buffer_put_int(&b, ssh_packet_get_connection_in(ssh)); /* send # of socket */
-	buffer_put_string(&b, data, datalen);
-	if (ssh_msg_send(to[1], version, &b) == -1)
-		fatal("ssh_keysign: couldn't send request");
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 
-	if (ssh_msg_recv(from[0], &b) < 0) {
-		error("ssh_keysign: no reply");
-		buffer_free(&b);
+	/* send # of socket */
+	if ((r = sshbuf_put_u32(b, ssh_packet_get_connection_in(ssh))) != 0 ||
+	    (r = sshbuf_put_string(b, data, datalen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if (ssh_msg_send(to[1], version, b) == -1)
+		fatal("%s: couldn't send request", __func__);
+
+	sshbuf_reset(b);
+
+	if (ssh_msg_recv(from[0], b) < 0) {
+		error("%s: no reply", __func__);
+		sshbuf_free(b);
 		return -1;
 	}
 	close(from[0]);
@@ -1701,14 +1726,17 @@ ssh_keysign(struct ssh *ssh, struct sshkey *key, u_char **sigp, u_int *lenp,
 	while (waitpid(pid, &status, 0) < 0)
 		if (errno != EINTR)
 			break;
-
-	if (buffer_get_char(&b) != version) {
-		error("ssh_keysign: bad version");
-		buffer_free(&b);
+	if ((r = sshbuf_get_u8(b, &rversion)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if (rversion != version) {
+		error("%s: bad version", __func__);
+		sshbuf_free(b);
 		return -1;
 	}
-	*sigp = buffer_get_string(&b, lenp);
-	buffer_free(&b);
+	if ((r = sshbuf_get_string(b, sigp, &len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	*lenp = len; /* XXX */
+	sshbuf_free(b);
 
 	return 0;
 }
@@ -1719,12 +1747,12 @@ userauth_hostbased(struct ssh *ssh)
 	Authctxt *authctxt = ssh->authctxt;
 	struct sshkey *private = NULL;
 	Sensitive *sensitive = authctxt->sensitive;
-	Buffer b;
+	struct sshbuf *b;
 	u_char *signature, *blob;
 	char *chost, *pkalg, *p;
 	const char *service;
 	u_int blen, slen;
-	int ok, i, found = 0;
+	int ok, i, r, found = 0;
 
 	/* check for a useful key */
 	for (i = 0; i < sensitive->nkeys; i++) {
@@ -1760,28 +1788,31 @@ userauth_hostbased(struct ssh *ssh)
 	service = ssh->compat & SSH_BUG_HBSERVICE ? "ssh-userauth" :
 	    authctxt->service;
 	pkalg = xstrdup(sshkey_ssh_name(private));
-	buffer_init(&b);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	/* construct data */
-	buffer_put_string(&b, ssh->kex->session_id, ssh->kex->session_id_len);
-	buffer_put_char(&b, SSH2_MSG_USERAUTH_REQUEST);
-	buffer_put_cstring(&b, authctxt->server_user);
-	buffer_put_cstring(&b, service);
-	buffer_put_cstring(&b, authctxt->method->name);
-	buffer_put_cstring(&b, pkalg);
-	buffer_put_string(&b, blob, blen);
-	buffer_put_cstring(&b, chost);
-	buffer_put_cstring(&b, authctxt->local_user);
+	if ((r = sshbuf_put_string(b, ssh->kex->session_id,
+	    ssh->kex->session_id_len)) != 0 ||
+	    (r = sshbuf_put_u8(b, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
+	    (r = sshbuf_put_cstring(b, authctxt->server_user)) != 0 ||
+	    (r = sshbuf_put_cstring(b, service)) != 0 ||
+	    (r = sshbuf_put_cstring(b, authctxt->method->name)) != 0 ||
+	    (r = sshbuf_put_cstring(b, pkalg)) != 0 ||
+	    (r = sshbuf_put_string(b, blob, blen)) != 0 ||
+	    (r = sshbuf_put_cstring(b, chost)) != 0 ||
+	    (r = sshbuf_put_cstring(b, authctxt->local_user)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 #ifdef DEBUG_PK
-	buffer_dump(&b);
+	sshbuf_dump(b, stderr);
 #endif
 	if (sensitive->external_keysign)
 		ok = ssh_keysign(ssh, private, &signature, &slen,
-		    buffer_ptr(&b), buffer_len(&b));
+		    sshbuf_ptr(b), sshbuf_len(b));
 	else
 		ok = sshkey_sign(private, &signature, &slen,
-		    buffer_ptr(&b), buffer_len(&b), ssh->compat);
+		    sshbuf_ptr(b), sshbuf_len(b), ssh->compat);
 	sshkey_free(private);
-	buffer_free(&b);
+	sshbuf_free(b);
 	if (ok != 0) {
 		error("sshkey_sign failed");
 		xfree(chost);
@@ -1968,19 +1999,23 @@ static char *
 authmethods_get(void)
 {
 	Authmethod *method = NULL;
-	Buffer b;
+	struct sshbuf *b;
 	char *list;
+	int r;
 
-	buffer_init(&b);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	for (method = authmethods; method->name != NULL; method++) {
 		if (authmethod_is_enabled(method)) {
-			if (buffer_len(&b) > 0)
-				buffer_append(&b, ",", 1);
-			buffer_append(&b, method->name, strlen(method->name));
+			if ((r = sshbuf_putf(b, "%s%s",
+			    sshbuf_len(b) ? "," : "", method->name)) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 		}
 	}
-	buffer_append(&b, "\0", 1);
-	list = xstrdup(buffer_ptr(&b));
-	buffer_free(&b);
+	if ((r = sshbuf_put_u8(b, 0)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	list = xstrdup(sshbuf_ptr(b));
+	sshbuf_free(b);
 	return list;
 }

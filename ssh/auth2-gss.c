@@ -35,7 +35,8 @@
 #include "ssh2.h"
 #include "log.h"
 #include "dispatch.h"
-#include "buffer.h"
+#include "sshbuf.h"
+#include "err.h"
 #include "servconf.h"
 #include "packet.h"
 #include "ssh-gss.h"
@@ -260,7 +261,7 @@ input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh)
 	Authctxt *authctxt = ssh->authctxt;
 	Gssctxt *gssctxt;
 	int authenticated = 0;
-	Buffer b;
+	struct sshbuf *b;
 	gss_buffer_desc mic, gssbuf;
 	u_int len;
 
@@ -272,18 +273,20 @@ input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh)
 	mic.value = ssh_packet_get_string(ssh, &len);
 	mic.length = len;
 
-	ssh_gssapi_buildmic(&b, authctxt->user, authctxt->service,
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	ssh_gssapi_buildmic(b, authctxt->user, authctxt->service,
 	    "gssapi-with-mic");
 
-	gssbuf.value = buffer_ptr(&b);
-	gssbuf.length = buffer_len(&b);
+	gssbuf.value = sshbuf_ptr(b);
+	gssbuf.length = sshbuf_len(b);
 
 	if (!GSS_ERROR(PRIVSEP(ssh_gssapi_checkmic(gssctxt, &gssbuf, &mic))))
 		authenticated = PRIVSEP(ssh_gssapi_userok(authctxt->user));
 	else
 		logit("GSSAPI MIC check failed");
 
-	buffer_free(&b);
+	sshbuf_free(b);
 	xfree(mic.value);
 
 	authctxt->postponed = 0;

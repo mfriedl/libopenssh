@@ -40,6 +40,8 @@
 
 #define SSH_GSS_OIDTYPE 0x06
 
+struct sshbuf;
+
 typedef struct {
 	char *filename;
 	char *envvar;
@@ -95,7 +97,8 @@ char *ssh_gssapi_last_error(Gssctxt *, OM_uint32 *, OM_uint32 *);
 void ssh_gssapi_build_ctx(Gssctxt **);
 void ssh_gssapi_delete_ctx(Gssctxt **);
 OM_uint32 ssh_gssapi_sign(Gssctxt *, gss_buffer_t, gss_buffer_t);
-void ssh_gssapi_buildmic(Buffer *, const char *, const char *, const char *);
+void ssh_gssapi_buildmic(struct sshbuf *,
+    const char *, const char *, const char *);
 int ssh_gssapi_check_mechanism(Gssctxt **, gss_OID, const char *);
 
 /* In the server */
