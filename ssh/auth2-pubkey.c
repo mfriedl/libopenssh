@@ -38,6 +38,7 @@
 #include "xmalloc.h"
 #include "ssh.h"
 #include "ssh2.h"
+#define PACKET_SKIP_COMPAT
 #include "packet.h"
 #include "sshbuf.h"
 #include "log.h"
@@ -71,33 +72,33 @@ userauth_pubkey(struct ssh *ssh)
 	struct sshbuf *b;
 	struct sshkey *key = NULL;
 	char *pkalg;
-	u_char *pkblob, *sig;
-	u_int alen, blen, slen;
-	int r, have_sig, pktype;
+	u_char *pkblob, *sig, have_sig;
+	size_t blen, slen;
+	int r, pktype;
 	int authenticated = 0;
 
 	if (!authctxt->valid) {
 		debug2("%s: disabled because of invalid user", __func__);
 		return 0;
 	}
-	have_sig = ssh_packet_get_char(ssh);
+	if ((r = sshpkt_get_u8(ssh, &have_sig)) != 0)
+		fatal("%s: sshpkt_get_u8 failed: %s", __func__, ssh_err(r));
 	if (ssh->compat & SSH_BUG_PKAUTH) {
 		debug2("%s: SSH_BUG_PKAUTH", __func__);
-		/* no explicit pkalg given */
-		pkblob = ssh_packet_get_string(ssh, &blen);
 		if ((b = sshbuf_new()) == NULL)
 			fatal("%s: sshbuf_new failed", __func__);
-		if ((r = sshbuf_put(b, pkblob, blen)) != 0)
-			fatal("%s: sshbuf_put failed: %s",
-			    __func__, ssh_err(r));
+		/* no explicit pkalg given */
 		/* so we have to extract the pkalg from the pkblob */
-		if ((r = sshbuf_get_cstring(b, &pkalg, NULL)) != 0)
-			fatal("%s: sshbuf_get_cstring failed: %s",
-			    __func__, ssh_err(r));
+		if ((r = sshpkt_get_string(ssh, &pkblob, &blen)) != 0 ||
+		    (r = sshbuf_put(b, pkblob, blen)) != 0 ||
+		    (r = sshbuf_get_cstring(b, &pkalg, NULL)) != 0)
+			fatal("%s: failed: %s", __func__, ssh_err(r));
 		sshbuf_free(b);
 	} else {
-		pkalg = ssh_packet_get_string(ssh, &alen);
-		pkblob = ssh_packet_get_string(ssh, &blen);
+		if ((r = sshpkt_get_cstring(ssh, &pkalg, NULL)) != 0 ||
+		    (r = sshpkt_get_string(ssh, &pkblob, &blen)) != 0)
+			fatal("%s: sshpkt_get_cstring failed: %s",
+			    __func__, ssh_err(r));
 	}
 	pktype = sshkey_type_from_name(pkalg);
 	if (pktype == KEY_UNSPEC) {
@@ -120,7 +121,8 @@ userauth_pubkey(struct ssh *ssh)
 		goto done;
 	}
 	if (have_sig) {
-		sig = ssh_packet_get_string(ssh, &slen);
+		if ((r = sshpkt_get_string(ssh, &sig, &slen)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		ssh_packet_check_eom(ssh);
 		if ((b = sshbuf_new()) == NULL)
 			fatal("%s: sshbuf_new failed", __func__);
@@ -180,10 +182,12 @@ userauth_pubkey(struct ssh *ssh)
 		 * issue? -markus
 		 */
 		if (PRIVSEP(user_key_allowed(authctxt->pw, key))) {
-			ssh_packet_start(ssh, SSH2_MSG_USERAUTH_PK_OK);
-			ssh_packet_put_string(ssh, pkalg, alen);
-			ssh_packet_put_string(ssh, pkblob, blen);
-			ssh_packet_send(ssh);
+			if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_PK_OK))
+			    != 0 ||
+			    (r = sshpkt_put_cstring(ssh, pkalg)) != 0 ||
+			    (r = sshpkt_put_string(ssh, pkblob, blen)) != 0 ||
+			    (r = sshpkt_send(ssh)) != 0)
+				fatal("%s: %s", __func__, ssh_err(r));
 			ssh_packet_write_wait(ssh);
 			authctxt->postponed = 1;
 		}
@@ -194,8 +198,8 @@ done:
 	debug2("%s: authenticated %d pkalg %s", __func__, authenticated, pkalg);
 	if (key != NULL)
 		sshkey_free(key);
-	xfree(pkalg);
-	xfree(pkblob);
+	free(pkalg);
+	free(pkblob);
 	return authenticated;
 }
 
