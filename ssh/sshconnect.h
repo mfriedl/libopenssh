@@ -47,10 +47,10 @@ int	 verify_host_key(char *, struct sockaddr *, struct sshkey *);
 void	 get_hostfile_hostname_ipaddr(char *, struct sockaddr *, u_short,
     char **, char **);
 
-void	 ssh_kex(char *, struct sockaddr *);
+void	 ssh_kex(struct ssh *, char *, struct sockaddr *);
 void	 ssh_kex2(struct ssh *, u_short);
 
-void	 ssh_userauth1(const char *, const char *, char *, Sensitive *);
+void	 ssh_userauth1(struct ssh *, const char *, const char *, char *, Sensitive *);
 void	 ssh_userauth2(struct ssh *, const char *, const char *, Sensitive *);
 
 void	 ssh_put_password(struct ssh *, char *);

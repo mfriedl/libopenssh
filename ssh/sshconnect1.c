@@ -31,6 +31,8 @@
 #include "ssh1.h"
 #include "rsa.h"
 #include "buffer.h"
+#define PACKET_SKIP_COMPAT
+#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "key.h"
 #include "cipher.h"
@@ -59,7 +61,7 @@ extern char *__progname;
  * authenticate using the agent.
  */
 static int
-try_agent_authentication(void)
+try_agent_authentication(struct ssh *ssh)
 {
 	int r, type, agent_fd, ret = 0;
 	u_char response[16];
@@ -94,13 +96,14 @@ try_agent_authentication(void)
 		 * Tell the server that we are willing to authenticate
 		 * using this key.
 		 */
-		packet_start(SSH_CMSG_AUTH_RSA);
-		packet_put_bignum(idlist->keys[i]->rsa->n);
-		packet_send();
-		packet_write_wait();
+		if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_RSA)) != 0 ||
+		    (r = sshpkt_put_bignum1(ssh, idlist->keys[i]->rsa->n)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
+		ssh_packet_write_wait(ssh);
 
 		/* Wait for server's response. */
-		type = packet_read();
+		type = ssh_packet_read(ssh);
 
 		/* The server sends failure if it doesn't like our key or
 		   does not support RSA authentication. */
@@ -110,11 +113,12 @@ try_agent_authentication(void)
 		}
 		/* Otherwise it should have sent a challenge. */
 		if (type != SSH_SMSG_AUTH_RSA_CHALLENGE)
-			packet_disconnect("Protocol error during RSA "
+			ssh_packet_disconnect(ssh, "Protocol error during RSA "
 			    "authentication: %d", type);
 
-		packet_get_bignum(challenge);
-		packet_check_eom();
+		if ((r = sshpkt_get_bignum1(ssh, challenge)) != 0 ||
+		    (r = sshpkt_get_end(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 
 		debug("Received RSA challenge from server.");
 
@@ -133,14 +137,14 @@ try_agent_authentication(void)
 		debug("Sending response to RSA challenge.");
 
 		/* Send the decrypted challenge back to the server. */
-		packet_start(SSH_CMSG_AUTH_RSA_RESPONSE);
-		for (i = 0; i < 16; i++)
-			packet_put_char(response[i]);
-		packet_send();
-		packet_write_wait();
+		if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_RSA_RESPONSE)) != 0 ||
+		    (r = sshpkt_put(ssh, &response, sizeof(response))) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
+		ssh_packet_write_wait(ssh);
 
 		/* Wait for response from the server. */
-		type = packet_read();
+		type = ssh_packet_read(ssh);
 
 		/*
 		 * The server returns success if it accepted the
@@ -151,7 +155,7 @@ try_agent_authentication(void)
 			ret = 1;
 			break;
 		} else if (type != SSH_SMSG_FAILURE)
-			packet_disconnect("Protocol error waiting RSA auth "
+			ssh_packet_disconnect(ssh, "Protocol error waiting RSA auth "
 			    "response: %d", type);
 	}
 	if (ret != 1)
@@ -168,16 +172,16 @@ try_agent_authentication(void)
  * the server.
  */
 static void
-respond_to_rsa_challenge(BIGNUM * challenge, RSA * prv)
+respond_to_rsa_challenge(struct ssh *ssh, BIGNUM * challenge, RSA * prv)
 {
 	u_char buf[32], response[16];
 	MD5_CTX md;
-	int r, i, len;
+	int r, len;
 
 	/* Decrypt the challenge using the private key. */
 	/* XXX think about Bleichenbacher, too */
 	if ((r = rsa_private_decrypt(challenge, challenge, prv)) != 0) {
-		packet_disconnect( "%s: rsa_private_decrypt: %s",
+		ssh_packet_disconnect(ssh,  "%s: rsa_private_decrypt: %s",
 		    __func__, ssh_err(r));
 	}
 
@@ -185,7 +189,7 @@ respond_to_rsa_challenge(BIGNUM * challenge, RSA * prv)
 	/* The response is MD5 of decrypted challenge plus session id. */
 	len = BN_num_bytes(challenge);
 	if (len <= 0 || (u_int)len > sizeof(buf))
-		packet_disconnect(
+		ssh_packet_disconnect(ssh,
 		    "respond_to_rsa_challenge: bad challenge length %d", len);
 
 	memset(buf, 0, sizeof(buf));
@@ -198,11 +202,11 @@ respond_to_rsa_challenge(BIGNUM * challenge, RSA * prv)
 	debug("Sending response to host key RSA challenge.");
 
 	/* Send the response back to the server. */
-	packet_start(SSH_CMSG_AUTH_RSA_RESPONSE);
-	for (i = 0; i < 16; i++)
-		packet_put_char(response[i]);
-	packet_send();
-	packet_write_wait();
+	if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_RSA_RESPONSE)) != 0 ||
+	    (r = sshpkt_put(ssh, &response, sizeof(response))) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	ssh_packet_write_wait(ssh);
 
 	memset(buf, 0, sizeof(buf));
 	memset(response, 0, sizeof(response));
@@ -214,7 +218,7 @@ respond_to_rsa_challenge(BIGNUM * challenge, RSA * prv)
  * the user using it.
  */
 static int
-try_rsa_authentication(int idx)
+try_rsa_authentication(struct ssh *ssh, int idx)
 {
 	BIGNUM *challenge;
 	struct sshkey *public, *private;
@@ -228,13 +232,14 @@ try_rsa_authentication(int idx)
 	debug("Trying RSA authentication with key '%.100s'", comment);
 
 	/* Tell the server that we are willing to authenticate using this key. */
-	packet_start(SSH_CMSG_AUTH_RSA);
-	packet_put_bignum(public->rsa->n);
-	packet_send();
-	packet_write_wait();
+	if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_RSA)) != 0 ||
+	    (r = sshpkt_put_bignum1(ssh, public->rsa->n)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	ssh_packet_write_wait(ssh);
 
 	/* Wait for server's response. */
-	type = packet_read();
+	type = ssh_packet_read(ssh);
 
 	/*
 	 * The server responds with failure if it doesn't like our key or
@@ -247,13 +252,14 @@ try_rsa_authentication(int idx)
 	}
 	/* Otherwise, the server should respond with a challenge. */
 	if (type != SSH_SMSG_AUTH_RSA_CHALLENGE)
-		packet_disconnect("Protocol error during RSA authentication: %d", type);
+		ssh_packet_disconnect(ssh,
+		    "Protocol error during RSA authentication: %d", type);
 
 	/* Get the challenge from the packet. */
 	if ((challenge = BN_new()) == NULL)
 		fatal("try_rsa_authentication: BN_new failed");
-	packet_get_bignum(challenge);
-	packet_check_eom();
+	if ((r = sshpkt_get_bignum1(ssh, challenge)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
 
 	debug("Received RSA challenge from server.");
 
@@ -325,20 +331,21 @@ try_rsa_authentication(int idx)
 			error("Bad passphrase."); /* XXX check r */
 
 		/* Send a dummy response packet to avoid protocol error. */
-		packet_start(SSH_CMSG_AUTH_RSA_RESPONSE);
-		for (i = 0; i < 16; i++)
-			packet_put_char(0);
-		packet_send();
-		packet_write_wait();
+		memset(buf, 0, 16);
+		if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_RSA_RESPONSE)) != 0 ||
+		    (r = sshpkt_put(ssh, buf, 16)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
+		ssh_packet_write_wait(ssh);
 
 		/* Expect the server to reject it... */
-		packet_read_expect(SSH_SMSG_FAILURE);
+		ssh_packet_read_expect(ssh, SSH_SMSG_FAILURE);
 		BN_clear_free(challenge);
 		return 0;
 	}
 
 	/* Compute and send a response to the challenge. */
-	respond_to_rsa_challenge(challenge, private->rsa);
+	respond_to_rsa_challenge(ssh, challenge, private->rsa);
 
 	/* Destroy the private key unless it in external hardware. */
 	if (!(private->flags & SSHKEY_FLAG_EXT))
@@ -348,13 +355,14 @@ try_rsa_authentication(int idx)
 	BN_clear_free(challenge);
 
 	/* Wait for response from the server. */
-	type = packet_read();
+	type = ssh_packet_read(ssh);
 	if (type == SSH_SMSG_SUCCESS) {
 		debug("RSA authentication accepted by server.");
 		return 1;
 	}
 	if (type != SSH_SMSG_FAILURE)
-		packet_disconnect("Protocol error waiting RSA auth response: %d", type);
+		ssh_packet_disconnect(ssh,
+		    "Protocol error waiting RSA auth response: %d", type);
 	debug("RSA authentication refused.");
 	return 0;
 }
@@ -364,24 +372,26 @@ try_rsa_authentication(int idx)
  * authentication and RSA host authentication.
  */
 static int
-try_rhosts_rsa_authentication(const char *local_user, struct sshkey * host_key)
+try_rhosts_rsa_authentication(struct ssh *ssh, const char *local_user,
+    struct sshkey *host_key)
 {
-	int type;
+	int r, type;
 	BIGNUM *challenge;
 
 	debug("Trying rhosts or /etc/hosts.equiv with RSA host authentication.");
 
 	/* Tell the server that we are willing to authenticate using this key. */
-	packet_start(SSH_CMSG_AUTH_RHOSTS_RSA);
-	packet_put_cstring(local_user);
-	packet_put_int(BN_num_bits(host_key->rsa->n));
-	packet_put_bignum(host_key->rsa->e);
-	packet_put_bignum(host_key->rsa->n);
-	packet_send();
-	packet_write_wait();
+	if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_RHOSTS_RSA)) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, local_user)) != 0 ||
+	    (r = sshpkt_put_u32(ssh, BN_num_bits(host_key->rsa->n))) != 0 ||
+	    (r = sshpkt_put_bignum1(ssh, host_key->rsa->e)) != 0 ||
+	    (r = sshpkt_put_bignum1(ssh, host_key->rsa->n)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	ssh_packet_write_wait(ssh);
 
 	/* Wait for server's response. */
-	type = packet_read();
+	type = ssh_packet_read(ssh);
 
 	/* The server responds with failure if it doesn't admit our
 	   .rhosts authentication or doesn't know our host key. */
@@ -391,30 +401,32 @@ try_rhosts_rsa_authentication(const char *local_user, struct sshkey * host_key)
 	}
 	/* Otherwise, the server should respond with a challenge. */
 	if (type != SSH_SMSG_AUTH_RSA_CHALLENGE)
-		packet_disconnect("Protocol error during RSA authentication: %d", type);
+		ssh_packet_disconnect(ssh, "Protocol error during RSA authentication: %d", type);
 
 	/* Get the challenge from the packet. */
 	if ((challenge = BN_new()) == NULL)
 		fatal("try_rhosts_rsa_authentication: BN_new failed");
-	packet_get_bignum(challenge);
-	packet_check_eom();
+	if ((r = sshpkt_get_bignum1(ssh, challenge)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	debug("Received RSA challenge for host key from server.");
 
 	/* Compute a response to the challenge. */
-	respond_to_rsa_challenge(challenge, host_key->rsa);
+	respond_to_rsa_challenge(ssh, challenge, host_key->rsa);
 
 	/* We no longer need the challenge. */
 	BN_clear_free(challenge);
 
 	/* Wait for response from the server. */
-	type = packet_read();
+	type = ssh_packet_read(ssh);
 	if (type == SSH_SMSG_SUCCESS) {
 		debug("Rhosts or /etc/hosts.equiv with RSA host authentication accepted by server.");
 		return 1;
 	}
 	if (type != SSH_SMSG_FAILURE)
-		packet_disconnect("Protocol error waiting RSA auth response: %d", type);
+		ssh_packet_disconnect(ssh,
+		    "Protocol error waiting RSA auth response: %d", type);
 	debug("Rhosts or /etc/hosts.equiv with RSA host authentication refused.");
 	return 0;
 }
@@ -424,33 +436,35 @@ try_rhosts_rsa_authentication(const char *local_user, struct sshkey * host_key)
  * Note that the client code is not tied to s/key or TIS.
  */
 static int
-try_challenge_response_authentication(void)
+try_challenge_response_authentication(struct ssh *ssh)
 {
-	int type, i;
-	u_int clen;
+	int type, r, i;
+	size_t clen;
 	char prompt[1024];
-	char *challenge, *response;
+	u_char *challenge, *response;
 
 	debug("Doing challenge response authentication.");
 
 	for (i = 0; i < options.number_of_password_prompts; i++) {
 		/* request a challenge */
-		packet_start(SSH_CMSG_AUTH_TIS);
-		packet_send();
-		packet_write_wait();
+		if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_TIS)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
+		ssh_packet_write_wait(ssh);
 
-		type = packet_read();
+		type = ssh_packet_read(ssh);
 		if (type != SSH_SMSG_FAILURE &&
 		    type != SSH_SMSG_AUTH_TIS_CHALLENGE) {
-			packet_disconnect("Protocol error: got %d in response "
+			ssh_packet_disconnect(ssh, "Protocol error: got %d in response "
 			    "to SSH_CMSG_AUTH_TIS", type);
 		}
 		if (type != SSH_SMSG_AUTH_TIS_CHALLENGE) {
 			debug("No challenge.");
 			return 0;
 		}
-		challenge = packet_get_string(&clen);
-		packet_check_eom();
+		if ((r = sshpkt_get_string(ssh, &challenge, &clen)) != 0 ||
+		    (r = sshpkt_get_end(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		snprintf(prompt, sizeof prompt, "%s%s", challenge,
 		    strchr(challenge, '\n') ? "" : "\nResponse: ");
 		xfree(challenge);
@@ -464,17 +478,20 @@ try_challenge_response_authentication(void)
 			xfree(response);
 			break;
 		}
-		packet_start(SSH_CMSG_AUTH_TIS_RESPONSE);
+		if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_TIS_RESPONSE)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		ssh_put_password(active_state, response);
 		memset(response, 0, strlen(response));
 		xfree(response);
-		packet_send();
-		packet_write_wait();
-		type = packet_read();
+		if ((r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
+		ssh_packet_write_wait(ssh);
+		type = ssh_packet_read(ssh);
 		if (type == SSH_SMSG_SUCCESS)
 			return 1;
 		if (type != SSH_SMSG_FAILURE)
-			packet_disconnect("Protocol error: got %d in response "
+			ssh_packet_disconnect(ssh,
+			    "Protocol error: got %d in response "
 			    "to SSH_CMSG_AUTH_TIS_RESPONSE", type);
 	}
 	/* failure */
@@ -485,9 +502,9 @@ try_challenge_response_authentication(void)
  * Tries to authenticate with plain passwd authentication.
  */
 static int
-try_password_authentication(char *prompt)
+try_password_authentication(struct ssh *ssh, char *prompt)
 {
-	int type, i;
+	int type, i, r;
 	char *password;
 
 	debug("Doing password authentication.");
@@ -497,18 +514,21 @@ try_password_authentication(char *prompt)
 		if (i != 0)
 			error("Permission denied, please try again.");
 		password = read_passphrase(prompt, 0);
-		packet_start(SSH_CMSG_AUTH_PASSWORD);
+		if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_PASSWORD)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		ssh_put_password(active_state, password);
 		memset(password, 0, strlen(password));
 		xfree(password);
-		packet_send();
-		packet_write_wait();
+		if ((r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
+		ssh_packet_write_wait(ssh);
 
-		type = packet_read();
+		type = ssh_packet_read(ssh);
 		if (type == SSH_SMSG_SUCCESS)
 			return 1;
 		if (type != SSH_SMSG_FAILURE)
-			packet_disconnect("Protocol error: got %d in response to passwd auth", type);
+			ssh_packet_disconnect(ssh,
+			    "Protocol error: got %d in response to passwd auth", type);
 	}
 	/* failure */
 	return 0;
@@ -518,7 +538,7 @@ try_password_authentication(char *prompt)
  * SSH1 key exchange
  */
 void
-ssh_kex(char *host, struct sockaddr *hostaddr)
+ssh_kex(struct ssh *ssh, char *host, struct sockaddr *hostaddr)
 {
 	int i, r;
 	BIGNUM *key;
@@ -529,23 +549,23 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 	u_char cookie[8];
 	u_int supported_ciphers;
 	u_int server_flags, client_flags;
-	u_int32_t rnd = 0;
 
 	debug("Waiting for server public key.");
 
 	/* Wait for a public key packet from the server. */
-	packet_read_expect(SSH_SMSG_PUBLIC_KEY);
+	ssh_packet_read_expect(ssh, SSH_SMSG_PUBLIC_KEY);
 
 	/* Get cookie from the packet. */
-	for (i = 0; i < 8; i++)
-		cookie[i] = packet_get_char();
+	if ((r = sshpkt_get(ssh, &cookie, 8)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	/* Get the public key. */
 	if ((server_key = sshkey_new(KEY_RSA1)) == NULL)
 		fatal("%s: sshkey_new failed", __func__);
-	bits = packet_get_int();
-	packet_get_bignum(server_key->rsa->e);
-	packet_get_bignum(server_key->rsa->n);
+	if ((r = sshpkt_get_u32(ssh, &bits)) != 0 ||
+	    (r = sshpkt_get_bignum1(ssh, server_key->rsa->e)) != 0 ||
+	    (r = sshpkt_get_bignum1(ssh, server_key->rsa->n)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	rbits = BN_num_bits(server_key->rsa->n);
 	if (bits != rbits) {
@@ -556,9 +576,10 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 	/* Get the host key. */
 	if ((host_key = sshkey_new(KEY_RSA1)) == NULL)
 		fatal("%s: sshkey_new failed", __func__);
-	bits = packet_get_int();
-	packet_get_bignum(host_key->rsa->e);
-	packet_get_bignum(host_key->rsa->n);
+	if ((r = sshpkt_get_u32(ssh, &bits)) != 0 ||
+	    (r = sshpkt_get_bignum1(ssh, host_key->rsa->e)) != 0 ||
+	    (r = sshpkt_get_bignum1(ssh, host_key->rsa->n)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	rbits = BN_num_bits(host_key->rsa->n);
 	if (bits != rbits) {
@@ -568,12 +589,13 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 	}
 
 	/* Get protocol flags. */
-	server_flags = packet_get_int();
-	packet_set_protocol_flags(server_flags);
+	if ((r = sshpkt_get_u32(ssh, &server_flags)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &supported_ciphers)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &supported_authentications)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
-	supported_ciphers = packet_get_int();
-	supported_authentications = packet_get_int();
-	packet_check_eom();
+	ssh_packet_set_protocol_flags(ssh, server_flags);
 
 	debug("Received server public key (%d bits) and host key (%d bits).",
 	    BN_num_bits(server_key->rsa->n), BN_num_bits(host_key->rsa->n));
@@ -587,20 +609,13 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 	    cookie, session_id)) != 0)
 		fatal("derive_ssh1_session_id: %s", ssh_err(r));
 
-	/* Generate a session key. */
-	arc4random_stir();
-
 	/*
 	 * Generate an encryption key for the session.   The key is a 256 bit
 	 * random number, interpreted as a 32-byte key, with the least
 	 * significant 8 bits being the first byte of the key.
 	 */
-	for (i = 0; i < 32; i++) {
-		if (i % 4 == 0)
-			rnd = arc4random();
-		session_key[i] = rnd & 0xff;
-		rnd >>= 8;
-	}
+	arc4random_stir();
+	arc4random_buf(session_key, SSH_SESSION_KEY_LENGTH);
 
 	/*
 	 * According to the protocol spec, the first byte of the session key
@@ -679,28 +694,22 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 	debug("Encryption type: %.100s", cipher_name(options.cipher));
 
 	/* Send the encrypted session key to the server. */
-	packet_start(SSH_CMSG_SESSION_KEY);
-	packet_put_char(options.cipher);
+	if ((r = sshpkt_start(ssh, SSH_CMSG_SESSION_KEY)) != 0 ||
+	    (r = sshpkt_put_u8(ssh, options.cipher)) != 0 ||
+	    (r = sshpkt_put(ssh, cookie, 8)) != 0 ||
+	    (r = sshpkt_put_bignum1(ssh, key)) != 0 ||
+	    (r = sshpkt_put_u32(ssh, client_flags)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
-	/* Send the cookie back to the server. */
-	for (i = 0; i < 8; i++)
-		packet_put_char(cookie[i]);
-
-	/* Send and destroy the encrypted encryption key integer. */
-	packet_put_bignum(key);
 	BN_clear_free(key);
-
-	/* Send protocol flags. */
-	packet_put_int(client_flags);
-
-	/* Send the packet now. */
-	packet_send();
-	packet_write_wait();
+	ssh_packet_write_wait(ssh);
 
 	debug("Sent encrypted session key.");
 
 	/* Set the encryption key. */
-	packet_set_encryption_key(session_key, SSH_SESSION_KEY_LENGTH, options.cipher);
+	ssh_packet_set_encryption_key(ssh, session_key, SSH_SESSION_KEY_LENGTH,
+	    options.cipher);
 
 	/* We will no longer need the session key here.  Destroy any extra copies. */
 	memset(session_key, 0, sizeof(session_key));
@@ -709,7 +718,7 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
 	 * Expect a success message from the server.  Note that this message
 	 * will be received in encrypted form.
 	 */
-	packet_read_expect(SSH_SMSG_SUCCESS);
+	ssh_packet_read_expect(ssh, SSH_SMSG_SUCCESS);
 
 	debug("Received encrypted confirmation.");
 }
@@ -718,32 +727,34 @@ ssh_kex(char *host, struct sockaddr *hostaddr)
  * Authenticate user
  */
 void
-ssh_userauth1(const char *local_user, const char *server_user, char *host,
-    Sensitive *sensitive)
+ssh_userauth1(struct ssh *ssh, const char *local_user, const char *server_user,
+    char *host, Sensitive *sensitive)
 {
-	int i, type;
+	int r, i, type;
 
 	if (supported_authentications == 0)
 		fatal("ssh_userauth1: server supports no auth methods");
 
 	/* Send the name of the user to log in as on the server. */
-	packet_start(SSH_CMSG_USER);
-	packet_put_cstring(server_user);
-	packet_send();
-	packet_write_wait();
+	if ((r = sshpkt_start(ssh, SSH_CMSG_USER)) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, server_user)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	ssh_packet_write_wait(ssh);
 
 	/*
 	 * The server should respond with success if no authentication is
 	 * needed (the user has no password).  Otherwise the server responds
 	 * with failure.
 	 */
-	type = packet_read();
+	type = ssh_packet_read(ssh);
 
 	/* check whether the connection was accepted without authentication. */
 	if (type == SSH_SMSG_SUCCESS)
 		goto success;
 	if (type != SSH_SMSG_FAILURE)
-		packet_disconnect("Protocol error: got %d in response to SSH_CMSG_USER", type);
+		ssh_packet_disconnect(ssh,
+		    "Protocol error: got %d in response to SSH_CMSG_USER", type);
 
 	/*
 	 * Try .rhosts or /etc/hosts.equiv authentication with RSA host
@@ -754,7 +765,7 @@ ssh_userauth1(const char *local_user, const char *server_user, char *host,
 		for (i = 0; i < sensitive->nkeys; i++) {
 			if (sensitive->keys[i] != NULL &&
 			    sensitive->keys[i]->type == KEY_RSA1 &&
-			    try_rhosts_rsa_authentication(local_user,
+			    try_rhosts_rsa_authentication(ssh, local_user,
 			    sensitive->keys[i]))
 				goto success;
 		}
@@ -767,20 +778,20 @@ ssh_userauth1(const char *local_user, const char *server_user, char *host,
 		 * agent is tried first because no passphrase is needed for
 		 * it, whereas identity files may require passphrases.
 		 */
-		if (try_agent_authentication())
+		if (try_agent_authentication(ssh))
 			goto success;
 
 		/* Try RSA authentication for each identity. */
 		for (i = 0; i < options.num_identity_files; i++)
 			if (options.identity_keys[i] != NULL &&
 			    options.identity_keys[i]->type == KEY_RSA1 &&
-			    try_rsa_authentication(i))
+			    try_rsa_authentication(ssh, i))
 				goto success;
 	}
 	/* Try challenge response authentication if the server supports it. */
 	if ((supported_authentications & (1 << SSH_AUTH_TIS)) &&
 	    options.challenge_response_authentication && !options.batch_mode) {
-		if (try_challenge_response_authentication())
+		if (try_challenge_response_authentication(ssh))
 			goto success;
 	}
 	/* Try password authentication if the server supports it. */
@@ -790,7 +801,7 @@ ssh_userauth1(const char *local_user, const char *server_user, char *host,
 
 		snprintf(prompt, sizeof(prompt), "%.30s@%.128s's password: ",
 		    server_user, host);
-		if (try_password_authentication(prompt))
+		if (try_password_authentication(ssh, prompt))
 			goto success;
 	}
 	/* All authentication methods have failed.  Exit with an error message. */
