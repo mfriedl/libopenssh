@@ -31,7 +31,6 @@
 #include "ssh1.h"
 #include "ssh2.h"
 #include "log.h"
-#define DISPATCH_COMPAT
 #include "dispatch.h"
 #include "packet.h"
 #include "compat.h"
@@ -122,13 +121,4 @@ ssh_dispatch_run(struct ssh *ssh, int mode, volatile sig_atomic_t *done)
 		if (done != NULL && *done)
 			return 0;
 	}
-}
-
-void
-dispatch_run(int mode, volatile sig_atomic_t *done)
-{
-	int r;
-
-	if ((r = ssh_dispatch_run(active_state, mode, done)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
 }

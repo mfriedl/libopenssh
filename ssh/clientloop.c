@@ -1409,7 +1409,10 @@ client_process_output(struct ssh *ssh, fd_set *writeset)
 static void
 client_process_buffered_input_packets(struct ssh *ssh)
 {
-	ssh_dispatch_run(ssh, DISPATCH_NONBLOCK, &quit_pending);
+	int r;
+
+	if ((r = ssh_dispatch_run(ssh, DISPATCH_NONBLOCK, &quit_pending)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 /* scan buf[] for '~' before sending data to the peer */

@@ -53,8 +53,6 @@
 #include <unistd.h>
 #include <stdarg.h>
 
-#define DISPATCH_COMPAT 1
-
 #include "xmalloc.h"
 #include "packet.h"
 #include "buffer.h"
@@ -115,7 +113,7 @@ static volatile sig_atomic_t child_terminated = 0;	/* The child has terminated. 
 static volatile sig_atomic_t received_sigterm = 0;
 
 /* prototypes */
-static void server_init_dispatch(void);
+static void server_init_dispatch(struct ssh *);
 
 /*
  * we write to this pipe if a SIGCHLD is caught in order to avoid
@@ -510,9 +508,12 @@ drain_output(void)
 }
 
 static void
-process_buffered_input_packets(void)
+process_buffered_input_packets(struct ssh *ssh)
 {
-	dispatch_run(DISPATCH_NONBLOCK, NULL);
+	int r;
+
+	if ((r = ssh_dispatch_run(ssh, DISPATCH_NONBLOCK, NULL)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 /*
@@ -599,13 +600,13 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 	if (fderr == -1)
 		fderr_eof = 1;
 
-	server_init_dispatch();
+	server_init_dispatch(active_state);
 
 	/* Main loop of the server for the interactive session mode. */
 	for (;;) {
 
 		/* Process buffered packets from the client. */
-		process_buffered_input_packets();
+		process_buffered_input_packets(active_state);
 
 		/*
 		 * If we have received eof, and there is no more pending
@@ -813,10 +814,10 @@ server_loop2(Authctxt *authctxt)
 	max_fd = MAX(connection_in, connection_out);
 	max_fd = MAX(max_fd, notify_pipe[0]);
 
-	server_init_dispatch();
+	server_init_dispatch(active_state);
 
 	for (;;) {
-		process_buffered_input_packets();
+		process_buffered_input_packets(active_state);
 
 		rekeying = (active_state->kex != NULL &&
 			    !active_state->kex->done);
@@ -1174,58 +1175,74 @@ server_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 }
 
 static void
-server_init_dispatch_20(void)
+server_init_dispatch_20(struct ssh *ssh)
 {
 	debug("server_init_dispatch_20");
-	dispatch_init(&dispatch_protocol_error);
-	dispatch_set(SSH2_MSG_CHANNEL_CLOSE, &channel_input_oclose);
-	dispatch_set(SSH2_MSG_CHANNEL_DATA, &channel_input_data);
-	dispatch_set(SSH2_MSG_CHANNEL_EOF, &channel_input_ieof);
-	dispatch_set(SSH2_MSG_CHANNEL_EXTENDED_DATA, &channel_input_extended_data);
-	dispatch_set(SSH2_MSG_CHANNEL_OPEN, &server_input_channel_open);
-	dispatch_set(SSH2_MSG_CHANNEL_OPEN_CONFIRMATION, &channel_input_open_confirmation);
-	dispatch_set(SSH2_MSG_CHANNEL_OPEN_FAILURE, &channel_input_open_failure);
-	dispatch_set(SSH2_MSG_CHANNEL_REQUEST, &server_input_channel_req);
-	dispatch_set(SSH2_MSG_CHANNEL_WINDOW_ADJUST, &channel_input_window_adjust);
-	dispatch_set(SSH2_MSG_GLOBAL_REQUEST, &server_input_global_request);
+	ssh_dispatch_init(ssh, &dispatch_protocol_error);
+	ssh_dispatch_set(ssh, SSH2_MSG_CHANNEL_CLOSE, &channel_input_oclose);
+	ssh_dispatch_set(ssh, SSH2_MSG_CHANNEL_DATA, &channel_input_data);
+	ssh_dispatch_set(ssh, SSH2_MSG_CHANNEL_EOF, &channel_input_ieof);
+	ssh_dispatch_set(ssh, SSH2_MSG_CHANNEL_EXTENDED_DATA,
+	    &channel_input_extended_data);
+	ssh_dispatch_set(ssh, SSH2_MSG_CHANNEL_OPEN,
+	    &server_input_channel_open);
+	ssh_dispatch_set(ssh, SSH2_MSG_CHANNEL_OPEN_CONFIRMATION,
+	    &channel_input_open_confirmation);
+	ssh_dispatch_set(ssh, SSH2_MSG_CHANNEL_OPEN_FAILURE,
+	    &channel_input_open_failure);
+	ssh_dispatch_set(ssh, SSH2_MSG_CHANNEL_REQUEST,
+	    &server_input_channel_req);
+	ssh_dispatch_set(ssh, SSH2_MSG_CHANNEL_WINDOW_ADJUST,
+	    &channel_input_window_adjust);
+	ssh_dispatch_set(ssh, SSH2_MSG_GLOBAL_REQUEST,
+	    &server_input_global_request);
 	/* client_alive */
-	dispatch_set(SSH2_MSG_CHANNEL_SUCCESS, &server_input_keep_alive);
-	dispatch_set(SSH2_MSG_CHANNEL_FAILURE, &server_input_keep_alive);
-	dispatch_set(SSH2_MSG_REQUEST_SUCCESS, &server_input_keep_alive);
-	dispatch_set(SSH2_MSG_REQUEST_FAILURE, &server_input_keep_alive);
+	ssh_dispatch_set(ssh, SSH2_MSG_CHANNEL_SUCCESS,
+	    &server_input_keep_alive);
+	ssh_dispatch_set(ssh, SSH2_MSG_CHANNEL_FAILURE,
+	    &server_input_keep_alive);
+	ssh_dispatch_set(ssh, SSH2_MSG_REQUEST_SUCCESS,
+	    &server_input_keep_alive);
+	ssh_dispatch_set(ssh, SSH2_MSG_REQUEST_FAILURE,
+	    &server_input_keep_alive);
 	/* rekeying */
-	dispatch_set(SSH2_MSG_KEXINIT, &kex_input_kexinit);
+	ssh_dispatch_set(ssh, SSH2_MSG_KEXINIT, &kex_input_kexinit);
 }
 static void
-server_init_dispatch_13(void)
+server_init_dispatch_13(struct ssh *ssh)
 {
 	debug("server_init_dispatch_13");
-	dispatch_init(NULL);
-	dispatch_set(SSH_CMSG_EOF, &server_input_eof);
-	dispatch_set(SSH_CMSG_STDIN_DATA, &server_input_stdin_data);
-	dispatch_set(SSH_CMSG_WINDOW_SIZE, &server_input_window_size);
-	dispatch_set(SSH_MSG_CHANNEL_CLOSE, &channel_input_close);
-	dispatch_set(SSH_MSG_CHANNEL_CLOSE_CONFIRMATION, &channel_input_close_confirmation);
-	dispatch_set(SSH_MSG_CHANNEL_DATA, &channel_input_data);
-	dispatch_set(SSH_MSG_CHANNEL_OPEN_CONFIRMATION, &channel_input_open_confirmation);
-	dispatch_set(SSH_MSG_CHANNEL_OPEN_FAILURE, &channel_input_open_failure);
-	dispatch_set(SSH_MSG_PORT_OPEN, &channel_input_port_open);
+	ssh_dispatch_init(ssh, NULL);
+	ssh_dispatch_set(ssh, SSH_CMSG_EOF, &server_input_eof);
+	ssh_dispatch_set(ssh, SSH_CMSG_STDIN_DATA, &server_input_stdin_data);
+	ssh_dispatch_set(ssh, SSH_CMSG_WINDOW_SIZE, &server_input_window_size);
+	ssh_dispatch_set(ssh, SSH_MSG_CHANNEL_CLOSE, &channel_input_close);
+	ssh_dispatch_set(ssh, SSH_MSG_CHANNEL_CLOSE_CONFIRMATION,
+	    &channel_input_close_confirmation);
+	ssh_dispatch_set(ssh, SSH_MSG_CHANNEL_DATA, &channel_input_data);
+	ssh_dispatch_set(ssh, SSH_MSG_CHANNEL_OPEN_CONFIRMATION,
+	    &channel_input_open_confirmation);
+	ssh_dispatch_set(ssh, SSH_MSG_CHANNEL_OPEN_FAILURE,
+	    &channel_input_open_failure);
+	ssh_dispatch_set(ssh, SSH_MSG_PORT_OPEN, &channel_input_port_open);
 }
 static void
-server_init_dispatch_15(void)
+server_init_dispatch_15(struct ssh *ssh)
 {
-	server_init_dispatch_13();
+	server_init_dispatch_13(ssh);
 	debug("server_init_dispatch_15");
-	dispatch_set(SSH_MSG_CHANNEL_CLOSE, &channel_input_ieof);
-	dispatch_set(SSH_MSG_CHANNEL_CLOSE_CONFIRMATION, &channel_input_oclose);
+	ssh_dispatch_set(ssh, SSH_MSG_CHANNEL_CLOSE,
+	    &channel_input_ieof);
+	ssh_dispatch_set(ssh, SSH_MSG_CHANNEL_CLOSE_CONFIRMATION,
+	    &channel_input_oclose);
 }
 static void
-server_init_dispatch(void)
+server_init_dispatch(struct ssh *ssh)
 {
 	if (compat20)
-		server_init_dispatch_20();
+		server_init_dispatch_20(ssh);
 	else if (compat13)
-		server_init_dispatch_13();
+		server_init_dispatch_13(ssh);
 	else
-		server_init_dispatch_15();
+		server_init_dispatch_15(ssh);
 }
