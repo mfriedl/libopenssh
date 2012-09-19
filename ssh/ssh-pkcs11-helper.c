@@ -25,6 +25,7 @@
 #include <errno.h>
 
 #include "xmalloc.h"
+#include "sshbuf.h"
 #include "buffer.h"
 #include "log.h"
 #include "misc.h"
@@ -111,7 +112,7 @@ process_add(void)
 	struct sshkey **keys;
 	int r, i, nkeys;
 	u_char *blob;
-	u_int blen;
+	size_t blen;
 	Buffer msg;
 
 	buffer_init(&msg);
@@ -124,8 +125,10 @@ process_add(void)
 			if ((r = sshkey_to_blob(keys[i], &blob, &blen)) != 0)
 				fatal("%s: sshkey_to_blob: %s",
 				    __func__, ssh_err(r));
-			buffer_put_string(&msg, blob, blen);
-			buffer_put_cstring(&msg, name);
+			if ((r = sshbuf_put_string(&msg, blob, blen)) != 0 ||
+			    (r = sshbuf_put_cstring(&msg, name)) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 			xfree(blob);
 			add_key(keys[i], name);
 		}

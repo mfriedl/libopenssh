@@ -26,6 +26,7 @@
 
 #include "pathnames.h"
 #include "xmalloc.h"
+#include "sshbuf.h"
 #include "buffer.h"
 #include "log.h"
 #include "misc.h"
@@ -101,7 +102,7 @@ pkcs11_rsa_private_encrypt(int flen, const u_char *from, u_char *to, RSA *rsa,
 {
 	struct sshkey key;
 	u_char *blob, *signature = NULL;
-	u_int blen, slen = 0;
+	size_t blen, slen = 0;
 	int r, ret = -1;
 	Buffer msg;
 
@@ -123,8 +124,9 @@ pkcs11_rsa_private_encrypt(int flen, const u_char *from, u_char *to, RSA *rsa,
 	buffer_clear(&msg);
 
 	if (recv_msg(&msg) == SSH2_AGENT_SIGN_RESPONSE) {
-		signature = buffer_get_string(&msg, &slen);
-		if (slen <= (u_int)RSA_size(rsa)) {
+		if ((r = sshbuf_get_string(&msg, &signature, &slen)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
+		if (slen <= (size_t)RSA_size(rsa)) {
 			memcpy(to, signature, slen);
 			ret = slen;
 		}

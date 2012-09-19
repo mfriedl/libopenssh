@@ -40,7 +40,7 @@ struct Authctxt;
 void mm_log_handler(LogLevel, const char *, void *);
 int mm_is_monitor(void);
 DH *mm_choose_dh(int, int, int);
-int mm_sshkey_sign(struct sshkey *, u_char **, u_int *, u_char *, u_int, u_int);
+int mm_sshkey_sign(struct sshkey *, u_char **, size_t *, u_char *, size_t, u_int);
 void mm_inform_authserv(char *, char *);
 struct passwd *mm_getpwnamallow(const char *);
 char *mm_auth2_read_banner(void);
@@ -50,7 +50,7 @@ int mm_user_key_allowed(struct passwd *, struct sshkey *);
 int mm_hostbased_key_allowed(struct passwd *, char *, char *, struct sshkey *);
 int mm_auth_rhosts_rsa_key_allowed(struct passwd *, char *, char *,
     struct sshkey *);
-int mm_sshkey_verify(struct sshkey *, u_char *, u_int, u_char *, u_int, u_int);
+int mm_sshkey_verify(struct sshkey *, u_char *, size_t, u_char *, size_t, u_int);
 int mm_auth_rsa_key_allowed(struct passwd *, BIGNUM *, struct sshkey **);
 int mm_auth_rsa_verify_response(struct sshkey *, BIGNUM *, u_char *);
 BIGNUM *mm_auth_rsa_generate_challenge(struct sshkey *);

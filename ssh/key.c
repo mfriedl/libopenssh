@@ -518,14 +518,15 @@ sshkey_equal(const struct sshkey *a, const struct sshkey *b)
 
 u_char*
 sshkey_fingerprint_raw(struct sshkey *k, enum sshkey_fp_type dgst_type,
-    u_int *dgst_raw_length)
+    size_t *dgst_raw_length)
 {
 	const EVP_MD *md = NULL;
 	EVP_MD_CTX ctx;
 	u_char *blob;
 	u_char *retval = NULL;
-	u_int len = 0;
+	size_t len = 0;
 	int nlen, elen, otype;
+	u_int dlen;
 
 	*dgst_raw_length = 0;
 
@@ -583,17 +584,18 @@ sshkey_fingerprint_raw(struct sshkey *k, enum sshkey_fp_type dgst_type,
 	}
 	EVP_DigestInit(&ctx, md);
 	EVP_DigestUpdate(&ctx, blob, len);
-	EVP_DigestFinal(&ctx, retval, dgst_raw_length);
+	EVP_DigestFinal(&ctx, retval, &dlen);
+	*dgst_raw_length = dlen;
 	bzero(blob, len);
 	free(blob);
 	return retval;
 }
 
 static char *
-fingerprint_hex(u_char *dgst_raw, u_int dgst_raw_len)
+fingerprint_hex(u_char *dgst_raw, size_t dgst_raw_len)
 {
 	char *retval;
-	u_int i;
+	size_t i;
 
 	if ((retval = calloc(1, dgst_raw_len * 3 + 1)) == NULL)
 		return NULL;
@@ -609,7 +611,7 @@ fingerprint_hex(u_char *dgst_raw, u_int dgst_raw_len)
 }
 
 static char *
-fingerprint_bubblebabble(u_char *dgst_raw, u_int dgst_raw_len)
+fingerprint_bubblebabble(u_char *dgst_raw, size_t dgst_raw_len)
 {
 	char vowels[] = { 'a', 'e', 'i', 'o', 'u', 'y' };
 	char consonants[] = { 'b', 'c', 'd', 'f', 'g', 'h', 'k', 'l', 'm',
@@ -690,7 +692,7 @@ fingerprint_bubblebabble(u_char *dgst_raw, u_int dgst_raw_len)
 #define	FLDSIZE_Y	(FLDBASE + 1)
 #define	FLDSIZE_X	(FLDBASE * 2 + 1)
 static char *
-fingerprint_randomart(u_char *dgst_raw, u_int dgst_raw_len,
+fingerprint_randomart(u_char *dgst_raw, size_t dgst_raw_len,
     const struct sshkey *k)
 {
 	/*
@@ -700,7 +702,8 @@ fingerprint_randomart(u_char *dgst_raw, u_int dgst_raw_len,
 	char	*augmentation_string = " .o+=*BOX@%&#/^SE";
 	char	*retval, *p;
 	u_char	 field[FLDSIZE_X][FLDSIZE_Y];
-	u_int	 i, b;
+	size_t	 i;
+	u_int	 b;
 	int	 x, y;
 	size_t	 len = strlen(augmentation_string) - 1;
 
@@ -774,7 +777,7 @@ sshkey_fingerprint(struct sshkey *k, enum sshkey_fp_type dgst_type,
 {
 	char *retval = NULL;
 	u_char *dgst_raw;
-	u_int dgst_raw_len;
+	size_t dgst_raw_len;
 
 	if ((dgst_raw = sshkey_fingerprint_raw(k, dgst_type,
 	    &dgst_raw_len)) == NULL)
@@ -1386,7 +1389,8 @@ sshkey_names_valid2(const char *names)
 }
 
 static int
-cert_parse(struct sshbuf *b, struct sshkey *key, const u_char *blob, u_int blen)
+cert_parse(struct sshbuf *b, struct sshkey *key, const u_char *blob,
+    size_t blen)
 {
 	u_char *principals = NULL, *critical = NULL, *exts = NULL;
 	u_char *sig_key = NULL, *sig = NULL;
@@ -1518,7 +1522,7 @@ cert_parse(struct sshbuf *b, struct sshkey *key, const u_char *blob, u_int blen)
 }
 
 int
-sshkey_from_blob(const u_char *blob, u_int blen, struct sshkey **keyp)
+sshkey_from_blob(const u_char *blob, size_t blen, struct sshkey **keyp)
 {
 	struct sshbuf *b;
 	int type, nid = -1, ret = SSH_ERR_INTERNAL_ERROR;
@@ -1712,7 +1716,7 @@ sshkey_to_blob_buf(const struct sshkey *key, struct sshbuf *b)
 }
 
 int
-sshkey_to_blob(const struct sshkey *key, u_char **blobp, u_int *lenp)
+sshkey_to_blob(const struct sshkey *key, u_char **blobp, size_t *lenp)
 {
 	int ret = SSH_ERR_INTERNAL_ERROR;
 	size_t len;
@@ -1740,9 +1744,11 @@ sshkey_to_blob(const struct sshkey *key, u_char **blobp, u_int *lenp)
 
 int
 sshkey_sign(const struct sshkey *key,
-    u_char **sigp, u_int *lenp,
-    const u_char *data, u_int datalen, u_int compat)
+    u_char **sigp, size_t *lenp,
+    const u_char *data, size_t datalen, u_int compat)
 {
+	if (datalen > SSH_KEY_MAX_SIGN_DATA_SIZE)
+		return SSH_ERR_INVALID_ARGUMENT;
 	switch (key->type) {
 	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
@@ -1765,12 +1771,14 @@ sshkey_sign(const struct sshkey *key,
  */
 int
 sshkey_verify(const struct sshkey *key,
-    const u_char *sig, u_int siglen,
-    const u_char *data, u_int dlen, u_int compat)
+    const u_char *sig, size_t siglen,
+    const u_char *data, size_t dlen, u_int compat)
 {
 	if (siglen == 0)
 		return -1;
 
+	if (dlen > SSH_KEY_MAX_SIGN_DATA_SIZE)
+		return SSH_ERR_INVALID_ARGUMENT;
 	switch (key->type) {
 	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
@@ -1955,7 +1963,7 @@ sshkey_certify(struct sshkey *k, struct sshkey *ca)
 {
 	struct sshbuf *principals = NULL;
 	u_char *ca_blob = NULL, *sig_blob = NULL, nonce[32];
-	u_int i, ca_len, sig_len;
+	size_t i, ca_len, sig_len;
 	int ret;
 	struct sshbuf *cert;
 

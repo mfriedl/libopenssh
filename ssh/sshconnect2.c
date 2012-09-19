@@ -1199,8 +1199,8 @@ input_userauth_jpake_server_confirm(int type, u_int32_t seq, struct ssh *ssh)
 #endif /* JPAKE */
 
 static int
-identity_sign(Identity *id, u_char **sigp, u_int *lenp,
-    u_char *data, u_int datalen, u_int compat)
+identity_sign(Identity *id, u_char **sigp, size_t *lenp,
+    u_char *data, size_t datalen, u_int compat)
 {
 	struct sshkey *prv;
 	int ret;
@@ -1230,8 +1230,7 @@ sign_and_send_pubkey(struct ssh *ssh, Identity *id)
 	Authctxt *authctxt = ssh->authctxt;
 	struct sshbuf *b;
 	u_char *blob, *signature;
-	u_int bloblen, slen;
-	u_int skip = 0;
+	size_t bloblen, slen, skip = 0;
 	int r, ret = -1;
 	int have_sig = 1;
 	char *fp;
@@ -1332,7 +1331,8 @@ send_pubkey_test(struct ssh *ssh, Identity *id)
 {
 	Authctxt *authctxt = ssh->authctxt;
 	u_char *blob;
-	u_int bloblen, have_sig = 0;
+	size_t bloblen;
+	u_int have_sig = 0;
 	int r;
 
 	debug3("send_pubkey_test");
@@ -1654,7 +1654,7 @@ input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 }
 
 static int
-ssh_keysign(struct ssh *ssh, struct sshkey *key, u_char **sigp, u_int *lenp,
+ssh_keysign(struct ssh *ssh, struct sshkey *key, u_char **sigp, size_t *lenp,
     u_char *data, size_t datalen)
 {
 	struct sshbuf *b;
@@ -1751,7 +1751,7 @@ userauth_hostbased(struct ssh *ssh)
 	u_char *signature, *blob;
 	char *chost, *pkalg, *p;
 	const char *service;
-	u_int blen, slen;
+	size_t blen, slen;
 	int ok, i, r, found = 0;
 
 	/* check for a useful key */

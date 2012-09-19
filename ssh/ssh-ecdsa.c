@@ -40,14 +40,15 @@
 
 /* ARGSUSED */
 int
-ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, u_int *lenp,
-    const u_char *data, u_int datalen, u_int compat)
+ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+    const u_char *data, size_t datalen, u_int compat)
 {
 	ECDSA_SIG *sig = NULL;
 	const EVP_MD *evp_md;
 	EVP_MD_CTX md;
 	u_char digest[EVP_MAX_MD_SIZE];
-	u_int len, dlen;
+	size_t len;
+	u_int dlen;
 	struct sshbuf *b = NULL, *bb = NULL;
 	int ret = SSH_ERR_INTERNAL_ERROR;
 
@@ -105,8 +106,8 @@ ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, u_int *lenp,
 /* ARGSUSED */
 int
 ssh_ecdsa_verify(const struct sshkey *key,
-    const u_char *signature, u_int signaturelen,
-    const u_char *data, u_int datalen, u_int compat)
+    const u_char *signature, size_t signaturelen,
+    const u_char *data, size_t datalen, u_int compat)
 {
 	ECDSA_SIG *sig = NULL;
 	const EVP_MD *evp_md;

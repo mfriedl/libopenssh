@@ -42,6 +42,7 @@
 #include "ssh.h"
 #include "ssh2.h"
 #include "misc.h"
+#include "sshbuf.h"
 #include "buffer.h"
 #include "authfile.h"
 #include "msg.h"
@@ -55,14 +56,14 @@
 uid_t original_real_uid;
 
 static int
-valid_request(struct passwd *pw, char *host, struct sshkey **ret, u_char *data,
-    u_int datalen)
+valid_request(struct passwd *pw, char *host, struct sshkey **ret,
+    u_char *data, size_t datalen)
 {
 	Buffer b;
 	struct sshkey *key = NULL;
-	u_char *pkblob;
-	u_int blen, len;
-	char *pkalg, *p;
+	u_char *pkblob, *p;
+	size_t blen, len;
+	char *pkalg, *luser;
 	int r, pktype, fail;
 
 	fail = 0;
@@ -71,7 +72,8 @@ valid_request(struct passwd *pw, char *host, struct sshkey **ret, u_char *data,
 	buffer_append(&b, data, datalen);
 
 	/* session id, currently limited to SHA1 (20 bytes) or SHA256 (32) */
-	p = buffer_get_string(&b, &len);
+	if ((r = sshbuf_get_string(&b, &p, &len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (len != 20 && len != 32)
 		fail++;
 	xfree(p);
@@ -95,8 +97,9 @@ valid_request(struct passwd *pw, char *host, struct sshkey **ret, u_char *data,
 	xfree(p);
 
 	/* pubkey */
-	pkalg = buffer_get_string(&b, NULL);
-	pkblob = buffer_get_string(&b, &blen);
+	if ((r = sshbuf_get_cstring(&b, &pkalg, NULL)) != 0 ||
+	    (r = sshbuf_get_string(&b, &pkblob, &blen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	pktype = sshkey_type_from_name(pkalg);
 	if (pktype == KEY_UNSPEC)
@@ -110,7 +113,8 @@ valid_request(struct passwd *pw, char *host, struct sshkey **ret, u_char *data,
 	xfree(pkblob);
 
 	/* client host name, handle trailing dot */
-	p = buffer_get_string(&b, &len);
+	if ((r = sshbuf_get_string(&b, &p, &len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	debug2("valid_request: check expect chost %s got %s", host, p);
 	if (strlen(host) != len - 1)
 		fail++;
@@ -122,10 +126,12 @@ valid_request(struct passwd *pw, char *host, struct sshkey **ret, u_char *data,
 
 	/* local user */
 	p = buffer_get_string(&b, NULL);
+	if ((r = sshbuf_get_cstring(&b, &luser, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
-	if (strcmp(pw->pw_name, p) != 0)
+	if (strcmp(pw->pw_name, luser) != 0)
 		fail++;
-	xfree(p);
+	xfree(luser);
 
 	/* end of message */
 	if (buffer_len(&b) != 0)
@@ -153,7 +159,7 @@ main(int argc, char **argv)
 	int r, key_fd[NUM_KEYTYPES], i, found, version = 2, fd;
 	u_char *signature, *data;
 	char *host;
-	u_int slen, dlen;
+	size_t slen, dlen;
 	u_int32_t rnd[256];
 
 	/* Ensure that stdin and stdout are connected */
@@ -226,7 +232,8 @@ main(int argc, char **argv)
 	if ((host = get_local_name(fd)) == NULL)
 		fatal("cannot get local name for fd");
 
-	data = buffer_get_string(&b, &dlen);
+	if ((r = sshbuf_get_string(&b, &data, &dlen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (valid_request(pw, host, &key, data, dlen) < 0)
 		fatal("not a valid request");
 	xfree(host);

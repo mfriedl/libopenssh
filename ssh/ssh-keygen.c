@@ -259,7 +259,7 @@ load_identity(char *filename)
 static void
 do_convert_to_ssh2(struct passwd *pw, struct sshkey *k)
 {
-	u_int len;
+	size_t len;
 	u_char *blob;
 	char comment[61];
 	int r;
@@ -383,7 +383,7 @@ do_convert_private_ssh2_from_blob(u_char *blob, u_int blen)
 	char *type, *cipher;
 	u_char *sig = NULL, data[] = "abcde12345";
 	int r, magic, rlen, ktype, i1, i2, i3, i4;
-	u_int slen;
+	size_t slen;
 	u_long e;
 
 	buffer_init(&b);

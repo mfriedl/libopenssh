@@ -142,7 +142,7 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	struct sshkey *server_host_public, *server_host_private;
 	u_char *kbuf = NULL, *signature = NULL, *server_host_key_blob = NULL;
 	u_char *hash;
-	u_int sbloblen, slen;
+	size_t sbloblen, slen;
 	size_t klen = 0, hashlen;
 	int kout, r;
 

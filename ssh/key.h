@@ -37,6 +37,7 @@
 #endif
 
 #define SSH_RSA_MINIMUM_MODULUS_SIZE	768
+#define SSH_KEY_MAX_SIGN_DATA_SIZE	(1 << 20)
 
 /* XXX compat, remove when we can */
 #define types sshkey_types
@@ -114,7 +115,7 @@ int		 sshkey_equal(const struct sshkey *, const struct sshkey *);
 char		*sshkey_fingerprint(struct sshkey *,
     enum sshkey_fp_type, enum sshkey_fp_rep);
 u_char		*sshkey_fingerprint_raw(struct sshkey *,
-    enum sshkey_fp_type, u_int *);
+    enum sshkey_fp_type, size_t *);
 const char	*sshkey_type(const struct sshkey *);
 const char	*sshkey_cert_type(const struct sshkey *);
 int		 sshkey_write(const struct sshkey *, FILE *);
@@ -145,38 +146,38 @@ const EVP_MD *	 sshkey_ec_nid_to_evpmd(int nid);
 int		 sshkey_ec_validate_public(const EC_GROUP *, const EC_POINT *);
 int		 sshkey_ec_validate_private(const EC_KEY *);
 
-int		 sshkey_from_blob(const u_char *, u_int, struct sshkey **);
+int		 sshkey_from_blob(const u_char *, size_t, struct sshkey **);
 int		 sshkey_to_blob_buf(const struct sshkey *, struct sshbuf *);
-int		 sshkey_to_blob(const struct sshkey *, u_char **, u_int *);
+int		 sshkey_to_blob(const struct sshkey *, u_char **, size_t *);
 const char	*sshkey_ssh_name(const struct sshkey *);
 const char	*sshkey_ssh_name_plain(const struct sshkey *);
 int		 sshkey_names_valid2(const char *);
 
-int	 sshkey_sign(const struct sshkey *, u_char **, u_int *,
-    const u_char *, u_int, u_int);
-int	 sshkey_verify(const struct sshkey *, const u_char *, u_int,
-    const u_char *, u_int, u_int);
+int	 sshkey_sign(const struct sshkey *, u_char **, size_t *,
+    const u_char *, size_t, u_int);
+int	 sshkey_verify(const struct sshkey *, const u_char *, size_t,
+    const u_char *, size_t, u_int);
 
 /* for debug */
 void	sshkey_dump_ec_point(const EC_GROUP *, const EC_POINT *);
 void	sshkey_dump_ec_key(const EC_KEY *);
 
 #ifdef SSHKEY_INTERNAL
-int ssh_rsa_sign(const struct sshkey *key, u_char **sigp, u_int *lenp,
-    const u_char *data, u_int datalen, u_int compat);
+int ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+    const u_char *data, size_t datalen, u_int compat);
 int ssh_rsa_verify(const struct sshkey *key,
-    const u_char *signature, u_int signaturelen,
-    const u_char *data, u_int datalen, u_int compat);
-int ssh_dss_sign(const struct sshkey *key, u_char **sigp, u_int *lenp,
-    const u_char *data, u_int datalen, u_int compat);
+    const u_char *signature, size_t signaturelen,
+    const u_char *data, size_t datalen, u_int compat);
+int ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+    const u_char *data, size_t datalen, u_int compat);
 int ssh_dss_verify(const struct sshkey *key,
-    const u_char *signature, u_int signaturelen,
-    const u_char *data, u_int datalen, u_int compat);
-int ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, u_int *lenp,
-    const u_char *data, u_int datalen, u_int compat);
+    const u_char *signature, size_t signaturelen,
+    const u_char *data, size_t datalen, u_int compat);
+int ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+    const u_char *data, size_t datalen, u_int compat);
 int ssh_ecdsa_verify(const struct sshkey *key,
-    const u_char *signature, u_int signaturelen,
-    const u_char *data, u_int datalen, u_int compat);
+    const u_char *signature, size_t signaturelen,
+    const u_char *data, size_t datalen, u_int compat);
 #endif
 
 

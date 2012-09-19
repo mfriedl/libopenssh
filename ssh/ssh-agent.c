@@ -59,6 +59,7 @@
 #include "xmalloc.h"
 #include "ssh.h"
 #include "rsa.h"
+#include "sshbuf.h"
 #include "buffer.h"
 #include "key.h"
 #include "authfd.h"
@@ -215,7 +216,7 @@ process_request_identities(SocketEntry *e, int version)
 			buffer_put_bignum(&msg, id->key->rsa->n);
 		} else {
 			u_char *blob;
-			u_int blen;
+			size_t blen;
 			if ((r = sshkey_to_blob(id->key, &blob, &blen)) != 0) {
 				error("%s: sshkey_to_blob: %s", __func__,
 				    ssh_err(r));
@@ -310,14 +311,15 @@ static void
 process_sign_request2(SocketEntry *e)
 {
 	u_char *blob, *data, *signature = NULL;
-	u_int blen, dlen, slen = 0;
+	size_t blen, dlen, slen = 0;
 	u_int compat = 0;
-	int ok = -1, flags;
+	int r, ok = -1, flags;
 	Buffer msg;
 	struct sshkey *key;
 
-	blob = buffer_get_string(&e->request, &blen);
-	data = buffer_get_string(&e->request, &dlen);
+	if ((r = sshbuf_get_string(&e->request, &blob, &blen)) != 0 ||
+	    (r = sshbuf_get_string(&e->request, &data, &dlen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	flags = buffer_get_int(&e->request);
 	if (flags & SSH_AGENT_OLD_SIGNATURE)

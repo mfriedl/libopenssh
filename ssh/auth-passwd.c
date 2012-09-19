@@ -45,7 +45,9 @@
 #include <stdarg.h>
 
 #include "packet.h"
+#include "sshbuf.h"
 #include "buffer.h"
+#include "err.h"
 #include "log.h"
 #include "servconf.h"
 #include "key.h"
@@ -53,7 +55,7 @@
 #include "auth.h"
 #include "auth-options.h"
 
-extern Buffer loginmsg;
+extern struct sshbuf *loginmsg;
 extern ServerOptions options;
 int sys_auth_passwd(Authctxt *, const char *);
 
@@ -98,7 +100,7 @@ auth_password(Authctxt *authctxt, const char *password)
 static void
 warn_expiry(Authctxt *authctxt, auth_session_t *as)
 {
-	char buf[256];
+	int r;
 	quad_t pwtimeleft, actimeleft, daysleft, pwwarntime, acwarntime;
 
 	pwwarntime = acwarntime = TWO_WEEKS;
@@ -113,17 +115,17 @@ warn_expiry(Authctxt *authctxt, auth_session_t *as)
 	}
 	if (pwtimeleft != 0 && pwtimeleft < pwwarntime) {
 		daysleft = pwtimeleft / DAY + 1;
-		snprintf(buf, sizeof(buf),
+		if ((r = sshbuf_putf(loginmsg,
 		    "Your password will expire in %lld day%s.\n",
-		    daysleft, daysleft == 1 ? "" : "s");
-		buffer_append(&loginmsg, buf, strlen(buf));
+		    daysleft, daysleft == 1 ? "" : "s")) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
 	if (actimeleft != 0 && actimeleft < acwarntime) {
 		daysleft = actimeleft / DAY + 1;
-		snprintf(buf, sizeof(buf),
+		if ((r = sshbuf_putf(loginmsg,
 		    "Your account will expire in %lld day%s.\n",
-		    daysleft, daysleft == 1 ? "" : "s");
-		buffer_append(&loginmsg, buf, strlen(buf));
+		    daysleft, daysleft == 1 ? "" : "s")) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
 }
 

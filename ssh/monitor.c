@@ -47,7 +47,7 @@
 #include "xmalloc.h"
 #include "ssh.h"
 #include "key.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "hostfile.h"
 #include "auth.h"
 #include "cipher.h"
@@ -85,44 +85,44 @@ static Gssctxt *gsscontext = NULL;
 extern ServerOptions options;
 extern u_int utmp_len;
 extern u_char session_id[];
-extern Buffer loginmsg;
+extern struct sshbuf *loginmsg;
 
 /* State exported from the child */
-Buffer child_state;
+static struct sshbuf *child_state;
 
 /* Functions on the monitor that answer unprivileged requests */
 
-int mm_answer_moduli(int, Buffer *);
-int mm_answer_sign(int, Buffer *);
-int mm_answer_pwnamallow(int, Buffer *);
-int mm_answer_auth2_read_banner(int, Buffer *);
-int mm_answer_authserv(int, Buffer *);
-int mm_answer_authpassword(int, Buffer *);
-int mm_answer_bsdauthquery(int, Buffer *);
-int mm_answer_bsdauthrespond(int, Buffer *);
-int mm_answer_skeyquery(int, Buffer *);
-int mm_answer_skeyrespond(int, Buffer *);
-int mm_answer_keyallowed(int, Buffer *);
-int mm_answer_keyverify(int, Buffer *);
-int mm_answer_pty(int, Buffer *);
-int mm_answer_pty_cleanup(int, Buffer *);
-int mm_answer_term(int, Buffer *);
-int mm_answer_rsa_keyallowed(int, Buffer *);
-int mm_answer_rsa_challenge(int, Buffer *);
-int mm_answer_rsa_response(int, Buffer *);
-int mm_answer_sesskey(int, Buffer *);
-int mm_answer_sessid(int, Buffer *);
-int mm_answer_jpake_get_pwdata(int, Buffer *);
-int mm_answer_jpake_step1(int, Buffer *);
-int mm_answer_jpake_step2(int, Buffer *);
-int mm_answer_jpake_key_confirm(int, Buffer *);
-int mm_answer_jpake_check_confirm(int, Buffer *);
+int mm_answer_moduli(int, struct sshbuf *);
+int mm_answer_sign(int, struct sshbuf *);
+int mm_answer_pwnamallow(int, struct sshbuf *);
+int mm_answer_auth2_read_banner(int, struct sshbuf *);
+int mm_answer_authserv(int, struct sshbuf *);
+int mm_answer_authpassword(int, struct sshbuf *);
+int mm_answer_bsdauthquery(int, struct sshbuf *);
+int mm_answer_bsdauthrespond(int, struct sshbuf *);
+int mm_answer_skeyquery(int, struct sshbuf *);
+int mm_answer_skeyrespond(int, struct sshbuf *);
+int mm_answer_keyallowed(int, struct sshbuf *);
+int mm_answer_keyverify(int, struct sshbuf *);
+int mm_answer_pty(int, struct sshbuf *);
+int mm_answer_pty_cleanup(int, struct sshbuf *);
+int mm_answer_term(int, struct sshbuf *);
+int mm_answer_rsa_keyallowed(int, struct sshbuf *);
+int mm_answer_rsa_challenge(int, struct sshbuf *);
+int mm_answer_rsa_response(int, struct sshbuf *);
+int mm_answer_sesskey(int, struct sshbuf *);
+int mm_answer_sessid(int, struct sshbuf *);
+int mm_answer_jpake_get_pwdata(int, struct sshbuf *);
+int mm_answer_jpake_step1(int, struct sshbuf *);
+int mm_answer_jpake_step2(int, struct sshbuf *);
+int mm_answer_jpake_key_confirm(int, struct sshbuf *);
+int mm_answer_jpake_check_confirm(int, struct sshbuf *);
 
 #ifdef GSSAPI
-int mm_answer_gss_setup_ctx(int, Buffer *);
-int mm_answer_gss_accept_ctx(int, Buffer *);
-int mm_answer_gss_userok(int, Buffer *);
-int mm_answer_gss_checkmic(int, Buffer *);
+int mm_answer_gss_setup_ctx(int, struct sshbuf *);
+int mm_answer_gss_accept_ctx(int, struct sshbuf *);
+int mm_answer_gss_userok(int, struct sshbuf *);
+int mm_answer_gss_checkmic(int, struct sshbuf *);
 #endif
 
 static int monitor_read_log(struct monitor *);
@@ -144,7 +144,7 @@ static pid_t monitor_child_pid;
 struct mon_table {
 	enum monitor_reqtype type;
 	int flags;
-	int (*f)(int, Buffer *);
+	int (*f)(int, struct sshbuf *);
 };
 
 #define MON_ISAUTH	0x0004	/* Required for Authentication */
@@ -396,18 +396,21 @@ mm_zfree(struct mm_master *mm, void *address)
 static int
 monitor_read_log(struct monitor *pmonitor)
 {
-	Buffer logmsg;
+	struct sshbuf *logmsg;
 	u_int len, level;
 	char *msg;
+	int r;
 
-	buffer_init(&logmsg);
+	if ((logmsg = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 
 	/* Read length */
-	buffer_append_space(&logmsg, 4);
+	if ((r = sshbuf_reserve(logmsg, 4, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (atomicio(read, pmonitor->m_log_recvfd,
-	    buffer_ptr(&logmsg), buffer_len(&logmsg)) != buffer_len(&logmsg)) {
+	    sshbuf_ptr(logmsg), sshbuf_len(logmsg)) != sshbuf_len(logmsg)) {
 		if (errno == EPIPE) {
-			buffer_free(&logmsg);
+			sshbuf_free(logmsg);
 			debug("%s: child log fd closed", __func__);
 			close(pmonitor->m_log_recvfd);
 			pmonitor->m_log_recvfd = -1;
@@ -415,26 +418,29 @@ monitor_read_log(struct monitor *pmonitor)
 		}
 		fatal("%s: log fd read: %s", __func__, strerror(errno));
 	}
-	len = buffer_get_int(&logmsg);
+	if ((r = sshbuf_get_u32(logmsg, &len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (len <= 4 || len > 8192)
 		fatal("%s: invalid log message length %u", __func__, len);
 
 	/* Read severity, message */
-	buffer_clear(&logmsg);
-	buffer_append_space(&logmsg, len);
+	sshbuf_reset(logmsg);
+	if ((r = sshbuf_reserve(logmsg, len, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (atomicio(read, pmonitor->m_log_recvfd,
-	    buffer_ptr(&logmsg), buffer_len(&logmsg)) != buffer_len(&logmsg))
+	    sshbuf_ptr(logmsg), sshbuf_len(logmsg)) != sshbuf_len(logmsg))
 		fatal("%s: log fd read: %s", __func__, strerror(errno));
 
 	/* Log it */
-	level = buffer_get_int(&logmsg);
-	msg = buffer_get_string(&logmsg, NULL);
+	if ((r = sshbuf_get_u32(logmsg, &level)) != 0 ||
+	    (r = sshbuf_get_cstring(logmsg, &msg, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (log_level_name(level) == NULL)
 		fatal("%s: invalid log level %u (corrupted message?)",
 		    __func__, level);
 	do_log2(level, "%s [preauth]", msg);
 
-	buffer_free(&logmsg);
+	sshbuf_free(logmsg);
 	xfree(msg);
 
 	return 0;
@@ -444,8 +450,8 @@ int
 monitor_read(struct monitor *pmonitor, struct mon_table *ent,
     struct mon_table **pent)
 {
-	Buffer m;
-	int ret;
+	struct sshbuf *m;
+	int ret, r;
 	u_char type;
 	struct pollfd pfd[2];
 
@@ -472,10 +478,12 @@ monitor_read(struct monitor *pmonitor, struct mon_table *ent,
 			break;  /* Continues below */
 	}
 
-	buffer_init(&m);
+	if ((m = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 
-	mm_request_receive(pmonitor->m_sendfd, &m);
-	type = buffer_get_char(&m);
+	mm_request_receive(pmonitor->m_sendfd, m);
+	if ((r = sshbuf_get_u8(m, &type)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	debug3("%s: checking request %d", __func__, type);
 
@@ -489,8 +497,8 @@ monitor_read(struct monitor *pmonitor, struct mon_table *ent,
 		if (!(ent->flags & MON_PERMIT))
 			fatal("%s: unpermitted request %d", __func__,
 			    type);
-		ret = (*ent->f)(pmonitor->m_sendfd, &m);
-		buffer_free(&m);
+		ret = (*ent->f)(pmonitor->m_sendfd, m);
+		sshbuf_free(m);
 
 		/* The child may use this request only once, disable it */
 		if (ent->flags & MON_ONCE) {
@@ -540,14 +548,16 @@ monitor_reset_key_state(void)
 }
 
 int
-mm_answer_moduli(int sock, Buffer *m)
+mm_answer_moduli(int sock, struct sshbuf *m)
 {
 	DH *dh;
-	int min, want, max;
+	int r;
+	u_int min, want, max;
 
-	min = buffer_get_int(m);
-	want = buffer_get_int(m);
-	max = buffer_get_int(m);
+	if ((r = sshbuf_get_u32(m, &min)) != 0 ||
+	    (r = sshbuf_get_u32(m, &want)) != 0 ||
+	    (r = sshbuf_get_u32(m, &max)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	debug3("%s: got parameters: %d %d %d",
 	    __func__, min, want, max);
@@ -556,17 +566,19 @@ mm_answer_moduli(int sock, Buffer *m)
 		fatal("%s: bad parameters: %d %d %d",
 		    __func__, min, want, max);
 
-	buffer_clear(m);
+	sshbuf_reset(m);
 
 	dh = choose_dh(min, want, max);
 	if (dh == NULL) {
-		buffer_put_char(m, 0);
+		if ((r = sshbuf_put_u8(m, 0)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		return (0);
 	} else {
 		/* Send first bignum */
-		buffer_put_char(m, 1);
-		buffer_put_bignum2(m, dh->p);
-		buffer_put_bignum2(m, dh->g);
+		if ((r = sshbuf_put_u8(m, 1)) != 0 ||
+		    (r = sshbuf_put_bignum2(m, dh->p)) != 0 ||
+		    (r = sshbuf_put_bignum2(m, dh->g)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 		DH_free(dh);
 	}
@@ -575,25 +587,26 @@ mm_answer_moduli(int sock, Buffer *m)
 }
 
 int
-mm_answer_sign(int sock, Buffer *m)
+mm_answer_sign(int sock, struct sshbuf *m)
 {
 	struct sshkey *key;
 	u_char *p;
 	u_char *signature;
-	u_int siglen, datlen;
+	size_t datlen, siglen;
 	int keyid, r;
 
 	debug3("%s", __func__);
 
-	keyid = buffer_get_int(m);
-	p = buffer_get_string(m, &datlen);
+	if ((r = sshbuf_get_u32(m, &keyid)) != 0 ||
+	    (r = sshbuf_get_string(m, &p, &datlen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	/*
 	 * Supported KEX types use SHA1 (20 bytes), SHA256 (32 bytes),
 	 * SHA384 (48 bytes) and SHA512 (64 bytes).
 	 */
 	if (datlen != 20 && datlen != 32 && datlen != 48 && datlen != 64)
-		fatal("%s: data length incorrect: %u", __func__, datlen);
+		fatal("%s: data length incorrect: %zu", __func__, datlen);
 
 	/* save session id, it will be passed on the first call */
 	if (session_id2_len == 0) {
@@ -608,10 +621,11 @@ mm_answer_sign(int sock, Buffer *m)
 	    active_state->compat)) != 0)
 		fatal("%s: sshkey_sign failed: %s", __func__, ssh_err(r));
 
-	debug3("%s: signature %p(%u)", __func__, signature, siglen);
+	debug3("%s: signature %p(%zu)", __func__, signature, siglen);
 
-	buffer_clear(m);
-	buffer_put_string(m, signature, siglen);
+	sshbuf_reset(m);
+	if ((r = sshbuf_put_string(m, signature, siglen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	xfree(p);
 	xfree(signature);
@@ -627,11 +641,11 @@ mm_answer_sign(int sock, Buffer *m)
 /* Retrieves the password entry and also checks if the user is permitted */
 
 int
-mm_answer_pwnamallow(int sock, Buffer *m)
+mm_answer_pwnamallow(int sock, struct sshbuf *m)
 {
 	char *username;
 	struct passwd *pwent;
-	int allowed = 0;
+	int r, allowed = 0;
 	u_int i;
 
 	debug3("%s", __func__);
@@ -639,7 +653,8 @@ mm_answer_pwnamallow(int sock, Buffer *m)
 	if (authctxt->attempt++ != 0)
 		fatal("%s: multiple attempts for getpwnam", __func__);
 
-	username = buffer_get_string(m, NULL);
+	if ((r = sshbuf_get_cstring(m, &username, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	pwent = getpwnamallow(username);
 
@@ -647,10 +662,11 @@ mm_answer_pwnamallow(int sock, Buffer *m)
 	setproctitle("%s [priv]", pwent ? username : "unknown");
 	xfree(username);
 
-	buffer_clear(m);
+	sshbuf_reset(m);
 
 	if (pwent == NULL) {
-		buffer_put_char(m, 0);
+		if ((r = sshbuf_put_u8(m, 0)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		authctxt->pw = fakepw();
 		goto out;
 	}
@@ -659,25 +675,31 @@ mm_answer_pwnamallow(int sock, Buffer *m)
 	authctxt->pw = pwent;
 	authctxt->valid = 1;
 
-	buffer_put_char(m, 1);
-	buffer_put_string(m, pwent, sizeof(struct passwd));
-	buffer_put_cstring(m, pwent->pw_name);
-	buffer_put_cstring(m, "*");
-	buffer_put_cstring(m, pwent->pw_gecos);
-	buffer_put_cstring(m, pwent->pw_class);
-	buffer_put_cstring(m, pwent->pw_dir);
-	buffer_put_cstring(m, pwent->pw_shell);
+	if ((r = sshbuf_put_u8(m, 1)) != 0 ||
+	    (r = sshbuf_put_string(m, pwent, sizeof(struct passwd))) != 0 ||
+	    (r = sshbuf_put_cstring(m, pwent->pw_name)) != 0 ||
+	    (r = sshbuf_put_cstring(m, "*")) != 0 ||
+	    (r = sshbuf_put_cstring(m, pwent->pw_gecos)) != 0 ||
+	    (r = sshbuf_put_cstring(m, pwent->pw_class)) != 0 ||
+	    (r = sshbuf_put_cstring(m, pwent->pw_dir)) != 0 ||
+	    (r = sshbuf_put_cstring(m, pwent->pw_shell)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
  out:
-	buffer_put_string(m, &options, sizeof(options));
+	if ((r = sshbuf_put_string(m, &options, sizeof(options))) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 #define M_CP_STROPT(x) do { \
 		if (options.x != NULL) \
-			buffer_put_cstring(m, options.x); \
+			if ((r = sshbuf_put_cstring(m, options.x)) != 0) \
+				fatal("%s: buffer error: %s", __func__, \
+				    ssh_err(r)); \
 	} while (0)
 #define M_CP_STRARRAYOPT(x, nx) do { \
 		for (i = 0; i < options.nx; i++) \
-			buffer_put_cstring(m, options.x[i]); \
+			if ((r = sshbuf_put_cstring(m, options.x[i])) != 0) \
+				fatal("%s: buffer error: %s", __func__, \
+				    ssh_err(r)); \
 	} while (0)
 	/* See comment in servconf.h */
 	COPY_MATCH_STRING_OPTS();
@@ -699,13 +721,15 @@ mm_answer_pwnamallow(int sock, Buffer *m)
 	return (0);
 }
 
-int mm_answer_auth2_read_banner(int sock, Buffer *m)
+int mm_answer_auth2_read_banner(int sock, struct sshbuf *m)
 {
 	char *banner;
+	int r;
 
-	buffer_clear(m);
+	sshbuf_reset(m);
 	banner = auth2_read_banner();
-	buffer_put_cstring(m, banner != NULL ? banner : "");
+	if ((r = sshbuf_put_cstring(m, banner != NULL ? banner : "")) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	mm_request_send(sock, MONITOR_ANS_AUTH2_READ_BANNER, m);
 
 	if (banner != NULL)
@@ -715,12 +739,15 @@ int mm_answer_auth2_read_banner(int sock, Buffer *m)
 }
 
 int
-mm_answer_authserv(int sock, Buffer *m)
+mm_answer_authserv(int sock, struct sshbuf *m)
 {
+	int r;
+
 	monitor_permit_authentications(1);
 
-	authctxt->service = buffer_get_string(m, NULL);
-	authctxt->style = buffer_get_string(m, NULL);
+	if ((r = sshbuf_get_cstring(m, &authctxt->service, NULL)) != 0 ||
+	    (r = sshbuf_get_cstring(m, &authctxt->style, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	debug3("%s: service=%s, style=%s",
 	    __func__, authctxt->service, authctxt->style);
 
@@ -733,22 +760,24 @@ mm_answer_authserv(int sock, Buffer *m)
 }
 
 int
-mm_answer_authpassword(int sock, Buffer *m)
+mm_answer_authpassword(int sock, struct sshbuf *m)
 {
 	static int call_count;
 	char *passwd;
-	int authenticated;
-	u_int plen;
+	int r, authenticated;
+	size_t plen;
 
-	passwd = buffer_get_string(m, &plen);
+	if ((r = sshbuf_get_cstring(m, &passwd, &plen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	/* Only authenticate if the context is valid */
 	authenticated = options.password_authentication &&
 	    auth_password(authctxt, passwd);
-	memset(passwd, 0, strlen(passwd));
+	bzero(passwd, plen);
 	xfree(passwd);
 
-	buffer_clear(m);
-	buffer_put_int(m, authenticated);
+	sshbuf_reset(m);
+	if ((r = sshbuf_put_u32(m, authenticated)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	debug3("%s: sending result %d", __func__, authenticated);
 	mm_request_send(sock, MONITOR_ANS_AUTHPASSWORD, m);
@@ -764,21 +793,19 @@ mm_answer_authpassword(int sock, Buffer *m)
 }
 
 int
-mm_answer_bsdauthquery(int sock, Buffer *m)
+mm_answer_bsdauthquery(int sock, struct sshbuf *m)
 {
-	char *name, *infotxt;
-	u_int numprompts;
-	u_int *echo_on;
-	char **prompts;
-	u_int success;
+	char *name, *infotxt, **prompts;
+	u_int numprompts, *echo_on, success;
+	int r;
 
 	success = bsdauth_query(authctxt, &name, &infotxt, &numprompts,
 	    &prompts, &echo_on) < 0 ? 0 : 1;
 
-	buffer_clear(m);
-	buffer_put_int(m, success);
-	if (success)
-		buffer_put_cstring(m, prompts[0]);
+	sshbuf_reset(m);
+	if ((r = sshbuf_put_u32(m, success)) != 0 ||
+	    (success && (r = sshbuf_put_cstring(m, prompts[0])) != 0))
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	debug3("%s: sending challenge success: %u", __func__, success);
 	mm_request_send(sock, MONITOR_ANS_BSDAUTHQUERY, m);
@@ -794,23 +821,25 @@ mm_answer_bsdauthquery(int sock, Buffer *m)
 }
 
 int
-mm_answer_bsdauthrespond(int sock, Buffer *m)
+mm_answer_bsdauthrespond(int sock, struct sshbuf *m)
 {
 	char *response;
-	int authok;
+	int r, authok;
 
 	if (authctxt->as == 0)
 		fatal("%s: no bsd auth session", __func__);
 
-	response = buffer_get_string(m, NULL);
+	if ((r = sshbuf_get_cstring(m, &response, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	authok = options.challenge_response_authentication &&
 	    auth_userresponse(authctxt->as, response, 0);
 	authctxt->as = NULL;
 	debug3("%s: <%s> = <%d>", __func__, response, authok);
 	xfree(response);
 
-	buffer_clear(m);
-	buffer_put_int(m, authok);
+	sshbuf_reset(m);
+	if ((r = sshbuf_put_u32(m, authok)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	debug3("%s: sending authenticated: %d", __func__, authok);
 	mm_request_send(sock, MONITOR_ANS_BSDAUTHRESPOND, m);
@@ -821,21 +850,22 @@ mm_answer_bsdauthrespond(int sock, Buffer *m)
 }
 
 int
-mm_answer_keyallowed(int sock, Buffer *m)
+mm_answer_keyallowed(int sock, struct sshbuf *m)
 {
 	struct sshkey *key;
 	char *cuser, *chost;
 	u_char *blob;
-	u_int bloblen;
+	size_t bloblen;
 	enum mm_keytype type = 0;
 	int r, allowed = 0;
 
 	debug3("%s entering", __func__);
 
-	type = buffer_get_int(m);
-	cuser = buffer_get_string(m, NULL);
-	chost = buffer_get_string(m, NULL);
-	blob = buffer_get_string(m, &bloblen);
+	if ((r = sshbuf_get_u32(m, &type)) != 0 ||
+	    (r = sshbuf_get_cstring(m, &cuser, NULL)) != 0 ||
+	    (r = sshbuf_get_cstring(m, &chost, NULL)) != 0 ||
+	    (r = sshbuf_get_string(m, &blob, &bloblen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	if ((r = sshkey_from_blob(blob, bloblen, &key)) != 0)
 		fatal("%s: cannot parse key: %s", __func__, ssh_err(r));
@@ -897,9 +927,10 @@ mm_answer_keyallowed(int sock, Buffer *m)
 	debug3("%s: key %p is %s",
 	    __func__, key, allowed ? "allowed" : "not allowed");
 
-	buffer_clear(m);
-	buffer_put_int(m, allowed);
-	buffer_put_int(m, forced_command != NULL);
+	sshbuf_reset(m);
+	if ((r = sshbuf_put_u32(m, allowed)) != 0 ||
+	    (r = sshbuf_put_u32(m, forced_command != NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	mm_request_send(sock, MONITOR_ANS_KEYALLOWED, m);
 
@@ -912,56 +943,72 @@ mm_answer_keyallowed(int sock, Buffer *m)
 static int
 monitor_valid_userblob(u_char *data, u_int datalen)
 {
-	Buffer b;
-	char *p;
-	u_int len;
-	int fail = 0;
+	struct sshbuf *b;
+	u_char c, *p;
+	size_t len;
+	int r, fail = 0;
+	char *username, *methodname;
 
-	buffer_init(&b);
-	buffer_append(&b, data, datalen);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((r = sshbuf_put(b, data, datalen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	if (active_state->compat & SSH_OLD_SESSIONID) {
-		p = buffer_ptr(&b);
-		len = buffer_len(&b);
+		p = sshbuf_ptr(b);
+		len = sshbuf_len(b);
 		if ((session_id2 == NULL) ||
 		    (len < session_id2_len) ||
 		    (timingsafe_bcmp(p, session_id2, session_id2_len) != 0))
 			fail++;
-		buffer_consume(&b, session_id2_len);
+		if ((r = sshbuf_consume(b, session_id2_len)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	} else {
-		p = buffer_get_string(&b, &len);
+		if ((r = sshbuf_get_string(b, &p, &len)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		if ((session_id2 == NULL) ||
 		    (len != session_id2_len) ||
 		    (timingsafe_bcmp(p, session_id2, session_id2_len) != 0))
 			fail++;
 		xfree(p);
 	}
-	if (buffer_get_char(&b) != SSH2_MSG_USERAUTH_REQUEST)
+	if ((r = sshbuf_get_u8(b, &c)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if (c != SSH2_MSG_USERAUTH_REQUEST)
 		fail++;
-	p = buffer_get_string(&b, NULL);
-	if (strcmp(authctxt->user, p) != 0) {
-		logit("wrong user name passed to monitor: expected %s != %.100s",
+	if ((r = sshbuf_get_cstring(b, &username, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if (strcmp(authctxt->user, username) != 0) {
+		logit("wrong user name sent to monitor: expected %s != %.100s",
 		    authctxt->user, p);
 		fail++;
 	}
-	xfree(p);
-	buffer_skip_string(&b);
+	xfree(username);
+	if ((r = sshbuf_skip_string(b)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (active_state->compat & SSH_BUG_PKAUTH) {
-		if (!buffer_get_char(&b))
+		if ((r = sshbuf_get_u8(b, &c)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
+		if (!c)
 			fail++;
 	} else {
-		p = buffer_get_string(&b, NULL);
-		if (strcmp("publickey", p) != 0)
+		if ((r = sshbuf_get_cstring(b, &methodname, NULL)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
+		if (strcmp("publickey", methodname) != 0)
 			fail++;
-		xfree(p);
-		if (!buffer_get_char(&b))
+		xfree(methodname);
+		if ((r = sshbuf_get_u8(b, &c)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
+		if (!c)
 			fail++;
-		buffer_skip_string(&b);
+		if ((r = sshbuf_skip_string(b)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
-	buffer_skip_string(&b);
-	if (buffer_len(&b) != 0)
+	if ((r = sshbuf_skip_string(b)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if (sshbuf_len(b) != 0)
 		fail++;
-	buffer_free(&b);
+	sshbuf_free(b);
 	return (fail == 0);
 }
 
@@ -969,69 +1016,80 @@ static int
 monitor_valid_hostbasedblob(u_char *data, u_int datalen, char *cuser,
     char *chost)
 {
-	Buffer b;
-	char *p;
-	u_int len;
-	int fail = 0;
+	struct sshbuf *b;
+	char *username, *methodname, *rawhost, *ruser;
+	u_char *sid, c;
+	size_t len;
+	int r, fail = 0;
 
-	buffer_init(&b);
-	buffer_append(&b, data, datalen);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((r = sshbuf_put(b, data, datalen)) != 0 ||
+	    (r = sshbuf_get_string(b, &sid, &len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
-	p = buffer_get_string(&b, &len);
 	if ((session_id2 == NULL) ||
 	    (len != session_id2_len) ||
-	    (timingsafe_bcmp(p, session_id2, session_id2_len) != 0))
+	    (timingsafe_bcmp(sid, session_id2, session_id2_len) != 0))
 		fail++;
-	xfree(p);
+	xfree(sid);
 
-	if (buffer_get_char(&b) != SSH2_MSG_USERAUTH_REQUEST)
+	if ((r = sshbuf_get_u8(b, &c)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if (c != SSH2_MSG_USERAUTH_REQUEST)
 		fail++;
-	p = buffer_get_string(&b, NULL);
-	if (strcmp(authctxt->user, p) != 0) {
-		logit("wrong user name passed to monitor: expected %s != %.100s",
-		    authctxt->user, p);
+	if ((r = sshbuf_get_cstring(b, &username, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if (strcmp(authctxt->user, username) != 0) {
+		logit("wrong user name sent to monitor: expected %s != %.100s",
+		    authctxt->user, username);
 		fail++;
 	}
-	xfree(p);
-	buffer_skip_string(&b);	/* service */
-	p = buffer_get_string(&b, NULL);
-	if (strcmp(p, "hostbased") != 0)
+	xfree(username);
+	if ((r = sshbuf_skip_string(b)) != 0 || /* service */
+	    (r = sshbuf_get_cstring(b, &methodname, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if (strcmp("hostbased", methodname) != 0)
 		fail++;
-	xfree(p);
-	buffer_skip_string(&b);	/* pkalg */
-	buffer_skip_string(&b);	/* pkblob */
+	xfree(methodname);
+	if ((r = sshbuf_skip_string(b)) != 0 ||	/* pkalg */
+	    (r = sshbuf_skip_string(b)) != 0)	/* pkblob */
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	/* verify client host, strip trailing dot if necessary */
-	p = buffer_get_string(&b, NULL);
-	if (((len = strlen(p)) > 0) && p[len - 1] == '.')
-		p[len - 1] = '\0';
-	if (strcmp(p, chost) != 0)
+	if ((r = sshbuf_get_cstring(b, &rawhost, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if (((len = strlen(rawhost)) > 0) && rawhost[len - 1] == '.')
+		rawhost[len - 1] = '\0';
+	if (strcmp(rawhost, chost) != 0)
 		fail++;
-	xfree(p);
+	xfree(rawhost);
 
 	/* verify client user */
-	p = buffer_get_string(&b, NULL);
-	if (strcmp(p, cuser) != 0)
+	if ((r = sshbuf_get_cstring(b, &ruser, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if (strcmp(ruser, cuser) != 0)
 		fail++;
-	xfree(p);
+	xfree(ruser);
 
-	if (buffer_len(&b) != 0)
+	if (sshbuf_len(b) != 0)
 		fail++;
-	buffer_free(&b);
+	sshbuf_free(b);
 	return (fail == 0);
 }
 
 int
-mm_answer_keyverify(int sock, Buffer *m)
+mm_answer_keyverify(int sock, struct sshbuf *m)
 {
 	struct sshkey *key;
 	u_char *signature, *data, *blob;
-	u_int signaturelen, datalen, bloblen;
-	int r, valid_data = 0;
+	size_t signaturelen, datalen, bloblen;
+	int r, ret, valid_data = 0;
 
-	blob = buffer_get_string(m, &bloblen);
-	signature = buffer_get_string(m, &signaturelen);
-	data = buffer_get_string(m, &datalen);
+	if ((r = sshbuf_get_string(m, &blob, &bloblen)) != 0 ||
+	    (r = sshbuf_get_string(m, &signature, &signaturelen)) != 0 ||
+	    (r = sshbuf_get_string(m, &data, &datalen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	if (hostbased_cuser == NULL || hostbased_chost == NULL ||
 	  !monitor_allowed_key(blob, bloblen))
@@ -1055,7 +1113,7 @@ mm_answer_keyverify(int sock, Buffer *m)
 	if (!valid_data)
 		fatal("%s: bad signature data blob", __func__);
 
-	r = sshkey_verify(key, signature, signaturelen, data, datalen,
+	ret = sshkey_verify(key, signature, signaturelen, data, datalen,
 	    active_state->compat);
 	debug3("%s: key %p signature %s",
 	    __func__, key, (r == 0) ? "verified" : "unverified");
@@ -1069,11 +1127,13 @@ mm_answer_keyverify(int sock, Buffer *m)
 
 	monitor_reset_key_state();
 
-	buffer_clear(m);
-	buffer_put_int(m, r);
+	sshbuf_reset(m);
+	
+	if ((r = sshbuf_put_u32(m, ret)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	mm_request_send(sock, MONITOR_ANS_KEYVERIFY, m);
 
-	return (r==0);
+	return ret == 0;
 }
 
 static void
@@ -1113,15 +1173,15 @@ mm_session_close(Session *s)
 }
 
 int
-mm_answer_pty(int sock, Buffer *m)
+mm_answer_pty(int sock, struct sshbuf *m)
 {
 	extern struct monitor *pmonitor;
 	Session *s;
-	int res, fd0;
+	int r, res, fd0;
 
 	debug3("%s entering", __func__);
 
-	buffer_clear(m);
+	sshbuf_reset(m);
 	s = session_new();
 	if (s == NULL)
 		goto error;
@@ -1133,8 +1193,9 @@ mm_answer_pty(int sock, Buffer *m)
 		goto error;
 	pty_setowner(authctxt->pw, s->tty);
 
-	buffer_put_int(m, 1);
-	buffer_put_cstring(m, s->tty);
+	if ((r = sshbuf_put_u32(m, 1)) != 0 ||
+	    (r = sshbuf_put_cstring(m, s->tty)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	/* We need to trick ttyslot */
 	if (dup2(s->ttyfd, 0) == -1)
@@ -1146,8 +1207,9 @@ mm_answer_pty(int sock, Buffer *m)
 	close(0);
 
 	/* send messages generated by record_login */
-	buffer_put_string(m, buffer_ptr(&loginmsg), buffer_len(&loginmsg));
-	buffer_clear(&loginmsg);
+	if ((r = sshbuf_put_stringb(m, loginmsg)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	sshbuf_reset(loginmsg);
 
 	mm_request_send(sock, MONITOR_ANS_PTY, m);
 
@@ -1174,32 +1236,35 @@ mm_answer_pty(int sock, Buffer *m)
  error:
 	if (s != NULL)
 		mm_session_close(s);
-	buffer_put_int(m, 0);
+	if ((r = sshbuf_put_u32(m, 0)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	mm_request_send(sock, MONITOR_ANS_PTY, m);
 	return (0);
 }
 
 int
-mm_answer_pty_cleanup(int sock, Buffer *m)
+mm_answer_pty_cleanup(int sock, struct sshbuf *m)
 {
 	Session *s;
 	char *tty;
+	int r;
 
 	debug3("%s entering", __func__);
 
-	tty = buffer_get_string(m, NULL);
+	if ((r = sshbuf_get_cstring(m, &tty, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if ((s = session_by_tty(tty)) != NULL)
 		mm_session_close(s);
-	buffer_clear(m);
+	sshbuf_reset(m);
 	xfree(tty);
 	return (0);
 }
 
 int
-mm_answer_sesskey(int sock, Buffer *m)
+mm_answer_sesskey(int sock, struct sshbuf *m)
 {
 	BIGNUM *p;
-	int rsafail;
+	int r, rsafail;
 
 	/* Turn off permissions */
 	monitor_permit(mon_dispatch, MONITOR_REQ_SESSKEY, 0);
@@ -1207,13 +1272,15 @@ mm_answer_sesskey(int sock, Buffer *m)
 	if ((p = BN_new()) == NULL)
 		fatal("%s: BN_new", __func__);
 
-	buffer_get_bignum2(m, p);
+	if ((r = sshbuf_get_bignum2(m, p)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	rsafail = ssh1_session_key(p);
 
-	buffer_clear(m);
-	buffer_put_int(m, rsafail);
-	buffer_put_bignum2(m, p);
+	sshbuf_reset(m);
+	if ((r = sshbuf_put_u32(m, rsafail)) != 0 ||
+	    (r = sshbuf_put_bignum2(m, p)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	BN_clear_free(p);
 
@@ -1226,16 +1293,17 @@ mm_answer_sesskey(int sock, Buffer *m)
 }
 
 int
-mm_answer_sessid(int sock, Buffer *m)
+mm_answer_sessid(int sock, struct sshbuf *m)
 {
-	int i;
+	int r;
 
 	debug3("%s entering", __func__);
 
-	if (buffer_len(m) != 16)
-		fatal("%s: bad ssh1 session id", __func__);
-	for (i = 0; i < 16; i++)
-		session_id[i] = buffer_get_char(m);
+	if (sshbuf_len(m) != 16)
+		fatal("%s: bad ssh1 session id, len = %zu",
+		    __func__, sshbuf_len(m));
+	if ((r = sshbuf_get(m, session_id, 16)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	/* Turn on permissions for getpwnam */
 	monitor_permit(mon_dispatch, MONITOR_REQ_PWNAM, 1);
@@ -1244,12 +1312,12 @@ mm_answer_sessid(int sock, Buffer *m)
 }
 
 int
-mm_answer_rsa_keyallowed(int sock, Buffer *m)
+mm_answer_rsa_keyallowed(int sock, struct sshbuf *m)
 {
 	BIGNUM *client_n;
 	struct sshkey *key = NULL;
 	u_char *blob = NULL;
-	u_int blen = 0;
+	size_t blen = 0;
 	int r, allowed = 0;
 
 	debug3("%s entering", __func__);
@@ -1258,13 +1326,15 @@ mm_answer_rsa_keyallowed(int sock, Buffer *m)
 	if (options.rsa_authentication && authctxt->valid) {
 		if ((client_n = BN_new()) == NULL)
 			fatal("%s: BN_new", __func__);
-		buffer_get_bignum2(m, client_n);
+		if ((r = sshbuf_get_bignum2(m, client_n)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		allowed = auth_rsa_key_allowed(authctxt->pw, client_n, &key);
 		BN_clear_free(client_n);
 	}
-	buffer_clear(m);
-	buffer_put_int(m, allowed);
-	buffer_put_int(m, forced_command != NULL);
+	sshbuf_reset(m);
+	if ((r = sshbuf_put_u32(m, allowed)) != 0 ||
+	    (r = sshbuf_put_u32(m, forced_command != NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	/* clear temporarily storage (used by generate challenge) */
 	monitor_reset_key_state();
@@ -1274,7 +1344,8 @@ mm_answer_rsa_keyallowed(int sock, Buffer *m)
 		if ((r = sshkey_to_blob(key, &blob, &blen)) != 0)
 			fatal("%s: key_to_blob failed: %s",
 			    __func__, ssh_err(r));
-		buffer_put_string(m, blob, blen);
+		if ((r = sshbuf_put_string(m, blob, blen)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 		/* Save temporarily for comparison in verify */
 		key_blob = blob;
@@ -1292,18 +1363,19 @@ mm_answer_rsa_keyallowed(int sock, Buffer *m)
 }
 
 int
-mm_answer_rsa_challenge(int sock, Buffer *m)
+mm_answer_rsa_challenge(int sock, struct sshbuf *m)
 {
 	struct sshkey *key = NULL;
 	u_char *blob;
-	u_int blen;
+	size_t blen;
 	int r;
 
 	debug3("%s entering", __func__);
 
 	if (!authctxt->valid)
 		fatal("%s: authctxt not valid", __func__);
-	blob = buffer_get_string(m, &blen);
+	if ((r = sshbuf_get_string(m, &blob, &blen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (!monitor_allowed_key(blob, blen))
 		fatal("%s: bad key, not previously allowed", __func__);
 	if (key_blobtype != MM_RSAUSERKEY && key_blobtype != MM_RSAHOSTKEY)
@@ -1317,8 +1389,9 @@ mm_answer_rsa_challenge(int sock, Buffer *m)
 		BN_clear_free(ssh1_challenge);
 	ssh1_challenge = auth_rsa_generate_challenge(key);
 
-	buffer_clear(m);
-	buffer_put_bignum2(m, ssh1_challenge);
+	sshbuf_reset(m);
+	if ((r = sshbuf_put_bignum2(m, ssh1_challenge)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	debug3("%s sending reply", __func__);
 	mm_request_send(sock, MONITOR_ANS_RSACHALLENGE, m);
@@ -1331,11 +1404,11 @@ mm_answer_rsa_challenge(int sock, Buffer *m)
 }
 
 int
-mm_answer_rsa_response(int sock, Buffer *m)
+mm_answer_rsa_response(int sock, struct sshbuf *m)
 {
 	struct sshkey *key = NULL;
 	u_char *blob, *response;
-	u_int blen, len;
+	size_t blen, len;
 	int r, success;
 
 	debug3("%s entering", __func__);
@@ -1345,14 +1418,16 @@ mm_answer_rsa_response(int sock, Buffer *m)
 	if (ssh1_challenge == NULL)
 		fatal("%s: no ssh1_challenge", __func__);
 
-	blob = buffer_get_string(m, &blen);
+	if ((r = sshbuf_get_string(m, &blob, &blen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (!monitor_allowed_key(blob, blen))
 		fatal("%s: bad key, not previously allowed", __func__);
 	if (key_blobtype != MM_RSAUSERKEY && key_blobtype != MM_RSAHOSTKEY)
 		fatal("%s: key type mismatch: %d", __func__, key_blobtype);
 	if ((r = sshkey_from_blob(blob, blen, &key)) != 0)
 		fatal("%s: received bad key: %s", __func__, ssh_err(r));
-	response = buffer_get_string(m, &len);
+	if ((r = sshbuf_get_string(m, &response, &len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (len != 16)
 		fatal("%s: received bad response to challenge", __func__);
 	success = auth_rsa_verify_response(key, ssh1_challenge, response);
@@ -1368,15 +1443,16 @@ mm_answer_rsa_response(int sock, Buffer *m)
 	ssh1_challenge = NULL;
 	monitor_reset_key_state();
 
-	buffer_clear(m);
-	buffer_put_int(m, success);
+	sshbuf_reset(m);
+	if ((r = sshbuf_put_u32(m, success)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	mm_request_send(sock, MONITOR_ANS_RSARESPONSE, m);
 
 	return (success);
 }
 
 int
-mm_answer_term(int sock, Buffer *req)
+mm_answer_term(int sock, struct sshbuf *req)
 {
 	extern struct monitor *pmonitor;
 	int res, status;
@@ -1403,9 +1479,10 @@ monitor_apply_keystate(struct monitor *pmonitor)
 	int r;
 
 	debug3("%s: packet_set_state", __func__);
-	if ((r = packet_set_state(&child_state)) != 0)
+	if ((r = packet_set_state(child_state)) != 0)
                 fatal("%s: packet_set_state: %s", __func__, ssh_err(r));
-	buffer_free(&child_state);
+	sshbuf_free(child_state);
+	child_state = NULL;
 
 	if ((kex = active_state->kex) != 0) {
 		/* XXX set callbacks */
@@ -1435,9 +1512,10 @@ mm_get_keystate(struct monitor *pmonitor)
 {
 	debug3("%s: Waiting for new keys", __func__);
 
-	buffer_init(&child_state);
+	if ((child_state = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	mm_request_receive_expect(pmonitor->m_sendfd, MONITOR_REQ_KEYEXPORT,
-	    &child_state);
+	    child_state);
 	debug3("%s: GOT new keys", __func__);
 }
 
@@ -1505,21 +1583,26 @@ monitor_reinit(struct monitor *mon)
 
 #ifdef GSSAPI
 int
-mm_answer_gss_setup_ctx(int sock, Buffer *m)
+mm_answer_gss_setup_ctx(int sock, struct sshbuf *m)
 {
 	gss_OID_desc goid;
 	OM_uint32 major;
-	u_int len;
+	size_t len;
+	u_char *p;
+	int r;
 
-	goid.elements = buffer_get_string(m, &len);
+	if ((r = sshbuf_get_string(m, &p, &len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	goid.elements = p;
 	goid.length = len;
 
 	major = ssh_gssapi_server_ctx(&gsscontext, &goid);
 
 	xfree(goid.elements);
 
-	buffer_clear(m);
-	buffer_put_int(m, major);
+	sshbuf_reset(m);
+	if ((r = sshbuf_put_u32(m, major)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	mm_request_send(sock, MONITOR_ANS_GSSSETUP, m);
 
@@ -1530,23 +1613,28 @@ mm_answer_gss_setup_ctx(int sock, Buffer *m)
 }
 
 int
-mm_answer_gss_accept_ctx(int sock, Buffer *m)
+mm_answer_gss_accept_ctx(int sock, struct sshbuf *m)
 {
 	gss_buffer_desc in;
 	gss_buffer_desc out = GSS_C_EMPTY_BUFFER;
 	OM_uint32 major, minor;
 	OM_uint32 flags = 0; /* GSI needs this */
-	u_int len;
+	size_t len;
+	u_char *p;
+	int r;
 
-	in.value = buffer_get_string(m, &len);
+	if ((r = sshbuf_get_string(m, &p, &len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	in.value = p;
 	in.length = len;
 	major = ssh_gssapi_accept_ctx(gsscontext, &in, &out, &flags);
 	xfree(in.value);
 
-	buffer_clear(m);
-	buffer_put_int(m, major);
-	buffer_put_string(m, out.value, out.length);
-	buffer_put_int(m, flags);
+	sshbuf_reset(m);
+	if ((r = sshbuf_put_u32(m, major)) != 0 ||
+	    (r = sshbuf_put_string(m, out.value, out.length)) != 0 ||
+	    (r = sshbuf_put_u32(m, flags)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	mm_request_send(sock, MONITOR_ANS_GSSSTEP, m);
 
 	gss_release_buffer(&minor, &out);
@@ -1556,19 +1644,25 @@ mm_answer_gss_accept_ctx(int sock, Buffer *m)
 		monitor_permit(mon_dispatch, MONITOR_REQ_GSSUSEROK, 1);
 		monitor_permit(mon_dispatch, MONITOR_REQ_GSSCHECKMIC, 1);
 	}
-	return (0);
+	return 0;
 }
 
 int
-mm_answer_gss_checkmic(int sock, Buffer *m)
+mm_answer_gss_checkmic(int sock, struct sshbuf *m)
 {
 	gss_buffer_desc gssbuf, mic;
 	OM_uint32 ret;
-	u_int len;
+	size_t len;
+	int r;
+	u_char *p;
 
-	gssbuf.value = buffer_get_string(m, &len);
+	if ((r = sshbuf_get_string(m, &p, &len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	gssbuf.value = p;
 	gssbuf.length = len;
-	mic.value = buffer_get_string(m, &len);
+	if ((r = sshbuf_get_string(m, &p, &len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	mic.value = p;
 	mic.length = len;
 
 	ret = ssh_gssapi_checkmic(gsscontext, &gssbuf, &mic);
@@ -1576,26 +1670,28 @@ mm_answer_gss_checkmic(int sock, Buffer *m)
 	xfree(gssbuf.value);
 	xfree(mic.value);
 
-	buffer_clear(m);
-	buffer_put_int(m, ret);
+	sshbuf_reset(m);
+	if ((r = sshbuf_put_u32(m, ret)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	mm_request_send(sock, MONITOR_ANS_GSSCHECKMIC, m);
 
 	if (!GSS_ERROR(ret))
 		monitor_permit(mon_dispatch, MONITOR_REQ_GSSUSEROK, 1);
 
-	return (0);
+	return 0;
 }
 
 int
-mm_answer_gss_userok(int sock, Buffer *m)
+mm_answer_gss_userok(int sock, struct sshbuf *m)
 {
-	int authenticated;
+	int r, authenticated;
 
 	authenticated = authctxt->valid && ssh_gssapi_userok(authctxt->user);
 
-	buffer_clear(m);
-	buffer_put_int(m, authenticated);
+	sshbuf_reset(m);
+	if ((r = sshbuf_put_u32(m, authenticated)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	debug3("%s: sending result %d", __func__, authenticated);
 	mm_request_send(sock, MONITOR_ANS_GSSUSEROK, m);
@@ -1609,11 +1705,12 @@ mm_answer_gss_userok(int sock, Buffer *m)
 
 #ifdef JPAKE
 int
-mm_answer_jpake_step1(int sock, Buffer *m)
+mm_answer_jpake_step1(int sock, struct sshbuf *m)
 {
 	struct jpake_ctx *pctx;
 	u_char *x3_proof, *x4_proof;
 	u_int x3_proof_len, x4_proof_len;
+	int r;
 
 	if (!options.zero_knowledge_password_authentication)
 		fatal("zero_knowledge_password_authentication disabled");
@@ -1631,13 +1728,15 @@ mm_answer_jpake_step1(int sock, Buffer *m)
 
 	JPAKE_DEBUG_CTX((pctx, "step1 done in %s", __func__));
 
-	buffer_clear(m);
+	sshbuf_reset(m);
 
-	buffer_put_string(m, pctx->server_id, pctx->server_id_len);
-	buffer_put_bignum2(m, pctx->g_x3);
-	buffer_put_bignum2(m, pctx->g_x4);
-	buffer_put_string(m, x3_proof, x3_proof_len);
-	buffer_put_string(m, x4_proof, x4_proof_len);
+	if ((r = sshbuf_put_string(m, pctx->server_id,
+	    pctx->server_id_len)) != 0 ||
+	    (r = sshbuf_put_bignum2(m, pctx->g_x3)) != 0 ||
+	    (r = sshbuf_put_bignum2(m, pctx->g_x4)) != 0 ||
+	    (r = sshbuf_put_string(m, x3_proof, x3_proof_len)) != 0 ||
+	    (r = sshbuf_put_string(m, x4_proof, x4_proof_len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	debug3("%s: sending step1", __func__);
 	mm_request_send(sock, MONITOR_ANS_JPAKE_STEP1, m);
@@ -1654,20 +1753,22 @@ mm_answer_jpake_step1(int sock, Buffer *m)
 }
 
 int
-mm_answer_jpake_get_pwdata(int sock, Buffer *m)
+mm_answer_jpake_get_pwdata(int sock, struct sshbuf *m)
 {
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	char *hash_scheme, *salt;
+	int r;
 
 	if (pctx == NULL)
 		fatal("%s: pctx == NULL", __func__);
 
 	auth2_jpake_get_pwdata(authctxt, &pctx->s, &hash_scheme, &salt);
 
-	buffer_clear(m);
+	sshbuf_reset(m);
 	/* pctx->s is sensitive, not returned to slave */
-	buffer_put_cstring(m, hash_scheme);
-	buffer_put_cstring(m, salt);
+	if ((r = sshbuf_put_cstring(m, hash_scheme)) != 0 ||
+	    (r = sshbuf_put_cstring(m, salt)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	debug3("%s: sending pwdata", __func__);
 	mm_request_send(sock, MONITOR_ANS_JPAKE_GET_PWDATA, m);
@@ -1683,11 +1784,12 @@ mm_answer_jpake_get_pwdata(int sock, Buffer *m)
 }
 
 int
-mm_answer_jpake_step2(int sock, Buffer *m)
+mm_answer_jpake_step2(int sock, struct sshbuf *m)
 {
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	u_char *x1_proof, *x2_proof, *x4_s_proof;
 	u_int x1_proof_len, x2_proof_len, x4_s_proof_len;
+	int r;
 
 	if (pctx == NULL)
 		fatal("%s: pctx == NULL", __func__);
@@ -1695,11 +1797,13 @@ mm_answer_jpake_step2(int sock, Buffer *m)
 	if ((pctx->g_x1 = BN_new()) == NULL ||
 	    (pctx->g_x2 = BN_new()) == NULL)
 		fatal("%s: BN_new", __func__);
-	buffer_get_bignum2(m, pctx->g_x1);
-	buffer_get_bignum2(m, pctx->g_x2);
-	pctx->client_id = buffer_get_string(m, &pctx->client_id_len);
-	x1_proof = buffer_get_string(m, &x1_proof_len);
-	x2_proof = buffer_get_string(m, &x2_proof_len);
+	if ((r = sshbuf_get_bignum2(m, pctx->g_x1)) != 0 ||
+	    (r = sshbuf_get_bignum2(m, pctx->g_x2)) != 0 ||
+	    (r = sshbuf_get_string(m, &pctx->client_id,
+	    &pctx->client_id_len)) != 0 ||
+	    (r = sshbuf_get_string(m, &x1_proof, &x1_proof_len)) != 0 ||
+	    (r = sshbuf_get_string(m, &x2_proof, &x2_proof_len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	jpake_step2(pctx->grp, pctx->s, pctx->g_x3,
 	    pctx->g_x1, pctx->g_x2, pctx->x4,
@@ -1717,10 +1821,11 @@ mm_answer_jpake_step2(int sock, Buffer *m)
 	xfree(x1_proof);
 	xfree(x2_proof);
 
-	buffer_clear(m);
+	sshbuf_reset(m);
 
-	buffer_put_bignum2(m, pctx->b);
-	buffer_put_string(m, x4_s_proof, x4_s_proof_len);
+	if ((r = sshbuf_put_bignum2(m, pctx->b)) != 0 ||
+	    (r = sshbuf_put_string(m, x4_s_proof, x4_s_proof_len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	debug3("%s: sending step2", __func__);
 	mm_request_send(sock, MONITOR_ANS_JPAKE_STEP2, m);
@@ -1734,19 +1839,21 @@ mm_answer_jpake_step2(int sock, Buffer *m)
 }
 
 int
-mm_answer_jpake_key_confirm(int sock, Buffer *m)
+mm_answer_jpake_key_confirm(int sock, struct sshbuf *m)
 {
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	u_char *x2_s_proof;
 	u_int x2_s_proof_len;
+	int r;
 
 	if (pctx == NULL)
 		fatal("%s: pctx == NULL", __func__);
 
 	if ((pctx->a = BN_new()) == NULL)
 		fatal("%s: BN_new", __func__);
-	buffer_get_bignum2(m, pctx->a);
-	x2_s_proof = buffer_get_string(m, &x2_s_proof_len);
+	if ((r = sshbuf_get_bignum2(m, pctx->a)) != 0 ||
+	    (r = sshbuf_get_string(m, &x2_s_proof, &x2_s_proof_len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	jpake_key_confirm(pctx->grp, pctx->s, pctx->a,
 	    pctx->x4, pctx->g_x3, pctx->g_x4, pctx->g_x1, pctx->g_x2,
@@ -1760,10 +1867,12 @@ mm_answer_jpake_key_confirm(int sock, Buffer *m)
 	JPAKE_DEBUG_CTX((pctx, "key_confirm done in %s", __func__));
 
 	bzero(x2_s_proof, x2_s_proof_len);
-	buffer_clear(m);
+	sshbuf_reset(m);
 
 	/* pctx->k is sensitive, not sent */
-	buffer_put_string(m, pctx->h_k_sid_sessid, pctx->h_k_sid_sessid_len);
+	if ((r = sshbuf_put_string(m, pctx->h_k_sid_sessid,
+	    pctx->h_k_sid_sessid_len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	debug3("%s: sending confirmation hash", __func__);
 	mm_request_send(sock, MONITOR_ANS_JPAKE_KEY_CONFIRM, m);
@@ -1774,9 +1883,9 @@ mm_answer_jpake_key_confirm(int sock, Buffer *m)
 }
 
 int
-mm_answer_jpake_check_confirm(int sock, Buffer *m)
+mm_answer_jpake_check_confirm(int sock, struct sshbuf *m)
 {
-	int authenticated = 0;
+	int r, authenticated = 0;
 	u_char *peer_confirm_hash;
 	u_int peer_confirm_hash_len;
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
@@ -1784,7 +1893,9 @@ mm_answer_jpake_check_confirm(int sock, Buffer *m)
 	if (pctx == NULL)
 		fatal("%s: pctx == NULL", __func__);
 
-	peer_confirm_hash = buffer_get_string(m, &peer_confirm_hash_len);
+	if ((r = sshbuf_get_string(m, peer_confirm_hash,
+	     &peer_confirm_hash_len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	authenticated = jpake_check_confirm(pctx->k,
 	    pctx->client_id, pctx->client_id_len,
@@ -1796,8 +1907,9 @@ mm_answer_jpake_check_confirm(int sock, Buffer *m)
 	bzero(peer_confirm_hash, peer_confirm_hash_len);
 	xfree(peer_confirm_hash);
 
-	buffer_clear(m);
-	buffer_put_int(m, authenticated);
+	sshbuf_reset(m);
+	if ((r = sshbuf_put_u32(m, authenticated)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	debug3("%s: sending result %d", __func__, authenticated);
 	mm_request_send(sock, MONITOR_ANS_JPAKE_CHECK_CONFIRM, m);

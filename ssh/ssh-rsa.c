@@ -28,17 +28,18 @@
 #define SSHKEY_INTERNAL
 #include "key.h"
 
-static int openssh_RSA_verify(int, u_char *, u_int, u_char *, u_int, RSA *);
+static int openssh_RSA_verify(int, u_char *, size_t, u_char *, size_t, RSA *);
 
 /* RSASSA-PKCS1-v1_5 (PKCS #1 v2.0 signature) with SHA1 */
 int
-ssh_rsa_sign(const struct sshkey *key, u_char **sigp, u_int *lenp,
-    const u_char *data, u_int datalen, u_int compat)
+ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+    const u_char *data, size_t datalen, u_int compat)
 {
 	const EVP_MD *evp_md;
 	EVP_MD_CTX md;
 	u_char digest[EVP_MAX_MD_SIZE], *sig = NULL;
-	u_int slen, dlen, len;
+	size_t slen;
+	u_int dlen, len;
 	int nid, ret = SSH_ERR_INTERNAL_ERROR;
 	struct sshbuf *b = NULL;
 
@@ -68,7 +69,7 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, u_int *lenp,
 		goto out;
 	}
 	if (len < slen) {
-		u_int diff = slen - len;
+		size_t diff = slen - len;
 		memmove(sig + diff, sig, len);
 		memset(sig, 0, diff);
 	} else if (len > slen) {
@@ -108,16 +109,16 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, u_int *lenp,
 
 int
 ssh_rsa_verify(const struct sshkey *key,
-    const u_char *signature, u_int signaturelen,
-    const u_char *data, u_int datalen, u_int compat)
+    const u_char *signature, size_t signaturelen,
+    const u_char *data, size_t datalen, u_int compat)
 {
 	struct sshbuf *b = NULL;
 	const EVP_MD *evp_md;
 	EVP_MD_CTX md;
 	char *ktype;
 	u_char digest[EVP_MAX_MD_SIZE], *osigblob, *sigblob = NULL;
-	size_t len;
-	u_int diff, dlen, modlen;
+	size_t len, diff, modlen;
+	u_int dlen;
 	int nid, ret = SSH_ERR_INTERNAL_ERROR;
 
 	if (key == NULL || key->rsa == NULL || (key->type != KEY_RSA &&
@@ -220,10 +221,10 @@ static const u_char id_md5[] = {
 };
 
 static int
-openssh_RSA_verify(int type, u_char *hash, u_int hashlen,
-    u_char *sigbuf, u_int siglen, RSA *rsa)
+openssh_RSA_verify(int type, u_char *hash, size_t hashlen,
+    u_char *sigbuf, size_t siglen, RSA *rsa)
 {
-	u_int ret, rsasize = 0, oidlen = 0, hlen = 0;
+	size_t ret, rsasize = 0, oidlen = 0, hlen = 0;
 	int len, oidmatch, hashmatch;
 	const u_char *oid = NULL;
 	u_char *decrypted = NULL;
@@ -262,7 +263,7 @@ openssh_RSA_verify(int type, u_char *hash, u_int hashlen,
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto done;
 	}
-	if (len < 0 || (u_int)len != hlen + oidlen) {
+	if (len < 0 || (size_t)len != hlen + oidlen) {
 		ret = SSH_ERR_INVALID_FORMAT;
 		goto done;
 	}

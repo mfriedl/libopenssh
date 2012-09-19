@@ -40,14 +40,15 @@
 #define SIGBLOB_LEN	(2*INTBLOB_LEN)
 
 int
-ssh_dss_sign(const struct sshkey *key, u_char **sigp, u_int *lenp,
-    const u_char *data, u_int datalen, u_int compat)
+ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
+    const u_char *data, size_t datalen, u_int compat)
 {
 	DSA_SIG *sig = NULL;
 	const EVP_MD *evp_md = EVP_sha1();
 	EVP_MD_CTX md;
 	u_char digest[EVP_MAX_MD_SIZE], sigblob[SIGBLOB_LEN];
-	u_int rlen, slen, len, dlen;
+	size_t rlen, slen, len;
+	u_int dlen;
 	struct sshbuf *b = NULL;
 	int ret = SSH_ERR_INVALID_ARGUMENT;
 
@@ -120,8 +121,8 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, u_int *lenp,
 
 int
 ssh_dss_verify(const struct sshkey *key,
-    const u_char *signature, u_int signaturelen,
-    const u_char *data, u_int datalen, u_int compat)
+    const u_char *signature, size_t signaturelen,
+    const u_char *data, size_t datalen, u_int compat)
 {
 	DSA_SIG *sig = NULL;
 	const EVP_MD *evp_md = EVP_sha1();

@@ -163,6 +163,9 @@ int	sshbuf_put_stringb(struct sshbuf *buf, const struct sshbuf *v);
 int	sshbuf_get_string_direct(struct sshbuf *buf, const u_char **valp,
 	    size_t *lenp);
 
+/* Skip past a string */
+#define sshbuf_skip_string(buf) sshbuf_get_string_direct(buf, NULL, NULL)
+
 /* Another variant: "peeks" into the buffer without modifying it */
 int	sshbuf_peek_string_direct(const struct sshbuf *buf, const u_char **valp,
 	    size_t *lenp);

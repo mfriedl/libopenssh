@@ -72,7 +72,7 @@ dns_result_totext(unsigned int res)
  */
 static int
 dns_read_key(u_int8_t *algorithm, u_int8_t *digest_type,
-    u_char **digest, u_int *digest_len, struct sshkey *key)
+    u_char **digest, size_t *digest_len, struct sshkey *key)
 {
 	int success = 0;
 	enum fp_type fp_type = 0;
@@ -128,7 +128,7 @@ dns_read_key(u_int8_t *algorithm, u_int8_t *digest_type,
  */
 static int
 dns_read_rdata(u_int8_t *algorithm, u_int8_t *digest_type,
-    u_char **digest, u_int *digest_len, u_char *rdata, int rdata_len)
+    u_char **digest, size_t *digest_len, u_char *rdata, int rdata_len)
 {
 	int success = 0;
 
@@ -198,12 +198,12 @@ verify_host_key_dns(const char *hostname, struct sockaddr *address,
 	u_int8_t hostkey_algorithm;
 	u_int8_t hostkey_digest_type = SSHFP_HASH_RESERVED;
 	u_char *hostkey_digest;
-	u_int hostkey_digest_len;
+	size_t hostkey_digest_len;
 
 	u_int8_t dnskey_algorithm;
 	u_int8_t dnskey_digest_type;
 	u_char *dnskey_digest;
-	u_int dnskey_digest_len;
+	size_t dnskey_digest_len;
 
 	*flags = 0;
 
@@ -305,7 +305,7 @@ export_dns_rr(const char *hostname, struct sshkey *key, FILE *f, int generic)
 	u_int8_t rdata_digest_type = SSHFP_HASH_RESERVED;
 	u_int8_t dtype;
 	u_char *rdata_digest;
-	u_int i, rdata_digest_len;
+	size_t i, rdata_digest_len;
 	int success = 0;
 
 	for (dtype = SSHFP_HASH_SHA1; dtype < SSHFP_HASH_MAX; dtype++) {
@@ -313,7 +313,7 @@ export_dns_rr(const char *hostname, struct sshkey *key, FILE *f, int generic)
 		if (dns_read_key(&rdata_pubkey_algorithm, &rdata_digest_type,
 		    &rdata_digest, &rdata_digest_len, key)) {
 			if (generic) {
-				fprintf(f, "%s IN TYPE%d \\# %d %02x %02x ",
+				fprintf(f, "%s IN TYPE%d \\# %zu %02x %02x ",
 				    hostname, DNS_RDATATYPE_SSHFP,
 				    2 + rdata_digest_len,
 				    rdata_pubkey_algorithm, rdata_digest_type);

@@ -68,7 +68,7 @@ input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 	struct sshkey *server_host_private, *server_host_public;
 	u_char *server_host_key_blob = NULL, *signature = NULL;
 	u_char *kbuf = NULL, *hash;
-	u_int slen, sbloblen;
+	size_t slen, sbloblen;
 	size_t klen = 0, hashlen;
 	int curve_nid, r;
 

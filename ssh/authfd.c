@@ -424,16 +424,17 @@ ssh_decrypt_challenge(int sock, struct sshkey* key, BIGNUM *challenge,
 /* ask agent to sign data, returns err.h code on error, 0 on success */
 int
 ssh_agent_sign(int sock, struct sshkey *key,
-    u_char **sigp, u_int *lenp,
-    u_char *data, u_int datalen, u_int compat)
+    u_char **sigp, size_t *lenp,
+    u_char *data, size_t datalen, u_int compat)
 {
 	struct sshbuf *msg;
-	u_char *blob;
-	u_int blen, flags = 0;
-	u_char type;
-	size_t len;
+	u_char *blob, type;
+	size_t blen, len;
+	u_int flags = 0;
 	int r;
 
+	if (datalen > SSH_KEY_MAX_SIGN_DATA_SIZE)
+		return SSH_ERR_INVALID_ARGUMENT;
 	if (compat & SSH_BUG_SIGBLOB)
 		flags |= SSH_AGENT_OLD_SIGNATURE;
 	if ((msg = sshbuf_new()) == NULL)
@@ -641,7 +642,7 @@ ssh_remove_identity(int sock, struct sshkey *key)
 	struct sshbuf *msg;
 	int r;
 	u_char type, *blob = NULL;
-	u_int blen;
+	size_t blen;
 
 	if ((msg = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;

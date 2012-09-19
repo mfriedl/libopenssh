@@ -54,11 +54,12 @@
 #include <stdarg.h>
 
 #include "sshlogin.h"
+#include "err.h"
 #include "log.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "servconf.h"
 
-extern Buffer loginmsg;
+extern struct sshbuf *loginmsg;
 extern ServerOptions options;
 
 /*
@@ -113,8 +114,9 @@ get_last_login_time(uid_t uid, const char *logname,
 static void
 store_lastlog_message(const char *user, uid_t uid)
 {
-	char *time_string, hostname[MAXHOSTNAMELEN] = "", buf[512];
+	char *time_string, hostname[MAXHOSTNAMELEN] = "";
 	time_t last_login_time;
+	int r;
 
 	if (!options.print_lastlog)
 		return;
@@ -126,12 +128,13 @@ store_lastlog_message(const char *user, uid_t uid)
 		time_string = ctime(&last_login_time);
 		time_string[strcspn(time_string, "\n")] = '\0';
 		if (strcmp(hostname, "") == 0)
-			snprintf(buf, sizeof(buf), "Last login: %s\r\n",
+			r = sshbuf_putf(loginmsg, "Last login: %s\r\n",
 			    time_string);
 		else
-			snprintf(buf, sizeof(buf), "Last login: %s from %s\r\n",
+			r = sshbuf_putf(loginmsg, "Last login: %s from %s\r\n",
 			    time_string, hostname);
-		buffer_append(&loginmsg, buf, strlen(buf));
+		if (r != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
 }
 

@@ -229,7 +229,7 @@ Authctxt *the_authctxt = NULL;
 Buffer cfg;
 
 /* message to be displayed after login */
-Buffer loginmsg;
+struct sshbuf *loginmsg = NULL;
 
 /* Prototypes for various functions defined later in this file. */
 void destroy_sensitive_data(void);
@@ -702,7 +702,7 @@ privsep_postauth(Authctxt *authctxt)
 		fatal("fork of unprivileged child failed");
 	else if (pmonitor->m_pid != 0) {
 		verbose("User child is on pid %ld", (long)pmonitor->m_pid);
-		buffer_clear(&loginmsg);
+		sshbuf_reset(loginmsg);
 		monitor_child_postauth(pmonitor);
 
 		/* NEVERREACHED */
@@ -1863,7 +1863,8 @@ main(int ac, char **av)
 	the_authctxt = authctxt;
 
 	/* prepare buffer to collect messages to display to user after login */
-	buffer_init(&loginmsg);
+	if ((loginmsg = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	auth_debug_reset();
 
 	if (use_privsep)
