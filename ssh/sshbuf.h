@@ -16,6 +16,7 @@
  */
 
 #ifndef _SSHBUF_H
+#define _SSHBUF_H
 
 #include <sys/types.h>
 #include <stdarg.h>
@@ -28,7 +29,7 @@
 #endif
 
 #define SSHBUF_SIZE_MAX		0x20000000	/* Hard maximum size */
-#define SSHBUF_MAX_BIGNUM		(8192 / 8)	/* Max bignum *bytes* */
+#define SSHBUF_MAX_BIGNUM	(8192 / 8)	/* Max bignum *bytes* */
 #define SSHBUF_MAX_ECPOINT	((528 * 2 / 8) + 1) /* Max EC point *bytes* */
 
 /*
@@ -101,7 +102,6 @@ u_char *sshbuf_ptr(const struct sshbuf *buf);
  * with unsigned overflows correctly.
  * Returns 0 on success, or a negative SSH_ERR_* error code on failure.
  */
-
 int	sshbuf_check_reserve(const struct sshbuf *buf, size_t len);
 
 /*
