@@ -27,6 +27,7 @@
 #include "xmalloc.h"
 #include "err.h"
 #include "rsa.h"
+#define PACKET_SKIP_COMPAT 1
 #include "packet.h"
 #include "ssh1.h"
 #include "uidswap.h"
@@ -129,6 +130,7 @@ auth_rsa_verify_response(struct sshkey *key, BIGNUM *challenge,
 int
 auth_rsa_challenge_dialog(struct sshkey *key)
 {
+	struct ssh *ssh = active_state;
 	BIGNUM *challenge, *encrypted_challenge;
 	u_char response[16];
 	int r, i, success;
@@ -144,17 +146,19 @@ auth_rsa_challenge_dialog(struct sshkey *key)
 		fatal("%s: rsa_public_encrypt: %s", __func__, ssh_err(r));
 
 	/* Send the encrypted challenge to the client. */
-	packet_start(SSH_SMSG_AUTH_RSA_CHALLENGE);
-	packet_put_bignum(encrypted_challenge);
-	packet_send();
+	if ((r = sshpkt_start(ssh, SSH_SMSG_AUTH_RSA_CHALLENGE)) != 0 ||
+	    (r = sshpkt_put_bignum1(ssh, encrypted_challenge)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	BN_clear_free(encrypted_challenge);
-	packet_write_wait();
+	ssh_packet_write_wait(ssh);
 
 	/* Wait for a response. */
-	packet_read_expect(SSH_CMSG_AUTH_RSA_RESPONSE);
+	ssh_packet_read_expect(ssh, SSH_CMSG_AUTH_RSA_RESPONSE);
 	for (i = 0; i < 16; i++)
-		response[i] = (u_char)packet_get_char();
-	packet_check_eom();
+		if ((r = sshpkt_get_u8(ssh, &response[i])) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
+	ssh_packet_check_eom(ssh);
 
 	success = PRIVSEP(auth_rsa_verify_response(key, challenge, response));
 	BN_clear_free(challenge);
@@ -298,6 +302,7 @@ auth_rsa_key_allowed(struct passwd *pw, BIGNUM *client_n,
 int
 auth_rsa(Authctxt *authctxt, BIGNUM *client_n)
 {
+	struct ssh *ssh = active_state;
 	struct sshkey *key;
 	char *fp;
 	struct passwd *pw = authctxt->pw;
@@ -315,7 +320,8 @@ auth_rsa(Authctxt *authctxt, BIGNUM *client_n)
 	if (!auth_rsa_challenge_dialog(key)) {
 		/* Wrong response. */
 		verbose("Wrong response to RSA authentication challenge.");
-		packet_send_debug("Wrong response to RSA authentication challenge.");
+		ssh_packet_send_debug(ssh,
+		    "Wrong response to RSA authentication challenge.");
 		/*
 		 * Break out of the loop. Otherwise we might send
 		 * another challenge and break the protocol.
@@ -335,6 +341,6 @@ auth_rsa(Authctxt *authctxt, BIGNUM *client_n)
 	xfree(fp);
 	sshkey_free(key);
 
-	packet_send_debug("RSA authentication accepted.");
+	ssh_packet_send_debug(ssh, "RSA authentication accepted.");
 	return (1);
 }
