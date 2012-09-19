@@ -2237,13 +2237,6 @@ ssh_packet_get_maxsize(struct ssh *ssh)
 	return ssh->state->max_packet_size;
 }
 
-/* roundup current message to pad bytes */
-void
-ssh_packet_add_padding(struct ssh *ssh, u_char pad)
-{
-	ssh->state->extra_pad = pad;
-}
-
 /*
  * 9.2.  Ignored Data Message
  *
@@ -2895,5 +2888,13 @@ sshpkt_disconnect(struct ssh *ssh, const char *fmt,...)
 		    (r = sshpkt_send(ssh)) != 0)
 			return r;
 	}
+	return 0;
+}
+
+/* roundup current message to pad bytes */
+int
+sshpkt_add_padding(struct ssh *ssh, u_char pad)
+{
+	ssh->state->extra_pad = pad;
 	return 0;
 }

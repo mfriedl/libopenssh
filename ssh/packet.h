@@ -150,7 +150,6 @@ int      ssh_packet_not_very_much_data_to_write(struct ssh *);
 int	 ssh_packet_connection_is_on_socket(struct ssh *);
 int	 ssh_packet_remaining(struct ssh *);
 void	 ssh_packet_send_ignore(struct ssh *, int);
-void	 ssh_packet_add_padding(struct ssh *, u_char);
 
 void	 tty_make_modes(int, struct termios *);
 void	 tty_parse_modes(int, int *);
@@ -316,6 +315,7 @@ void     packet_set_connection(int, int);
 int	sshpkt_start(struct ssh *ssh, u_char type);
 int	sshpkt_send(struct ssh *ssh);
 int     sshpkt_disconnect(struct ssh *, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+int	sshpkt_add_padding(struct ssh *, u_char);
 
 int	sshpkt_put(struct ssh *ssh, const void *v, size_t len);
 int	sshpkt_put_u8(struct ssh *ssh, u_char val);
