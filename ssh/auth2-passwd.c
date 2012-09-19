@@ -28,8 +28,9 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include "xmalloc.h"
+#define PACKET_SKIP_COMPAT 1
 #include "packet.h"
+#include "err.h"
 #include "log.h"
 #include "key.h"
 #include "hostfile.h"
@@ -47,19 +48,15 @@ extern ServerOptions options;
 static int
 userauth_passwd(struct ssh *ssh)
 {
-	char *password, *newpass;
-	int authenticated = 0;
-	int change;
-	u_int len, newlen;
+	char *password;
+	int authenticated = 0, r;
+	u_char change;
+	size_t len;
 
-	change = ssh_packet_get_char(ssh);
-	password = ssh_packet_get_string(ssh, &len);
-	if (change) {
-		/* discard new password from packet */
-		newpass = ssh_packet_get_string(ssh, &newlen);
-		memset(newpass, 0, newlen);
-		xfree(newpass);
-	}
+	if ((r = sshpkt_get_u8(ssh, &change)) != 0 ||
+	    (r = sshpkt_get_cstring(ssh, &password, &len)) != 0 ||
+	    (change && (r = sshpkt_get_cstring(ssh, NULL, NULL)) != 0))
+		fatal("%s: %s", __func__, ssh_err(r));
 	ssh_packet_check_eom(ssh);
 
 	if (change)
@@ -67,7 +64,7 @@ userauth_passwd(struct ssh *ssh)
 	else if (PRIVSEP(auth_password(ssh->authctxt, password)) == 1)
 		authenticated = 1;
 	memset(password, 0, len);
-	xfree(password);
+	free(password);
 	return authenticated;
 }
 
