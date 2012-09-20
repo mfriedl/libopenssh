@@ -2238,8 +2238,6 @@ do_ssh2_kex(struct ssh *ssh)
 	kex->load_host_private_key=&get_hostkey_private_by_type;
 	kex->host_key_index=&get_hostkey_index;
 
-	ssh->kex = kex;
-
 	if ((r = ssh_dispatch_run(ssh, DISPATCH_BLOCK,
 	    &kex->done)) != 0)
 		fatal("%s: key exchange failed: %s", __func__, ssh_err(r));
