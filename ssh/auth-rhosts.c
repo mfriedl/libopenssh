@@ -26,7 +26,6 @@
 #include <unistd.h>
 
 #include "packet.h"
-#include "buffer.h"
 #include "uidswap.h"
 #include "pathnames.h"
 #include "log.h"

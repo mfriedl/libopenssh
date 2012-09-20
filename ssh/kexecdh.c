@@ -34,13 +34,13 @@
 #include <openssl/ec.h>
 #include <openssl/ecdh.h>
 
-#include "buffer.h"
 #include "ssh2.h"
 #include "key.h"
 #include "cipher.h"
 #include "kex.h"
 #include "log.h"
 #include "err.h"
+#include "sshbuf.h"
 
 int
 kex_ecdh_name_to_nid(const char *kexname)

@@ -54,7 +54,8 @@
 #include "log.h"
 #include "ssh1.h"
 #include "compat.h"
-#include "buffer.h"
+#include "sshbuf.h"
+#include "err.h"
 
 #define TTY_OP_END		0
 /*
@@ -244,6 +245,24 @@ baud_to_speed(int baud)
 	}
 }
 
+static void
+put1(struct sshbuf *b, u_int v)
+{
+	int r;
+
+	if ((r = sshbuf_put_u8(b, v)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+}
+
+static void
+put2(struct sshbuf *b, u_int v)
+{
+	int r;
+
+	if ((r = sshbuf_put_u32(b, v)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+}
+
 /*
  * Encodes terminal modes for the terminal referenced by fd
  * or tiop in a portable manner, and appends the modes to a packet
@@ -253,20 +272,20 @@ void
 tty_make_modes(int fd, struct termios *tiop)
 {
 	struct termios tio;
-	int baud;
-	Buffer buf;
-	int tty_op_ospeed, tty_op_ispeed;
-	void (*put_arg)(Buffer *, u_int);
+	struct sshbuf *buf;
+	int r, tty_op_ospeed, tty_op_ispeed, ibaud, obaud;
+	void (*put_arg)(struct sshbuf *, u_int);
 
-	buffer_init(&buf);
+	if ((buf = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	if (compat20) {
 		tty_op_ospeed = TTY_OP_OSPEED_PROTO2;
 		tty_op_ispeed = TTY_OP_ISPEED_PROTO2;
-		put_arg = buffer_put_int;
+		put_arg = put2;
 	} else {
 		tty_op_ospeed = TTY_OP_OSPEED_PROTO1;
 		tty_op_ispeed = TTY_OP_ISPEED_PROTO1;
-		put_arg = (void (*)(Buffer *, u_int)) buffer_put_char;
+		put_arg = put1;
 	}
 
 	if (tiop == NULL) {
@@ -282,21 +301,24 @@ tty_make_modes(int fd, struct termios *tiop)
 		tio = *tiop;
 
 	/* Store input and output baud rates. */
-	baud = speed_to_baud(cfgetospeed(&tio));
-	buffer_put_char(&buf, tty_op_ospeed);
-	buffer_put_int(&buf, baud);
-	baud = speed_to_baud(cfgetispeed(&tio));
-	buffer_put_char(&buf, tty_op_ispeed);
-	buffer_put_int(&buf, baud);
+	obaud = speed_to_baud(cfgetospeed(&tio));
+	ibaud = speed_to_baud(cfgetispeed(&tio));
+	if ((r = sshbuf_put_u8(buf, tty_op_ospeed)) != 0 ||
+	    (r = sshbuf_put_u32(buf, obaud)) != 0 ||
+	    (r = sshbuf_put_u8(buf, tty_op_ispeed)) != 0 ||
+	    (r = sshbuf_put_u32(buf, ibaud)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	/* Store values of mode flags. */
 #define TTYCHAR(NAME, OP) \
-	buffer_put_char(&buf, OP); \
-	put_arg(&buf, tio.c_cc[NAME]);
+	if ((r = sshbuf_put_u8(buf, OP)) != 0) \
+		fatal("%s: buffer error: %s", __func__, ssh_err(r)); \
+	put_arg(buf, tio.c_cc[NAME]);
 
 #define TTYMODE(NAME, FIELD, OP) \
-	buffer_put_char(&buf, OP); \
-	put_arg(&buf, ((tio.FIELD & NAME) != 0));
+	if ((r = sshbuf_put_u8(buf, OP)) != 0) \
+		fatal("%s: buffer error: %s", __func__, ssh_err(r)); \
+	put_arg(buf, ((tio.FIELD & NAME) != 0));
 
 #include "ttymodes.h"
 
@@ -305,12 +327,13 @@ tty_make_modes(int fd, struct termios *tiop)
 
 end:
 	/* Mark end of mode data. */
-	buffer_put_char(&buf, TTY_OP_END);
+	if ((r = sshbuf_put_u8(buf, TTY_OP_END)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (compat20)
-		packet_put_string(buffer_ptr(&buf), buffer_len(&buf));
+		packet_put_string(sshbuf_ptr(buf), sshbuf_len(buf));
 	else
-		packet_put_raw(buffer_ptr(&buf), buffer_len(&buf));
-	buffer_free(&buf);
+		packet_put_raw(sshbuf_ptr(buf), sshbuf_len(buf));
+	sshbuf_free(buf);
 }
 
 /*

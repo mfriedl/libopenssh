@@ -75,7 +75,7 @@
 #include "compat.h"
 #include "cipher.h"
 #include "packet.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "channels.h"
 #include "key.h"
 #include "authfd.h"
@@ -651,14 +651,15 @@ main(int ac, char **av)
 	} else {
 		/* A command has been specified.  Store it into the buffer. */
 		for (i = 0; i < ac; i++) {
-			if (i)
-				buffer_append(command, " ", 1);
-			buffer_append(command, av[i], strlen(av[i]));
+			if ((r = sshbuf_putf(command, "%s%s",
+			    i ? " " : "", av[i])) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 		}
 	}
 
 	/* Cannot fork to background if no command. */
-	if (fork_after_authentication_flag && buffer_len(command) == 0 &&
+	if (fork_after_authentication_flag && sshbuf_len(command) == 0 &&
 	    !no_shell_flag)
 		fatal("Cannot fork into background without a command "
 		    "to execute.");
@@ -703,7 +704,7 @@ main(int ac, char **av)
 		tty_flag = 1;
 
 	/* Allocate a tty by default if no command specified. */
-	if (buffer_len(command) == 0)
+	if (sshbuf_len(command) == 0)
 		tty_flag = options.request_tty != REQUEST_TTY_NO;
 
 	/* Force no tty */
@@ -1291,7 +1292,7 @@ ssh_session(struct ssh *ssh)
 	 * If a command was specified on the command line, execute the
 	 * command now. Otherwise request the server to start a shell.
 	 */
-	if (buffer_len(command) > 0) {
+	if (sshbuf_len(command) > 0) {
 		size_t len = sshbuf_len(command);
 		if (len > 900)
 			len = 900;

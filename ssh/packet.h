@@ -24,7 +24,6 @@
 #include <sys/queue.h>
 
 /* XXX fixme */
-#include "buffer.h"
 #include "cipher.h"
 #include "dispatch.h"
 #include "key.h"

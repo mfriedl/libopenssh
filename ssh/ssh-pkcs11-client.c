@@ -27,7 +27,6 @@
 #include "pathnames.h"
 #include "xmalloc.h"
 #include "sshbuf.h"
-#include "buffer.h"
 #include "log.h"
 #include "misc.h"
 #include "key.h"

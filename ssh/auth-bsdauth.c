@@ -30,7 +30,6 @@
 #include "hostfile.h"
 #include "auth.h"
 #include "log.h"
-#include "buffer.h"
 #ifdef GSSAPI
 #include "ssh-gss.h"
 #endif

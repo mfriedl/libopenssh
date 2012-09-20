@@ -32,7 +32,6 @@
 
 #include <openssl/dh.h>
 
-#include "buffer.h"
 #include "key.h"
 #include "cipher.h"
 #include "kex.h"
@@ -47,6 +46,7 @@
 #include "monitor_wrap.h"
 #include "dispatch.h"
 #include "err.h"
+#include "sshbuf.h"
 
 static int input_kex_dh_gex_request(int, u_int32_t, struct ssh *);
 static int input_kex_dh_gex_init(int, u_int32_t, struct ssh *);

@@ -31,7 +31,6 @@
 #include "auth.h"
 #include "packet.h"
 #include "log.h"
-#include "buffer.h"
 #include "servconf.h"
 #include "compat.h"
 #include "ssh2.h"

@@ -32,7 +32,6 @@
 #include <string.h>
 #include <signal.h>
 
-#include "buffer.h"
 #include "key.h"
 #include "cipher.h"
 #include "kex.h"
@@ -43,6 +42,7 @@
 #include "compat.h"
 #include "dispatch.h"
 #include "err.h"
+#include "sshbuf.h"
 
 static int input_kex_dh_gex_group(int, u_int32_t, struct ssh *);
 static int input_kex_dh_gex_reply(int, u_int32_t, struct ssh *);

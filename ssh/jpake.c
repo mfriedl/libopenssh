@@ -39,7 +39,6 @@
 #include "key.h"
 #include "hostfile.h"
 #include "auth.h"
-#include "buffer.h"
 #include "packet.h"
 #include "dispatch.h"
 #include "log.h"
@@ -325,21 +324,24 @@ jpake_confirm_hash(const BIGNUM *k,
     const u_char *sess_id, u_int sess_id_len,
     u_char **confirm_hash, u_int *confirm_hash_len)
 {
-	Buffer b;
+	struct sshbuf *b;
+	int r;
 
 	/*
 	 * Calculate confirmation proof:
 	 *     client: H(k || client_id || session_id)
 	 *     server: H(k || server_id || session_id)
 	 */
-	buffer_init(&b);
-	buffer_put_bignum2(&b, k);
-	buffer_put_string(&b, endpoint_id, endpoint_id_len);
-	buffer_put_string(&b, sess_id, sess_id_len);
-	if (hash_buffer(buffer_ptr(&b), buffer_len(&b), EVP_sha256(),
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((r = sshbuf_put_bignum2(b, k)) != 0 ||
+	    (r = sshbuf_put_string(b, endpoint_id, endpoint_id_len)) != 0 ||
+	    (r = sshbuf_put_string(b, sess_id, sess_id_len)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if (hash_buffer(sshbuf_ptr(b), sshbuf_len(b), EVP_sha256(),
 	    confirm_hash, confirm_hash_len) != 0)
 		fatal("%s: hash_buffer", __func__);
-	buffer_free(&b);
+	sshbuf_free(b);
 }
 
 /* Shared parts of key derivation and confirmation calculation */

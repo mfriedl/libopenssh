@@ -33,7 +33,6 @@
 #include <openssl/crypto.h>
 
 #include "ssh2.h"
-#include "buffer.h"
 #include "packet.h"
 #include "compat.h"
 #include "cipher.h"
@@ -46,6 +45,7 @@
 #include "monitor.h"
 #include "roaming.h"
 #include "err.h"
+#include "sshbuf.h"
 
 /* prototype */
 static int kex_choose_conf(struct ssh *);

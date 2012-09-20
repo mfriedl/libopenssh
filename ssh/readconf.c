@@ -38,7 +38,6 @@
 #include "readconf.h"
 #include "match.h"
 #include "misc.h"
-#include "buffer.h"
 #include "kex.h"
 #include "mac.h"
 

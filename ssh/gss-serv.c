@@ -33,7 +33,6 @@
 #include <string.h>
 
 #include "xmalloc.h"
-#include "buffer.h"
 #include "key.h"
 #include "hostfile.h"
 #include "auth.h"

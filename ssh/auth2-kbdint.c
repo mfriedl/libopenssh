@@ -33,7 +33,6 @@
 #include "hostfile.h"
 #include "auth.h"
 #include "log.h"
-#include "buffer.h"
 #include "servconf.h"
 #include "err.h"
 

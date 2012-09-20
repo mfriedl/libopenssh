@@ -30,7 +30,8 @@
 #include "packet.h"
 #include "xmalloc.h"
 #include "cipher.h"
-#include "buffer.h"
+#include "sshbuf.h"
+#include "err.h"
 #include "roaming.h"
 
 static size_t out_buf_size = 0;
@@ -221,22 +222,27 @@ resend_bytes(int fd, u_int64_t *offset)
 void
 calculate_new_key(u_int64_t *key, u_int64_t cookie, u_int64_t challenge)
 {
+	int r;
+
 	const EVP_MD *md = EVP_sha1();
 	EVP_MD_CTX ctx;
 	char hash[EVP_MAX_MD_SIZE];
-	Buffer b;
+	struct sshbuf *b;
 
-	buffer_init(&b);
-	buffer_put_int64(&b, *key);
-	buffer_put_int64(&b, cookie);
-	buffer_put_int64(&b, challenge);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((r = sshbuf_put_u64(b, *key)) != 0 ||
+	    (r = sshbuf_put_u64(b, cookie)) != 0 ||
+	    (r = sshbuf_put_u64(b, challenge)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	EVP_DigestInit(&ctx, md);
-	EVP_DigestUpdate(&ctx, buffer_ptr(&b), buffer_len(&b));
+	EVP_DigestUpdate(&ctx, sshbuf_ptr(b), sshbuf_len(b));
 	EVP_DigestFinal(&ctx, hash, NULL);
 
-	buffer_clear(&b);
-	buffer_append(&b, hash, EVP_MD_size(md));
-	*key = buffer_get_int64(&b);
-	buffer_free(&b);
+	sshbuf_reset(b);
+	if ((r = sshbuf_put(b, hash, EVP_MD_size(md))) != 0 ||
+	    (r = sshbuf_get_u64(b, key)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	sshbuf_free(b);
 }

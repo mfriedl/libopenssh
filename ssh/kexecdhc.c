@@ -32,7 +32,6 @@
 
 #include <openssl/ecdh.h>
 
-#include "buffer.h"
 #include "key.h"
 #include "cipher.h"
 #include "kex.h"
@@ -43,6 +42,7 @@
 #include "dispatch.h"
 #include "compat.h"
 #include "err.h"
+#include "sshbuf.h"
 
 static int input_kex_ecdh_reply(int, u_int32_t, struct ssh *);
 

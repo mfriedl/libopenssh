@@ -36,7 +36,7 @@
 #include "xmalloc.h"
 #include "ssh.h"
 #include "rsa.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "packet.h"
 #include "uidswap.h"
 #include "compat.h"
@@ -612,7 +612,7 @@ check_host_cert(const char *host, const struct sshkey *host_key)
 		error("%s", reason);
 		return 0;
 	}
-	if (buffer_len(host_key->cert->critical) != 0) {
+	if (sshbuf_len(host_key->cert->critical) != 0) {
 		error("Certificate for %s contains unsupported "
 		    "critical options(s)", host);
 		return 0;

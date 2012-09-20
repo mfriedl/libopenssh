@@ -35,6 +35,7 @@
 #include "readconf.h"
 #include "authfile.h"
 #include "err.h"
+#include "sshbuf.h"
 
 struct side {
 	int fd;

@@ -29,12 +29,12 @@
 #include <openssl/evp.h>
 #include <signal.h>
 
-#include "buffer.h"
 #include "key.h"
 #include "cipher.h"
 #include "kex.h"
 #include "ssh2.h"
 #include "err.h"
+#include "sshbuf.h"
 
 int
 kexgex_hash(

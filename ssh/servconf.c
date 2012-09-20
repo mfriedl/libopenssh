@@ -46,6 +46,7 @@
 #include "groupaccess.h"
 #include "canohost.h"
 #include "packet.h"
+#include "err.h"
 
 static void add_listen_addr(ServerOptions *, char *, int);
 static void add_one_listen_addr(ServerOptions *, char *, int);
@@ -1484,14 +1485,14 @@ load_server_config(const char *filename, struct sshbuf *conf)
 {
 	char line[4096], *cp;
 	FILE *f;
-	int lineno = 0;
+	int r, lineno = 0;
 
 	debug2("%s: filename %s", __func__, filename);
 	if ((f = fopen(filename, "r")) == NULL) {
 		perror(filename);
 		exit(1);
 	}
-	buffer_clear(conf);
+	sshbuf_reset(conf);
 	while (fgets(line, sizeof(line), f)) {
 		lineno++;
 		if (strlen(line) == sizeof(line) - 1)
@@ -1504,12 +1505,13 @@ load_server_config(const char *filename, struct sshbuf *conf)
 		if ((cp = strchr(line, '#')) != NULL)
 			memcpy(cp, "\n", 2);
 		cp = line + strspn(line, " \t\r");
-
-		buffer_append(conf, cp, strlen(cp));
+		if ((r = sshbuf_put(conf, cp, strlen(cp))) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
-	buffer_append(conf, "\0", 1);
+	if ((r = sshbuf_put_u8(conf, 0)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	fclose(f);
-	debug2("%s: done config len = %d", __func__, buffer_len(conf));
+	debug2("%s: done config len = %zu", __func__, sshbuf_len(conf));
 }
 
 void
@@ -1643,9 +1645,9 @@ parse_server_config(ServerOptions *options, const char *filename,
 	int active, linenum, bad_options = 0;
 	char *cp, *obuf, *cbuf;
 
-	debug2("%s: config %s len %d", __func__, filename, buffer_len(conf));
+	debug2("%s: config %s len %zu", __func__, filename, sshbuf_len(conf));
 
-	obuf = cbuf = xstrdup(buffer_ptr(conf));
+	obuf = cbuf = xstrdup(sshbuf_ptr(conf));
 	active = connectinfo ? 0 : 1;
 	linenum = 1;
 	while ((cp = strsep(&cbuf, "\n")) != NULL) {

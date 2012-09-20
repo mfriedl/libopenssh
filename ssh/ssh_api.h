@@ -5,7 +5,6 @@
 #include <sys/types.h>
 #include <signal.h>
 
-#include "buffer.h"
 #include "cipher.h"
 #include "key.h"
 #include "kex.h"

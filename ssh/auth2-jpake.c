@@ -43,7 +43,7 @@
 #include "key.h"
 #include "hostfile.h"
 #include "auth.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #define PACKET_SKIP_COMPAT
 #define PACKET_SKIP_COMPAT2
 #include "packet.h"
@@ -147,11 +147,14 @@ derive_rawsalt(const char *username, u_char *rawsalt, u_int len)
 {
 	u_char *digest;
 	u_int digest_len;
-	Buffer b;
+	struct sshbuf *b;
 	struct sshkey *k;
+	int r;
 
-	buffer_init(&b);
-	buffer_put_cstring(&b, username);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((r = sshbuf_put_cstring(b, username)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if ((k = get_hostkey_by_index(0)) == NULL ||
 	    (k->flags & SSHKEY_FLAG_EXT))
 		fatal("%s: no hostkeys", __func__);
@@ -160,26 +163,30 @@ derive_rawsalt(const char *username, u_char *rawsalt, u_int len)
 	case KEY_RSA:
 		if (k->rsa->p == NULL || k->rsa->q == NULL)
 			fatal("%s: RSA key missing p and/or q", __func__);
-		buffer_put_bignum2(&b, k->rsa->p);
-		buffer_put_bignum2(&b, k->rsa->q);
+		if ((r = sshbuf_put_bignum2(b, k->rsa->p)) != 0 ||
+		    (r = sshbuf_put_bignum2(b, k->rsa->q)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		break;
 	case KEY_DSA:
 		if (k->dsa->priv_key == NULL)
 			fatal("%s: DSA key missing priv_key", __func__);
-		buffer_put_bignum2(&b, k->dsa->priv_key);
+		if ((r = sshbuf_put_bignum2(b, k->dsa->priv_key)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		break;
 	case KEY_ECDSA:
 		if (EC_KEY_get0_private_key(k->ecdsa) == NULL)
 			fatal("%s: ECDSA key missing priv_key", __func__);
-		buffer_put_bignum2(&b, EC_KEY_get0_private_key(k->ecdsa));
+		if ((r = sshbuf_put_bignum2(b,
+		    EC_KEY_get0_private_key(k->ecdsa))) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		break;
 	default:
 		fatal("%s: unknown key type %d", __func__, k->type);
 	}
-	if (hash_buffer(buffer_ptr(&b), buffer_len(&b), EVP_sha256(),
+	if (hash_buffer(sshbuf_ptr(b), sshbuf_len(b), EVP_sha256(),
 	    &digest, &digest_len) != 0)
 		fatal("%s: hash_buffer", __func__);
-	buffer_free(&b);
+	sshbuf_free(b);
 	if (len > digest_len)
 		fatal("%s: not enough bytes for rawsalt (want %u have %u)",
 		    __func__, len, digest_len);

@@ -59,7 +59,6 @@
 #include "ssh2.h"
 #include "sshpty.h"
 #include "packet.h"
-#include "buffer.h"
 #include "match.h"
 #include "uidswap.h"
 #include "compat.h"
@@ -84,6 +83,7 @@
 #include "monitor_wrap.h"
 #include "sftp.h"
 #include "err.h"
+#include "sshbuf.h"
 
 #ifdef KRB5
 #include <kafs.h>

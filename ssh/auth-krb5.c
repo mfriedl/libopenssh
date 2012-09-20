@@ -37,7 +37,6 @@
 #include "ssh1.h"
 #include "packet.h"
 #include "log.h"
-#include "buffer.h"
 #include "servconf.h"
 #include "uidswap.h"
 #include "key.h"

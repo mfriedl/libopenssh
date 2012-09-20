@@ -33,7 +33,6 @@
 #include "ssh1.h"
 #include "uidswap.h"
 #include "match.h"
-#include "buffer.h"
 #include "pathnames.h"
 #include "log.h"
 #include "servconf.h"

@@ -24,7 +24,6 @@
 #define PACKET_SKIP_COMPAT
 #define PACKET_SKIP_COMPAT2
 #include "packet.h"
-#include "buffer.h"
 #include "log.h"
 #include "servconf.h"
 #include "compat.h"

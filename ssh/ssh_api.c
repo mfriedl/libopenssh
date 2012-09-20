@@ -10,6 +10,7 @@
 #include "version.h"
 #include "myproposal.h"
 #include "err.h"
+#include "sshbuf.h"
 
 #include <string.h>
 

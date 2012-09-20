@@ -35,7 +35,6 @@
 #include "auth.h"
 #include "log.h"
 
-#include "buffer.h"
 #include "ssh-gss.h"
 
 #include <krb5.h>

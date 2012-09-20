@@ -41,7 +41,7 @@
 #define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "log.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "servconf.h"
 #include "compat.h"
 #include "key.h"
@@ -345,25 +345,26 @@ userauth_finish(struct ssh *ssh, int authenticated, char *method)
 static char *
 authmethods_get(void)
 {
-	Buffer b;
+	struct sshbuf *b;
 	char *list;
-	int i;
+	int i, r;
 
-	buffer_init(&b);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	for (i = 0; authmethods[i] != NULL; i++) {
 		if (strcmp(authmethods[i]->name, "none") == 0)
 			continue;
-		if (authmethods[i]->enabled != NULL &&
-		    *(authmethods[i]->enabled) != 0) {
-			if (buffer_len(&b) > 0)
-				buffer_append(&b, ",", 1);
-			buffer_append(&b, authmethods[i]->name,
-			    strlen(authmethods[i]->name));
-		}
+		if (authmethods[i]->enabled == NULL ||
+		    *(authmethods[i]->enabled) == 0)
+			continue;
+		if ((r = sshbuf_putf(b, "%s%s", sshbuf_len(b) ? "," : "",
+		    authmethods[i]->name)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
-	buffer_append(&b, "\0", 1);
-	list = xstrdup(buffer_ptr(&b));
-	buffer_free(&b);
+	if ((r = sshbuf_put_u8(b, 0)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	list = xstrdup(sshbuf_ptr(b));
+	sshbuf_free(b);
 	return list;
 }
 

@@ -21,7 +21,6 @@
 #include "packet.h"
 #include "uidswap.h"
 #include "log.h"
-#include "buffer.h"
 #include "servconf.h"
 #include "key.h"
 #include "hostfile.h"

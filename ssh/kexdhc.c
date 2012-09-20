@@ -31,7 +31,6 @@
 #include <string.h>
 #include <signal.h>
 
-#include "buffer.h"
 #include "key.h"
 #include "cipher.h"
 #include "kex.h"
@@ -42,6 +41,7 @@
 #include "dispatch.h"
 #include "compat.h"
 #include "err.h"
+#include "sshbuf.h"
 
 static int input_kex_dh(int, u_int32_t, struct ssh *);
 

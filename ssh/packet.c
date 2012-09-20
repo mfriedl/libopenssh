@@ -58,7 +58,6 @@
 #include <zlib.h>
 
 #include "xmalloc.h"
-#include "buffer.h"
 #include "crc32.h"
 #include "deattack.h"
 #include "compat.h"
@@ -75,6 +74,7 @@
 #include "packet.h"
 #include "roaming.h"
 #include "err.h"
+#include "sshbuf.h"
 
 #ifdef PACKET_DEBUG
 #define DBG(x) x
@@ -2391,7 +2391,7 @@ ssh_packet_set_postauth(struct ssh *ssh)
 
 /* turn kex into a blob for packet state serialization */
 static int
-kex_to_blob(Buffer *m, Kex *kex)
+kex_to_blob(struct sshbuf *m, Kex *kex)
 {
 	int r;
 
@@ -2582,7 +2582,7 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 
 /* restore kex from blob for packet state de-serialization */
 static int
-kex_from_blob(Buffer *m, Kex **kexp)
+kex_from_blob(struct sshbuf *m, Kex **kexp)
 {
 	Kex *kex;
 	int r;

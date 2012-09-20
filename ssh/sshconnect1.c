@@ -30,7 +30,6 @@
 #include "ssh.h"
 #include "ssh1.h"
 #include "rsa.h"
-#include "buffer.h"
 #define PACKET_SKIP_COMPAT
 #define PACKET_SKIP_COMPAT2
 #include "packet.h"

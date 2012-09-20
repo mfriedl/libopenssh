@@ -54,7 +54,6 @@
 #include <unistd.h>
 
 #include "cipher.h"
-#include "buffer.h"
 #include "key.h"
 #include "ssh.h"
 #include "log.h"
@@ -62,6 +61,7 @@
 #include "rsa.h"
 #include "misc.h"
 #include "atomicio.h"
+#include "sshbuf.h"
 #include "err.h"
 
 #define MAX_KEY_FILE_SIZE	(1024 * 1024)

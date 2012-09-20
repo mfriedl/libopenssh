@@ -33,11 +33,11 @@
 
 #include "ssh1.h"
 #include "ssh2.h"
-#include "buffer.h"
 #include "packet.h"
 #include "channels.h"
 #include "compat.h"
 #include "log.h"
+#include "sshbuf.h"
 
 /*
  * SSH Protocol 1.5 aka New Channel Protocol

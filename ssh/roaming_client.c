@@ -28,7 +28,8 @@
 #include <openssl/sha.h>
 
 #include "xmalloc.h"
-#include "buffer.h"
+#include "sshbuf.h"
+#include "err.h"
 #include "channels.h"
 #include "cipher.h"
 #include "dispatch.h"
@@ -88,9 +89,10 @@ roaming_auth_required(void)
 {
 	u_char digest[SHA_DIGEST_LENGTH];
 	EVP_MD_CTX md;
-	Buffer b;
+	struct sshbuf *b;
 	const EVP_MD *evp_md = EVP_sha1();
 	u_int64_t chall, oldchall;
+	int r;
 
 	chall = packet_get_int64();
 	oldchall = packet_get_int64();
@@ -100,13 +102,16 @@ roaming_auth_required(void)
 	}
 	lastseenchall = chall;
 
-	buffer_init(&b);
-	buffer_put_int64(&b, cookie);
-	buffer_put_int64(&b, chall);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((r = sshbuf_put_u64(b, cookie)) != 0 ||
+	    (r = sshbuf_put_u64(b, chall)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+
 	EVP_DigestInit(&md, evp_md);
-	EVP_DigestUpdate(&md, buffer_ptr(&b), buffer_len(&b));
+	EVP_DigestUpdate(&md, sshbuf_ptr(b), sshbuf_len(b));
 	EVP_DigestFinal(&md, digest, NULL);
-	buffer_free(&b);
+	sshbuf_free(b);
 
 	packet_start(SSH2_MSG_KEX_ROAMING_AUTH);
 	packet_put_int64(key1 ^ get_recv_bytes());
