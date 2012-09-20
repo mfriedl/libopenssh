@@ -24,7 +24,6 @@
 
 #include "xmalloc.h"
 #include "sftp.h"
-#include "buffer.h"
 #include "sftp-common.h"
 #include "sftp-client.h"
 
