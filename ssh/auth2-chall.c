@@ -34,7 +34,7 @@
 #include "key.h"
 #include "hostfile.h"
 #include "auth.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #define PACKET_SKIP_COMPAT
 #define PACKET_SKIP_COMPAT2
 #include "packet.h"
@@ -66,21 +66,23 @@ static KbdintAuthctxt *
 kbdint_alloc(const char *devs)
 {
 	KbdintAuthctxt *kbdintctxt;
-	Buffer b;
-	int i;
+	struct sshbuf *b;
+	int i, r;
 
 	kbdintctxt = xmalloc(sizeof(KbdintAuthctxt));
 	if (strcmp(devs, "") == 0) {
-		buffer_init(&b);
+		if ((b = sshbuf_new()) == NULL)
+			fatal("%s: sshbuf_new failed", __func__);
 		for (i = 0; devices[i]; i++) {
-			if (buffer_len(&b) > 0)
-				buffer_append(&b, ",", 1);
-			buffer_append(&b, devices[i]->name,
-			    strlen(devices[i]->name));
+			if ((r = sshbuf_putf(b, "%s%s",
+			    sshbuf_len(b) ? "," : "", devices[i]->name)) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 		}
-		buffer_append(&b, "\0", 1);
-		kbdintctxt->devices = xstrdup(buffer_ptr(&b));
-		buffer_free(&b);
+		if ((r = sshbuf_put_u8(b, 0)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
+		kbdintctxt->devices = xstrdup(sshbuf_ptr(b));
+		sshbuf_free(b);
 	} else {
 		kbdintctxt->devices = xstrdup(devs);
 	}
