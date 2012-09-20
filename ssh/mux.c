@@ -612,7 +612,6 @@ mux_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 			    &rfwd->allocated_port)) != 0)
 				fatal("%s: packet error: %s",
 				    __func__, ssh_err(r));
-			rfwd->allocated_port = packet_get_int();
 			logit("Allocated port %u for mux remote forward"
 			    " to %s:%d", rfwd->allocated_port,
 			    rfwd->connect_host, rfwd->connect_port);
