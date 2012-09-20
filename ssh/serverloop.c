@@ -54,6 +54,8 @@
 #include <stdarg.h>
 
 #include "xmalloc.h"
+#define PACKET_SKIP_COMPAT
+#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "buffer.h"
 #include "log.h"
@@ -183,25 +185,28 @@ sigterm_handler(int sig)
  * to the client.
  */
 static void
-make_packets_from_stderr_data(void)
+make_packets_from_stderr_data(struct ssh *ssh)
 {
 	u_int len;
+	int r;
 
 	/* Send buffered stderr data to the client. */
 	while (buffer_len(&stderr_buffer) > 0 &&
-	    packet_not_very_much_data_to_write()) {
+	    ssh_packet_not_very_much_data_to_write(ssh)) {
 		len = buffer_len(&stderr_buffer);
-		if (packet_is_interactive()) {
+		if (ssh_packet_is_interactive(ssh)) {
 			if (len > 512)
 				len = 512;
 		} else {
 			/* Keep the packets at reasonable size. */
-			if (len > packet_get_maxsize())
-				len = packet_get_maxsize();
+			if (len > ssh_packet_get_maxsize(ssh))
+				len = ssh_packet_get_maxsize(ssh);
 		}
-		packet_start(SSH_SMSG_STDERR_DATA);
-		packet_put_string(buffer_ptr(&stderr_buffer), len);
-		packet_send();
+		if ((r = sshpkt_start(ssh, SSH_SMSG_STDERR_DATA)) != 0 ||
+		    (r = sshpkt_put_string(ssh, buffer_ptr(&stderr_buffer),
+		    len)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		buffer_consume(&stderr_buffer, len);
 		stderr_bytes += len;
 	}
@@ -212,37 +217,40 @@ make_packets_from_stderr_data(void)
  * client.
  */
 static void
-make_packets_from_stdout_data(void)
+make_packets_from_stdout_data(struct ssh *ssh)
 {
 	u_int len;
+	int r;
 
 	/* Send buffered stdout data to the client. */
 	while (buffer_len(&stdout_buffer) > 0 &&
-	    packet_not_very_much_data_to_write()) {
+	    ssh_packet_not_very_much_data_to_write(ssh)) {
 		len = buffer_len(&stdout_buffer);
-		if (packet_is_interactive()) {
+		if (ssh_packet_is_interactive(ssh)) {
 			if (len > 512)
 				len = 512;
 		} else {
 			/* Keep the packets at reasonable size. */
-			if (len > packet_get_maxsize())
-				len = packet_get_maxsize();
+			if (len > ssh_packet_get_maxsize(ssh))
+				len = ssh_packet_get_maxsize(ssh);
 		}
-		packet_start(SSH_SMSG_STDOUT_DATA);
-		packet_put_string(buffer_ptr(&stdout_buffer), len);
-		packet_send();
+		if ((r = sshpkt_start(ssh, SSH_SMSG_STDOUT_DATA)) != 0 ||
+		    (r = sshpkt_put_string(ssh, buffer_ptr(&stdout_buffer),
+		    len)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		buffer_consume(&stdout_buffer, len);
 		stdout_bytes += len;
 	}
 }
 
 static void
-client_alive_check(void)
+client_alive_check(struct ssh *ssh)
 {
-	int channel_id;
+	int channel_id, r;
 
 	/* timeout, check to see how many we have had */
-	if (packet_inc_alive_timeouts() > options.client_alive_count_max) {
+	if (ssh_packet_inc_alive_timeouts(ssh) > options.client_alive_count_max) {
 		logit("Timeout, client not responding.");
 		cleanup_exit(255);
 	}
@@ -252,13 +260,16 @@ client_alive_check(void)
 	 * we should get back a failure
 	 */
 	if ((channel_id = channel_find_open()) == -1) {
-		packet_start(SSH2_MSG_GLOBAL_REQUEST);
-		packet_put_cstring("keepalive@openssh.com");
-		packet_put_char(1);	/* boolean: want reply */
+		if ((r = sshpkt_start(ssh, SSH2_MSG_GLOBAL_REQUEST)) != 0 ||
+		    (r = sshpkt_put_cstring(ssh, "keepalive@openssh.com"))
+		    != 0 ||
+		    (r = sshpkt_put_u8(ssh, 1)) != 0) /* boolean: want reply */
+			fatal("%s: %s", __func__, ssh_err(r));
 	} else {
 		channel_request_start(channel_id, "keepalive@openssh.com", 1);
 	}
-	packet_send();
+	if ((r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 }
 
 /*
@@ -316,7 +327,7 @@ wait_until_can_do_something(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
 		 * If there is not too much data already buffered going to
 		 * the client, try to get some more data from the program.
 		 */
-		if (packet_not_very_much_data_to_write()) {
+		if (ssh_packet_not_very_much_data_to_write(active_state)) {
 			if (!fdout_eof)
 				FD_SET(fdout, *readsetp);
 			if (!fderr_eof)
@@ -335,14 +346,14 @@ wait_until_can_do_something(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
 	 * If we have buffered packet data going to the client, mark that
 	 * descriptor.
 	 */
-	if (packet_have_data_to_write())
+	if (ssh_packet_have_data_to_write(active_state))
 		FD_SET(connection_out, *writesetp);
 
 	/*
 	 * If child has terminated and there is enough buffer space to read
 	 * from it, then read as much as is available and exit.
 	 */
-	if (child_terminated && packet_not_very_much_data_to_write())
+	if (child_terminated && ssh_packet_not_very_much_data_to_write(active_state))
 		if (max_time_milliseconds == 0 || client_alive_scheduled)
 			max_time_milliseconds = 100;
 
@@ -363,7 +374,7 @@ wait_until_can_do_something(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
 		if (errno != EINTR)
 			error("select: %.100s", strerror(errno));
 	} else if (ret == 0 && client_alive_scheduled)
-		client_alive_check();
+		client_alive_check(active_state);
 
 	notify_done(*readsetp);
 }
@@ -373,7 +384,7 @@ wait_until_can_do_something(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
  * in buffers and processed later.
  */
 static void
-process_input(fd_set *readset)
+process_input(struct ssh *ssh, fd_set *readset)
 {
 	int len;
 	char buf[16384];
@@ -386,7 +397,7 @@ process_input(fd_set *readset)
 			if (cont)
 				return;
 			verbose("Connection closed by %.100s",
-			    get_remote_ipaddr());
+			    ssh_remote_ipaddr(ssh));
 			connection_closed = 1;
 			if (compat20)
 				return;
@@ -395,12 +406,12 @@ process_input(fd_set *readset)
 			if (errno != EINTR && errno != EAGAIN) {
 				verbose("Read error from remote host "
 				    "%.100s: %.100s",
-				    get_remote_ipaddr(), strerror(errno));
+				    ssh_remote_ipaddr(ssh), strerror(errno));
 				cleanup_exit(255);
 			}
 		} else {
 			/* Buffer any received data. */
-			packet_process_incoming(buf, len);
+			ssh_packet_process_incoming(ssh, buf, len);
 		}
 	}
 	if (compat20)
@@ -435,12 +446,12 @@ process_input(fd_set *readset)
  * Sends data from internal buffers to client program stdin.
  */
 static void
-process_output(fd_set *writeset)
+process_output(struct ssh *ssh, fd_set *writeset)
 {
 	struct termios tio;
 	u_char *data;
 	u_int dlen;
-	int len;
+	int r, len;
 
 	/* Write buffered data to program stdin. */
 	if (!compat20 && fdin != -1 && FD_ISSET(fdin, writeset)) {
@@ -464,8 +475,9 @@ process_output(fd_set *writeset)
 				 * Simulate echo to reduce the impact of
 				 * traffic analysis
 				 */
-				packet_send_ignore(len);
-				packet_send();
+				ssh_packet_send_ignore(ssh, len);
+				if ((r = sshpkt_send(ssh)) != 0)
+					fatal("%s: %s", __func__, ssh_err(r));
 			}
 			/* Consume the data from the buffer. */
 			buffer_consume(&stdin_buffer, len);
@@ -475,7 +487,7 @@ process_output(fd_set *writeset)
 	}
 	/* Send any buffered packet data to the client. */
 	if (FD_ISSET(connection_out, writeset))
-		packet_write_poll();
+		ssh_packet_write_poll(ssh);
 }
 
 /*
@@ -483,28 +495,31 @@ process_output(fd_set *writeset)
  * This is used when the program terminates.
  */
 static void
-drain_output(void)
+drain_output(struct ssh *ssh)
 {
+	int r;
+
 	/* Send any buffered stdout data to the client. */
 	if (buffer_len(&stdout_buffer) > 0) {
-		packet_start(SSH_SMSG_STDOUT_DATA);
-		packet_put_string(buffer_ptr(&stdout_buffer),
-				  buffer_len(&stdout_buffer));
-		packet_send();
+		if ((r = sshpkt_start(ssh, SSH_SMSG_STDOUT_DATA)) != 0 ||
+		    (r = sshpkt_put_string(ssh, buffer_ptr(&stdout_buffer),
+		    buffer_len(&stdout_buffer))) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		/* Update the count of sent bytes. */
 		stdout_bytes += buffer_len(&stdout_buffer);
 	}
 	/* Send any buffered stderr data to the client. */
 	if (buffer_len(&stderr_buffer) > 0) {
-		packet_start(SSH_SMSG_STDERR_DATA);
-		packet_put_string(buffer_ptr(&stderr_buffer),
-				  buffer_len(&stderr_buffer));
-		packet_send();
+		if ((r = sshpkt_start(ssh, SSH_SMSG_STDERR_DATA)) != 0 ||
+		    (r = sshpkt_put_string(ssh, buffer_ptr(&stderr_buffer),
+		    buffer_len(&stderr_buffer))) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
 		/* Update the count of sent bytes. */
 		stderr_bytes += buffer_len(&stderr_buffer);
 	}
 	/* Wait until all buffered data has been written to the client. */
-	packet_write_wait();
+	ssh_packet_write_wait(ssh);
 }
 
 static void
@@ -526,6 +541,7 @@ process_buffered_input_packets(struct ssh *ssh)
 void
 server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 {
+	struct ssh *ssh = active_state; /* XXX */
 	fd_set *readset = NULL, *writeset = NULL;
 	int max_fd = 0;
 	u_int nalloc = 0;
@@ -535,7 +551,7 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 	u_int max_time_milliseconds;
 	u_int previous_stdout_buffer_bytes;
 	u_int stdout_buffer_bytes;
-	int type;
+	int r, type;
 
 	debug("Entering interactive session.");
 
@@ -561,18 +577,18 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 	if (fderr != -1)
 		set_nonblock(fderr);
 
-	if (!(active_state->compat & SSH_BUG_IGNOREMSG) && isatty(fdin))
+	if (!(ssh->compat & SSH_BUG_IGNOREMSG) && isatty(fdin))
 		fdin_is_tty = 1;
 
-	connection_in = packet_get_connection_in();
-	connection_out = packet_get_connection_out();
+	connection_in = ssh_packet_get_connection_in(ssh);
+	connection_out = ssh_packet_get_connection_out(ssh);
 
 	notify_setup();
 
 	previous_stdout_buffer_bytes = 0;
 
 	/* Set approximate I/O buffer size. */
-	if (packet_is_interactive())
+	if (ssh_packet_is_interactive(ssh))
 		buffer_high = 4096;
 	else
 		buffer_high = 64 * 1024;
@@ -600,13 +616,13 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 	if (fderr == -1)
 		fderr_eof = 1;
 
-	server_init_dispatch(active_state);
+	server_init_dispatch(ssh);
 
 	/* Main loop of the server for the interactive session mode. */
 	for (;;) {
 
 		/* Process buffered packets from the client. */
-		process_buffered_input_packets(active_state);
+		process_buffered_input_packets(ssh);
 
 		/*
 		 * If we have received eof, and there is no more pending
@@ -620,7 +636,7 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 			fdin = -1;
 		}
 		/* Make packets from buffered stderr data to send to the client. */
-		make_packets_from_stderr_data();
+		make_packets_from_stderr_data(ssh);
 
 		/*
 		 * Make packets from buffered stdout data to send to the
@@ -637,12 +653,12 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 			max_time_milliseconds = 10;
 		} else {
 			/* Send it now. */
-			make_packets_from_stdout_data();
+			make_packets_from_stdout_data(ssh);
 		}
 		previous_stdout_buffer_bytes = buffer_len(&stdout_buffer);
 
 		/* Send channel data to the client. */
-		if (packet_not_very_much_data_to_write())
+		if (ssh_packet_not_very_much_data_to_write(ssh))
 			channel_output_poll();
 
 		/*
@@ -650,7 +666,7 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 		 * descriptors, and we have no more data to send to the
 		 * client, and there is no pending buffered data.
 		 */
-		if (fdout_eof && fderr_eof && !packet_have_data_to_write() &&
+		if (fdout_eof && fderr_eof && !ssh_packet_have_data_to_write(ssh) &&
 		    buffer_len(&stdout_buffer) == 0 && buffer_len(&stderr_buffer) == 0) {
 			if (!channel_still_open())
 				break;
@@ -686,10 +702,10 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 		channel_after_select(readset, writeset);
 
 		/* Process input from the client and from program stdout/stderr. */
-		process_input(readset);
+		process_input(ssh, readset);
 
 		/* Process output to the client and to program stdin. */
-		process_output(writeset);
+		process_output(ssh, writeset);
 	}
 	if (readset)
 		xfree(readset);
@@ -699,7 +715,7 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 	/* Cleanup and termination code. */
 
 	/* Wait until all output has been sent to the client. */
-	drain_output();
+	drain_output(ssh);
 
 	debug("End of interactive session; stdin %ld, stdout (read %ld, sent %ld), stderr %ld bytes.",
 	    stdin_bytes, fdout_bytes, stdout_bytes, stderr_bytes);
@@ -729,7 +745,7 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 
 	while ((wait_pid = waitpid(-1, &wait_status, 0)) < 0)
 		if (errno != EINTR)
-			packet_disconnect("wait: %.100s", strerror(errno));
+			ssh_packet_disconnect(ssh, "wait: %.100s", strerror(errno));
 	if (wait_pid != pid)
 		error("Strange, wait returned pid %ld, expected %ld",
 		    (long)wait_pid, (long)pid);
@@ -738,10 +754,11 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 	if (WIFEXITED(wait_status)) {
 		/* Yes, normal exit.  Get exit status and send it to the client. */
 		debug("Command exited with status %d.", WEXITSTATUS(wait_status));
-		packet_start(SSH_SMSG_EXITSTATUS);
-		packet_put_int(WEXITSTATUS(wait_status));
-		packet_send();
-		packet_write_wait();
+		if ((r = sshpkt_start(ssh, SSH_SMSG_EXITSTATUS)) != 0 ||
+		    (r = sshpkt_put_u32(ssh, WEXITSTATUS(wait_status))) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
+		ssh_packet_write_wait(ssh);
 
 		/*
 		 * Wait for exit confirmation.  Note that there might be
@@ -751,7 +768,7 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 		 * the exit status.
 		 */
 		do {
-			type = packet_read();
+			type = ssh_packet_read(ssh);
 		}
 		while (type != SSH_CMSG_EXIT_CONFIRMATION);
 
@@ -760,11 +777,11 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 	}
 	/* Check if the program terminated due to a signal. */
 	if (WIFSIGNALED(wait_status))
-		packet_disconnect("Command terminated on signal %d.",
-				  WTERMSIG(wait_status));
+		ssh_packet_disconnect(ssh, "Command terminated on signal %d.",
+		    WTERMSIG(wait_status));
 
 	/* Some weird exit cause.  Just exit. */
-	packet_disconnect("wait returned status %04x.", wait_status);
+	ssh_packet_disconnect(ssh, "wait returned status %04x.", wait_status);
 	/* NOTREACHED */
 }
 
@@ -793,6 +810,7 @@ collect_children(void)
 void
 server_loop2(Authctxt *authctxt)
 {
+	struct ssh *ssh = active_state;	/* XXX */
 	fd_set *readset = NULL, *writeset = NULL;
 	int r, rekeying = 0, max_fd, nalloc = 0;
 
@@ -800,8 +818,8 @@ server_loop2(Authctxt *authctxt)
 
 	signal(SIGCHLD, sigchld_handler);
 	child_terminated = 0;
-	connection_in = packet_get_connection_in();
-	connection_out = packet_get_connection_out();
+	connection_in = ssh_packet_get_connection_in(ssh);
+	connection_out = ssh_packet_get_connection_out(ssh);
 
 	if (!use_privsep) {
 		signal(SIGTERM, sigterm_handler);
@@ -814,15 +832,15 @@ server_loop2(Authctxt *authctxt)
 	max_fd = MAX(connection_in, connection_out);
 	max_fd = MAX(max_fd, notify_pipe[0]);
 
-	server_init_dispatch(active_state);
+	server_init_dispatch(ssh);
 
 	for (;;) {
-		process_buffered_input_packets(active_state);
+		process_buffered_input_packets(ssh);
 
-		rekeying = (active_state->kex != NULL &&
-			    !active_state->kex->done);
+		rekeying = (ssh->kex != NULL &&
+			    !ssh->kex->done);
 
-		if (!rekeying && packet_not_very_much_data_to_write())
+		if (!rekeying && ssh_packet_not_very_much_data_to_write(ssh))
 			channel_output_poll();
 		wait_until_can_do_something(&readset, &writeset, &max_fd,
 		    &nalloc, 0);
@@ -836,19 +854,19 @@ server_loop2(Authctxt *authctxt)
 		collect_children();
 		if (!rekeying) {
 			channel_after_select(readset, writeset);
-			if (packet_need_rekeying()) {
+			if (ssh_packet_need_rekeying(ssh)) {
 				debug("need rekeying");
-				active_state->kex->done = 0;
-				if ((r = kex_send_kexinit(active_state)) != 0) {
+				ssh->kex->done = 0;
+				if ((r = kex_send_kexinit(ssh)) != 0) {
 					fatal("%s: kex_send_kexinit: %s",
 					    __func__, ssh_err(r));
 				}
 			}
 		}
-		process_input(readset);
+		process_input(ssh, readset);
 		if (connection_closed)
 			break;
-		process_output(writeset);
+		process_output(ssh, writeset);
 	}
 	collect_children();
 
@@ -873,69 +891,83 @@ server_input_keep_alive(int type, u_int32_t seq, struct ssh *ssh)
 	 * even if this was generated by something other than
 	 * the bogus CHANNEL_REQUEST we send for keepalives.
 	 */
-	packet_set_alive_timeouts(0);
+	ssh_packet_set_alive_timeouts(ssh, 0);
 	return 0;
 }
 
 static int
 server_input_stdin_data(int type, u_int32_t seq, struct ssh *ssh)
 {
-	char *data;
-	u_int data_len;
+	u_char *data = NULL;
+	size_t data_len;
+	int r;
 
 	/* Stdin data from the client.  Append it to the buffer. */
 	/* Ignore any data if the client has closed stdin. */
 	if (fdin == -1)
 		return 0;
-	data = packet_get_string(&data_len);
-	packet_check_eom();
+	if ((r = sshpkt_get_string(ssh, &data, &data_len)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		goto out;
 	buffer_append(&stdin_buffer, data, data_len);
-	memset(data, 0, data_len);
-	xfree(data);
-	return 0;
+	r = 0;
+ out:
+	if (data) {
+		memset(data, 0, data_len);
+		free(data);
+	}
+	return r;
 }
 
 static int
 server_input_eof(int type, u_int32_t seq, struct ssh *ssh)
 {
+	int r;
+
 	/*
 	 * Eof from the client.  The stdin descriptor to the
 	 * program will be closed when all buffered data has
 	 * drained.
 	 */
 	debug("EOF received for stdin.");
-	packet_check_eom();
+	r = sshpkt_get_end(ssh);
 	stdin_eof = 1;
-	return 0;
+	return r;
 }
 
 static int
 server_input_window_size(int type, u_int32_t seq, struct ssh *ssh)
 {
-	u_int row = packet_get_int();
-	u_int col = packet_get_int();
-	u_int xpixel = packet_get_int();
-	u_int ypixel = packet_get_int();
+	u_int row, col, xpixel, ypixel;
+	int r;
+
+	if ((r = sshpkt_get_u32(ssh, &row)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &col)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &xpixel)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &ypixel)) != 0 ||
+	    (r = sshpkt_get_end(ssh)))
+		return r;
 
 	debug("Window change received.");
-	packet_check_eom();
 	if (fdin != -1)
 		pty_change_window_size(fdin, row, col, xpixel, ypixel);
 	return 0;
 }
 
 static Channel *
-server_request_direct_tcpip(void)
+server_request_direct_tcpip(struct ssh *ssh)
 {
 	Channel *c;
 	char *target, *originator;
-	u_short target_port, originator_port;
+	u_int target_port, originator_port;
+	int r;
 
-	target = packet_get_string(NULL);
-	target_port = packet_get_int();
-	originator = packet_get_string(NULL);
-	originator_port = packet_get_int();
-	packet_check_eom();
+	if ((r = sshpkt_get_cstring(ssh, &target, NULL)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &target_port)) != 0 ||
+	    (r = sshpkt_get_cstring(ssh, &originator, NULL)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &originator_port)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	debug("server_request_direct_tcpip: originator %s port %d, target %s "
 	    "port %d", originator, originator_port, target, target_port);
@@ -951,28 +983,27 @@ server_request_direct_tcpip(void)
 }
 
 static Channel *
-server_request_tun(void)
+server_request_tun(struct ssh *ssh)
 {
 	Channel *c = NULL;
-	int mode, tun;
-	int sock;
+	int r, mode, tun, sock;
 
-	mode = packet_get_int();
+	if ((r = sshpkt_get_u32(ssh, &mode)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &tun)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	switch (mode) {
 	case SSH_TUNMODE_POINTOPOINT:
 	case SSH_TUNMODE_ETHERNET:
 		break;
 	default:
-		packet_send_debug("Unsupported tunnel device mode.");
+		ssh_packet_send_debug(ssh, "Unsupported tunnel device mode.");
 		return NULL;
 	}
 	if ((options.permit_tun & mode) == 0) {
-		packet_send_debug("Server has rejected tunnel device "
+		ssh_packet_send_debug(ssh, "Server has rejected tunnel device "
 		    "forwarding");
 		return NULL;
 	}
-
-	tun = packet_get_int();
 	if (forced_tun_device != -1) {
 		if (tun != SSH_TUNID_ANY && forced_tun_device != tun)
 			goto done;
@@ -987,20 +1018,23 @@ server_request_tun(void)
 
  done:
 	if (c == NULL)
-		packet_send_debug("Failed to open the tunnel device.");
+		ssh_packet_send_debug(ssh, "Failed to open the tunnel device.");
 	return c;
 }
 
 static Channel *
-server_request_session(void)
+server_request_session(struct ssh *ssh)
 {
 	Channel *c;
+	int r;
 
 	debug("input_session_request");
-	packet_check_eom();
+	if ((r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	if (no_more_sessions) {
-		packet_disconnect("Possible attack: attempt to open a session "
+		ssh_packet_disconnect(ssh,
+		    "Possible attack: attempt to open a session "
 		    "after additional sessions disabled");
 	}
 
@@ -1026,24 +1060,26 @@ static int
 server_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
-	char *ctype;
-	int rchan;
-	u_int rmaxpack, rwindow, len;
+	char *ctype = 0;
+	int r, rchan;
+	u_int rmaxpack, rwindow;
+	size_t len;
 
-	ctype = packet_get_string(&len);
-	rchan = packet_get_int();
-	rwindow = packet_get_int();
-	rmaxpack = packet_get_int();
+	if ((r = sshpkt_get_cstring(ssh, &ctype, &len)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &rchan)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &rwindow)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &rmaxpack)) != 0)
+		goto out;
 
 	debug("server_input_channel_open: ctype %s rchan %d win %d max %d",
 	    ctype, rchan, rwindow, rmaxpack);
 
 	if (strcmp(ctype, "session") == 0) {
-		c = server_request_session();
+		c = server_request_session(ssh);
 	} else if (strcmp(ctype, "direct-tcpip") == 0) {
-		c = server_request_direct_tcpip();
+		c = server_request_direct_tcpip(ssh);
 	} else if (strcmp(ctype, "tun@openssh.com") == 0) {
-		c = server_request_tun();
+		c = server_request_tun(ssh);
 	}
 	if (c != NULL) {
 		debug("server_input_channel_open: confirm %s", ctype);
@@ -1051,50 +1087,58 @@ server_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 		c->remote_window = rwindow;
 		c->remote_maxpacket = rmaxpack;
 		if (c->type != SSH_CHANNEL_CONNECTING) {
-			packet_start(SSH2_MSG_CHANNEL_OPEN_CONFIRMATION);
-			packet_put_int(c->remote_id);
-			packet_put_int(c->self);
-			packet_put_int(c->local_window);
-			packet_put_int(c->local_maxpacket);
-			packet_send();
+			if ((r = sshpkt_start(ssh,
+			    SSH2_MSG_CHANNEL_OPEN_CONFIRMATION)) != 0 ||
+			    (r = sshpkt_put_u32(ssh, c->remote_id)) != 0 ||
+			    (r = sshpkt_put_u32(ssh, c->self)) != 0 ||
+			    (r = sshpkt_put_u32(ssh, c->local_window)) != 0 ||
+			    (r = sshpkt_put_u32(ssh, c->local_maxpacket)) != 0||
+			    (r = sshpkt_send(ssh)) != 0)
+				goto out;
 		}
 	} else {
 		debug("server_input_channel_open: failure %s", ctype);
-		packet_start(SSH2_MSG_CHANNEL_OPEN_FAILURE);
-		packet_put_int(rchan);
-		packet_put_int(SSH2_OPEN_ADMINISTRATIVELY_PROHIBITED);
-		if (!(ssh->compat & SSH_BUG_OPENFAILURE)) {
-			packet_put_cstring("open failed");
-			packet_put_cstring("");
-		}
-		packet_send();
+		if ((r = sshpkt_start(ssh, SSH2_MSG_CHANNEL_OPEN_FAILURE)) != 0 ||
+		    (r = sshpkt_put_u32(ssh, rchan)) != 0 ||
+		    (r = sshpkt_put_u32(ssh,
+		    SSH2_OPEN_ADMINISTRATIVELY_PROHIBITED)) != 0 ||
+		    (!(ssh->compat & SSH_BUG_OPENFAILURE) &&
+		    (r = sshpkt_put_cstring(ssh, "open failed")) != 0) ||
+		    (!(ssh->compat & SSH_BUG_OPENFAILURE) &&
+		    (r = sshpkt_put_cstring(ssh, "")) != 0) ||
+		    (r = sshpkt_send(ssh)) != 0)
+			goto out;
 	}
-	xfree(ctype);
-	return 0;
+	r = 0;
+ out:
+	if (ctype)
+		free(ctype);
+	return r;
 }
 
 static int
 server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 {
-	char *rtype;
-	int want_reply;
-	int success = 0, allocated_listen_port = 0;
+	char *rtype = NULL, *listen_address = NULL, *cancel_address = NULL;
+	char want_reply;
+	u_int listen_port, cancel_port;
+	int r, success = 0, allocated_listen_port = 0;
 
-	rtype = packet_get_string(NULL);
-	want_reply = packet_get_char();
+	if ((r = sshpkt_get_cstring(ssh, &rtype, NULL)) != 0 ||
+	    (r = sshpkt_get_u8(ssh, &want_reply)) != 0)
+		goto out;
 	debug("server_input_global_request: rtype %s want_reply %d", rtype, want_reply);
 
 	/* -R style forwarding */
 	if (strcmp(rtype, "tcpip-forward") == 0) {
 		struct passwd *pw;
-		char *listen_address;
-		u_short listen_port;
 
 		pw = the_authctxt->pw;
 		if (pw == NULL || !the_authctxt->valid)
 			fatal("server_input_global_request: no/invalid user");
-		listen_address = packet_get_string(NULL);
-		listen_port = (u_short)packet_get_int();
+		if ((r = sshpkt_get_cstring(ssh, &listen_address, NULL)) != 0 ||
+		    (r = sshpkt_get_u32(ssh, &listen_port)) != 0)
+			goto out;
 		debug("server_input_global_request: tcpip-forward listen %s port %d",
 		    listen_address, listen_port);
 
@@ -1105,73 +1149,83 @@ server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 		    (listen_port != 0 && listen_port < IPPORT_RESERVED &&
 		    pw->pw_uid != 0)) {
 			success = 0;
-			packet_send_debug("Server has disabled port forwarding.");
+			ssh_packet_send_debug(ssh,
+			    "Server has disabled port forwarding.");
 		} else {
 			/* Start listening on the port */
 			success = channel_setup_remote_fwd_listener(
 			    listen_address, listen_port,
 			    &allocated_listen_port, options.gateway_ports);
 		}
-		xfree(listen_address);
 	} else if (strcmp(rtype, "cancel-tcpip-forward") == 0) {
-		char *cancel_address;
-		u_short cancel_port;
-
-		cancel_address = packet_get_string(NULL);
-		cancel_port = (u_short)packet_get_int();
+		if ((r = sshpkt_get_cstring(ssh, &cancel_address, NULL)) != 0 ||
+		    (r = sshpkt_get_u32(ssh, &cancel_port)) != 0)
+			goto out;
 		debug("%s: cancel-tcpip-forward addr %s port %d", __func__,
 		    cancel_address, cancel_port);
-
 		success = channel_cancel_rport_listener(cancel_address,
 		    cancel_port);
-		xfree(cancel_address);
 	} else if (strcmp(rtype, "no-more-sessions@openssh.com") == 0) {
 		no_more_sessions = 1;
 		success = 1;
 	}
 	if (want_reply) {
-		packet_start(success ?
-		    SSH2_MSG_REQUEST_SUCCESS : SSH2_MSG_REQUEST_FAILURE);
-		if (success && allocated_listen_port > 0)
-			packet_put_int(allocated_listen_port);
-		packet_send();
-		packet_write_wait();
+		if ((r = sshpkt_start(ssh, success ?
+		    SSH2_MSG_REQUEST_SUCCESS : SSH2_MSG_REQUEST_FAILURE)) != 0 ||
+		    (success && allocated_listen_port > 0 &&
+		    (r = sshpkt_put_u32(ssh, allocated_listen_port)) != 0) ||
+		    (r = sshpkt_send(ssh)) != 0) 
+			goto out;
+		ssh_packet_write_wait(ssh);
 	}
-	xfree(rtype);
-	return 0;
+	r = 0;
+ out:
+	if (rtype)
+		free(rtype);
+	if (listen_address)
+		free(listen_address);
+	if (cancel_address)
+		free(cancel_address);
+	return r;
 }
 
 static int
 server_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c;
-	int id, reply, success = 0;
-	char *rtype;
+	int r, id, success = 0;
+	char *rtype = NULL, reply;
 
-	id = packet_get_int();
-	rtype = packet_get_string(NULL);
-	reply = packet_get_char();
+	if ((r = sshpkt_get_u32(ssh, &id)) != 0 ||
+	    (r = sshpkt_get_cstring(ssh, &rtype, NULL)) != 0 ||
+	    (r = sshpkt_get_u8(ssh, &reply)) != 0)
+		goto out;
 
 	debug("server_input_channel_req: channel %d request %s reply %d",
 	    id, rtype, reply);
 
 	if ((c = channel_lookup(id)) == NULL)
-		packet_disconnect("server_input_channel_req: "
+		ssh_packet_disconnect(ssh, "server_input_channel_req: "
 		    "unknown channel %d", id);
 	if (!strcmp(rtype, "eow@openssh.com")) {
-		packet_check_eom();
+		if ((r = sshpkt_get_end(ssh)) != 0)
+			goto out;
 		chan_rcvd_eow(c);
 	} else if ((c->type == SSH_CHANNEL_LARVAL ||
 	    c->type == SSH_CHANNEL_OPEN) && strcmp(c->ctype, "session") == 0)
 		success = session_input_channel_req(c, rtype);
 	if (reply) {
-		packet_start(success ?
-		    SSH2_MSG_CHANNEL_SUCCESS : SSH2_MSG_CHANNEL_FAILURE);
-		packet_put_int(c->remote_id);
-		packet_send();
+		if ((r = sshpkt_start(ssh, success ? SSH2_MSG_CHANNEL_SUCCESS :
+		    SSH2_MSG_CHANNEL_FAILURE)) != 0 ||
+		    (r = sshpkt_put_u32(ssh, c->remote_id)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			goto out;
 	}
-	xfree(rtype);
-	return 0;
+	r = 0;
+ out:
+	if (rtype)
+		free(rtype);
+	return r;
 }
 
 static void
