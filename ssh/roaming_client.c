@@ -37,6 +37,8 @@
 #include "log.h"
 #include "match.h"
 #include "misc.h"
+#define PACKET_SKIP_COMPAT
+#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "ssh.h"
 #include "key.h"
@@ -45,6 +47,7 @@
 #include "roaming.h"
 #include "ssh2.h"
 #include "sshconnect.h"
+#include "err.h"
 
 /* import */
 extern Options options;
@@ -60,32 +63,43 @@ static u_int64_t key1, key2, oldkey1, oldkey2;
 void
 roaming_reply(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 {
+	struct ssh *ssh = ctxt;
+	u_int size;
+	int r;
+
 	if (type == SSH2_MSG_REQUEST_FAILURE) {
 		logit("Server denied roaming");
 		return;
 	}
 	verbose("Roaming enabled");
-	roaming_id = packet_get_int();
-	cookie = packet_get_int64();
-	key1 = oldkey1 = packet_get_int64();
-	key2 = oldkey2 = packet_get_int64();
-	set_out_buffer_size(packet_get_int() + get_snd_buf_size());
+	if ((r = sshpkt_get_u32(ssh, &roaming_id)) != 0 ||
+	    (r = sshpkt_get_u64(ssh, &cookie)) != 0 ||
+	    (r = sshpkt_get_u64(ssh, &oldkey1)) != 0 ||
+	    (r = sshpkt_get_u64(ssh, &oldkey2)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &size)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	key1 = oldkey1;
+	key2 = oldkey2;
+	set_out_buffer_size(size + get_snd_buf_size());
 	roaming_enabled = 1;
 }
 
 void
-request_roaming(void)
+request_roaming(struct ssh *ssh)
 {
-	packet_start(SSH2_MSG_GLOBAL_REQUEST);
-	packet_put_cstring(ROAMING_REQUEST);
-	packet_put_char(1);
-	packet_put_int(get_recv_buf_size());
-	packet_send();
-	client_register_global_confirm(roaming_reply, NULL);
+	int r;
+
+	if ((r = sshpkt_start(ssh, SSH2_MSG_GLOBAL_REQUEST)) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, ROAMING_REQUEST)) != 0 ||
+	    (r = sshpkt_put_u8(ssh, 1)) != 0 ||
+	    (r = sshpkt_put_u32(ssh, get_recv_buf_size())) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	client_register_global_confirm(roaming_reply, ssh);
 }
 
 static void
-roaming_auth_required(void)
+roaming_auth_required(struct ssh *ssh)
 {
 	u_char digest[SHA_DIGEST_LENGTH];
 	EVP_MD_CTX md;
@@ -94,8 +108,10 @@ roaming_auth_required(void)
 	u_int64_t chall, oldchall;
 	int r;
 
-	chall = packet_get_int64();
-	oldchall = packet_get_int64();
+	if ((r = sshpkt_get_u64(ssh, &chall)) != 0 ||
+	    (r = sshpkt_get_u64(ssh, &oldchall)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+
 	if (oldchall != lastseenchall) {
 		key1 = oldkey1;
 		key2 = oldkey2;
@@ -113,10 +129,11 @@ roaming_auth_required(void)
 	EVP_DigestFinal(&md, digest, NULL);
 	sshbuf_free(b);
 
-	packet_start(SSH2_MSG_KEX_ROAMING_AUTH);
-	packet_put_int64(key1 ^ get_recv_bytes());
-	packet_put_raw(digest, sizeof(digest));
-	packet_send();
+	if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ROAMING_AUTH)) != 0 ||
+	    (r = sshpkt_put_u64(ssh, key1 ^ get_recv_bytes())) != 0 ||
+	    (r = sshpkt_put(ssh, digest, sizeof(digest))) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	oldkey1 = key1;
 	oldkey2 = key2;
@@ -143,10 +160,10 @@ roaming_resume(void)
 	struct ssh *ssh = active_state;	/* XXX */
 	u_int64_t recv_bytes;
 	char *str = NULL, *kexlist = NULL, *c;
-	int i, type;
+	int r = 0, i, type;
 	int timeout_ms = options.connection_timeout * 1000;
-	u_int len;
 	u_int32_t rnd = 0;
+	u_char first_kex_packet_follows, kex_cookie[KEX_COOKIE_LEN];
 
 	resume_in_progress = 1;
 
@@ -155,71 +172,78 @@ roaming_resume(void)
 	ssh_packet_set_nonblocking(ssh);
 
 	/* Send a kexinit message with resume@appgate.com as only kex algo */
-	packet_start(SSH2_MSG_KEXINIT);
-	for (i = 0; i < KEX_COOKIE_LEN; i++) {
-		if (i % 4 == 0)
-			rnd = arc4random();
-		packet_put_char(rnd & 0xff);
-		rnd >>= 8;
-	}
-	packet_put_cstring(KEX_RESUME);
+	arc4random_buf(kex_cookie, KEX_COOKIE_LEN);
+	if ((r = sshpkt_start(ssh, SSH2_MSG_KEXINIT)) != 0 ||
+	    (r = sshpkt_put_u8(ssh, rnd & 0xff)) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, KEX_RESUME)) != 0)
+		goto fail;
 	for (i = 1; i < PROPOSAL_MAX; i++) {
 		/* kex algorithm added so start with i=1 and not 0 */
-		packet_put_cstring(""); /* Not used when we resume */
+		/* Not used when we resume */
+		if ((r = sshpkt_put_cstring(ssh, "")) != 0)
+			goto fail;
 	}
-	packet_put_char(1); /* first kex_packet follows */
-	packet_put_int(0); /* reserved */
-	packet_send();
+	if ((r = sshpkt_put_u8(ssh, 1)) != 0 || /* first kex_packet follows */
+	    (r = sshpkt_put_u32(ssh, 0)) != 0 || /* reserved */
+	    (r = sshpkt_send(ssh)) != 0)
+		goto fail;
 
 	/* Assume that resume@appgate.com will be accepted */
-	packet_start(SSH2_MSG_KEX_ROAMING_RESUME);
-	packet_put_int(roaming_id);
-	packet_send();
+	if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ROAMING_RESUME)) != 0 ||
+	    (r = sshpkt_put_u32(ssh, roaming_id)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		goto fail;
 
 	/* Read the server's kexinit and check for resume@appgate.com */
-	if ((type = packet_read()) != SSH2_MSG_KEXINIT) {
+	if ((type = ssh_packet_read(ssh)) != SSH2_MSG_KEXINIT) {
 		debug("expected kexinit on resume, got %d", type);
 		goto fail;
 	}
 	for (i = 0; i < KEX_COOKIE_LEN; i++)
-		(void)packet_get_char();
-	kexlist = packet_get_string(&len);
+		if ((r = sshpkt_get_u8(ssh, NULL)) != 0)
+			goto fail;
+	if ((r = sshpkt_get_cstring(ssh, &kexlist, NULL)) != 0)
+		goto fail;
 	if (!kexlist
 	    || (str = match_list(KEX_RESUME, kexlist, NULL)) == NULL) {
 		debug("server doesn't allow resume");
 		goto fail;
 	}
 	xfree(str);
-	for (i = 1; i < PROPOSAL_MAX; i++) {
-		/* kex algorithm taken care of so start with i=1 and not 0 */
-		xfree(packet_get_string(&len));
-	}
-	i = packet_get_char(); /* first_kex_packet_follows */
-	if (i && (c = strchr(kexlist, ',')))
+	/* kex algorithm taken care of so start with i=1 and not 0 */
+	for (i = 1; i < PROPOSAL_MAX; i++)
+		if ((r = sshpkt_get_string(ssh, NULL, NULL)) != 0)
+			goto fail;
+	if ((r = sshpkt_get_u8(ssh, &first_kex_packet_follows)) != 0)
+		goto fail;
+	if (first_kex_packet_follows && (c = strchr(kexlist, ',')))
 		*c = 0;
-	if (i && strcmp(kexlist, KEX_RESUME)) {
+	if (first_kex_packet_follows && strcmp(kexlist, KEX_RESUME)) {
 		debug("server's kex guess (%s) was wrong, skipping", kexlist);
-		(void)packet_read(); /* Wrong guess - discard packet */
+		ssh_packet_read(ssh); /* Wrong guess - discard packet */
 	}
 
 	/*
 	 * Read the ROAMING_AUTH_REQUIRED challenge from the server and
 	 * send ROAMING_AUTH
 	 */
-	if ((type = packet_read()) != SSH2_MSG_KEX_ROAMING_AUTH_REQUIRED) {
+	if ((type = ssh_packet_read(ssh)) != SSH2_MSG_KEX_ROAMING_AUTH_REQUIRED) {
 		debug("expected roaming_auth_required, got %d", type);
 		goto fail;
 	}
-	roaming_auth_required();
+	roaming_auth_required(ssh);
 
 	/* Read ROAMING_AUTH_OK from the server */
-	if ((type = packet_read()) != SSH2_MSG_KEX_ROAMING_AUTH_OK) {
+	if ((type = ssh_packet_read(ssh)) != SSH2_MSG_KEX_ROAMING_AUTH_OK) {
 		debug("expected roaming_auth_ok, got %d", type);
 		goto fail;
 	}
-	recv_bytes = packet_get_int64() ^ oldkey2;
+	if ((r = sshpkt_get_u64(ssh, &recv_bytes)) != 0)
+		goto fail;
+	recv_bytes = recv_bytes ^ oldkey2;
+
 	debug("Peer received %llu bytes", (unsigned long long)recv_bytes);
-	resend_bytes(packet_get_connection_out(), &recv_bytes);
+	resend_bytes(ssh_packet_get_connection_out(ssh), &recv_bytes);
 
 	resume_in_progress = 0;
 
@@ -228,13 +252,16 @@ roaming_resume(void)
 	return 0;
 
 fail:
+	if (r != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	if (kexlist)
 		xfree(kexlist);
-	if (packet_get_connection_in() == packet_get_connection_out())
-		close(packet_get_connection_in());
+	if (ssh_packet_get_connection_in(ssh) ==
+	    ssh_packet_get_connection_out(ssh))
+		close(ssh_packet_get_connection_in(ssh));
 	else {
-		close(packet_get_connection_in());
-		close(packet_get_connection_out());
+		close(ssh_packet_get_connection_in(ssh));
+		close(ssh_packet_get_connection_out(ssh));
 	}
 	return 1;
 }
@@ -253,7 +280,7 @@ wait_for_roaming_reconnect(void)
 
 	fprintf(stderr, "[connection suspended, press return to resume]");
 	fflush(stderr);
-	packet_backup_state();
+	ssh_packet_backup_state(NULL, NULL);	/* XXX FIXME */
 	/* TODO Perhaps we should read from tty here */
 	while ((c = fgetc(stdin)) != EOF) {
 		if (c == 'Z' - 64) {
@@ -268,8 +295,7 @@ wait_for_roaming_reconnect(void)
 		    options.tcp_keep_alive, options.use_privileged_port,
 		    options.proxy_command);
 		if (nssh && roaming_resume()) {
-			packet_restore_state();	/* XXX FIXME */
-
+			ssh_packet_restore_state(NULL, NULL); /* XXX FIXME */
 			reenter_guard = 0;
 			fprintf(stderr, "[connection resumed]\n");
 			fflush(stderr);

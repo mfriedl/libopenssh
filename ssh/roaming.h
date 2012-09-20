@@ -26,8 +26,9 @@ struct ssh;
 
 extern int roaming_enabled;
 extern int resume_in_progress;
+struct ssh;
 
-void	request_roaming(void);
+void	request_roaming(struct ssh *ssh);
 int	get_snd_buf_size(void);
 int	get_recv_buf_size(void);
 void	add_recv_bytes(u_int64_t);

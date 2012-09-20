@@ -1487,7 +1487,7 @@ ssh_session2(struct ssh *ssh)
 	}
 
 	if (options.use_roaming)
-		request_roaming();
+		request_roaming(ssh);
 
 	return client_loop(ssh, tty_flag, tty_flag ?
 	    options.escape_char : SSH_ESCAPECHAR_NONE, id);
