@@ -21,6 +21,8 @@
 #include "xmalloc.h"
 #include "rsa.h"
 #include "ssh1.h"
+#define PACKET_SKIP_COMPAT
+#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "buffer.h"
 #include "log.h"
@@ -32,6 +34,7 @@
 #include "channels.h"
 #include "session.h"
 #include "uidswap.h"
+#include "err.h"
 #ifdef GSSAPI
 #include "ssh-gss.h"
 #endif
@@ -40,17 +43,17 @@
 /* import */
 extern ServerOptions options;
 
-static int auth1_process_password(Authctxt *, char *, size_t);
-static int auth1_process_rsa(Authctxt *, char *, size_t);
-static int auth1_process_rhosts_rsa(Authctxt *, char *, size_t);
-static int auth1_process_tis_challenge(Authctxt *, char *, size_t);
-static int auth1_process_tis_response(Authctxt *, char *, size_t);
+static int auth1_process_password(struct ssh *, char *, size_t);
+static int auth1_process_rsa(struct ssh *, char *, size_t);
+static int auth1_process_rhosts_rsa(struct ssh *, char *, size_t);
+static int auth1_process_tis_challenge(struct ssh *, char *, size_t);
+static int auth1_process_tis_response(struct ssh *, char *, size_t);
 
 struct AuthMethod1 {
 	int type;
 	char *name;
 	int *enabled;
-	int (*method)(Authctxt *, char *, size_t);
+	int (*method)(struct ssh *, char *, size_t);
 };
 
 const struct AuthMethod1 auth1_methods[] = {
@@ -105,19 +108,21 @@ get_authname(int type)
 
 /*ARGSUSED*/
 static int
-auth1_process_password(Authctxt *authctxt, char *info, size_t infolen)
+auth1_process_password(struct ssh *ssh, char *info, size_t infolen)
 {
-	int authenticated = 0;
+	Authctxt *authctxt = ssh->authctxt;
+	int r, authenticated = 0;
 	char *password;
-	u_int dlen;
+	size_t dlen;
 
 	/*
 	 * Read user password.  It is in plain text, but was
 	 * transmitted over the encrypted channel so it is
 	 * not visible to an outside observer.
 	 */
-	password = packet_get_string(&dlen);
-	packet_check_eom();
+	if ((r = sshpkt_get_cstring(ssh, &password, &dlen)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	/* Try authentication with the password. */
 	authenticated = PRIVSEP(auth_password(authctxt, password));
@@ -130,16 +135,19 @@ auth1_process_password(Authctxt *authctxt, char *info, size_t infolen)
 
 /*ARGSUSED*/
 static int
-auth1_process_rsa(Authctxt *authctxt, char *info, size_t infolen)
+auth1_process_rsa(struct ssh *ssh, char *info, size_t infolen)
 {
-	int authenticated = 0;
+	Authctxt *authctxt = ssh->authctxt;
+	int r, authenticated = 0;
 	BIGNUM *n;
 
 	/* RSA authentication requested. */
 	if ((n = BN_new()) == NULL)
 		fatal("do_authloop: BN_new failed");
-	packet_get_bignum(n);
-	packet_check_eom();
+	if ((r = sshpkt_get_bignum1(ssh, n)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+
 	authenticated = auth_rsa(authctxt, n);
 	BN_clear_free(n);
 
@@ -148,26 +156,30 @@ auth1_process_rsa(Authctxt *authctxt, char *info, size_t infolen)
 
 /*ARGSUSED*/
 static int
-auth1_process_rhosts_rsa(Authctxt *authctxt, char *info, size_t infolen)
+auth1_process_rhosts_rsa(struct ssh *ssh, char *info, size_t infolen)
 {
+	Authctxt *authctxt = ssh->authctxt;
 	int keybits, authenticated = 0;
 	u_int bits;
 	char *client_user;
 	struct sshkey *client_host_key;
-	u_int ulen;
+	int r;
 
 	/*
 	 * Get client user name.  Note that we just have to
 	 * trust the client; root on the client machine can
 	 * claim to be any user.
 	 */
-	client_user = packet_get_cstring(&ulen);
-
 	/* Get the client host key. */
 	client_host_key = sshkey_new(KEY_RSA1);
-	bits = packet_get_int();
-	packet_get_bignum(client_host_key->rsa->e);
-	packet_get_bignum(client_host_key->rsa->n);
+	if (client_host_key == NULL)
+		fatal("%s: sshkey_new", __func__);
+	if ((r = sshpkt_get_cstring(ssh, &client_user, NULL)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &bits)) != 0 ||
+	    (r = sshpkt_get_bignum1(ssh, client_host_key->rsa->e)) != 0 ||
+	    (r = sshpkt_get_bignum1(ssh, client_host_key->rsa->n)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	keybits = BN_num_bits(client_host_key->rsa->n);
 	if (keybits < 0 || bits != (u_int)keybits) {
@@ -175,7 +187,6 @@ auth1_process_rhosts_rsa(Authctxt *authctxt, char *info, size_t infolen)
 		    "actual %d, announced %d",
 		    BN_num_bits(client_host_key->rsa->n), bits);
 	}
-	packet_check_eom();
 
 	authenticated = auth_rhosts_rsa(authctxt, client_user,
 	    client_host_key);
@@ -189,33 +200,39 @@ auth1_process_rhosts_rsa(Authctxt *authctxt, char *info, size_t infolen)
 
 /*ARGSUSED*/
 static int
-auth1_process_tis_challenge(Authctxt *authctxt, char *info, size_t infolen)
+auth1_process_tis_challenge(struct ssh *ssh, char *info, size_t infolen)
 {
+	Authctxt *authctxt = ssh->authctxt;
 	char *challenge;
+	int r;
 
 	if ((challenge = get_challenge(authctxt)) == NULL)
 		return (0);
 
 	debug("sending challenge '%s'", challenge);
-	packet_start(SSH_SMSG_AUTH_TIS_CHALLENGE);
-	packet_put_cstring(challenge);
-	xfree(challenge);
-	packet_send();
-	packet_write_wait();
+	if ((r = sshpkt_start(ssh, SSH_SMSG_AUTH_TIS_CHALLENGE)) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, challenge)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	ssh_packet_write_wait(ssh);
 
+	free(challenge);
 	return (-1);
 }
 
 /*ARGSUSED*/
 static int
-auth1_process_tis_response(Authctxt *authctxt, char *info, size_t infolen)
+auth1_process_tis_response(struct ssh *ssh, char *info, size_t infolen)
 {
+	Authctxt *authctxt = ssh->authctxt;
 	int authenticated = 0;
 	char *response;
-	u_int dlen;
+	size_t dlen;
+	int r;
 
-	response = packet_get_string(&dlen);
-	packet_check_eom();
+	if ((r = sshpkt_get_cstring(ssh, &response, &dlen)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	authenticated = verify_response(authctxt, response);
 	memset(response, 'r', dlen);
 	xfree(response);
@@ -228,11 +245,12 @@ auth1_process_tis_response(Authctxt *authctxt, char *info, size_t infolen)
  * return only if authentication is successful
  */
 static void
-do_authloop(Authctxt *authctxt)
+do_authloop(struct ssh *ssh)
 {
+	Authctxt *authctxt = ssh->authctxt;
 	int authenticated = 0;
 	char info[1024];
-	int type = 0;
+	int r, type = 0;
 	const struct AuthMethod1 *meth;
 
 	debug("Attempting authentication for %s%.100s.",
@@ -249,9 +267,10 @@ do_authloop(Authctxt *authctxt)
 	}
 
 	/* Indicate that authentication is needed. */
-	packet_start(SSH_SMSG_FAILURE);
-	packet_send();
-	packet_write_wait();
+	if ((r = sshpkt_start(ssh, SSH_SMSG_FAILURE)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	ssh_packet_write_wait(ssh);
 
 	for (;;) {
 		/* default to fail */
@@ -260,7 +279,7 @@ do_authloop(Authctxt *authctxt)
 		info[0] = '\0';
 
 		/* Get a packet from the client. */
-		type = packet_read();
+		type = ssh_packet_read(ssh);
 		if (authctxt->failures >= options.max_authtries)
 			goto skip;
 		if ((meth = lookup_authmethod1(type)) == NULL) {
@@ -274,7 +293,7 @@ do_authloop(Authctxt *authctxt)
 			goto skip;
 		}
 
-		authenticated = meth->method(authctxt, info, sizeof(info));
+		authenticated = meth->method(ssh, info, sizeof(info));
 		if (authenticated == -1)
 			continue; /* "postponed" */
 
@@ -299,11 +318,12 @@ do_authloop(Authctxt *authctxt)
 			return;
 
 		if (++authctxt->failures >= options.max_authtries)
-			packet_disconnect(AUTH_FAIL_MSG, authctxt->user);
+			ssh_packet_disconnect(ssh, AUTH_FAIL_MSG, authctxt->user);
 
-		packet_start(SSH_SMSG_FAILURE);
-		packet_send();
-		packet_write_wait();
+		if ((r = sshpkt_start(ssh, SSH_SMSG_FAILURE)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
+		ssh_packet_write_wait(ssh);
 	}
 }
 
@@ -314,15 +334,19 @@ do_authloop(Authctxt *authctxt)
 void
 do_authentication(Authctxt *authctxt)
 {
-	u_int ulen;
+	struct ssh *ssh = active_state;		/* XXX */
 	char *user, *style = NULL;
+	int r;
+
+	ssh->authctxt = authctxt;		/* XXX move to caller */
 
 	/* Get the name of the user that we wish to log in as. */
-	packet_read_expect(SSH_CMSG_USER);
+	ssh_packet_read_expect(ssh, SSH_CMSG_USER);
 
 	/* Get the user name. */
-	user = packet_get_cstring(&ulen);
-	packet_check_eom();
+	if ((r = sshpkt_get_cstring(ssh, &user, NULL)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	if ((style = strchr(user, ':')) != NULL)
 		*style++ = '\0';
@@ -347,16 +371,18 @@ do_authentication(Authctxt *authctxt)
 	 */
 	if (!use_privsep && getuid() != 0 && authctxt->pw &&
 	    authctxt->pw->pw_uid != getuid())
-		packet_disconnect("Cannot change user when server not running as root.");
+		ssh_packet_disconnect(ssh,
+		    "Cannot change user when server not running as root.");
 
 	/*
 	 * Loop until the user has been authenticated or the connection is
 	 * closed, do_authloop() returns only if authentication is successful
 	 */
-	do_authloop(authctxt);
+	do_authloop(ssh);
 
 	/* The user has been authenticated and accepted. */
-	packet_start(SSH_SMSG_SUCCESS);
-	packet_send();
-	packet_write_wait();
+	if ((r = sshpkt_start(ssh, SSH_SMSG_SUCCESS)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	ssh_packet_write_wait(ssh);
 }
