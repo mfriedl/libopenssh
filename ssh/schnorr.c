@@ -35,7 +35,8 @@
 #include <openssl/bn.h>
 
 #include "xmalloc.h"
-#include "buffer.h"
+#include "sshbuf.h"
+#include "err.h"
 #include "log.h"
 
 #include "schnorr.h"
@@ -64,27 +65,29 @@ schnorr_hash(const BIGNUM *p, const BIGNUM *q, const BIGNUM *g,
 	u_char *digest;
 	u_int digest_len;
 	BIGNUM *h;
-	Buffer b;
-	int success = -1;
+	struct sshbuf *b;
+	int r, success = -1;
 
 	if ((h = BN_new()) == NULL) {
 		error("%s: BN_new", __func__);
 		return NULL;
 	}
 
-	buffer_init(&b);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 
 	/* h = H(g || p || q || g^v || g^x || id) */
-	buffer_put_bignum2(&b, g);
-	buffer_put_bignum2(&b, p);
-	buffer_put_bignum2(&b, q);
-	buffer_put_bignum2(&b, g_v);
-	buffer_put_bignum2(&b, g_x);
-	buffer_put_string(&b, id, idlen);
+	if ((r = sshbuf_put_bignum2(b, g)) != 0 ||
+	    (r = sshbuf_put_bignum2(b, p)) != 0 ||
+	    (r = sshbuf_put_bignum2(b, q)) != 0 ||
+	    (r = sshbuf_put_bignum2(b, g_v)) != 0 ||
+	    (r = sshbuf_put_bignum2(b, g_x)) != 0 ||
+	    (r = sshbuf_put_string(b, id, idlen)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
-	SCHNORR_DEBUG_BUF((buffer_ptr(&b), buffer_len(&b),
+	SCHNORR_DEBUG_BUF((sshbuf_ptr(b), sshbuf_len(b),
 	    "%s: hashblob", __func__));
-	if (hash_buffer(buffer_ptr(&b), buffer_len(&b), evp_md,
+	if (hash_buffer(sshbuf_ptr(b), sshbuf_len(b), evp_md,
 	    &digest, &digest_len) != 0) {
 		error("%s: hash_buffer", __func__);
 		goto out;
@@ -96,7 +99,7 @@ schnorr_hash(const BIGNUM *p, const BIGNUM *q, const BIGNUM *g,
 	success = 0;
 	SCHNORR_DEBUG_BN((h, "%s: h = ", __func__));
  out:
-	buffer_free(&b);
+	sshbuf_free(b);
 	bzero(digest, digest_len);
 	xfree(digest);
 	digest_len = 0;
@@ -216,26 +219,29 @@ schnorr_sign_buf(const BIGNUM *grp_p, const BIGNUM *grp_q, const BIGNUM *grp_g,
     const BIGNUM *x, const BIGNUM *g_x, const u_char *id, u_int idlen,
     u_char **sig, u_int *siglen)
 {
-	Buffer b;
-	BIGNUM *r, *e;
+	struct sshbuf *b;
+	BIGNUM *rv, *e;
+	int r;
 
 	if (schnorr_sign(grp_p, grp_q, grp_g, EVP_sha256(),
-	    x, g_x, id, idlen, &r, &e) != 0)
+	    x, g_x, id, idlen, &rv, &e) != 0)
 		return -1;
 
 	/* Signature is (e, r) */
-	buffer_init(&b);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	/* XXX sigtype-hash as string? */
-	buffer_put_bignum2(&b, e);
-	buffer_put_bignum2(&b, r);
-	*siglen = buffer_len(&b);
+	if ((r = sshbuf_put_bignum2(b, e)) != 0 ||
+	    (r = sshbuf_put_bignum2(b, rv)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	*siglen = sshbuf_len(b);
 	*sig = xmalloc(*siglen);
-	memcpy(*sig, buffer_ptr(&b), *siglen);
-	SCHNORR_DEBUG_BUF((buffer_ptr(&b), buffer_len(&b),
+	memcpy(*sig, sshbuf_ptr(b), *siglen);
+	SCHNORR_DEBUG_BUF((sshbuf_ptr(b), sshbuf_len(b),
 	    "%s: sigblob", __func__));
-	buffer_free(&b);
+	sshbuf_free(b);
 
-	BN_clear_free(r);
+	BN_clear_free(rv);
 	BN_clear_free(e);
 
 	return 0;
@@ -355,37 +361,38 @@ schnorr_verify_buf(const BIGNUM *grp_p, const BIGNUM *grp_q,
     const BIGNUM *g_x, const u_char *id, u_int idlen,
     const u_char *sig, u_int siglen)
 {
-	Buffer b;
-	int ret = -1;
+	struct sshbuf *b;
+	int r, ret = -1;
 	u_int rlen;
-	BIGNUM *r, *e;
+	BIGNUM *rv, *e;
 
-	e = r = NULL;
+	e = rv = NULL;
 	if ((e = BN_new()) == NULL ||
-	    (r = BN_new()) == NULL) {
+	    (rv = BN_new()) == NULL) {
 		error("%s: BN_new", __func__);
 		goto out;
 	}
 
 	/* Extract g^v and r from signature blob */
-	buffer_init(&b);
-	buffer_append(&b, sig, siglen);
-	SCHNORR_DEBUG_BUF((buffer_ptr(&b), buffer_len(&b),
-	    "%s: sigblob", __func__));
-	buffer_get_bignum2(&b, e);
-	buffer_get_bignum2(&b, r);
-	rlen = buffer_len(&b);
-	buffer_free(&b);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	SCHNORR_DEBUG_BUF((b, b, "%s: sigblob", __func__));
+	if ((r = sshbuf_put(b, sig, siglen)) != 0 ||
+	    (r = sshbuf_get_bignum2(b, e)) != 0 ||
+	    (r = sshbuf_get_bignum2(b, rv)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	rlen = sshbuf_len(b);
+	sshbuf_free(b);
 	if (rlen != 0) {
 		error("%s: remaining bytes in signature %d", __func__, rlen);
 		goto out;
 	}
 
 	ret = schnorr_verify(grp_p, grp_q, grp_g, EVP_sha256(),
-	    g_x, id, idlen, r, e);
+	    g_x, id, idlen, rv, e);
  out:
 	BN_clear_free(e);
-	BN_clear_free(r);
+	BN_clear_free(rv);
 
 	return ret;
 }

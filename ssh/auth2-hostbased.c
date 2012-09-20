@@ -35,7 +35,7 @@
 #define PACKET_SKIP_COMPAT
 #define PACKET_SKIP_COMPAT2
 #include "packet.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "log.h"
 #include "servconf.h"
 #include "compat.h"
@@ -59,7 +59,7 @@ static int
 userauth_hostbased(struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
-	Buffer b;
+	struct sshbuf *b;
 	struct sshkey *key = NULL;
 	char *pkalg, *cuser, *chost, *service;
 	u_char *pkblob, *sig;
@@ -81,10 +81,10 @@ userauth_hostbased(struct ssh *ssh)
 	    cuser, chost, pkalg, slen);
 #ifdef DEBUG_PK
 	debug("signature:");
-	buffer_init(&b);
-	buffer_append(&b, sig, slen);
-	buffer_dump(&b);
-	buffer_free(&b);
+	b = sshbuf_new();
+	sshbuf_put(b, sig, siglen);
+	sshbuf_dump(b, stderr);
+	sshbuf_free(b);
 #endif
 	pktype = sshkey_type_from_name(pkalg);
 	if (pktype == KEY_UNSPEC) {
@@ -108,28 +108,30 @@ userauth_hostbased(struct ssh *ssh)
 	}
 	service = ssh->compat & SSH_BUG_HBSERVICE ? "ssh-userauth" :
 	    authctxt->service;
-	buffer_init(&b);
-	buffer_put_string(&b, session_id2, session_id2_len);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	/* reconstruct packet */
-	buffer_put_char(&b, SSH2_MSG_USERAUTH_REQUEST);
-	buffer_put_cstring(&b, authctxt->user);
-	buffer_put_cstring(&b, service);
-	buffer_put_cstring(&b, "hostbased");
-	buffer_put_string(&b, pkalg, alen);
-	buffer_put_string(&b, pkblob, blen);
-	buffer_put_cstring(&b, chost);
-	buffer_put_cstring(&b, cuser);
+	if ((r = sshbuf_put_string(b, session_id2, session_id2_len)) != 0 ||
+	    (r = sshbuf_put_u8(b, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
+	    (r = sshbuf_put_cstring(b, authctxt->user)) != 0 ||
+	    (r = sshbuf_put_cstring(b, service)) != 0 ||
+	    (r = sshbuf_put_cstring(b, "hostbased")) != 0 ||
+	    (r = sshbuf_put_string(b, pkalg, alen)) != 0 ||
+	    (r = sshbuf_put_string(b, pkblob, blen)) != 0 ||
+	    (r = sshbuf_put_cstring(b, chost)) != 0 ||
+	    (r = sshbuf_put_cstring(b, cuser)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 #ifdef DEBUG_PK
-	buffer_dump(&b);
+	sshbuf_dump(b, stderr);
 #endif
 	/* test for allowed key and correct signature */
 	authenticated = 0;
 	if (PRIVSEP(hostbased_key_allowed(authctxt->pw, cuser, chost, key)) &&
 	    PRIVSEP(sshkey_verify(key, sig, slen,
-	    buffer_ptr(&b), buffer_len(&b), ssh->compat)) == 0)
+	    sshbuf_ptr(b), sshbuf_len(b), ssh->compat)) == 0)
 		authenticated = 1;
 
-	buffer_free(&b);
+	sshbuf_free(b);
 done:
 	debug2("%s: authenticated %d", __func__, authenticated);
 	if (key != NULL)
