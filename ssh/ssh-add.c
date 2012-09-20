@@ -54,7 +54,7 @@
 #include "rsa.h"
 #include "log.h"
 #include "key.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "authfd.h"
 #include "authfile.h"
 #include "pathnames.h"
@@ -142,7 +142,7 @@ add_file(int agent_fd, const char *filename, int key_only)
 	char *comment = NULL;
 	char msg[1024], *certpath = NULL;
 	int r, fd, perms_ok, ret = -1;
-	Buffer keyblob;
+	struct sshbuf *keyblob;
 
 	if (strcmp(filename, "-") == 0) {
 		fd = STDIN_FILENO;
@@ -163,18 +163,19 @@ add_file(int agent_fd, const char *filename, int key_only)
 			return -1;
 		}
 	}
-	buffer_init(&keyblob);
-	if ((r = sshkey_load_file(fd, filename, &keyblob)) != 0) {
+	if ((keyblob = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((r = sshkey_load_file(fd, filename, keyblob)) != 0) {
 		fprintf(stderr, "Error loading key \"%s\": %s\n",
 		    filename, ssh_err(r));
-		buffer_free(&keyblob);
+		sshbuf_free(keyblob);
 		close(fd);
 		return -1;
 	}
 	close(fd);
 
 	/* At first, try empty passphrase */
-	r = sshkey_parse_private(&keyblob, "", filename, &private, &comment);
+	r = sshkey_parse_private(keyblob, "", filename, &private, &comment);
 	if (r != 0 && r != SSH_ERR_KEY_WRONG_PASSPHRASE) {
 		fprintf(stderr, "Error loading key \"%s\": %s\n",
 		    filename, ssh_err(r));
@@ -184,7 +185,7 @@ add_file(int agent_fd, const char *filename, int key_only)
 		comment = xstrdup(filename);
 	/* try last */
 	if (private == NULL && pass != NULL) {
-		r = sshkey_parse_private(&keyblob, pass, filename,
+		r = sshkey_parse_private(keyblob, pass, filename,
 		    &private, NULL);
 		if (r != 0 && r != SSH_ERR_KEY_WRONG_PASSPHRASE) {
 			fprintf(stderr, "Error loading key \"%s\": %s\n",
@@ -201,7 +202,7 @@ add_file(int agent_fd, const char *filename, int key_only)
 			pass = read_passphrase(msg, RP_ALLOW_STDIN);
 			if (strcmp(pass, "") == 0)
 				goto fail_load;
-			if ((r = sshkey_parse_private(&keyblob, pass, filename,
+			if ((r = sshkey_parse_private(keyblob, pass, filename,
 			    &private, NULL)) == 0)
 				break;
 			else if (r != SSH_ERR_KEY_WRONG_PASSPHRASE) {
@@ -212,7 +213,7 @@ add_file(int agent_fd, const char *filename, int key_only)
 				clear_pass();
 				if (comment)
 					xfree(comment);
-				buffer_free(&keyblob);
+				sshbuf_free(keyblob);
 				return -1;
 			}
 			clear_pass();
@@ -220,7 +221,7 @@ add_file(int agent_fd, const char *filename, int key_only)
 			    "Bad passphrase, try again for %.200s: ", comment);
 		}
 	}
-	buffer_free(&keyblob);
+	sshbuf_free(keyblob);
 
 	if ((r = ssh_add_identity_constrained(agent_fd, private, comment,
 	    lifetime, confirm)) == 0) {
