@@ -33,7 +33,7 @@
 #include "rsa.h"
 #include "authfile.h"
 #include "uuencode.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "pathnames.h"
 #include "log.h"
 #include "misc.h"
@@ -361,51 +361,61 @@ do_convert_to(struct passwd *pw)
 	exit(0);
 }
 
+/* XXX isn't this just the bignum1 encoding? */
 static void
-buffer_get_bignum_bits(Buffer *b, BIGNUM *value)
+buffer_get_bignum_bits(struct sshbuf *b, BIGNUM *value)
 {
-	u_int bignum_bits = buffer_get_int(b);
-	u_int bytes = (bignum_bits + 7) / 8;
+	u_int bytes, bignum_bits;
+	int r;
 
-	if (buffer_len(b) < bytes)
-		fatal("buffer_get_bignum_bits: input buffer too small: "
-		    "need %d have %d", bytes, buffer_len(b));
-	if (BN_bin2bn(buffer_ptr(b), bytes, value) == NULL)
-		fatal("buffer_get_bignum_bits: BN_bin2bn failed");
-	buffer_consume(b, bytes);
+	if ((r = sshbuf_get_u32(b, &bignum_bits)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	bytes = (bignum_bits + 7) / 8;
+	if (sshbuf_len(b) < bytes)
+		fatal("%s: input buffer too small: need %d have %zu",
+		    __func__, bytes, sshbuf_len(b));
+	if (BN_bin2bn(sshbuf_ptr(b), bytes, value) == NULL)
+		fatal("%s: BN_bin2bn failed", __func__);
+	if ((r = sshbuf_consume(b, bytes)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 }
 
 static struct sshkey *
 do_convert_private_ssh2_from_blob(u_char *blob, u_int blen)
 {
-	Buffer b;
+	struct sshbuf *b;
 	struct sshkey *key = NULL;
 	char *type, *cipher;
-	u_char *sig = NULL, data[] = "abcde12345";
-	int r, magic, rlen, ktype, i1, i2, i3, i4;
+	u_char e1, e2, e3, *sig = NULL, data[] = "abcde12345";
+	int r, rlen, ktype;
+	u_int magic, i1, i2, i3, i4;
 	size_t slen;
 	u_long e;
 
-	buffer_init(&b);
-	buffer_append(&b, blob, blen);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((r = sshbuf_put(b, blob, blen)) != 0 ||
+	    (r = sshbuf_get_u32(b, &magic)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
-	magic = buffer_get_int(&b);
 	if (magic != SSH_COM_PRIVATE_KEY_MAGIC) {
-		error("bad magic 0x%x != 0x%x", magic, SSH_COM_PRIVATE_KEY_MAGIC);
-		buffer_free(&b);
+		error("bad magic 0x%x != 0x%x", magic,
+		    SSH_COM_PRIVATE_KEY_MAGIC);
+		sshbuf_free(b);
 		return NULL;
 	}
-	i1 = buffer_get_int(&b);
-	type   = buffer_get_string(&b, NULL);
-	cipher = buffer_get_string(&b, NULL);
-	i2 = buffer_get_int(&b);
-	i3 = buffer_get_int(&b);
-	i4 = buffer_get_int(&b);
+	if ((r = sshbuf_get_u32(b, &i1)) != 0 ||
+	    (r = sshbuf_get_cstring(b, &type, NULL)) != 0 ||
+	    (r = sshbuf_get_cstring(b, &cipher, NULL)) != 0 ||
+	    (r = sshbuf_get_u32(b, &i2)) != 0 ||
+	    (r = sshbuf_get_u32(b, &i3)) != 0 ||
+	    (r = sshbuf_get_u32(b, &i4)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	debug("ignore (%d %d %d %d)", i1, i2, i3, i4);
 	if (strcmp(cipher, "none") != 0) {
 		error("unsupported cipher %s", cipher);
 		xfree(cipher);
-		buffer_free(&b);
+		sshbuf_free(b);
 		xfree(type);
 		return NULL;
 	}
@@ -416,7 +426,7 @@ do_convert_private_ssh2_from_blob(u_char *blob, u_int blen)
 	} else if (strstr(type, "rsa")) {
 		ktype = KEY_RSA;
 	} else {
-		buffer_free(&b);
+		sshbuf_free(b);
 		xfree(type);
 		return NULL;
 	}
@@ -426,42 +436,46 @@ do_convert_private_ssh2_from_blob(u_char *blob, u_int blen)
 
 	switch (key->type) {
 	case KEY_DSA:
-		buffer_get_bignum_bits(&b, key->dsa->p);
-		buffer_get_bignum_bits(&b, key->dsa->g);
-		buffer_get_bignum_bits(&b, key->dsa->q);
-		buffer_get_bignum_bits(&b, key->dsa->pub_key);
-		buffer_get_bignum_bits(&b, key->dsa->priv_key);
+		buffer_get_bignum_bits(b, key->dsa->p);
+		buffer_get_bignum_bits(b, key->dsa->g);
+		buffer_get_bignum_bits(b, key->dsa->q);
+		buffer_get_bignum_bits(b, key->dsa->pub_key);
+		buffer_get_bignum_bits(b, key->dsa->priv_key);
 		break;
 	case KEY_RSA:
-		e = buffer_get_char(&b);
+		if ((r = sshbuf_get_u8(b, &e1)) != 0 ||
+		    (e1 < 30 && (r = sshbuf_get_u8(b, &e2)) != 0) ||
+		    (e1 < 30 && (r = sshbuf_get_u8(b, &e3)) != 0))
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
+		e = e1;
 		debug("e %lx", e);
 		if (e < 30) {
 			e <<= 8;
-			e += buffer_get_char(&b);
+			e += e2;
 			debug("e %lx", e);
 			e <<= 8;
-			e += buffer_get_char(&b);
+			e += e3;
 			debug("e %lx", e);
 		}
 		if (!BN_set_word(key->rsa->e, e)) {
-			buffer_free(&b);
+			sshbuf_free(b);
 			sshkey_free(key);
 			return NULL;
 		}
-		buffer_get_bignum_bits(&b, key->rsa->d);
-		buffer_get_bignum_bits(&b, key->rsa->n);
-		buffer_get_bignum_bits(&b, key->rsa->iqmp);
-		buffer_get_bignum_bits(&b, key->rsa->q);
-		buffer_get_bignum_bits(&b, key->rsa->p);
+		buffer_get_bignum_bits(b, key->rsa->d);
+		buffer_get_bignum_bits(b, key->rsa->n);
+		buffer_get_bignum_bits(b, key->rsa->iqmp);
+		buffer_get_bignum_bits(b, key->rsa->q);
+		buffer_get_bignum_bits(b, key->rsa->p);
 		if ((r = rsa_generate_additional_parameters(key->rsa)) != 0)
 			fatal("generate RSA parameters failed: %s", ssh_err(r));
 		break;
 	}
-	rlen = buffer_len(&b);
+	rlen = sshbuf_len(b);
 	if (rlen != 0)
 		error("do_convert_private_ssh2_from_blob: "
 		    "remaining bytes in key blob %d", rlen);
-	buffer_free(&b);
+	sshbuf_free(b);
 
 	/* try the key */
 	if (sshkey_sign(key, &sig, &slen, data, sizeof(data), 0) != 0 ||
@@ -1453,34 +1467,39 @@ fmt_validity(u_int64_t valid_from, u_int64_t valid_to)
 }
 
 static void
-add_flag_option(Buffer *c, const char *name)
+add_flag_option(struct sshbuf *c, const char *name)
 {
+	int r;
+
 	debug3("%s: %s", __func__, name);
-	buffer_put_cstring(c, name);
-	buffer_put_string(c, NULL, 0);
+	if ((r = sshbuf_put_cstring(c, name)) != 0 ||
+	    (r = sshbuf_put_string(c, NULL, 0)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 }
 
 static void
-add_string_option(Buffer *c, const char *name, const char *value)
+add_string_option(struct sshbuf *c, const char *name, const char *value)
 {
-	Buffer b;
+	struct sshbuf *b;
+	int r;
 
 	debug3("%s: %s=%s", __func__, name, value);
-	buffer_init(&b);
-	buffer_put_cstring(&b, value);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((r = sshbuf_put_cstring(b, value)) != 0 ||
+	    (r = sshbuf_put_cstring(c, name)) != 0 ||
+	    (r = sshbuf_put_stringb(c, b)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
-	buffer_put_cstring(c, name);
-	buffer_put_string(c, buffer_ptr(&b), buffer_len(&b));
-
-	buffer_free(&b);
+	sshbuf_free(b);
 }
 
 #define OPTIONS_CRITICAL	1
 #define OPTIONS_EXTENSIONS	2
 static void
-prepare_options_buf(Buffer *c, int which)
+prepare_options_buf(struct sshbuf *c, int which)
 {
-	buffer_clear(c);
+	sshbuf_reset(c);
 	if ((which & OPTIONS_CRITICAL) != 0 &&
 	    certflags_command != NULL)
 		add_string_option(c, "force-command", certflags_command);
@@ -1797,21 +1816,23 @@ add_cert_option(char *opt)
 }
 
 static void
-show_options(const Buffer *optbuf, int v00, int in_critical)
+show_options(const struct sshbuf *optbuf, int v00, int in_critical)
 {
-	u_char *name, *data;
-	const u_char *odata;
-	u_int dlen;
-	Buffer options, option;
+	char *name, *data;
+	struct sshbuf *options, *option;
+	int r;
 
-	buffer_init(&options);
-	buffer_append(&options, buffer_ptr(optbuf), buffer_len(optbuf));
+	if ((options = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((r = sshbuf_putb(options, optbuf)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
-	buffer_init(&option);
-	while (buffer_len(&options) != 0) {
-		name = buffer_get_string(&options, NULL);
-		odata = buffer_get_string_ptr(&options, &dlen);
-		buffer_append(&option, odata, dlen);
+	if ((option = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	while (sshbuf_len(options) != 0) {
+		if ((r = sshbuf_get_cstring(options, &name, NULL)) != 0 ||
+		    (r = sshbuf_get_stringb(options, option)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		printf("                %s", name);
 		if ((v00 || !in_critical) && 
 		    (strcmp(name, "permit-X11-forwarding") == 0 ||
@@ -1823,20 +1844,22 @@ show_options(const Buffer *optbuf, int v00, int in_critical)
 		else if ((v00 || in_critical) &&
 		    (strcmp(name, "force-command") == 0 ||
 		    strcmp(name, "source-address") == 0)) {
-			data = buffer_get_string(&option, NULL);
+			if ((r = sshbuf_get_cstring(option, &data, NULL)) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 			printf(" %s\n", data);
 			xfree(data);
 		} else {
-			printf(" UNKNOWN OPTION (len %u)\n",
-			    buffer_len(&option));
-			buffer_clear(&option);
+			printf(" UNKNOWN OPTION (len %zu)\n",
+			    sshbuf_len(option));
+			sshbuf_reset(option);
 		}
 		xfree(name);
-		if (buffer_len(&option) != 0)
+		if (sshbuf_len(option) != 0)
 			fatal("Option corrupt: extra data at end");
 	}
-	buffer_free(&option);
-	buffer_free(&options);
+	sshbuf_free(option);
+	sshbuf_free(options);
 }
 
 static void
@@ -1886,7 +1909,7 @@ do_show_cert(struct passwd *pw)
 		printf("\n");
 	}
 	printf("        Critical Options: ");
-	if (buffer_len(key->cert->critical) == 0)
+	if (sshbuf_len(key->cert->critical) == 0)
 		printf("(none)\n");
 	else {
 		printf("\n");
@@ -1894,7 +1917,7 @@ do_show_cert(struct passwd *pw)
 	}
 	if (!v00) {
 		printf("        Extensions: ");
-		if (buffer_len(key->cert->extensions) == 0)
+		if (sshbuf_len(key->cert->extensions) == 0)
 			printf("(none)\n");
 		else {
 			printf("\n");

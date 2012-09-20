@@ -32,7 +32,7 @@
 #include "xmalloc.h"
 #include "ssh.h"
 #include "log.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "servconf.h"
 #include "compat.h"
 #include "pathnames.h"
@@ -52,7 +52,7 @@ static void add_one_listen_addr(ServerOptions *, char *, int);
 
 /* Use of privilege separation or not */
 extern int use_privsep;
-extern Buffer cfg;
+extern struct sshbuf *cfg;
 
 /* Initializes the server options to their default values. */
 
@@ -1480,7 +1480,7 @@ process_server_config_line(ServerOptions *options, char *line,
 /* Reads the server configuration file. */
 
 void
-load_server_config(const char *filename, Buffer *conf)
+load_server_config(const char *filename, struct sshbuf *conf)
 {
 	char line[4096], *cp;
 	FILE *f;
@@ -1519,7 +1519,7 @@ parse_server_match_config(ServerOptions *options,
 	ServerOptions mo;
 
 	initialize_server_options(&mo);
-	parse_server_config(&mo, "reprocess config", &cfg, connectinfo);
+	parse_server_config(&mo, "reprocess config", cfg, connectinfo);
 	copy_set_server_options(options, &mo, 0);
 }
 
@@ -1637,8 +1637,8 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 #undef M_CP_STRARRAYOPT
 
 void
-parse_server_config(ServerOptions *options, const char *filename, Buffer *conf,
-    struct connection_info *connectinfo)
+parse_server_config(ServerOptions *options, const char *filename,
+    struct sshbuf *conf, struct connection_info *connectinfo)
 {
 	int active, linenum, bad_options = 0;
 	char *cp, *obuf, *cbuf;

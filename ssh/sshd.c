@@ -77,7 +77,7 @@
 #define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "log.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "servconf.h"
 #include "uidswap.h"
 #include "compat.h"
@@ -228,7 +228,7 @@ int privsep_is_preauth = 1;
 Authctxt *the_authctxt = NULL;
 
 /* sshd_config buffer */
-Buffer cfg;
+struct sshbuf *cfg;
 
 /* message to be displayed after login */
 struct sshbuf *loginmsg = NULL;
@@ -743,13 +743,13 @@ privsep_postauth(struct ssh *ssh)
 static char *
 list_hostkey_types(void)
 {
-	Buffer b;
-	const char *p;
+	struct sshbuf *b;
 	char *ret;
-	int i;
+	int r, i;
 	struct sshkey *key;
 
-	buffer_init(&b);
+	if ((b = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	for (i = 0; i < options.num_host_key_files; i++) {
 		key = sensitive_data.host_keys[i];
 		if (key == NULL)
@@ -758,10 +758,11 @@ list_hostkey_types(void)
 		case KEY_RSA:
 		case KEY_DSA:
 		case KEY_ECDSA:
-			if (buffer_len(&b) > 0)
-				buffer_append(&b, ",", 1);
-			p = sshkey_ssh_name(key);
-			buffer_append(&b, p, strlen(p));
+			if ((r = sshbuf_putf(b, "%s%s",
+			    sshbuf_len(b) > 0 ? "," : "",
+			    sshkey_ssh_name(key))) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 			break;
 		}
 		/* If the private key has a cert peer, then list that too */
@@ -774,16 +775,18 @@ list_hostkey_types(void)
 		case KEY_RSA_CERT:
 		case KEY_DSA_CERT:
 		case KEY_ECDSA_CERT:
-			if (buffer_len(&b) > 0)
-				buffer_append(&b, ",", 1);
-			p = sshkey_ssh_name(key);
-			buffer_append(&b, p, strlen(p));
+			if ((r = sshbuf_putf(b, "%s%s",
+			    sshbuf_len(b) > 0 ? "," : "",
+			    sshkey_ssh_name(key))) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 			break;
 		}
 	}
-	buffer_append(&b, "\0", 1);
-	ret = xstrdup(buffer_ptr(&b));
-	buffer_free(&b);
+	if ((r = sshbuf_put_u8(b, 0)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	ret = xstrdup(sshbuf_ptr(b));
+	sshbuf_free(b);
 	debug("list_hostkey_types: %s", ret);
 	return ret;
 }
@@ -893,12 +896,13 @@ usage(void)
 }
 
 static void
-send_rexec_state(int fd, Buffer *conf)
+send_rexec_state(int fd, struct sshbuf *conf)
 {
-	Buffer m;
+	struct sshbuf *m;
+	int r;
 
-	debug3("%s: entering fd = %d config len %d", __func__, fd,
-	    buffer_len(conf));
+	debug3("%s: entering fd = %d config len %zu", __func__, fd,
+	    sshbuf_len(conf));
 
 	/*
 	 * Protocol from reexec master to child:
@@ -911,68 +915,90 @@ send_rexec_state(int fd, Buffer *conf)
 	 *	bignum	p			"
 	 *	bignum	q			"
 	 */
-	buffer_init(&m);
-	buffer_put_cstring(&m, buffer_ptr(conf));
+	if ((m = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	/* servconf.c:load_server_config() ensures a \0 at the end of cfg */
+	if ((r = sshbuf_put_cstring(m, sshbuf_ptr(conf))) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	if (sensitive_data.server_key != NULL &&
 	    sensitive_data.server_key->type == KEY_RSA1) {
-		buffer_put_int(&m, 1);
-		buffer_put_bignum(&m, sensitive_data.server_key->rsa->e);
-		buffer_put_bignum(&m, sensitive_data.server_key->rsa->n);
-		buffer_put_bignum(&m, sensitive_data.server_key->rsa->d);
-		buffer_put_bignum(&m, sensitive_data.server_key->rsa->iqmp);
-		buffer_put_bignum(&m, sensitive_data.server_key->rsa->p);
-		buffer_put_bignum(&m, sensitive_data.server_key->rsa->q);
-	} else
-		buffer_put_int(&m, 0);
+		if ((r = sshbuf_put_u32(m, 1)) != 0 ||
+		    (r = sshbuf_put_bignum1(m,
+		    sensitive_data.server_key->rsa->e)) != 0 ||
+		    (r = sshbuf_put_bignum1(m,
+		    sensitive_data.server_key->rsa->n)) != 0 ||
+		    (r = sshbuf_put_bignum1(m,
+		    sensitive_data.server_key->rsa->d)) != 0 ||
+		    (r = sshbuf_put_bignum1(m,
+		    sensitive_data.server_key->rsa->iqmp)) != 0 ||
+		    (r = sshbuf_put_bignum1(m,
+		    sensitive_data.server_key->rsa->p)) != 0 ||
+		    (r = sshbuf_put_bignum1(m,
+		    sensitive_data.server_key->rsa->q)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	} else if ((r = sshbuf_put_u32(m, 0)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
-	if (ssh_msg_send(fd, 0, &m) == -1)
+	if (ssh_msg_send(fd, 0, m) == -1)
 		fatal("%s: ssh_msg_send failed", __func__);
 
-	buffer_free(&m);
+	sshbuf_free(m);
 
 	debug3("%s: done", __func__);
 }
 
 static void
-recv_rexec_state(int fd, Buffer *conf)
+recv_rexec_state(int fd, struct sshbuf *conf)
 {
-	Buffer m;
+	struct sshbuf *m;
 	char *cp;
-	u_int len;
+	size_t len;
 	int r;
+	u_char ver;
+	u_int key_follows;
 
 	debug3("%s: entering fd = %d", __func__, fd);
 
-	buffer_init(&m);
+	if ((m = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 
-	if (ssh_msg_recv(fd, &m) == -1)
+	if (ssh_msg_recv(fd, m) == -1)
 		fatal("%s: ssh_msg_recv failed", __func__);
-	if (buffer_get_char(&m) != 0)
+	if ((r = sshbuf_get_u8(m, &ver)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if (ver != 0)
 		fatal("%s: rexec version mismatch", __func__);
-
-	cp = buffer_get_string(&m, &len);
-	if (conf != NULL)
-		buffer_append(conf, cp, len + 1);
+	if ((r = sshbuf_get_cstring(m, &cp, &len)) != 0 ||
+	    (conf != NULL && (r = sshbuf_put(conf, cp, len + 1)) != 0) ||
+	    (r = sshbuf_get_u32(m, &key_follows)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	xfree(cp);
 
-	if (buffer_get_int(&m)) {
+	if (key_follows) {
 		if (sensitive_data.server_key != NULL)
 			sshkey_free(sensitive_data.server_key);
 		sensitive_data.server_key = sshkey_new_private(KEY_RSA1);
 		if (sensitive_data.server_key == NULL)
 			fatal("%s: sshkey_new_private failed", __func__);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->e);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->n);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->d);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->iqmp);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->p);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->q);
+		if ((r = sshbuf_get_bignum1(m,
+		    sensitive_data.server_key->rsa->e)) != 0 ||
+		    (r = sshbuf_get_bignum1(m,
+		    sensitive_data.server_key->rsa->n)) != 0 ||
+		    (r = sshbuf_get_bignum1(m,
+		    sensitive_data.server_key->rsa->d)) != 0 ||
+		    (r = sshbuf_get_bignum1(m,
+		    sensitive_data.server_key->rsa->iqmp)) != 0 ||
+		    (r = sshbuf_get_bignum1(m,
+		    sensitive_data.server_key->rsa->p)) != 0 ||
+		    (r = sshbuf_get_bignum1(m,
+		    sensitive_data.server_key->rsa->q)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		if ((r = rsa_generate_additional_parameters(
 		    sensitive_data.server_key->rsa)) != 0)
 			fatal("generate RSA parameters failed: %s", ssh_err(r));
 	}
-	buffer_free(&m);
+	sshbuf_free(m);
 
 	debug3("%s: done", __func__);
 }
@@ -1218,8 +1244,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 				startup_pipe = -1;
 				pid = getpid();
 				if (rexec_flag) {
-					send_rexec_state(config_s[0],
-					    &cfg);
+					send_rexec_state(config_s[0], cfg);
 					close(config_s[0]);
 				}
 				break;
@@ -1262,7 +1287,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			close(startup_p[1]);
 
 			if (rexec_flag) {
-				send_rexec_state(config_s[0], &cfg);
+				send_rexec_state(config_s[0], cfg);
 				close(config_s[0]);
 				close(config_s[1]);
 			}
@@ -1482,14 +1507,15 @@ main(int ac, char **av)
 		   "test mode (-T)");
 
 	/* Fetch our configuration */
-	buffer_init(&cfg);
+	if ((cfg = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	if (rexeced_flag)
-		recv_rexec_state(REEXEC_CONFIG_PASS_FD, &cfg);
+		recv_rexec_state(REEXEC_CONFIG_PASS_FD, cfg);
 	else
-		load_server_config(config_file_name, &cfg);
+		load_server_config(config_file_name, cfg);
 
 	parse_server_config(&options, rexeced_flag ? "rexec" : config_file_name,
-	    &cfg, NULL);
+	    cfg, NULL);
 
 	/* Fill in default values for those options not explicitly set. */
 	fill_default_server_options(&options);

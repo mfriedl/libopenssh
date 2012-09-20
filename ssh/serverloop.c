@@ -57,7 +57,7 @@
 #define PACKET_SKIP_COMPAT
 #define PACKET_SKIP_COMPAT2
 #include "packet.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "log.h"
 #include "servconf.h"
 #include "sshpty.h"
@@ -83,17 +83,17 @@ extern ServerOptions options;
 extern Authctxt *the_authctxt;
 extern int use_privsep;
 
-static Buffer stdin_buffer;	/* Buffer for stdin data. */
-static Buffer stdout_buffer;	/* Buffer for stdout data. */
-static Buffer stderr_buffer;	/* Buffer for stderr data. */
+static struct sshbuf *stdin_buffer;	/* Buffer for stdin data. */
+static struct sshbuf *stdout_buffer;	/* Buffer for stdout data. */
+static struct sshbuf *stderr_buffer;	/* Buffer for stderr data. */
 static int fdin;		/* Descriptor for stdin (for writing) */
 static int fdout;		/* Descriptor for stdout (for reading);
 				   May be same number as fdin. */
 static int fderr;		/* Descriptor for stderr.  May be -1. */
-static long stdin_bytes = 0;	/* Number of bytes written to stdin. */
-static long stdout_bytes = 0;	/* Number of stdout bytes sent to client. */
-static long stderr_bytes = 0;	/* Number of stderr bytes sent to client. */
-static long fdout_bytes = 0;	/* Number of stdout bytes read from program. */
+static size_t stdin_bytes = 0;	/* Number of bytes written to stdin. */
+static size_t stdout_bytes = 0;	/* Number of stdout bytes sent to client. */
+static size_t stderr_bytes = 0;	/* Number of stderr bytes sent to client. */
+static size_t fdout_bytes = 0;	/* Number of stdout bytes read from program. */
 static int stdin_eof = 0;	/* EOF message received from client. */
 static int fdout_eof = 0;	/* EOF encountered reading from fdout. */
 static int fderr_eof = 0;	/* EOF encountered readung from fderr. */
@@ -187,13 +187,13 @@ sigterm_handler(int sig)
 static void
 make_packets_from_stderr_data(struct ssh *ssh)
 {
-	u_int len;
+	size_t len;
 	int r;
 
 	/* Send buffered stderr data to the client. */
-	while (buffer_len(&stderr_buffer) > 0 &&
+	while (sshbuf_len(stderr_buffer) > 0 &&
 	    ssh_packet_not_very_much_data_to_write(ssh)) {
-		len = buffer_len(&stderr_buffer);
+		len = sshbuf_len(stderr_buffer);
 		if (ssh_packet_is_interactive(ssh)) {
 			if (len > 512)
 				len = 512;
@@ -203,11 +203,12 @@ make_packets_from_stderr_data(struct ssh *ssh)
 				len = ssh_packet_get_maxsize(ssh);
 		}
 		if ((r = sshpkt_start(ssh, SSH_SMSG_STDERR_DATA)) != 0 ||
-		    (r = sshpkt_put_string(ssh, buffer_ptr(&stderr_buffer),
+		    (r = sshpkt_put_string(ssh, sshbuf_ptr(stderr_buffer),
 		    len)) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
-		buffer_consume(&stderr_buffer, len);
+		if ((r = sshbuf_consume(stderr_buffer, len)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		stderr_bytes += len;
 	}
 }
@@ -219,13 +220,13 @@ make_packets_from_stderr_data(struct ssh *ssh)
 static void
 make_packets_from_stdout_data(struct ssh *ssh)
 {
-	u_int len;
+	size_t len;
 	int r;
 
 	/* Send buffered stdout data to the client. */
-	while (buffer_len(&stdout_buffer) > 0 &&
+	while (sshbuf_len(stdout_buffer) > 0 &&
 	    ssh_packet_not_very_much_data_to_write(ssh)) {
-		len = buffer_len(&stdout_buffer);
+		len = sshbuf_len(stdout_buffer);
 		if (ssh_packet_is_interactive(ssh)) {
 			if (len > 512)
 				len = 512;
@@ -235,11 +236,12 @@ make_packets_from_stdout_data(struct ssh *ssh)
 				len = ssh_packet_get_maxsize(ssh);
 		}
 		if ((r = sshpkt_start(ssh, SSH_SMSG_STDOUT_DATA)) != 0 ||
-		    (r = sshpkt_put_string(ssh, buffer_ptr(&stdout_buffer),
+		    (r = sshpkt_put_string(ssh, sshbuf_ptr(stdout_buffer),
 		    len)) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
-		buffer_consume(&stdout_buffer, len);
+		if ((r = sshbuf_consume(stdout_buffer, len)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		stdout_bytes += len;
 	}
 }
@@ -320,7 +322,7 @@ wait_until_can_do_something(struct ssh *ssh, fd_set **readsetp, fd_set **writese
 		 * Read packets from the client unless we have too much
 		 * buffered stdin or channel data.
 		 */
-		if (buffer_len(&stdin_buffer) < buffer_high &&
+		if (sshbuf_len(stdin_buffer) < buffer_high &&
 		    channel_not_very_much_buffered_data())
 			FD_SET(connection_in, *readsetp);
 		/*
@@ -337,7 +339,7 @@ wait_until_can_do_something(struct ssh *ssh, fd_set **readsetp, fd_set **writese
 		 * If we have buffered data, try to write some of that data
 		 * to the program.
 		 */
-		if (fdin != -1 && buffer_len(&stdin_buffer) > 0)
+		if (fdin != -1 && sshbuf_len(stdin_buffer) > 0)
 			FD_SET(fdin, *writesetp);
 	}
 	notify_prepare(*readsetp);
@@ -386,7 +388,7 @@ wait_until_can_do_something(struct ssh *ssh, fd_set **readsetp, fd_set **writese
 static void
 process_input(struct ssh *ssh, fd_set *readset)
 {
-	int len;
+	int len, r;
 	char buf[16384];
 
 	/* Read and buffer any input data from the client. */
@@ -425,7 +427,9 @@ process_input(struct ssh *ssh, fd_set *readset)
 		} else if (len <= 0) {
 			fdout_eof = 1;
 		} else {
-			buffer_append(&stdout_buffer, buf, len);
+			if ((r = sshbuf_put(stdout_buffer, buf, len)) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 			fdout_bytes += len;
 		}
 	}
@@ -437,7 +441,9 @@ process_input(struct ssh *ssh, fd_set *readset)
 		} else if (len <= 0) {
 			fderr_eof = 1;
 		} else {
-			buffer_append(&stderr_buffer, buf, len);
+			if ((r = sshbuf_put(stderr_buffer, buf, len)) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 		}
 	}
 }
@@ -455,8 +461,8 @@ process_output(struct ssh *ssh, fd_set *writeset)
 
 	/* Write buffered data to program stdin. */
 	if (!compat20 && fdin != -1 && FD_ISSET(fdin, writeset)) {
-		data = buffer_ptr(&stdin_buffer);
-		dlen = buffer_len(&stdin_buffer);
+		data = sshbuf_ptr(stdin_buffer);
+		dlen = sshbuf_len(stdin_buffer);
 		len = write(fdin, data, dlen);
 		if (len < 0 && (errno == EINTR || errno == EAGAIN)) {
 			/* do nothing */
@@ -480,7 +486,9 @@ process_output(struct ssh *ssh, fd_set *writeset)
 					fatal("%s: %s", __func__, ssh_err(r));
 			}
 			/* Consume the data from the buffer. */
-			buffer_consume(&stdin_buffer, len);
+			if ((r = sshbuf_consume(stdin_buffer, len)) != 0)
+				fatal("%s: buffer error: %s", __func__,
+				    ssh_err(r));
 			/* Update the count of bytes written to the program. */
 			stdin_bytes += len;
 		}
@@ -500,23 +508,23 @@ drain_output(struct ssh *ssh)
 	int r;
 
 	/* Send any buffered stdout data to the client. */
-	if (buffer_len(&stdout_buffer) > 0) {
+	if (sshbuf_len(stdout_buffer) > 0) {
 		if ((r = sshpkt_start(ssh, SSH_SMSG_STDOUT_DATA)) != 0 ||
-		    (r = sshpkt_put_string(ssh, buffer_ptr(&stdout_buffer),
-		    buffer_len(&stdout_buffer))) != 0 ||
+		    (r = sshpkt_put_string(ssh, sshbuf_ptr(stdout_buffer),
+		    sshbuf_len(stdout_buffer))) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
 		/* Update the count of sent bytes. */
-		stdout_bytes += buffer_len(&stdout_buffer);
+		stdout_bytes += sshbuf_len(stdout_buffer);
 	}
 	/* Send any buffered stderr data to the client. */
-	if (buffer_len(&stderr_buffer) > 0) {
+	if (sshbuf_len(stderr_buffer) > 0) {
 		if ((r = sshpkt_start(ssh, SSH_SMSG_STDERR_DATA)) != 0 ||
-		    (r = sshpkt_put_string(ssh, buffer_ptr(&stderr_buffer),
-		    buffer_len(&stderr_buffer))) != 0 ||
+		    (r = sshpkt_put_string(ssh, sshbuf_ptr(stderr_buffer),
+		    sshbuf_len(stderr_buffer))) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)
 		/* Update the count of sent bytes. */
-		stderr_bytes += buffer_len(&stderr_buffer);
+		stderr_bytes += sshbuf_len(stderr_buffer);
 	}
 	/* Wait until all buffered data has been written to the client. */
 	ssh_packet_write_wait(ssh);
@@ -603,9 +611,12 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 #endif
 
 	/* Initialize Initialize buffers. */
-	buffer_init(&stdin_buffer);
-	buffer_init(&stdout_buffer);
-	buffer_init(&stderr_buffer);
+	if ((stdin_buffer = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((stdout_buffer = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((stderr_buffer = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 
 	/*
 	 * If we have no separate fderr (which is the case when we have a pty
@@ -628,7 +639,7 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 		 * If we have received eof, and there is no more pending
 		 * input data, cause a real eof by closing fdin.
 		 */
-		if (stdin_eof && fdin != -1 && buffer_len(&stdin_buffer) == 0) {
+		if (stdin_eof && fdin != -1 && sshbuf_len(stdin_buffer) == 0) {
 			if (fdin != fdout)
 				close(fdin);
 			else
@@ -646,7 +657,7 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 		 * wake up readers from a pty after each separate character.
 		 */
 		max_time_milliseconds = 0;
-		stdout_buffer_bytes = buffer_len(&stdout_buffer);
+		stdout_buffer_bytes = sshbuf_len(stdout_buffer);
 		if (stdout_buffer_bytes != 0 && stdout_buffer_bytes < 256 &&
 		    stdout_buffer_bytes != previous_stdout_buffer_bytes) {
 			/* try again after a while */
@@ -655,7 +666,7 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 			/* Send it now. */
 			make_packets_from_stdout_data(ssh);
 		}
-		previous_stdout_buffer_bytes = buffer_len(&stdout_buffer);
+		previous_stdout_buffer_bytes = sshbuf_len(stdout_buffer);
 
 		/* Send channel data to the client. */
 		if (ssh_packet_not_very_much_data_to_write(ssh))
@@ -667,18 +678,21 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 		 * client, and there is no pending buffered data.
 		 */
 		if (fdout_eof && fderr_eof && !ssh_packet_have_data_to_write(ssh) &&
-		    buffer_len(&stdout_buffer) == 0 && buffer_len(&stderr_buffer) == 0) {
+		    sshbuf_len(stdout_buffer) == 0 && sshbuf_len(stderr_buffer) == 0) {
 			if (!channel_still_open())
 				break;
 			if (!waiting_termination) {
 				const char *s = "Waiting for forwarded connections to terminate...\r\n";
-				char *cp;
-				waiting_termination = 1;
-				buffer_append(&stderr_buffer, s, strlen(s));
+				char *cp = channel_open_message();
 
+				waiting_termination = 1;
 				/* Display list of open channels. */
-				cp = channel_open_message();
-				buffer_append(&stderr_buffer, cp, strlen(cp));
+				if ((r = sshbuf_put(stderr_buffer,
+				    s, strlen(s))) != 0 ||
+				    (r = sshbuf_put(stderr_buffer,
+				    s, strlen(s))) != 0)
+					fatal("%s: buffer error: %s",
+					    __func__, ssh_err(r));
 				xfree(cp);
 			}
 		}
@@ -721,9 +735,9 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 	    stdin_bytes, fdout_bytes, stdout_bytes, stderr_bytes);
 
 	/* Free and clear the buffers. */
-	buffer_free(&stdin_buffer);
-	buffer_free(&stdout_buffer);
-	buffer_free(&stderr_buffer);
+	sshbuf_free(stdin_buffer);
+	sshbuf_free(stdout_buffer);
+	sshbuf_free(stderr_buffer);
 
 	/* Close the file descriptors. */
 	if (fdout != -1)
@@ -907,9 +921,9 @@ server_input_stdin_data(int type, u_int32_t seq, struct ssh *ssh)
 	if (fdin == -1)
 		return 0;
 	if ((r = sshpkt_get_string(ssh, &data, &data_len)) != 0 ||
-	    (r = sshpkt_get_end(ssh)) != 0)
+	    (r = sshpkt_get_end(ssh)) != 0 ||
+	    (r = sshbuf_put(stdin_buffer, data, data_len)) != 0)
 		goto out;
-	buffer_append(&stdin_buffer, data, data_len);
 	r = 0;
  out:
 	if (data) {
