@@ -332,13 +332,11 @@ do_authloop(struct ssh *ssh)
  * been exchanged and encryption is enabled.
  */
 void
-do_authentication(Authctxt *authctxt)
+do_authentication(struct ssh *ssh)
 {
-	struct ssh *ssh = active_state;		/* XXX */
+	Authctxt *authctxt = ssh->authctxt;
 	char *user, *style = NULL;
 	int r;
-
-	ssh->authctxt = authctxt;		/* XXX move to caller */
 
 	/* Get the name of the user that we wish to log in as. */
 	ssh_packet_read_expect(ssh, SSH_CMSG_USER);

@@ -73,6 +73,8 @@
 #include "ssh2.h"
 #include "rsa.h"
 #include "sshpty.h"
+#define PACKET_SKIP_COMPAT
+#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "log.h"
 #include "buffer.h"
@@ -235,8 +237,8 @@ struct sshbuf *loginmsg = NULL;
 void destroy_sensitive_data(void);
 void demote_sensitive_data(void);
 
-static void do_ssh1_kex(void);
-static void do_ssh2_kex(void);
+static void do_ssh1_kex(struct ssh *ssh);
+static void do_ssh2_kex(struct ssh *ssh);
 
 /*
  * Close all listening sockets
@@ -338,7 +340,8 @@ grace_alarm_handler(int sig)
 		kill(pmonitor->m_pid, SIGALRM);
 
 	/* Log error and exit. */
-	sigdie("Timeout before authentication for %s", get_remote_ipaddr());
+	sigdie("Timeout before authentication for %s",
+	    ssh_remote_ipaddr(active_state));
 }
 
 /*
@@ -379,7 +382,7 @@ key_regeneration_alarm(int sig)
 }
 
 static void
-sshd_exchange_identification(int sock_in, int sock_out)
+sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 {
 	u_int i;
 	int mismatch;
@@ -411,7 +414,8 @@ sshd_exchange_identification(int sock_in, int sock_out)
 	if (roaming_atomicio(vwrite, sock_out, server_version_string,
 	    strlen(server_version_string))
 	    != strlen(server_version_string)) {
-		logit("Could not write ident string to %s", get_remote_ipaddr());
+		logit("Could not write ident string to %s",
+		    ssh_remote_ipaddr(ssh));
 		cleanup_exit(255);
 	}
 
@@ -420,7 +424,7 @@ sshd_exchange_identification(int sock_in, int sock_out)
 	for (i = 0; i < sizeof(buf) - 1; i++) {
 		if (roaming_atomicio(read, sock_in, &buf[i], 1) != 1) {
 			logit("Did not receive identification string from %s",
-			    get_remote_ipaddr());
+			    ssh_remote_ipaddr(ssh));
 			cleanup_exit(255);
 		}
 		if (buf[i] == '\r') {
@@ -450,23 +454,23 @@ sshd_exchange_identification(int sock_in, int sock_out)
 		close(sock_in);
 		close(sock_out);
 		logit("Bad protocol version identification '%.100s' from %s",
-		    client_version_string, get_remote_ipaddr());
+		    client_version_string, ssh_remote_ipaddr(ssh));
 		cleanup_exit(255);
 	}
 	debug("Client protocol version %d.%d; client software version %.100s",
 	    remote_major, remote_minor, remote_version);
 
-	active_state->compat = compat_datafellows(remote_version);
+	ssh->compat = compat_datafellows(remote_version);
 
-	if (active_state->compat & SSH_BUG_PROBE) {
+	if (ssh->compat & SSH_BUG_PROBE) {
 		logit("probed from %s with %s.  Don't panic.",
-		    get_remote_ipaddr(), client_version_string);
+		    ssh_remote_ipaddr(ssh), client_version_string);
 		cleanup_exit(255);
 	}
 
-	if (active_state->compat & SSH_BUG_SCANNER) {
+	if (ssh->compat & SSH_BUG_SCANNER) {
 		logit("scanned from %s with %s.  Don't panic.",
-		    get_remote_ipaddr(), client_version_string);
+		    ssh_remote_ipaddr(ssh), client_version_string);
 		cleanup_exit(255);
 	}
 
@@ -485,7 +489,7 @@ sshd_exchange_identification(int sock_in, int sock_out)
 			break;
 		}
 		if (remote_minor < 3) {
-			packet_disconnect("Your ssh version is too old and "
+			ssh_packet_disconnect(ssh, "Your ssh version is too old and "
 			    "is no longer supported.  Please install a newer version.");
 		} else if (remote_minor == 3) {
 			/* note that this disables agent-forwarding */
@@ -511,7 +515,7 @@ sshd_exchange_identification(int sock_in, int sock_out)
 		close(sock_in);
 		close(sock_out);
 		logit("Protocol major versions differ for %s: %.200s vs. %.200s",
-		    get_remote_ipaddr(),
+		    ssh_remote_ipaddr(ssh),
 		    server_version_string, client_version_string);
 		cleanup_exit(255);
 	}
@@ -684,8 +688,9 @@ privsep_preauth(Authctxt *authctxt)
 }
 
 static void
-privsep_postauth(Authctxt *authctxt)
+privsep_postauth(struct ssh *ssh)
 {
+	Authctxt *authctxt = ssh->authctxt;
 	u_int32_t rnd[256];
 
 	if (authctxt->pw->pw_uid == 0 || options.use_login) {
@@ -732,7 +737,7 @@ privsep_postauth(Authctxt *authctxt)
 	 * Tell the packet layer that authentication was successful, since
 	 * this information is not part of the key state.
 	 */
-	packet_set_authenticated();
+	ssh_packet_set_authenticated(ssh);
 }
 
 static char *
@@ -1296,6 +1301,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 int
 main(int ac, char **av)
 {
+	struct ssh *ssh;
 	extern char *optarg;
 	extern int optind;
 	int opt, i, j, on = 1;
@@ -1791,11 +1797,12 @@ main(int ac, char **av)
 	 * Register our connection.  This turns encryption off because we do
 	 * not have a key.
 	 */
-	packet_set_connection(sock_in, sock_out);
-	packet_set_server();
+	ssh = ssh_packet_set_connection(NULL, sock_in, sock_out);
+	ssh_packet_set_server(ssh);
+	active_state = ssh; /* XXX */
 
 	/* Set SO_KEEPALIVE if requested. */
-	if (options.tcp_keep_alive && packet_connection_is_on_socket() &&
+	if (options.tcp_keep_alive && ssh_packet_connection_is_on_socket(ssh) &&
 	    setsockopt(sock_in, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on)) < 0)
 		error("setsockopt SO_KEEPALIVE: %.100s", strerror(errno));
 
@@ -1814,11 +1821,11 @@ main(int ac, char **av)
 	 * get_remote_ipaddr() caches the remote ip, even if
 	 * the socket goes away.
 	 */
-	remote_ip = get_remote_ipaddr();
+	remote_ip = ssh_remote_ipaddr(ssh);
 
 #ifdef LIBWRAP
 	/* Check whether logins are denied from this host. */
-	if (packet_connection_is_on_socket()) {
+	if (ssh_packet_connection_is_on_socket(ssh)) {
 		struct request_info req;
 
 		request_init(&req, RQ_DAEMON, __progname, RQ_FILE, sock_in, 0);
@@ -1848,19 +1855,20 @@ main(int ac, char **av)
 	if (!debug_flag)
 		alarm(options.login_grace_time);
 
-	sshd_exchange_identification(sock_in, sock_out);
+	sshd_exchange_identification(ssh, sock_in, sock_out);
 
 	/* In inetd mode, generate ephemeral key only for proto 1 connections */
 	if (!compat20 && inetd_flag && sensitive_data.server_key == NULL)
 		generate_ephemeral_server_key();
 
-	packet_set_nonblocking();
+	ssh_packet_set_nonblocking(ssh);
 
 	/* allocate authentication context */
 	authctxt = xcalloc(1, sizeof(*authctxt));
 
 	/* XXX global for cleanup, access from other modules */
 	the_authctxt = authctxt;
+	ssh->authctxt = authctxt;
 
 	/* prepare buffer to collect messages to display to user after login */
 	if ((loginmsg = sshbuf_new()) == NULL)
@@ -1874,11 +1882,11 @@ main(int ac, char **av)
 	/* perform the key exchange */
 	/* authenticate user and start session */
 	if (compat20) {
-		do_ssh2_kex();
-		do_authentication2(authctxt);
+		do_ssh2_kex(ssh);
+		do_authentication2(ssh);
 	} else {
-		do_ssh1_kex();
-		do_authentication(authctxt);
+		do_ssh1_kex(ssh);
+		do_authentication(ssh);
 	}
 	/*
 	 * If we use privilege separation, the unprivileged child transfers
@@ -1907,13 +1915,13 @@ main(int ac, char **av)
 	 * file descriptor passing.
 	 */
 	if (use_privsep) {
-		privsep_postauth(authctxt);
+		privsep_postauth(ssh);
 		/* the monitor process [priv] will not return */
 		if (!compat20)
 			destroy_sensitive_data();
 	}
 
-	packet_set_timeout(options.client_alive_interval,
+	ssh_packet_set_timeout(ssh, options.client_alive_interval,
 	    options.client_alive_count_max);
 
 	/* Start session. */
@@ -1925,7 +1933,7 @@ main(int ac, char **av)
 	    (unsigned long long)obytes, (unsigned long long)ibytes);
 
 	verbose("Closing connection to %.500s port %d", remote_ip, remote_port);
-	packet_close();
+	ssh_packet_close(ssh);
 
 	if (use_privsep)
 		mm_terminate();
@@ -1941,6 +1949,7 @@ int
 ssh1_session_key(BIGNUM *session_key_int)
 {
 	int r, rsafail = 0;
+	struct ssh *ssh = active_state; /* XXX */
 
 	if (BN_cmp(sensitive_data.server_key->rsa->n,
 	    sensitive_data.ssh1_host_key->rsa->n) > 0) {
@@ -1950,7 +1959,7 @@ ssh1_session_key(BIGNUM *session_key_int)
 		    SSH_KEY_BITS_RESERVED) {
 			fatal("do_connection: %s: "
 			    "server_key %d < host_key %d + SSH_KEY_BITS_RESERVED %d",
-			    get_remote_ipaddr(),
+			    ssh_remote_ipaddr(ssh),
 			    BN_num_bits(sensitive_data.server_key->rsa->n),
 			    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n),
 			    SSH_KEY_BITS_RESERVED);
@@ -1974,7 +1983,7 @@ ssh1_session_key(BIGNUM *session_key_int)
 		    SSH_KEY_BITS_RESERVED) {
 			fatal("do_connection: %s: "
 			    "host_key %d < server_key %d + SSH_KEY_BITS_RESERVED %d",
-			    get_remote_ipaddr(),
+			    ssh_remote_ipaddr(ssh),
 			    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n),
 			    BN_num_bits(sensitive_data.server_key->rsa->n),
 			    SSH_KEY_BITS_RESERVED);
@@ -1999,14 +2008,13 @@ ssh1_session_key(BIGNUM *session_key_int)
  * SSH1 key exchange
  */
 static void
-do_ssh1_kex(void)
+do_ssh1_kex(struct ssh *ssh)
 {
-	int i, len, r;
-	int rsafail = 0;
+	int i, len, r, rsafail = 0;
 	BIGNUM *session_key_int;
-	u_char session_key[SSH_SESSION_KEY_LENGTH];
-	u_char cookie[8];
-	u_int cipher_type, auth_mask, protocol_flags;
+	u_char session_key[SSH_SESSION_KEY_LENGTH], cookie[8], check[8];
+	u_int auth_mask, protocol_flags;
+	u_char cipher_type;
 
 	/*
 	 * Generate check bytes that the client must send back in the user
@@ -2019,32 +2027,6 @@ do_ssh1_kex(void)
 	 */
 	arc4random_buf(cookie, sizeof(cookie));
 
-	/*
-	 * Send our public key.  We include in the packet 64 bits of random
-	 * data that must be matched in the reply in order to prevent IP
-	 * spoofing.
-	 */
-	packet_start(SSH_SMSG_PUBLIC_KEY);
-	for (i = 0; i < 8; i++)
-		packet_put_char(cookie[i]);
-
-	/* Store our public server RSA key. */
-	packet_put_int(BN_num_bits(sensitive_data.server_key->rsa->n));
-	packet_put_bignum(sensitive_data.server_key->rsa->e);
-	packet_put_bignum(sensitive_data.server_key->rsa->n);
-
-	/* Store our public host RSA key. */
-	packet_put_int(BN_num_bits(sensitive_data.ssh1_host_key->rsa->n));
-	packet_put_bignum(sensitive_data.ssh1_host_key->rsa->e);
-	packet_put_bignum(sensitive_data.ssh1_host_key->rsa->n);
-
-	/* Put protocol flags. */
-	packet_put_int(SSH_PROTOFLAG_HOST_IN_FWD_OPEN);
-
-	/* Declare which ciphers we support. */
-	packet_put_int(cipher_mask_ssh1(0));
-
-	/* Declare supported authentication types. */
 	auth_mask = 0;
 	if (options.rhosts_rsa_authentication)
 		auth_mask |= 1 << SSH_AUTH_RHOSTS_RSA;
@@ -2054,41 +2036,71 @@ do_ssh1_kex(void)
 		auth_mask |= 1 << SSH_AUTH_TIS;
 	if (options.password_authentication)
 		auth_mask |= 1 << SSH_AUTH_PASSWORD;
-	packet_put_int(auth_mask);
 
-	/* Send the packet and wait for it to be sent. */
-	packet_send();
-	packet_write_wait();
+	/*
+	 * Send our public key.  We include in the packet 64 bits of random
+	 * data that must be matched in the reply in order to prevent IP
+	 * spoofing.
+	 */
+	if ((r = sshpkt_start(ssh, SSH_SMSG_PUBLIC_KEY)) != 0 ||
+	    (r = sshpkt_put(ssh, cookie, sizeof(cookie))) != 0 ||
+	    /* Store our public server RSA key. */
+	    (r = sshpkt_put_u32(ssh,
+	    BN_num_bits(sensitive_data.server_key->rsa->n))) != 0 ||
+	    (r = sshpkt_put_bignum1(ssh,
+	    sensitive_data.server_key->rsa->e)) != 0 ||
+	    (r = sshpkt_put_bignum1(ssh,
+	    sensitive_data.server_key->rsa->n)) != 0 ||
+	    /* Store our public host RSA key. */
+	    (r = sshpkt_put_u32(ssh,
+	    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n))) != 0 ||
+	    (r = sshpkt_put_bignum1(ssh,
+	    sensitive_data.ssh1_host_key->rsa->e)) != 0 ||
+	    (r = sshpkt_put_bignum1(ssh,
+	    sensitive_data.ssh1_host_key->rsa->n)) != 0 ||
+	    /* Put protocol flags. */
+	    (r = sshpkt_put_u32(ssh, SSH_PROTOFLAG_HOST_IN_FWD_OPEN)) != 0 ||
+	    /* Declare which ciphers we support. */
+	    (r = sshpkt_put_u32(ssh, cipher_mask_ssh1(0))) != 0 ||
+	    /* Declare supported authentication types. */
+	    (r = sshpkt_put_u32(ssh, auth_mask)) != 0 ||
+	    /* Send the packet and wait for it to be sent. */
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	ssh_packet_write_wait(ssh);
 
 	debug("Sent %d bit server key and %d bit host key.",
 	    BN_num_bits(sensitive_data.server_key->rsa->n),
 	    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n));
 
 	/* Read clients reply (cipher type and session key). */
-	packet_read_expect(SSH_CMSG_SESSION_KEY);
+	ssh_packet_read_expect(ssh, SSH_CMSG_SESSION_KEY);
+
+	if ((r = sshpkt_get_u8(ssh, &cipher_type)) != 0 ||
+	    (r = sshpkt_get(ssh, check, sizeof(check))) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	/* Get cipher type and check whether we accept this. */
-	cipher_type = packet_get_char();
-
 	if (!(cipher_mask_ssh1(0) & (1 << cipher_type)))
-		packet_disconnect("Warning: client selects unsupported cipher.");
+		ssh_packet_disconnect(ssh,
+		    "Warning: client selects unsupported cipher.");
 
 	/* Get check bytes from the packet.  These must match those we
 	   sent earlier with the public key packet. */
-	for (i = 0; i < 8; i++)
-		if (cookie[i] != packet_get_char())
-			packet_disconnect("IP Spoofing check bytes do not match.");
+        if (timingsafe_bcmp(check, cookie, sizeof(check)) != 0)
+		ssh_packet_disconnect(ssh,
+		    "IP Spoofing check bytes do not match.");
 
 	debug("Encryption type: %.200s", cipher_name(cipher_type));
 
 	/* Get the encrypted integer. */
 	if ((session_key_int = BN_new()) == NULL)
 		fatal("do_ssh1_kex: BN_new failed");
-	packet_get_bignum(session_key_int);
-
-	protocol_flags = packet_get_int();
-	packet_set_protocol_flags(protocol_flags);
-	packet_check_eom();
+	if ((r = sshpkt_get_bignum1(ssh, session_key_int)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &protocol_flags)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	ssh_packet_set_protocol_flags(ssh, protocol_flags);
 
 	/* Decrypt session_key_int using host/server keys */
 	rsafail = PRIVSEP(ssh1_session_key(session_key_int));
@@ -2104,7 +2116,8 @@ do_ssh1_kex(void)
 		if (len < 0 || (u_int)len > sizeof(session_key)) {
 			error("do_ssh1_kex: bad session key len from %s: "
 			    "session_key_int %d > sizeof(session_key) %lu",
-			    get_remote_ipaddr(), len, (u_long)sizeof(session_key));
+			    ssh_remote_ipaddr(ssh), len,
+			    (u_long)sizeof(session_key));
 			rsafail++;
 		} else {
 			memset(session_key, 0, sizeof(session_key));
@@ -2155,7 +2168,8 @@ do_ssh1_kex(void)
 	BN_clear_free(session_key_int);
 
 	/* Set the session key.  From this on all communications will be encrypted. */
-	packet_set_encryption_key(session_key, SSH_SESSION_KEY_LENGTH, cipher_type);
+	ssh_packet_set_encryption_key(ssh, session_key, SSH_SESSION_KEY_LENGTH,
+	    cipher_type);
 
 	/* Destroy our copy of the session key.  It is no longer needed. */
 	memset(session_key, 0, sizeof(session_key));
@@ -2163,16 +2177,17 @@ do_ssh1_kex(void)
 	debug("Received session key; encryption turned on.");
 
 	/* Send an acknowledgment packet.  Note that this packet is sent encrypted. */
-	packet_start(SSH_SMSG_SUCCESS);
-	packet_send();
-	packet_write_wait();
+	if ((r = sshpkt_start(ssh, SSH_SMSG_SUCCESS)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	ssh_packet_write_wait(ssh);
 }
 
 /*
  * SSH2 key exchange: diffie-hellman-group1-sha1
  */
 static void
-do_ssh2_kex(void)
+do_ssh2_kex(struct ssh *ssh)
 {
 	Kex *kex;
 	int r;
@@ -2183,10 +2198,10 @@ do_ssh2_kex(void)
 	}
 	myproposal[PROPOSAL_ENC_ALGS_CTOS] =
 	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_CTOS],
-	    active_state->compat);
+	    ssh->compat);
 	myproposal[PROPOSAL_ENC_ALGS_STOC] =
 	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_STOC],
-	    active_state->compat);
+	    ssh->compat);
 	if (myproposal[PROPOSAL_ENC_ALGS_CTOS] == NULL ||
 	    myproposal[PROPOSAL_ENC_ALGS_STOC] == NULL)
 		fatal("no compatible ciphers found");
@@ -2208,9 +2223,9 @@ do_ssh2_kex(void)
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = list_hostkey_types();
 
 	/* start key exchange */
-	if ((r = kex_setup(active_state, myproposal)) != 0)
+	if ((r = kex_setup(ssh, myproposal)) != 0)
 		fatal("kex_setup: %s", ssh_err(r));
-	kex = active_state->kex;
+	kex = ssh->kex;
 	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
 	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
 	kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
@@ -2223,9 +2238,9 @@ do_ssh2_kex(void)
 	kex->load_host_private_key=&get_hostkey_private_by_type;
 	kex->host_key_index=&get_hostkey_index;
 
-	active_state->kex = kex;
+	ssh->kex = kex;
 
-	if ((r = ssh_dispatch_run(active_state, DISPATCH_BLOCK,
+	if ((r = ssh_dispatch_run(ssh, DISPATCH_BLOCK,
 	    &kex->done)) != 0)
 		fatal("%s: key exchange failed: %s", __func__, ssh_err(r));
 
@@ -2234,10 +2249,11 @@ do_ssh2_kex(void)
 
 #ifdef DEBUG_KEXDH
 	/* send 1st encrypted/maced/compressed message */
-	packet_start(SSH2_MSG_IGNORE);
-	packet_put_cstring("markus");
-	packet_send();
-	packet_write_wait();
+	if ((r = sshpkt_start(ssh, SSH2_MSG_IGNORE)) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, "markus")) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	ssh_packet_write_wait(ssh);
 #endif
 	debug("KEX done");
 }

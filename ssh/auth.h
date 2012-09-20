@@ -121,8 +121,8 @@ int	auth_krb5_password(Authctxt *authctxt, const char *password);
 void	krb5_cleanup_proc(Authctxt *authctxt);
 #endif /* KRB5 */
 
-void	do_authentication(Authctxt *);
-void	do_authentication2(Authctxt *);
+void	do_authentication(struct ssh *);
+void	do_authentication2(struct ssh *);
 
 void	auth_log(Authctxt *, int, char *, char *);
 void	userauth_finish(struct ssh *, int, char *);
