@@ -891,7 +891,7 @@ static int
 process_mux_stdio_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 {
 	Channel *nc;
-	char *chost;
+	char *chost = NULL;
 	u_int cport, i, j;
 	int r, new_fd[2];
 
@@ -899,8 +899,7 @@ process_mux_stdio_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 	if ((r = sshbuf_skip_string(m)) != 0 || /* reserved */
 	    (r = sshbuf_get_cstring(m, &chost, NULL)) != 0 ||
 	    (r = sshbuf_get_u32(m, &cport)) != 0) {
-		if (chost != NULL)
-			xfree(chost);
+		free(chost);
 		error("%s: malformed message", __func__);
 		return -1;
 	}
@@ -1497,7 +1496,7 @@ mux_client_hello_exchange(int fd)
 	debug2("%s: master version %u", __func__, ver);
 	/* No extensions are presently defined */
 	while (sshbuf_len(m) > 0) {
-		char *name, *value;
+		char *name = NULL, *value = NULL;
 
 		if ((r = sshbuf_get_cstring(m, &name, NULL)) != 0 ||
 		    (r = sshbuf_get_cstring(m, &value, NULL)) != 0)
@@ -1682,12 +1681,14 @@ mux_client_forward(int fd, int cancel_flag, u_int ftype, Forward *fwd)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		sshbuf_free(m);
 		error("Master refused forwarding request: %s", e);
+		free(e);
 		return -1;
 	case MUX_S_FAILURE:
 		if ((r = sshbuf_get_cstring(m, &e, NULL)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		sshbuf_free(m);
 		error("%s: forwarding request failed: %s", __func__, e);
+		free(e);
 		return -1;
 	default:
 		fatal("%s: unexpected response from master 0x%08x",
@@ -1816,12 +1817,14 @@ mux_client_request_session(int fd)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		sshbuf_free(m);
 		error("Master refused session request: %s", e);
+		free(e);
 		return -1;
 	case MUX_S_FAILURE:
 		if ((r = sshbuf_get_cstring(m, &e, NULL)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		sshbuf_free(m);
 		error("%s: session request failed: %s", __func__, e);
+		free(e);
 		return -1;
 	default:
 		sshbuf_free(m);
