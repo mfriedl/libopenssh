@@ -63,7 +63,6 @@ static u_int64_t key1, key2, oldkey1, oldkey2;
 void
 roaming_reply(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 {
-	struct ssh *ssh = ctxt;
 	u_int size;
 	int r;
 
@@ -95,7 +94,7 @@ request_roaming(struct ssh *ssh)
 	    (r = sshpkt_put_u32(ssh, get_recv_buf_size())) != 0 ||
 	    (r = sshpkt_send(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
-	client_register_global_confirm(roaming_reply, ssh);
+	client_register_global_confirm(roaming_reply, NULL);
 }
 
 static void
@@ -162,7 +161,6 @@ roaming_resume(void)
 	char *str = NULL, *kexlist = NULL, *c;
 	int r = 0, i, type;
 	int timeout_ms = options.connection_timeout * 1000;
-	u_int32_t rnd = 0;
 	u_char first_kex_packet_follows, kex_cookie[KEX_COOKIE_LEN];
 
 	resume_in_progress = 1;
@@ -174,7 +172,7 @@ roaming_resume(void)
 	/* Send a kexinit message with resume@appgate.com as only kex algo */
 	arc4random_buf(kex_cookie, KEX_COOKIE_LEN);
 	if ((r = sshpkt_start(ssh, SSH2_MSG_KEXINIT)) != 0 ||
-	    (r = sshpkt_put_u8(ssh, rnd & 0xff)) != 0 ||
+	    (r = sshpkt_put(ssh, kex_cookie, KEX_COOKIE_LEN)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, KEX_RESUME)) != 0)
 		goto fail;
 	for (i = 1; i < PROPOSAL_MAX; i++) {
@@ -199,10 +197,8 @@ roaming_resume(void)
 		debug("expected kexinit on resume, got %d", type);
 		goto fail;
 	}
-	for (i = 0; i < KEX_COOKIE_LEN; i++)
-		if ((r = sshpkt_get_u8(ssh, NULL)) != 0)
-			goto fail;
-	if ((r = sshpkt_get_cstring(ssh, &kexlist, NULL)) != 0)
+	if ((r = sshpkt_get(ssh, NULL, KEX_COOKIE_LEN)) != 0 ||
+	    (r = sshpkt_get_cstring(ssh, &kexlist, NULL)) != 0)
 		goto fail;
 	if (!kexlist
 	    || (str = match_list(KEX_RESUME, kexlist, NULL)) == NULL) {
