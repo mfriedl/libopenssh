@@ -32,6 +32,8 @@
 
 #include "xmalloc.h"
 #include "ssh2.h"
+#define PACKET_SKIP_COMPAT
+#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "buffer.h"
 #include "log.h"
@@ -61,20 +63,21 @@ userauth_hostbased(struct ssh *ssh)
 	struct sshkey *key = NULL;
 	char *pkalg, *cuser, *chost, *service;
 	u_char *pkblob, *sig;
-	u_int alen, blen, slen;
+	size_t alen, blen, slen;
 	int r, pktype, authenticated = 0;
 
 	if (!authctxt->valid) {
 		debug2("%s: disabled because of invalid user", __func__);
 		return 0;
 	}
-	pkalg = ssh_packet_get_string(ssh, &alen);
-	pkblob = ssh_packet_get_string(ssh, &blen);
-	chost = ssh_packet_get_string(ssh, NULL);
-	cuser = ssh_packet_get_string(ssh, NULL);
-	sig = ssh_packet_get_string(ssh, &slen);
+	if ((r = sshpkt_get_cstring(ssh, &pkalg, &alen)) != 0 ||
+	    (r = sshpkt_get_string(ssh, &pkblob, &blen)) != 0 ||
+	    (r = sshpkt_get_cstring(ssh, &chost, NULL)) != 0 ||
+	    (r = sshpkt_get_cstring(ssh, &cuser, NULL)) != 0 ||
+	    (r = sshpkt_get_string(ssh, &sig, &slen)) != 0)
+		fatal("%s: packet parsing: %s", __func__, ssh_err(r));
 
-	debug("%s: cuser %s chost %s pkalg %s slen %d", __func__,
+	debug("%s: cuser %s chost %s pkalg %s slen %zu", __func__,
 	    cuser, chost, pkalg, slen);
 #ifdef DEBUG_PK
 	debug("signature:");
@@ -153,7 +156,7 @@ hostbased_key_allowed(struct passwd *pw, const char *cuser, char *chost,
 		return 0;
 
 	resolvedname = get_canonical_hostname(options.use_dns);
-	ipaddr = get_remote_ipaddr();
+	ipaddr = ssh_remote_ipaddr(active_state); /* XXX */
 
 	debug2("userauth_hostbased: chost %s resolvedname %s ipaddr %s",
 	    chost, resolvedname, ipaddr);
