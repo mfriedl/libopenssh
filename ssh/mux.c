@@ -1286,7 +1286,8 @@ mux_session_confirm(int id, int success, void *arg)
 	if (cctx->want_agent_fwd && options.forward_agent) {
 		debug("Requesting authentication agent forwarding.");
 		channel_request_start(id, "auth-agent-req@openssh.com", 0);
-		packet_send();
+		if ((r = sshpkt_send(ssh)) != 0)
+			fatal("%s: packet error: %s", __func__, ssh_err(r));
 	}
 
 	client_session2_setup(ssh, id, cctx->want_tty, cctx->want_subsys,
