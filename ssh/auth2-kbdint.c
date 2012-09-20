@@ -26,6 +26,8 @@
 #include <sys/types.h>
 
 #include "xmalloc.h"
+#define PACKET_SKIP_COMPAT
+#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "key.h"
 #include "hostfile.h"
@@ -33,6 +35,7 @@
 #include "log.h"
 #include "buffer.h"
 #include "servconf.h"
+#include "err.h"
 
 /* import */
 extern ServerOptions options;
@@ -40,20 +43,21 @@ extern ServerOptions options;
 static int
 userauth_kbdint(struct ssh *ssh)
 {
-	int authenticated = 0;
+	int r, authenticated = 0;
 	char *lang, *devs;
 
-	lang = ssh_packet_get_string(ssh, NULL);
-	devs = ssh_packet_get_string(ssh, NULL);
-	ssh_packet_check_eom(ssh);
+	if ((r = sshpkt_get_cstring(ssh, &lang, NULL)) != 0 ||
+	    (r = sshpkt_get_cstring(ssh, &devs, NULL)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	debug("keyboard-interactive devs %s", devs);
 
 	if (options.challenge_response_authentication)
 		authenticated = auth2_challenge(ssh, devs);
 
-	xfree(devs);
-	xfree(lang);
+	free(devs);
+	free(lang);
 	return authenticated;
 }
 
