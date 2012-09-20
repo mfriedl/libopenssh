@@ -1788,7 +1788,8 @@ mm_answer_jpake_step2(int sock, struct sshbuf *m)
 {
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	u_char *x1_proof, *x2_proof, *x4_s_proof;
-	u_int x1_proof_len, x2_proof_len, x4_s_proof_len;
+	u_int x4_s_proof_len;
+	size_t x1_proof_len, x2_proof_len, len;
 	int r;
 
 	if (pctx == NULL)
@@ -1799,11 +1800,11 @@ mm_answer_jpake_step2(int sock, struct sshbuf *m)
 		fatal("%s: BN_new", __func__);
 	if ((r = sshbuf_get_bignum2(m, pctx->g_x1)) != 0 ||
 	    (r = sshbuf_get_bignum2(m, pctx->g_x2)) != 0 ||
-	    (r = sshbuf_get_string(m, &pctx->client_id,
-	    &pctx->client_id_len)) != 0 ||
+	    (r = sshbuf_get_string(m, &pctx->client_id, &len)) != 0 ||
 	    (r = sshbuf_get_string(m, &x1_proof, &x1_proof_len)) != 0 ||
 	    (r = sshbuf_get_string(m, &x2_proof, &x2_proof_len)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	pctx->client_id_len = len;
 
 	jpake_step2(pctx->grp, pctx->s, pctx->g_x3,
 	    pctx->g_x1, pctx->g_x2, pctx->x4,
@@ -1843,7 +1844,7 @@ mm_answer_jpake_key_confirm(int sock, struct sshbuf *m)
 {
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	u_char *x2_s_proof;
-	u_int x2_s_proof_len;
+	size_t x2_s_proof_len;
 	int r;
 
 	if (pctx == NULL)
@@ -1887,13 +1888,13 @@ mm_answer_jpake_check_confirm(int sock, struct sshbuf *m)
 {
 	int r, authenticated = 0;
 	u_char *peer_confirm_hash;
-	u_int peer_confirm_hash_len;
+	size_t peer_confirm_hash_len;
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 
 	if (pctx == NULL)
 		fatal("%s: pctx == NULL", __func__);
 
-	if ((r = sshbuf_get_string(m, peer_confirm_hash,
+	if ((r = sshbuf_get_string(m, &peer_confirm_hash,
 	     &peer_confirm_hash_len)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 

@@ -955,6 +955,7 @@ mm_auth2_jpake_get_pwdata(Authctxt *authctxt, BIGNUM **s,
     char **hash_scheme, char **salt)
 {
 	struct sshbuf *m;
+	int r;
 
 	debug3("%s entering", __func__);
 
@@ -982,6 +983,8 @@ mm_jpake_step1(struct modp_group *grp,
     u_char **priv2_proof, u_int *priv2_proof_len)
 {
 	struct sshbuf *m;
+	size_t len, len1, len2;
+	int r;
 
 	debug3("%s entering", __func__);
 
@@ -1000,13 +1003,16 @@ mm_jpake_step1(struct modp_group *grp,
 	    (*g_priv2 = BN_new()) == NULL)
 		fatal("%s: BN_new", __func__);
 
-	if ((r = sshbuf_get_string(m, id, id_len)) != 0 ||
+	if ((r = sshbuf_get_string(m, id, &len)) != 0 ||
 	    /* priv1 and priv2 are, well, private */
 	    (r = sshbuf_get_bignum2(m, *g_priv1)) != 0 ||
 	    (r = sshbuf_get_bignum2(m, *g_priv2)) != 0 ||
-	    (r = sshbuf_get_string(m, priv1_proof, priv1_proof_len)) != 0 ||
-	    (r = sshbuf_get_string(m, priv2_proof, priv2_proof_len)) != 0)
+	    (r = sshbuf_get_string(m, priv1_proof, &len1)) != 0 ||
+	    (r = sshbuf_get_string(m, priv2_proof, &len2)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	*id_len = len;
+	*priv1_proof_len = len1;
+	*priv2_proof_len = len2;
 
 	sshbuf_free(m);
 }
@@ -1022,6 +1028,8 @@ mm_jpake_step2(struct modp_group *grp, BIGNUM *s,
     u_char **newpub_exponent_proof, u_int *newpub_exponent_proof_len)
 {
 	struct sshbuf *m;
+	size_t len;
+	int r;
 
 	debug3("%s entering", __func__);
 
@@ -1048,9 +1056,9 @@ mm_jpake_step2(struct modp_group *grp, BIGNUM *s,
 		fatal("%s: BN_new", __func__);
 
 	if ((r = sshbuf_get_bignum2(m, *newpub)) != 0 ||
-	    (r = sshbuf_get_string(m, newpub_exponent_proof,
-	    newpub_exponent_proof_len)) != 0)
+	    (r = sshbuf_get_string(m, newpub_exponent_proof, &len)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	*newpub_exponent_proof_len = len;
 
 	sshbuf_free(m);
 }
@@ -1067,6 +1075,8 @@ mm_jpake_key_confirm(struct modp_group *grp, BIGNUM *s, BIGNUM *step2_val,
     u_char **confirm_hash, u_int *confirm_hash_len)
 {
 	struct sshbuf *m;
+	size_t len;
+	int r;
 
 	debug3("%s entering", __func__);
 
@@ -1087,8 +1097,9 @@ mm_jpake_key_confirm(struct modp_group *grp, BIGNUM *s, BIGNUM *step2_val,
 	    MONITOR_ANS_JPAKE_KEY_CONFIRM, m);
 
 	/* 'k' is sensitive and stays in the monitor */
-	if ((r = sshbuf_get_string(m, confirm_hash, confirm_hash_len)) != 0)
+	if ((r = sshbuf_get_string(m, confirm_hash, &len)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	*confirm_hash_len = len;
 
 	sshbuf_free(m);
 }
@@ -1100,7 +1111,7 @@ mm_jpake_check_confirm(const BIGNUM *k,
     const u_char *peer_confirm_hash, u_int peer_confirm_hash_len)
 {
 	struct sshbuf *m;
-	int success = 0;
+	int r, success = 0;
 
 	debug3("%s entering", __func__);
 
