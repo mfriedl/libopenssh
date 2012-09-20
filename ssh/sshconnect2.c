@@ -1127,7 +1127,8 @@ input_userauth_jpake_server_step1(int type, u_int32_t seq, struct ssh *ssh)
 	Authctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->methoddata;
 	u_char *x3_proof = NULL, *x4_proof = NULL, *x2_s_proof = NULL;
-	u_int x3_proof_len, x4_proof_len, x2_s_proof_len;
+	size_t x3_proof_len, x4_proof_len, len;
+	u_int x2_s_proof_len;
 	char *crypt_scheme, *salt;
 	int r;
 
@@ -1139,16 +1140,16 @@ input_userauth_jpake_server_step1(int type, u_int32_t seq, struct ssh *ssh)
 		fatal("%s: BN_new", __func__);
 
 	/* Fetch step 1 values */
-	if ((r = sshpkt_get_string(ssh, &crypt_scheme, NULL)) != 0 ||
-	    (r = sshpkt_get_string(ssh, &salt, NULL)) != 0 ||
-	    (r = sshpkt_get_string(ssh, &pctx->server_id,
-	    &pctx->server_id_len)) != 0 ||
+	if ((r = sshpkt_get_cstring(ssh, &crypt_scheme, NULL)) != 0 ||
+	    (r = sshpkt_get_cstring(ssh, &salt, NULL)) != 0 ||
+	    (r = sshpkt_get_string(ssh, &pctx->server_id, &len)) != 0 ||
 	    (r = sshpkt_get_bignum2(ssh, pctx->g_x3)) != 0 ||
 	    (r = sshpkt_get_bignum2(ssh, pctx->g_x4)) != 0 ||
 	    (r = sshpkt_get_string(ssh, &x3_proof, &x3_proof_len)) != 0 ||
 	    (r = sshpkt_get_string(ssh, &x4_proof, &x4_proof_len)) != 0 ||
 	    (r = sshpkt_get_end(ssh)) != 0)
 		goto out;
+	pctx->server_id_len = len
 
 	JPAKE_DEBUG_CTX((pctx, "step 1 received in %s", __func__));
 
@@ -1184,15 +1185,15 @@ input_userauth_jpake_server_step1(int type, u_int32_t seq, struct ssh *ssh)
 		bzero(x2_s_proof, x2_s_proof_len);
 		xfree(x2_s_proof);
 	}
-	if (x3_s_proof) {
-		bzero(x3_s_proof, x3_s_proof_len);
-		xfree(x3_s_proof);
+	if (x3_proof) {
+		bzero(x3_proof, x3_proof_len);
+		xfree(x3_proof);
 	}
-	if (x4_s_proof) {
-		bzero(x4_s_proof, x4_s_proof_len);
-		xfree(x4_s_proof);
+	if (x4_proof) {
+		bzero(x4_proof, x4_proof_len);
+		xfree(x4_proof);
 	}
-	if (crypt_scheme)
+	if (crypt_scheme) {
 		bzero(crypt_scheme, strlen(crypt_scheme));
 		xfree(crypt_scheme);
 	}
@@ -1212,7 +1213,7 @@ input_userauth_jpake_server_step2(int type, u_int32_t seq, struct ssh *ssh)
 	Authctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->methoddata;
 	u_char *x4_s_proof = NULL;
-	u_int x4_s_proof_len;
+	size_t x4_s_proof_len;
 	int r;
 
 	/* Disable this message */
@@ -1245,7 +1246,7 @@ input_userauth_jpake_server_step2(int type, u_int32_t seq, struct ssh *ssh)
 	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_CONFIRM)) != 0 ||
 	    (r = sshpkt_put_string(ssh, pctx->h_k_cid_sessid,
 	    pctx->h_k_cid_sessid_len)) != 0 ||
-	    (r = sshpkt_send(ssh)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
 		goto out;
 
 	/* Expect confirmation from peer */
@@ -1268,14 +1269,16 @@ input_userauth_jpake_server_confirm(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->methoddata;
+	size_t len;
 	int r;
 
 	/* Disable this message */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_CONFIRM, NULL);
 
-	if ((r = sshpkt_get_string(ssh, &pctx->h_k_sid_sessid,
-	    &pctx->h_k_sid_sessid_len)) != 0 ||
+	if ((r = sshpkt_get_string(ssh, &pctx->h_k_sid_sessid, &len)) != 0 ||
 	    (r = sshpkt_get_end(ssh)) != 0)
+		goto out;
+	pctx->h_k_sid_sessid_len = len;
 
 	JPAKE_DEBUG_CTX((pctx, "confirm received in %s", __func__));
 
@@ -1963,6 +1966,7 @@ userauth_jpake(struct ssh *ssh)
 	struct jpake_ctx *pctx;
 	u_char *x1_proof, *x2_proof;
 	u_int x1_proof_len, x2_proof_len;
+	int r;
 
 	if (authctxt->attempt++ >= options.number_of_password_prompts)
 		return 0;
@@ -1979,11 +1983,12 @@ userauth_jpake(struct ssh *ssh)
 	 * Send request immediately, to get the protocol going while
 	 * we do the initial computations.
 	 */
-	ssh_packet_start(ssh, SSH2_MSG_USERAUTH_REQUEST);
-	ssh_packet_put_cstring(ssh, authctxt->server_user);
-	ssh_packet_put_cstring(ssh, authctxt->service);
-	ssh_packet_put_cstring(ssh, authctxt->method->name);
-	ssh_packet_send(ssh);
+	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, authctxt->server_user)) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, authctxt->service)) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, authctxt->method->name)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	ssh_packet_write_wait(ssh);
 
 	jpake_step1(pctx->grp,
@@ -1994,13 +1999,16 @@ userauth_jpake(struct ssh *ssh)
 
 	JPAKE_DEBUG_CTX((pctx, "step 1 sending in %s", __func__));
 
-	ssh_packet_start(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP1);
-	ssh_packet_put_string(ssh, pctx->client_id, pctx->client_id_len);
-	ssh_packet_put_bignum2(ssh, pctx->g_x1);
-	ssh_packet_put_bignum2(ssh, pctx->g_x2);
-	ssh_packet_put_string(ssh, x1_proof, x1_proof_len);
-	ssh_packet_put_string(ssh, x2_proof, x2_proof_len);
-	ssh_packet_send(ssh);
+	if ((r = sshpkt_start(ssh,
+	    SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP1)) != 0 ||
+	    (r = sshpkt_put_string(ssh, pctx->client_id,
+	    pctx->client_id_len)) != 0 ||
+	    (r = sshpkt_put_bignum2(ssh, pctx->g_x1)) != 0 ||
+	    (r = sshpkt_put_bignum2(ssh, pctx->g_x2)) != 0 ||
+	    (r = sshpkt_put_string(ssh, x1_proof, x1_proof_len)) != 0 ||
+	    (r = sshpkt_put_string(ssh, x2_proof, x2_proof_len)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	bzero(x1_proof, x1_proof_len);
 	bzero(x2_proof, x2_proof_len);
