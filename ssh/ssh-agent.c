@@ -60,7 +60,7 @@
 #include "ssh.h"
 #include "rsa.h"
 #include "sshbuf.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "key.h"
 #include "authfd.h"
 #include "compat.h"
@@ -81,9 +81,9 @@ typedef enum {
 typedef struct {
 	int fd;
 	sock_type type;
-	Buffer input;
-	Buffer output;
-	Buffer request;
+	struct sshbuf *input;
+	struct sshbuf *output;
+	struct sshbuf *request;
 } SocketEntry;
 
 u_int sockets_alloc = 0;
@@ -131,9 +131,9 @@ close_socket(SocketEntry *e)
 	close(e->fd);
 	e->fd = -1;
 	e->type = AUTH_UNUSED;
-	buffer_free(&e->input);
-	buffer_free(&e->output);
-	buffer_free(&e->request);
+	sshbuf_free(e->input);
+	sshbuf_free(e->output);
+	sshbuf_free(e->request);
 }
 
 static void
@@ -202,34 +202,47 @@ process_request_identities(SocketEntry *e, int version)
 {
 	Idtab *tab = idtab_lookup(version);
 	Identity *id;
-	Buffer msg;
+	struct sshbuf *msg;
 	int r;
 
-	buffer_init(&msg);
-	buffer_put_char(&msg, (version == 1) ?
-	    SSH_AGENT_RSA_IDENTITIES_ANSWER : SSH2_AGENT_IDENTITIES_ANSWER);
-	buffer_put_int(&msg, tab->nentries);
+	if ((msg = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((r = sshbuf_put_u8(msg, (version == 1) ?
+	    SSH_AGENT_RSA_IDENTITIES_ANSWER :
+	    SSH2_AGENT_IDENTITIES_ANSWER)) != 0 ||
+	    (r = sshbuf_put_u32(msg, tab->nentries)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	TAILQ_FOREACH(id, &tab->idlist, next) {
 		if (id->key->type == KEY_RSA1) {
-			buffer_put_int(&msg, BN_num_bits(id->key->rsa->n));
-			buffer_put_bignum(&msg, id->key->rsa->e);
-			buffer_put_bignum(&msg, id->key->rsa->n);
+			if ((r = sshbuf_put_u32(msg,
+			    BN_num_bits(id->key->rsa->n))) != 0 ||
+			    (r = sshbuf_put_bignum1(msg,
+			    id->key->rsa->e)) != 0 ||
+			    (r = sshbuf_put_bignum1(msg,
+			    id->key->rsa->n)) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 		} else {
 			u_char *blob;
 			size_t blen;
+
 			if ((r = sshkey_to_blob(id->key, &blob, &blen)) != 0) {
 				error("%s: sshkey_to_blob: %s", __func__,
 				    ssh_err(r));
 				continue;
 			}
-			buffer_put_string(&msg, blob, blen);
+			if ((r = sshbuf_put_string(msg, blob, blen)) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 			xfree(blob);
 		}
-		buffer_put_cstring(&msg, id->comment);
+		if ((r = sshbuf_put_cstring(msg, id->comment)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
-	buffer_put_int(&e->output, buffer_len(&msg));
-	buffer_append(&e->output, buffer_ptr(&msg), buffer_len(&msg));
-	buffer_free(&msg);
+	if ((r = sshbuf_put_u32(e->output, sshbuf_len(msg))) != 0 ||
+	    (r = sshbuf_putb(e->output, msg)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	sshbuf_free(msg);
 }
 
 /* ssh1 only */
@@ -240,27 +253,30 @@ process_authentication_challenge1(SocketEntry *e)
 	u_int response_type;
 	BIGNUM *challenge;
 	Identity *id;
-	int r, i, len;
-	Buffer msg;
+	int r, len;
+	struct sshbuf *msg;
 	MD5_CTX md;
 	struct sshkey *key;
 
-	buffer_init(&msg);
+	if ((msg = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	if ((key = sshkey_new(KEY_RSA1)) == NULL)
 		fatal("%s: sshkey_new failed", __func__);
 	if ((challenge = BN_new()) == NULL)
 		fatal("%s: BN_new failed", __func__);
 
-	(void) buffer_get_int(&e->request);			/* ignored */
-	buffer_get_bignum(&e->request, key->rsa->e);
-	buffer_get_bignum(&e->request, key->rsa->n);
-	buffer_get_bignum(&e->request, challenge);
+	if ((r = sshbuf_get_u32(e->request, NULL)) != 0 || /* ignored */
+	    (r = sshbuf_get_bignum1(e->request, key->rsa->e)) != 0 ||
+	    (r = sshbuf_get_bignum1(e->request, key->rsa->n)) != 0 ||
+	    (r = sshbuf_get_bignum1(e->request, challenge)))
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	/* Only protocol 1.1 is supported */
-	if (buffer_len(&e->request) == 0)
+	if (sshbuf_len(e->request) == 0)
 		goto failure;
-	buffer_get(&e->request, session_id, 16);
-	response_type = buffer_get_int(&e->request);
+	if ((r = sshbuf_get(e->request, session_id, sizeof(session_id))) != 0 ||
+	    (r = sshbuf_get_u32(e->request, &response_type)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (response_type != 1)
 		goto failure;
 
@@ -289,21 +305,23 @@ process_authentication_challenge1(SocketEntry *e)
 		MD5_Final(mdbuf, &md);
 
 		/* Send the response. */
-		buffer_put_char(&msg, SSH_AGENT_RSA_RESPONSE);
-		for (i = 0; i < 16; i++)
-			buffer_put_char(&msg, mdbuf[i]);
+		if ((r = sshbuf_put_u8(msg, SSH_AGENT_RSA_RESPONSE)) != 0 ||
+		    (r = sshbuf_put(msg, mdbuf, sizeof(mdbuf))) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		goto send;
 	}
 
-failure:
+ failure:
 	/* Unknown identity or protocol error.  Send failure. */
-	buffer_put_char(&msg, SSH_AGENT_FAILURE);
-send:
-	buffer_put_int(&e->output, buffer_len(&msg));
-	buffer_append(&e->output, buffer_ptr(&msg), buffer_len(&msg));
+	if ((r = sshbuf_put_u8(msg, SSH_AGENT_FAILURE)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+ send:
+	if ((r = sshbuf_put_u32(e->output, sshbuf_len(msg))) != 0 ||
+	    (r = sshbuf_putb(e->output, msg)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	sshkey_free(key);
 	BN_clear_free(challenge);
-	buffer_free(&msg);
+	sshbuf_free(msg);
 }
 
 /* ssh2 only */
@@ -314,14 +332,15 @@ process_sign_request2(SocketEntry *e)
 	size_t blen, dlen, slen = 0;
 	u_int compat = 0;
 	int r, ok = -1, flags;
-	Buffer msg;
+	struct sshbuf *msg;
 	struct sshkey *key;
 
-	if ((r = sshbuf_get_string(&e->request, &blob, &blen)) != 0 ||
-	    (r = sshbuf_get_string(&e->request, &data, &dlen)) != 0)
+	if ((r = sshbuf_get_string(e->request, &blob, &blen)) != 0 ||
+	    (r = sshbuf_get_string(e->request, &data, &dlen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
-	flags = buffer_get_int(&e->request);
+	if ((r = sshbuf_get_u32(e->request, &flags)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (flags & SSH_AGENT_OLD_SIGNATURE)
 		compat = SSH_BUG_SIGBLOB;
 
@@ -337,17 +356,20 @@ process_sign_request2(SocketEntry *e)
 		}
 		sshkey_free(key);
 	}
-	buffer_init(&msg);
+	if ((msg = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	if (ok == 0) {
-		buffer_put_char(&msg, SSH2_AGENT_SIGN_RESPONSE);
-		buffer_put_string(&msg, signature, slen);
-	} else {
-		buffer_put_char(&msg, SSH_AGENT_FAILURE);
-	}
-	buffer_put_int(&e->output, buffer_len(&msg));
-	buffer_append(&e->output, buffer_ptr(&msg),
-	    buffer_len(&msg));
-	buffer_free(&msg);
+		if ((r = sshbuf_put_u8(msg, SSH2_AGENT_SIGN_RESPONSE)) != 0 ||
+		    (r = sshbuf_put_string(msg, signature, slen)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	} else if ((r = sshbuf_put_u8(msg, SSH_AGENT_FAILURE)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+
+	if ((r = sshbuf_put_u32(e->output, sshbuf_len(msg))) != 0 ||
+	    (r = sshbuf_putb(e->output, msg)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+
+	sshbuf_free(msg);
 	xfree(data);
 	xfree(blob);
 	if (signature != NULL)
@@ -358,7 +380,8 @@ process_sign_request2(SocketEntry *e)
 static void
 process_remove_identity(SocketEntry *e, int version)
 {
-	u_int blen, bits;
+	size_t blen;
+	u_int bits;
 	int r, success = 0;
 	struct sshkey *key = NULL;
 	u_char *blob;
@@ -369,9 +392,10 @@ process_remove_identity(SocketEntry *e, int version)
 			error("%s: sshkey_new failed", __func__);
 			return;
 		}
-		bits = buffer_get_int(&e->request);
-		buffer_get_bignum(&e->request, key->rsa->e);
-		buffer_get_bignum(&e->request, key->rsa->n);
+		if ((r = sshbuf_get_u32(e->request, &bits)) != 0 ||
+		    (r = sshbuf_get_bignum1(e->request, key->rsa->e)) != 0 ||
+		    (r = sshbuf_get_bignum1(e->request, key->rsa->n)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 		if (bits != sshkey_size(key))
 			logit("Warning: identity keysize mismatch: "
@@ -379,7 +403,8 @@ process_remove_identity(SocketEntry *e, int version)
 			    sshkey_size(key), bits);
 		break;
 	case 2:
-		blob = buffer_get_string(&e->request, &blen);
+		if ((r = sshbuf_get_string(e->request, &blob, &blen)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		if ((r = sshkey_from_blob(blob, blen, &key)) != 0)
 			error("%s: sshkey_from_blob failed: %s",
 			    __func__, ssh_err(r));
@@ -408,9 +433,10 @@ process_remove_identity(SocketEntry *e, int version)
 		}
 		sshkey_free(key);
 	}
-	buffer_put_int(&e->output, 1);
-	buffer_put_char(&e->output,
-	    success ? SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE);
+	if ((r = sshbuf_put_u32(e->output, 1)) != 0 ||
+	    (r = sshbuf_put_u8(e->output, success ?
+	    SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 }
 
 static void
@@ -418,6 +444,7 @@ process_remove_all_identities(SocketEntry *e, int version)
 {
 	Idtab *tab = idtab_lookup(version);
 	Identity *id;
+	int r;
 
 	/* Loop over all identities and clear the keys. */
 	for (id = TAILQ_FIRST(&tab->idlist); id;
@@ -430,8 +457,9 @@ process_remove_all_identities(SocketEntry *e, int version)
 	tab->nentries = 0;
 
 	/* Send success. */
-	buffer_put_int(&e->output, 1);
-	buffer_put_char(&e->output, SSH_AGENT_SUCCESS);
+	if ((r = sshbuf_put_u32(e->output, 1)) != 0 ||
+	    (r = sshbuf_put_u8(e->output, SSH_AGENT_SUCCESS)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 }
 
 /* removes expired keys and returns number of seconds until the next expiry */
@@ -465,195 +493,358 @@ reaper(void)
 		return (deadline - now);
 }
 
+static int
+agent_decode_rsa1(struct sshbuf *m, struct sshkey **kp)
+{
+	struct sshkey *k = NULL;
+	int r = SSH_ERR_INTERNAL_ERROR;
+
+	*kp = NULL;
+	if ((k = sshkey_new_private(KEY_RSA1)) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+
+	if ((r = sshbuf_get_u32(m, NULL)) != 0 ||		/* ignored */
+	    (r = sshbuf_get_bignum1(m, k->rsa->n)) != 0 ||
+	    (r = sshbuf_get_bignum1(m, k->rsa->e)) != 0 ||
+	    (r = sshbuf_get_bignum1(m, k->rsa->d)) != 0 ||
+	    (r = sshbuf_get_bignum1(m, k->rsa->iqmp)) != 0 ||
+	    /* SSH1 and SSL have p and q swapped */
+	    (r = sshbuf_get_bignum1(m, k->rsa->q)) != 0 ||	/* p */
+	    (r = sshbuf_get_bignum1(m, k->rsa->p)) != 0) 	/* q */
+		goto out;
+
+	/* Generate additional parameters */
+	if ((r = rsa_generate_additional_parameters(k->rsa)) != 0)
+		goto out;
+	if (RSA_blinding_on(k->rsa, NULL) != 1) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
+
+	r = 0; /* success */
+ out:
+	if (r == 0)
+		*kp = k;
+	else
+		sshkey_free(k);
+	return r;
+}
+
+static int
+agent_decode_rsa(struct sshbuf *m, const char *typename,
+    int type, struct sshkey **kp)
+{
+	struct sshkey *k = NULL;
+	int r = SSH_ERR_INTERNAL_ERROR;
+
+	*kp = NULL;
+	if ((k = sshkey_new_private(type)) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+
+	if ((r = sshbuf_get_bignum2(m, k->rsa->n)) != 0 ||
+	    (r = sshbuf_get_bignum2(m, k->rsa->e)) != 0 ||
+	    (r = sshbuf_get_bignum2(m, k->rsa->d)) != 0 ||
+	    (r = sshbuf_get_bignum2(m, k->rsa->iqmp)) != 0 ||
+	    (r = sshbuf_get_bignum2(m, k->rsa->p)) != 0 ||
+	    (r = sshbuf_get_bignum2(m, k->rsa->q)) != 0)
+		goto out;
+
+	/* Generate additional parameters */
+	if ((r = rsa_generate_additional_parameters(k->rsa)) != 0)
+		goto out;
+	if (RSA_blinding_on(k->rsa, NULL) != 1) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
+
+	r = 0; /* success */
+ out:
+	if (r == 0)
+		*kp = k;
+	else
+		sshkey_free(k);
+	return r;
+}
+
+static int
+agent_decode_rsa_cert(struct sshbuf *m, const char *typename,
+    int type, struct sshkey **kp)
+{
+	struct sshkey *k = NULL;
+	int r = SSH_ERR_INTERNAL_ERROR;
+	u_char *blob = NULL;
+	size_t len;
+
+	*kp = NULL;
+
+	if ((r = sshbuf_get_string(m, &blob, &len)) != 0 ||
+	    (r = sshkey_from_blob(blob, len, &k)) != 0 ||
+	    (r = sshkey_add_private(k)) != 0 ||
+	    (r = sshbuf_get_bignum2(m, k->rsa->d) != 0) ||
+	    (r = sshbuf_get_bignum2(m, k->rsa->iqmp) != 0) ||
+	    (r = sshbuf_get_bignum2(m, k->rsa->p) != 0) ||
+	    (r = sshbuf_get_bignum2(m, k->rsa->q) != 0))
+		goto out;
+
+	/* Generate additional parameters */
+	if ((r = rsa_generate_additional_parameters(k->rsa)) != 0)
+		goto out;
+	if (RSA_blinding_on(k->rsa, NULL) != 1) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
+
+	r = 0; /* success */
+ out:
+	if (blob) {
+		bzero(blob, len);
+		free(blob);
+	}
+	if (r == 0)
+		*kp = k;
+	else
+		sshkey_free(k);
+	return r;
+}
+
+static int
+agent_decode_dsa(struct sshbuf *m, const char *typename,
+    int type, struct sshkey **kp)
+{
+	struct sshkey *k = NULL;
+	int r = SSH_ERR_INTERNAL_ERROR;
+
+	*kp = NULL;
+	if ((k = sshkey_new_private(type)) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+
+	if ((r = sshbuf_get_bignum2(m, k->dsa->p)) != 0 ||
+	    (r = sshbuf_get_bignum2(m, k->dsa->q)) != 0 ||
+	    (r = sshbuf_get_bignum2(m, k->dsa->g)) != 0 ||
+	    (r = sshbuf_get_bignum2(m, k->dsa->pub_key)) != 0 ||
+	    (r = sshbuf_get_bignum2(m, k->dsa->priv_key)) != 0)
+		goto out;
+
+	r = 0; /* success */
+ out:
+	if (r == 0)
+		*kp = k;
+	else
+		sshkey_free(k);
+	return r;
+}
+
+static int
+agent_decode_dsa_cert(struct sshbuf *m, const char *typename,
+    int type, struct sshkey **kp)
+{
+	struct sshkey *k = NULL;
+	int r = SSH_ERR_INTERNAL_ERROR;
+	u_char *blob = NULL;
+	size_t len;
+
+	*kp = NULL;
+
+	if ((r = sshbuf_get_string(m, &blob, &len)) != 0 ||
+	    (r = sshkey_from_blob(blob, len, &k)) != 0 ||
+	    (r = sshkey_add_private(k)) != 0 ||
+	    (r = sshbuf_get_bignum2(m, k->dsa->priv_key)) != 0)
+		goto out;
+
+	r = 0; /* success */
+ out:
+	if (blob) {
+		bzero(blob, len);
+		free(blob);
+	}
+	if (r == 0)
+		*kp = k;
+	else
+		sshkey_free(k);
+	return r;
+}
+
+static int
+agent_decode_ecdsa(struct sshbuf *m, const char *typename,
+    int type, struct sshkey **kp)
+{
+	struct sshkey *k = NULL;
+	int r = SSH_ERR_INTERNAL_ERROR;
+	char *curve = NULL;
+	BIGNUM *exponent = NULL;
+
+	*kp = NULL;
+	if ((k = sshkey_new_private(type)) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if ((k->ecdsa_nid = sshkey_ecdsa_nid_from_name(typename)) == -1) {
+		r = SSH_ERR_INVALID_ARGUMENT;
+		goto out;
+	}
+	if ((r = sshbuf_get_cstring(m, &curve, NULL)) != 0)
+		goto out;
+	if (k->ecdsa_nid != sshkey_curve_name_to_nid(curve)) {
+		r = SSH_ERR_EC_CURVE_MISMATCH;
+		goto out;
+	}
+	if ((k->ecdsa = EC_KEY_new_by_curve_name(k->ecdsa_nid)) == NULL ||
+	    (exponent = BN_new()) == NULL) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
+	if ((r = sshbuf_get_eckey(m, k->ecdsa)) != 0 ||
+	    (r = sshbuf_get_bignum2(m, exponent)))
+		goto out;
+	if (EC_KEY_set_private_key(k->ecdsa, exponent) != 1) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
+	if ((r = sshkey_ec_validate_public(EC_KEY_get0_group(k->ecdsa),
+	    EC_KEY_get0_public_key(k->ecdsa)) != 0) ||
+	    (r = sshkey_ec_validate_private(k->ecdsa)) != 0)
+		goto out;
+
+	r = 0; /* success */
+ out:
+	if (curve) {
+		bzero(curve, strlen(curve));
+		free(curve);
+	}
+	if (exponent)
+		BN_clear_free(exponent);
+	if (r == 0)
+		*kp = k;
+	else
+		sshkey_free(k);
+	return r;
+}
+
+static int
+agent_decode_ecdsa_cert(struct sshbuf *m, const char *typename,
+    int type, struct sshkey **kp)
+{
+	struct sshkey *k = NULL;
+	int r = SSH_ERR_INTERNAL_ERROR;
+	u_char *blob = NULL;
+	size_t len;
+	BIGNUM *exponent = NULL;
+
+	*kp = NULL;
+
+	if ((exponent = BN_new()) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+
+	if ((r = sshbuf_get_string(m, &blob, &len)) != 0 ||
+	    (r = sshkey_from_blob(blob, len, &k)) != 0 ||
+	    (r = sshkey_add_private(k)) != 0 ||
+	    (r = sshbuf_get_bignum2(m, exponent)) != 0)
+		goto out;
+
+	if (EC_KEY_set_private_key(k->ecdsa, exponent) != 1) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
+	if ((r = sshkey_ec_validate_public(EC_KEY_get0_group(k->ecdsa),
+	    EC_KEY_get0_public_key(k->ecdsa)) != 0) ||
+	    (r = sshkey_ec_validate_private(k->ecdsa)) != 0)
+		goto out;
+
+	r = 0; /* success */
+ out:
+	if (exponent)
+		BN_clear_free(exponent);
+	if (blob) {
+		bzero(blob, len);
+		free(blob);
+	}
+	if (r == 0)
+		*kp = k;
+	else
+		sshkey_free(k);
+	return r;
+}
+
 static void
 process_add_identity(SocketEntry *e, int version)
 {
 	Idtab *tab = idtab_lookup(version);
 	Identity *id;
-	int r, type, success = 0, death = 0, confirm = 0;
-	char *type_name, *comment, *curve;
+	int type, success = 0, death = 0, confirm = 0;
+	char *type_name, *comment;
 	struct sshkey *k = NULL;
-	BIGNUM *exponent;
-	EC_POINT *q;
-	u_char *cert;
-	u_int len;
+	u_char ctype;
+	int r = SSH_ERR_INTERNAL_ERROR;
 
 	switch (version) {
 	case 1:
-		if ((k = sshkey_new_private(KEY_RSA1)) == NULL)
-			fatal("%s: sshkey_new_private failed", __func__);
-		(void) buffer_get_int(&e->request);		/* ignored */
-		buffer_get_bignum(&e->request, k->rsa->n);
-		buffer_get_bignum(&e->request, k->rsa->e);
-		buffer_get_bignum(&e->request, k->rsa->d);
-		buffer_get_bignum(&e->request, k->rsa->iqmp);
-
-		/* SSH and SSL have p and q swapped */
-		buffer_get_bignum(&e->request, k->rsa->q);	/* p */
-		buffer_get_bignum(&e->request, k->rsa->p);	/* q */
-
-		/* Generate additional parameters */
-		if ((r = rsa_generate_additional_parameters(k->rsa)) != 0)
-			fatal("generate RSA parameters failed: %s", ssh_err(r));
+		r = agent_decode_rsa1(e->request, &k);
 		break;
 	case 2:
-		type_name = buffer_get_string(&e->request, NULL);
+		if ((r = sshbuf_get_cstring(e->request, &type_name, NULL)) != 0)
+			break;
 		type = sshkey_type_from_name(type_name);
 		switch (type) {
 		case KEY_DSA:
-			if ((k = sshkey_new_private(type)) == NULL)
-				fatal("%s: sshkey_new_private failed",
-				    __func__);
-			buffer_get_bignum2(&e->request, k->dsa->p);
-			buffer_get_bignum2(&e->request, k->dsa->q);
-			buffer_get_bignum2(&e->request, k->dsa->g);
-			buffer_get_bignum2(&e->request, k->dsa->pub_key);
-			buffer_get_bignum2(&e->request, k->dsa->priv_key);
+			r = agent_decode_dsa(e->request, type_name, type, &k);
 			break;
 		case KEY_DSA_CERT_V00:
 		case KEY_DSA_CERT:
-			cert = buffer_get_string(&e->request, &len);
-			if ((r = sshkey_from_blob(cert, len, &k)) != 0)
-				fatal("Certificate parse failed: %s",
-				    ssh_err(r));
-			xfree(cert);
-			if ((r = sshkey_add_private(k)) != 0)
-				fatal("%s: sshkey_add_private: %s",
-				    __func__, ssh_err(r));
-			buffer_get_bignum2(&e->request, k->dsa->priv_key);
+			r = agent_decode_dsa_cert(e->request, type_name,
+			    type, &k);
 			break;
 		case KEY_ECDSA:
-			if ((k = sshkey_new_private(type)) == NULL)
-				fatal("%s: sshkey_new_private failed",
-				    __func__);
-			k->ecdsa_nid = sshkey_ecdsa_nid_from_name(type_name);
-			curve = buffer_get_string(&e->request, NULL);
-			if (k->ecdsa_nid != sshkey_curve_name_to_nid(curve))
-				fatal("%s: curve names mismatch", __func__);
-			xfree(curve);
-			k->ecdsa = EC_KEY_new_by_curve_name(k->ecdsa_nid);
-			if (k->ecdsa == NULL)
-				fatal("%s: EC_KEY_new_by_curve_name failed",
-				    __func__);
-			q = EC_POINT_new(EC_KEY_get0_group(k->ecdsa));
-			if (q == NULL)
-				fatal("%s: BN_new failed", __func__);
-			if ((exponent = BN_new()) == NULL)
-				fatal("%s: BN_new failed", __func__);
-			buffer_get_ecpoint(&e->request,
-				EC_KEY_get0_group(k->ecdsa), q);
-			buffer_get_bignum2(&e->request, exponent);
-			if (EC_KEY_set_public_key(k->ecdsa, q) != 1)
-				fatal("%s: EC_KEY_set_public_key failed",
-				    __func__);
-			if (EC_KEY_set_private_key(k->ecdsa, exponent) != 1)
-				fatal("%s: EC_KEY_set_private_key failed",
-				    __func__);
-			if (sshkey_ec_validate_public(
-			    EC_KEY_get0_group(k->ecdsa),
-			    EC_KEY_get0_public_key(k->ecdsa)) != 0)
-				fatal("%s: bad ECDSA public key", __func__);
-			if (sshkey_ec_validate_private(k->ecdsa) != 0)
-				fatal("%s: bad ECDSA private key", __func__);
-			BN_clear_free(exponent);
-			EC_POINT_free(q);
+			r = agent_decode_ecdsa(e->request, type_name, type, &k);
 			break;
 		case KEY_ECDSA_CERT:
-			cert = buffer_get_string(&e->request, &len);
-			if ((r = sshkey_from_blob(cert, len, &k)) != 0)
-				fatal("Certificate parse failed: %s",
-				    ssh_err(r));
-			xfree(cert);
-			if ((r = sshkey_add_private(k)) != 0)
-				fatal("%s: key_add_private: %s",
-				    __func__, ssh_err(r));
-			if ((exponent = BN_new()) == NULL)
-				fatal("%s: BN_new failed", __func__);
-			buffer_get_bignum2(&e->request, exponent);
-			if (EC_KEY_set_private_key(k->ecdsa, exponent) != 1)
-				fatal("%s: EC_KEY_set_private_key failed",
-				    __func__);
-			if (sshkey_ec_validate_public(
-			    EC_KEY_get0_group(k->ecdsa),
-			    EC_KEY_get0_public_key(k->ecdsa)) != 0 ||
-			    sshkey_ec_validate_private(k->ecdsa) != 0)
-				fatal("%s: bad ECDSA key", __func__);
-			BN_clear_free(exponent);
+			r = agent_decode_ecdsa_cert(e->request, type_name,
+			    type, &k);
 			break;
 		case KEY_RSA:
-			if ((k = sshkey_new_private(type)) == NULL)
-				fatal("%s: sshkey_new_private failed",
-				    __func__);
-			buffer_get_bignum2(&e->request, k->rsa->n);
-			buffer_get_bignum2(&e->request, k->rsa->e);
-			buffer_get_bignum2(&e->request, k->rsa->d);
-			buffer_get_bignum2(&e->request, k->rsa->iqmp);
-			buffer_get_bignum2(&e->request, k->rsa->p);
-			buffer_get_bignum2(&e->request, k->rsa->q);
-
-			/* Generate additional parameters */
-			if ((r = rsa_generate_additional_parameters(
-			    k->rsa)) != 0)
-				fatal("generate RSA parameters failed: %s",
-				    ssh_err(r));
+			r = agent_decode_rsa(e->request, type_name, type, &k);
 			break;
 		case KEY_RSA_CERT_V00:
 		case KEY_RSA_CERT:
-			cert = buffer_get_string(&e->request, &len);
-			if ((r = sshkey_from_blob(cert, len, &k)) != 0)
-				fatal("Certificate parse failed: %s",
-				    ssh_err(r));
-			xfree(cert);
-			if ((r = sshkey_add_private(k)) != 0)
-				fatal("%s: key_add_private: %s",
-				    __func__, ssh_err(r));
-			buffer_get_bignum2(&e->request, k->rsa->d);
-			buffer_get_bignum2(&e->request, k->rsa->iqmp);
-			buffer_get_bignum2(&e->request, k->rsa->p);
-			buffer_get_bignum2(&e->request, k->rsa->q);
+			r = agent_decode_rsa_cert(e->request, type_name,
+			    type, &k);
 			break;
 		default:
-			xfree(type_name);
-			buffer_clear(&e->request);
-			goto send;
+			r = SSH_ERR_KEY_TYPE_UNKNOWN;
+			break;
 		}
-		xfree(type_name);
 		break;
 	}
-	comment = buffer_get_string(&e->request, NULL);
-	if (k == NULL) {
-		xfree(comment);
+	free(type_name);
+	if (r != 0 || k == NULL ||
+	    (r = sshbuf_get_cstring(e->request, &comment, NULL)) != 0) {
+		error("%s: decode private key: %s", __func__, ssh_err(r));
+		sshbuf_reset(e->request);
 		goto send;
 	}
-	/* enable blinding */
-	switch (k->type) {
-	case KEY_RSA:
-	case KEY_RSA_CERT_V00:
-	case KEY_RSA_CERT:
-	case KEY_RSA1:
-		if (RSA_blinding_on(k->rsa, NULL) != 1) {
-			error("process_add_identity: RSA_blinding_on failed");
-			sshkey_free(k);
-			goto send;
-		}
-		break;
-	}
-	while (buffer_len(&e->request)) {
-		switch ((type = buffer_get_char(&e->request))) {
+
+	while (sshbuf_len(e->request)) {
+		if ((r = sshbuf_get_u8(e->request, &ctype)) != 0)
+			break;
+		switch (ctype) {
 		case SSH_AGENT_CONSTRAIN_LIFETIME:
-			death = time(NULL) + buffer_get_int(&e->request);
+			if ((r = sshbuf_get_u32(e->request, &death)) != 0) {
+				error("%s: bad lifetime constraint: %s",
+				    __func__, ssh_err(r));
+				sshbuf_reset(e->request);
+				free(comment);
+				goto send;
+			}
+			death += time(NULL);
 			break;
 		case SSH_AGENT_CONSTRAIN_CONFIRM:
 			confirm = 1;
 			break;
 		default:
-			error("process_add_identity: "
-			    "Unknown constraint type %d", type);
-			xfree(comment);
+			error("%s: Unknown constraint %d", __func__, ctype);
+			free(comment);
 			sshkey_free(k);
 			goto send;
 		}
 	}
+
 	success = 1;
 	if (lifetime && !death)
 		death = time(NULL) + lifetime;
@@ -671,19 +862,21 @@ process_add_identity(SocketEntry *e, int version)
 	id->death = death;
 	id->confirm = confirm;
 send:
-	buffer_put_int(&e->output, 1);
-	buffer_put_char(&e->output,
-	    success ? SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE);
+	if ((r = sshbuf_put_u32(e->output, 1)) != 0 ||
+	    (r = sshbuf_put_u8(e->output, success ?
+	    SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 }
 
 /* XXX todo: encrypt sensitive data with passphrase */
 static void
 process_lock_agent(SocketEntry *e, int lock)
 {
-	int success = 0;
+	int r, success = 0;
 	char *passwd;
 
-	passwd = buffer_get_string(&e->request, NULL);
+	if ((r = sshbuf_get_cstring(e->request, &passwd, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (locked && !lock && strcmp(passwd, lock_passwd) == 0) {
 		locked = 0;
 		memset(lock_passwd, 0, strlen(lock_passwd));
@@ -698,24 +891,30 @@ process_lock_agent(SocketEntry *e, int lock)
 	memset(passwd, 0, strlen(passwd));
 	xfree(passwd);
 
-	buffer_put_int(&e->output, 1);
-	buffer_put_char(&e->output,
-	    success ? SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE);
+	if ((r = sshbuf_put_u32(e->output, 1)) != 0 ||
+	    (r = sshbuf_put_u8(e->output, success ?
+	    SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 }
 
 static void
 no_identities(SocketEntry *e, u_int type)
 {
-	Buffer msg;
+	struct sshbuf *msg;
+	int r;
 
-	buffer_init(&msg);
-	buffer_put_char(&msg,
+	if ((msg = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((r = sshbuf_put_u8(msg,
 	    (type == SSH_AGENTC_REQUEST_RSA_IDENTITIES) ?
-	    SSH_AGENT_RSA_IDENTITIES_ANSWER : SSH2_AGENT_IDENTITIES_ANSWER);
-	buffer_put_int(&msg, 0);
-	buffer_put_int(&e->output, buffer_len(&msg));
-	buffer_append(&e->output, buffer_ptr(&msg), buffer_len(&msg));
-	buffer_free(&msg);
+	    SSH_AGENT_RSA_IDENTITIES_ANSWER :
+	    SSH2_AGENT_IDENTITIES_ANSWER)) != 0 ||
+	    (r = sshbuf_put_u32(msg, 0)) != 0 ||
+	    (r = sshbuf_put_u32(e->output, sshbuf_len(msg))) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if ((r = sshbuf_putb(e->output, msg)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	sshbuf_free(msg);
 }
 
 #ifdef ENABLE_PKCS11
@@ -723,18 +922,25 @@ static void
 process_add_smartcard_key(SocketEntry *e)
 {
 	char *provider = NULL, *pin;
-	int i, type, version, count = 0, success = 0, death = 0, confirm = 0;
+	int r, i, version, count = 0, success = 0, death = 0, confirm = 0;
+	u_char type;
 	struct sshkey **keys = NULL, *k;
 	Identity *id;
 	Idtab *tab;
 
-	provider = buffer_get_string(&e->request, NULL);
-	pin = buffer_get_string(&e->request, NULL);
+	if ((r = sshbuf_get_cstring(e->request, &provider, NULL)) != 0 ||
+	    (r = sshbuf_get_cstring(e->request, &pin, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
-	while (buffer_len(&e->request)) {
-		switch ((type = buffer_get_char(&e->request))) {
+	while (sshbuf_len(e->request)) {
+		if ((r = sshbuf_get_u8(e->request, &type)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
+		switch (type) {
 		case SSH_AGENT_CONSTRAIN_LIFETIME:
-			death = time(NULL) + buffer_get_int(&e->request);
+			if ((r = sshbuf_get_u32(e->request, &death)) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
+			death += time(NULL);
 			break;
 		case SSH_AGENT_CONSTRAIN_CONFIRM:
 			confirm = 1;
@@ -775,21 +981,23 @@ send:
 		xfree(provider);
 	if (keys)
 		xfree(keys);
-	buffer_put_int(&e->output, 1);
-	buffer_put_char(&e->output,
-	    success ? SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE);
+	if ((r = sshbuf_put_u32(e->output, 1)) != 0 ||
+	    (r = sshbuf_put_u8(e->output, success ?
+	    SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 }
 
 static void
 process_remove_smartcard_key(SocketEntry *e)
 {
 	char *provider = NULL, *pin = NULL;
-	int version, success = 0;
+	int r, version, success = 0;
 	Identity *id, *nxt;
 	Idtab *tab;
 
-	provider = buffer_get_string(&e->request, NULL);
-	pin = buffer_get_string(&e->request, NULL);
+	if ((r = sshbuf_get_cstring(e->request, &provider, NULL)) != 0 ||
+	    (r = sshbuf_get_cstring(e->request, &pin, NULL)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	xfree(pin);
 
 	for (version = 1; version < 3; version++) {
@@ -809,9 +1017,10 @@ process_remove_smartcard_key(SocketEntry *e)
 		error("process_remove_smartcard_key:"
 		    " pkcs11_del_provider failed");
 	xfree(provider);
-	buffer_put_int(&e->output, 1);
-	buffer_put_char(&e->output,
-	    success ? SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE);
+	if ((r = sshbuf_put_u32(e->output, 1)) != 0 ||
+	    (r = sshbuf_put_u8(e->output, success ?
+	    SSH_AGENT_SUCCESS : SSH_AGENT_FAILURE)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 }
 #endif /* ENABLE_PKCS11 */
 
@@ -820,30 +1029,32 @@ process_remove_smartcard_key(SocketEntry *e)
 static void
 process_message(SocketEntry *e)
 {
-	u_int msg_len, type;
-	u_char *cp;
+	u_int msg_len;
+	u_char type, *cp;
+	int r;
 
-	if (buffer_len(&e->input) < 5)
+	if (sshbuf_len(e->input) < 5)
 		return;		/* Incomplete message. */
-	cp = buffer_ptr(&e->input);
-	msg_len = get_u32(cp);
+	cp = sshbuf_ptr(e->input);
+	msg_len = PEEK_U32(cp);
 	if (msg_len > 256 * 1024) {
 		close_socket(e);
 		return;
 	}
-	if (buffer_len(&e->input) < msg_len + 4)
+	if (sshbuf_len(e->input) < msg_len + 4)
 		return;
 
 	/* move the current input to e->request */
-	buffer_consume(&e->input, 4);
-	buffer_clear(&e->request);
-	buffer_append(&e->request, buffer_ptr(&e->input), msg_len);
-	buffer_consume(&e->input, msg_len);
-	type = buffer_get_char(&e->request);
+	sshbuf_reset(e->request);
+	if ((r = sshbuf_consume(e->input, 4)) != 0 ||
+	    (r = sshbuf_put(e->request, sshbuf_ptr(e->input), msg_len)) != 0 ||
+	    (r = sshbuf_consume(e->input, msg_len)) != 0 ||
+	    (r = sshbuf_get_u8(e->request, &type)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	/* check wheter agent is locked */
 	if (locked && type != SSH_AGENTC_UNLOCK) {
-		buffer_clear(&e->request);
+		sshbuf_reset(e->request);
 		switch (type) {
 		case SSH_AGENTC_REQUEST_RSA_IDENTITIES:
 		case SSH2_AGENTC_REQUEST_IDENTITIES:
@@ -852,8 +1063,11 @@ process_message(SocketEntry *e)
 			break;
 		default:
 			/* send a fail message for all other request types */
-			buffer_put_int(&e->output, 1);
-			buffer_put_char(&e->output, SSH_AGENT_FAILURE);
+			if ((r = sshbuf_put_u32(e->output, 1)) != 0 ||
+			    (r = sshbuf_put_u8(e->output,
+			    SSH_AGENT_FAILURE)) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 		}
 		return;
 	}
@@ -910,9 +1124,10 @@ process_message(SocketEntry *e)
 	default:
 		/* Unknown message.  Respond with failure. */
 		error("Unknown message %d", type);
-		buffer_clear(&e->request);
-		buffer_put_int(&e->output, 1);
-		buffer_put_char(&e->output, SSH_AGENT_FAILURE);
+		sshbuf_reset(e->request);
+		if ((r = sshbuf_put_u32(e->output, 1)) != 0 ||
+		    (r = sshbuf_put_u8(e->output, SSH_AGENT_FAILURE)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		break;
 	}
 }
@@ -930,9 +1145,12 @@ new_socket(sock_type type, int fd)
 	for (i = 0; i < sockets_alloc; i++)
 		if (sockets[i].type == AUTH_UNUSED) {
 			sockets[i].fd = fd;
-			buffer_init(&sockets[i].input);
-			buffer_init(&sockets[i].output);
-			buffer_init(&sockets[i].request);
+			if ((sockets[i].input = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+			if ((sockets[i].output = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+			if ((sockets[i].request = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 			sockets[i].type = type;
 			return;
 		}
@@ -943,9 +1161,12 @@ new_socket(sock_type type, int fd)
 		sockets[i].type = AUTH_UNUSED;
 	sockets_alloc = new_alloc;
 	sockets[old_alloc].fd = fd;
-	buffer_init(&sockets[old_alloc].input);
-	buffer_init(&sockets[old_alloc].output);
-	buffer_init(&sockets[old_alloc].request);
+	if ((sockets[old_alloc].input = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((sockets[old_alloc].output = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
+	if ((sockets[old_alloc].request = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 	sockets[old_alloc].type = type;
 }
 
@@ -992,7 +1213,7 @@ prepare_select(fd_set **fdrp, fd_set **fdwp, int *fdl, u_int *nallocp,
 		case AUTH_SOCKET:
 		case AUTH_CONNECTION:
 			FD_SET(sockets[i].fd, *fdrp);
-			if (buffer_len(&sockets[i].output) > 0)
+			if (sshbuf_len(sockets[i].output) > 0)
 				FD_SET(sockets[i].fd, *fdwp);
 			break;
 		default:
@@ -1019,7 +1240,7 @@ after_select(fd_set *readset, fd_set *writeset)
 	struct sockaddr_un sunaddr;
 	socklen_t slen;
 	char buf[1024];
-	int len, sock;
+	int len, sock, r;
 	u_int i, orig_alloc;
 	uid_t euid;
 	gid_t egid;
@@ -1055,11 +1276,11 @@ after_select(fd_set *readset, fd_set *writeset)
 			}
 			break;
 		case AUTH_CONNECTION:
-			if (buffer_len(&sockets[i].output) > 0 &&
+			if (sshbuf_len(sockets[i].output) > 0 &&
 			    FD_ISSET(sockets[i].fd, writeset)) {
 				len = write(sockets[i].fd,
-				    buffer_ptr(&sockets[i].output),
-				    buffer_len(&sockets[i].output));
+				    sshbuf_ptr(sockets[i].output),
+				    sshbuf_len(sockets[i].output));
 				if (len == -1 && (errno == EAGAIN ||
 				    errno == EINTR))
 					continue;
@@ -1067,7 +1288,10 @@ after_select(fd_set *readset, fd_set *writeset)
 					close_socket(&sockets[i]);
 					break;
 				}
-				buffer_consume(&sockets[i].output, len);
+				if ((r = sshbuf_consume(sockets[i].output,
+				    len)) != 0)
+					fatal("%s: buffer error: %s",
+					    __func__, ssh_err(r));
 			}
 			if (FD_ISSET(sockets[i].fd, readset)) {
 				len = read(sockets[i].fd, buf, sizeof(buf));
@@ -1078,7 +1302,10 @@ after_select(fd_set *readset, fd_set *writeset)
 					close_socket(&sockets[i]);
 					break;
 				}
-				buffer_append(&sockets[i].input, buf, len);
+				if ((r = sshbuf_put(sockets[i].input,
+				    buf, len)) != 0)
+					fatal("%s: buffer error: %s",
+					    __func__, ssh_err(r));
 				process_message(&sockets[i]);
 			}
 			break;
