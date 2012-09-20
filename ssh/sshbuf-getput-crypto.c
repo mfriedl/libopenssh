@@ -41,7 +41,7 @@ sshbuf_get_bignum2(struct sshbuf *buf, BIGNUM *v)
 		return SSH_ERR_BIGNUM_IS_NEGATIVE;
 	if (len > SSHBUF_MAX_BIGNUM)
 		return SSH_ERR_BIGNUM_TOO_LARGE;
-	if (BN_bin2bn(d, len, v) == NULL)
+	if (v != NULL && BN_bin2bn(d, len, v) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	/* Consume the string */
 	if (sshbuf_get_string_direct(buf, NULL, NULL) != 0) {
@@ -69,7 +69,7 @@ sshbuf_get_bignum1(struct sshbuf *buf, BIGNUM *v)
 		return SSH_ERR_BIGNUM_TOO_LARGE;
 	if (sshbuf_len(buf) < 2 + len_bytes)
 		return SSH_ERR_MESSAGE_INCOMPLETE;
-	if (BN_bin2bn(d + 2, len_bytes, v) == NULL)
+	if (v != NULL && BN_bin2bn(d + 2, len_bytes, v) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	if (sshbuf_consume(buf, 2 + len_bytes) != 0) {
 		SSHBUF_DBG(("SSH_ERR_INTERNAL_ERROR"));
@@ -92,9 +92,10 @@ sshbuf_get_ec(struct sshbuf *buf, EC_POINT *v, const EC_GROUP *g)
 	if (len == 0 || len > SSHBUF_MAX_ECPOINT)
 		return SSH_ERR_ECPOINT_TOO_LARGE;
 	/* Only handle uncompressed points */
-	if (*d != POINT_CONVERSION_UNCOMPRESSED ||
-	    EC_POINT_oct2point(g, v, d, len, NULL) != 1)
+	if (*d != POINT_CONVERSION_UNCOMPRESSED)
 		return SSH_ERR_INVALID_FORMAT;
+	if (v != NULL && EC_POINT_oct2point(g, v, d, len, NULL) != 1)
+		return SSH_ERR_INVALID_FORMAT; /* XXX assumption */
 	/* Skip string */
 	if (sshbuf_get_string_direct(buf, NULL, NULL) != 0) {
 		/* Shouldn't happen */
