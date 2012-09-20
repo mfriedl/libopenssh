@@ -44,6 +44,8 @@
 #include "hostfile.h"
 #include "auth.h"
 #include "buffer.h"
+#define PACKET_SKIP_COMPAT
+#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "dispatch.h"
 #include "log.h"
@@ -54,6 +56,7 @@
 #include "ssh-gss.h"
 #endif
 #include "monitor_wrap.h"
+#include "err.h"
 
 #include "schnorr.h"
 #include "jpake.h"
@@ -82,9 +85,10 @@ static int
 userauth_jpake(struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
-	int authenticated = 0;
+	int r, authenticated = 0;
 
-	ssh_packet_check_eom(ssh);
+	if ((r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	debug("jpake-01@openssh.com requested");
 
@@ -149,7 +153,7 @@ derive_rawsalt(const char *username, u_char *rawsalt, u_int len)
 	buffer_init(&b);
 	buffer_put_cstring(&b, username);
 	if ((k = get_hostkey_by_index(0)) == NULL ||
-	    (k->flags & KEY_FLAG_EXT))
+	    (k->flags & SSHKEY_FLAG_EXT))
 		fatal("%s: no hostkeys", __func__);
 	switch (k->type) {
 	case KEY_RSA1:
@@ -378,6 +382,7 @@ auth2_jpake_start(struct ssh *ssh)
 	u_char *x3_proof, *x4_proof;
 	u_int x3_proof_len, x4_proof_len;
 	char *salt, *hash_scheme;
+	int r;
 
 	debug("%s: start", __func__);
 
@@ -393,15 +398,18 @@ auth2_jpake_start(struct ssh *ssh)
 	if (!use_privsep)
 		JPAKE_DEBUG_CTX((pctx, "step 1 sending in %s", __func__));
 
-	ssh_packet_start(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_STEP1);
-	ssh_packet_put_cstring(ssh, hash_scheme);
-	ssh_packet_put_cstring(ssh, salt);
-	ssh_packet_put_string(ssh, pctx->server_id, pctx->server_id_len);
-	ssh_packet_put_bignum2(ssh, pctx->g_x3);
-	ssh_packet_put_bignum2(ssh, pctx->g_x4);
-	ssh_packet_put_string(ssh, x3_proof, x3_proof_len);
-	ssh_packet_put_string(ssh, x4_proof, x4_proof_len);
-	ssh_packet_send(ssh);
+	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_STEP1))
+	    != 0 ||
+	    (r = sshpkt_put_cstring(ssh, hash_scheme)) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, salt)) != 0 ||
+	    (r = sshpkt_put_string(ssh, pctx->server_id,
+	    pctx->server_id_len)) != 0 ||
+	    (r = sshpkt_put_bignum2(ssh, pctx->g_x3)) != 0 ||
+	    (r = sshpkt_put_bignum2(ssh, pctx->g_x4)) != 0 ||
+	    (r = sshpkt_put_string(ssh, x3_proof, x3_proof_len)) != 0 ||
+	    (r = sshpkt_put_string(ssh, x4_proof, x4_proof_len)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	ssh_packet_write_wait(ssh);
 
 	bzero(hash_scheme, strlen(hash_scheme));
@@ -428,7 +436,9 @@ input_userauth_jpake_client_step1(int type, u_int32_t seq, struct ssh *ssh)
 	Authctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	u_char *x1_proof, *x2_proof, *x4_s_proof;
-	u_int x1_proof_len, x2_proof_len, x4_s_proof_len;
+	size_t len, x1_proof_len, x2_proof_len;
+	u_int x4_s_proof_len;
+	int r;
 
 	/* Disable this message */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP1, NULL);
@@ -437,12 +447,14 @@ input_userauth_jpake_client_step1(int type, u_int32_t seq, struct ssh *ssh)
 	if ((pctx->g_x1 = BN_new()) == NULL ||
 	    (pctx->g_x2 = BN_new()) == NULL)
 		fatal("%s: BN_new", __func__);
-	pctx->client_id = ssh_packet_get_string(ssh, &pctx->client_id_len);
-	ssh_packet_get_bignum2(ssh, pctx->g_x1);
-	ssh_packet_get_bignum2(ssh, pctx->g_x2);
-	x1_proof = ssh_packet_get_string(ssh, &x1_proof_len);
-	x2_proof = ssh_packet_get_string(ssh, &x2_proof_len);
-	ssh_packet_check_eom(ssh);
+	if ((r = sshpkt_get_string(ssh, &pctx->client_id, &len)) != 0 ||
+	    (r = sshpkt_get_bignum2(ssh, pctx->g_x1)) != 0 ||
+	    (r = sshpkt_get_bignum2(ssh, pctx->g_x2)) != 0 ||
+	    (r = sshpkt_get_string(ssh, &x1_proof, &x1_proof_len)) != 0 ||
+	    (r = sshpkt_get_string(ssh, &x2_proof, &x2_proof_len)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	pctx->client_id_len = len;
 
 	if (!use_privsep)
 		JPAKE_DEBUG_CTX((pctx, "step 1 received in %s", __func__));
@@ -465,10 +477,12 @@ input_userauth_jpake_client_step1(int type, u_int32_t seq, struct ssh *ssh)
 		JPAKE_DEBUG_CTX((pctx, "step 2 sending in %s", __func__));
 
 	/* Send values for step 2 */
-	ssh_packet_start(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_STEP2);
-	ssh_packet_put_bignum2(ssh, pctx->b);
-	ssh_packet_put_string(ssh, x4_s_proof, x4_s_proof_len);
-	ssh_packet_send(ssh);
+	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_STEP2))
+	    != 0 ||
+	    (r = sshpkt_put_bignum2(ssh, pctx->b)) != 0 ||
+	    (r = sshpkt_put_string(ssh, x4_s_proof, x4_s_proof_len)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	ssh_packet_write_wait(ssh);
 
 	bzero(x4_s_proof, x4_s_proof_len);
@@ -487,7 +501,8 @@ input_userauth_jpake_client_step2(int type, u_int32_t seq, struct ssh *ssh)
 	Authctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	u_char *x2_s_proof;
-	u_int x2_s_proof_len;
+	size_t x2_s_proof_len;
+	int r;
 
 	/* Disable this message */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP2, NULL);
@@ -496,9 +511,10 @@ input_userauth_jpake_client_step2(int type, u_int32_t seq, struct ssh *ssh)
 		fatal("%s: BN_new", __func__);
 
 	/* Fetch step 2 values */
-	ssh_packet_get_bignum2(ssh, pctx->a);
-	x2_s_proof = ssh_packet_get_string(ssh, &x2_s_proof_len);
-	ssh_packet_check_eom(ssh);
+	if ((r = sshpkt_get_bignum2(ssh, pctx->a)) != 0 ||
+	    (r = sshpkt_get_string(ssh, &x2_s_proof, &x2_s_proof_len)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	if (!use_privsep)
 		JPAKE_DEBUG_CTX((pctx, "step 2 received in %s", __func__));
@@ -520,9 +536,12 @@ input_userauth_jpake_client_step2(int type, u_int32_t seq, struct ssh *ssh)
 		JPAKE_DEBUG_CTX((pctx, "confirm sending in %s", __func__));
 
 	/* Send key confirmation proof */
-	ssh_packet_start(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_CONFIRM);
-	ssh_packet_put_string(ssh, pctx->h_k_sid_sessid, pctx->h_k_sid_sessid_len);
-	ssh_packet_send(ssh);
+	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_CONFIRM))
+	     != 0 ||
+	    (r = sshpkt_put_string(ssh, pctx->h_k_sid_sessid,
+	    pctx->h_k_sid_sessid_len)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	ssh_packet_write_wait(ssh);
 
 	/* Expect confirmation from peer */
@@ -537,13 +556,16 @@ input_userauth_jpake_client_confirm(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
-	int authenticated = 0;
+	int r, authenticated = 0;
+	size_t len;
 
 	/* Disable this message */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_CONFIRM, NULL);
 
-	pctx->h_k_cid_sessid = ssh_packet_get_string(ssh, &pctx->h_k_cid_sessid_len);
-	ssh_packet_check_eom(ssh);
+	if ((r = sshpkt_get_string(ssh, &pctx->h_k_cid_sessid, &len)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	pctx->h_k_cid_sessid_len = len;
 
 	if (!use_privsep)
 		JPAKE_DEBUG_CTX((pctx, "confirm received in %s", __func__));
@@ -562,7 +584,7 @@ input_userauth_jpake_client_confirm(int type, u_int32_t seq, struct ssh *ssh)
 	jpake_free(authctxt->jpake_ctx);
 	authctxt->jpake_ctx = NULL;
 	userauth_finish(ssh, authenticated, method_jpake.name);
+	return 0;
 }
 
 #endif /* JPAKE */
-
