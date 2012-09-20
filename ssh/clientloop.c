@@ -87,7 +87,6 @@
 #include "ssh1.h"
 #include "ssh2.h"
 #include "packet.h"
-#include "buffer.h"
 #include "sshbuf.h"
 #include "compat.h"
 #include "channels.h"
@@ -149,9 +148,9 @@ static int escape_pending1;	/* Last character was an escape (proto1 only) */
 static int last_was_cr;		/* Last character was a newline. */
 static int exit_status;		/* Used to store the command exit status. */
 static int stdin_eof;		/* EOF has been encountered on stderr. */
-static Buffer stdin_buffer;	/* Buffer for stdin data. */
-static Buffer stdout_buffer;	/* Buffer for stdout data. */
-static Buffer stderr_buffer;	/* Buffer for stderr data. */
+static struct sshbuf *stdin_buffer;	/* Buffer for stdin data. */
+static struct sshbuf *stdout_buffer;	/* Buffer for stdout data. */
+static struct sshbuf *stderr_buffer;	/* Buffer for stderr data. */
 static u_int buffer_high;	/* Soft max buffer size. */
 static int connection_in;	/* Connection to server (input). */
 static int connection_out;	/* Connection to server (output). */
@@ -188,7 +187,7 @@ TAILQ_HEAD(global_confirms, global_confirm);
 static struct global_confirms global_confirms =
     TAILQ_HEAD_INITIALIZER(global_confirms);
 
-void ssh_process_session2_setup(int, int, int, Buffer *);
+void ssh_process_session2_setup(int, int, int, struct sshbuf *);
 
 /* Restores stdin to blocking mode. */
 
@@ -466,8 +465,9 @@ client_check_initial_eof_on_stdin(struct ssh *ssh)
 			 */
 			if ((u_char) buf[0] == escape_char1)
 				escape_pending1 = 1;
-			else
-				buffer_append(&stdin_buffer, buf, 1);
+			else if ((r = sshbuf_put(stdin_buffer, buf, 1)) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 		}
 		leave_non_blocking();
 	}
@@ -486,20 +486,21 @@ client_make_packets_from_stdin_data(struct ssh *ssh)
 	u_int len;
 
 	/* Send buffered stdin data to the server. */
-	while (buffer_len(&stdin_buffer) > 0 &&
+	while (sshbuf_len(stdin_buffer) > 0 &&
 	    ssh_packet_not_very_much_data_to_write(ssh)) {
-		len = buffer_len(&stdin_buffer);
+		len = sshbuf_len(stdin_buffer);
 		/* Keep the packets at reasonable size. */
 		if (len > ssh_packet_get_maxsize(ssh))
 			len = ssh_packet_get_maxsize(ssh);
 		if ((r = sshpkt_start(ssh, SSH_CMSG_STDIN_DATA)) != 0 ||
-		    (r = sshpkt_put_string(ssh, sshbuf_ptr(&stdin_buffer),
+		    (r = sshpkt_put_string(ssh, sshbuf_ptr(stdin_buffer),
 		    len)) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
-		buffer_consume(&stdin_buffer, len);
+		if ((r = sshbuf_consume(stdin_buffer, len)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		/* If we have a pending EOF, send it now. */
-		if (stdin_eof && buffer_len(&stdin_buffer) == 0) {
+		if (stdin_eof && sshbuf_len(stdin_buffer) == 0) {
 			if ((r = sshpkt_start(ssh, SSH_CMSG_EOF)) != 0 ||
 			    (r = sshpkt_send(ssh)) != 0)
 				fatal("%s: %s", __func__, ssh_err(r));
@@ -591,7 +592,7 @@ client_wait_until_can_do_something(struct ssh *ssh,
 	struct timeval tv, *tvp;
 	int timeout_secs;
 	time_t minwait_secs = 0;
-	int ret;
+	int r;
 
 	/* Add any selections by the channel mechanism. */
 	channel_prepare_select(readsetp, writesetp, maxfdp, nallocp,
@@ -599,8 +600,8 @@ client_wait_until_can_do_something(struct ssh *ssh,
 
 	if (!compat20) {
 		/* Read from the connection, unless our buffers are full. */
-		if (buffer_len(&stdout_buffer) < buffer_high &&
-		    buffer_len(&stderr_buffer) < buffer_high &&
+		if (sshbuf_len(stdout_buffer) < buffer_high &&
+		    sshbuf_len(stderr_buffer) < buffer_high &&
 		    channel_not_very_much_buffered_data())
 			FD_SET(connection_in, *readsetp);
 		/*
@@ -611,9 +612,9 @@ client_wait_until_can_do_something(struct ssh *ssh,
 			FD_SET(fileno(stdin), *readsetp);
 
 		/* Select stdout/stderr if have data in buffer. */
-		if (buffer_len(&stdout_buffer) > 0)
+		if (sshbuf_len(stdout_buffer) > 0)
 			FD_SET(fileno(stdout), *writesetp);
-		if (buffer_len(&stderr_buffer) > 0)
+		if (sshbuf_len(stderr_buffer) > 0)
 			FD_SET(fileno(stderr), *writesetp);
 	} else {
 		/* channel_prepare_select could have closed the last channel */
@@ -658,10 +659,8 @@ client_wait_until_can_do_something(struct ssh *ssh,
 		tvp = &tv;
 	}
 
-	ret = select((*maxfdp)+1, *readsetp, *writesetp, NULL, tvp);
-	if (ret < 0) {
-		char buf[100];
-
+	r = select((*maxfdp)+1, *readsetp, *writesetp, NULL, tvp);
+	if (r < 0) {
 		/*
 		 * We have to clear the select masks, because we return.
 		 * We have to return, because the mainloop checks for the flags
@@ -673,23 +672,25 @@ client_wait_until_can_do_something(struct ssh *ssh,
 		if (errno == EINTR)
 			return;
 		/* Note: we might still have data in the buffers. */
-		snprintf(buf, sizeof buf, "select: %s\r\n", strerror(errno));
-		buffer_append(&stderr_buffer, buf, strlen(buf));
+		if ((r = sshbuf_putf(stderr_buffer,
+		    "select: %s\r\n", strerror(errno))) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		quit_pending = 1;
-	} else if (ret == 0)
+	} else if (r == 0)
 		server_alive_check(ssh);
 }
 
 static void
-client_suspend_self(Buffer *bin, Buffer *bout, Buffer *berr)
+client_suspend_self(struct sshbuf **bin, struct sshbuf **bout,
+    struct sshbuf **berr)
 {
 	/* Flush stdout and stderr buffers. */
-	if (buffer_len(bout) > 0)
-		atomicio(vwrite, fileno(stdout), buffer_ptr(bout),
-		    buffer_len(bout));
-	if (buffer_len(berr) > 0)
-		atomicio(vwrite, fileno(stderr), buffer_ptr(berr),
-		    buffer_len(berr));
+	if (sshbuf_len(*bout) > 0)
+		atomicio(vwrite, fileno(stdout), sshbuf_ptr(*bout),
+		    sshbuf_len(*bout));
+	if (sshbuf_len(*berr) > 0)
+		atomicio(vwrite, fileno(stderr), sshbuf_ptr(*berr),
+		    sshbuf_len(*berr));
 
 	leave_raw_mode(options.request_tty == REQUEST_TTY_FORCE);
 
@@ -697,9 +698,9 @@ client_suspend_self(Buffer *bin, Buffer *bout, Buffer *berr)
 	 * Free (and clear) the buffer to reduce the amount of data that gets
 	 * written to swap.
 	 */
-	buffer_free(bin);
-	buffer_free(bout);
-	buffer_free(berr);
+	sshbuf_free(*bin);
+	sshbuf_free(*bout);
+	sshbuf_free(*berr);
 
 	/* Send the suspend signal to the program itself. */
 	kill(getpid(), SIGTSTP);
@@ -708,9 +709,10 @@ client_suspend_self(Buffer *bin, Buffer *bout, Buffer *berr)
 	received_window_change_signal = 1;
 
 	/* OK, we have been continued by the user. Reinitialize buffers. */
-	buffer_init(bin);
-	buffer_init(bout);
-	buffer_init(berr);
+	if ((*bin = sshbuf_new()) == NULL ||
+	    (*bout = sshbuf_new()) == NULL ||
+	    (*berr = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 
 	enter_raw_mode(options.request_tty == REQUEST_TTY_FORCE);
 }
@@ -718,7 +720,7 @@ client_suspend_self(Buffer *bin, Buffer *bout, Buffer *berr)
 static void
 client_process_net_input(struct ssh *ssh, fd_set *readset)
 {
-	int len, cont = 0;
+	int r, len, cont = 0;
 	char buf[8192];
 
 	/*
@@ -733,10 +735,11 @@ client_process_net_input(struct ssh *ssh, fd_set *readset)
 			 * Received EOF.  The remote host has closed the
 			 * connection.
 			 */
-			snprintf(buf, sizeof buf,
+			if ((r = sshbuf_putf(stderr_buffer,
 			    "Connection to %.300s closed by remote host.\r\n",
-			    host);
-			buffer_append(&stderr_buffer, buf, strlen(buf));
+			    host)) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 			quit_pending = 1;
 			return;
 		}
@@ -752,10 +755,11 @@ client_process_net_input(struct ssh *ssh, fd_set *readset)
 			 * An error has encountered.  Perhaps there is a
 			 * network problem.
 			 */
-			snprintf(buf, sizeof buf,
+			if ((r = sshbuf_putf(stderr_buffer,
 			    "Read from remote host %.300s: %.100s\r\n",
-			    host, strerror(errno));
-			buffer_append(&stderr_buffer, buf, strlen(buf));
+			    host, strerror(errno))) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 			quit_pending = 1;
 			return;
 		}
@@ -1030,15 +1034,15 @@ static struct escape_help_text esc_txt[] = {
 };
 
 static void
-print_escape_help(Buffer *b, int escape_char, int protocol2, int mux_client,
-    int using_stderr)
+print_escape_help(struct sshbuf *b, int escape_char, int protocol2,
+    int mux_client, int using_stderr)
 {
 	unsigned int i, suppress_flags;
-	char string[1024];
+	int r;
 
-	snprintf(string, sizeof string, "%c?\r\n"
-	    "Supported escape sequences:\r\n", escape_char);
-	buffer_append(b, string, strlen(string));
+	if ((r = sshbuf_putf(b,
+	    "%c?\r\nSupported escape sequences:\r\n", escape_char)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	suppress_flags = (protocol2 ? 0 : SUPPRESS_PROTO1) |
 	    (mux_client ? SUPPRESS_MUXCLIENT : 0) |
@@ -1048,26 +1052,26 @@ print_escape_help(Buffer *b, int escape_char, int protocol2, int mux_client,
 	for (i = 0; i < sizeof(esc_txt)/sizeof(esc_txt[0]); i++) {
 		if (esc_txt[i].flags & suppress_flags)
 			continue;
-		snprintf(string, sizeof string, " %c%-3s - %s\r\n",
-		    escape_char, esc_txt[i].cmd, esc_txt[i].text);
-		buffer_append(b, string, strlen(string));
+		if ((r = sshbuf_putf(b, " %c%-3s - %s\r\n",
+		    escape_char, esc_txt[i].cmd, esc_txt[i].text)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
 
-	snprintf(string, sizeof string,
+	if ((r = sshbuf_putf(b, 
 	    " %c%c   - send the escape character by typing it twice\r\n"
 	    "(Note that escapes are only recognized immediately after "
-	    "newline.)\r\n", escape_char, escape_char);
-	buffer_append(b, string, strlen(string));
+	    "newline.)\r\n", escape_char, escape_char)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 }
 
 /* 
  * Process the characters one by one, call with c==NULL for proto1 case.
  */
 static int
-process_escapes(struct ssh *ssh, Channel *c, struct sshbuf *bin,
-    struct sshbuf *bout, struct sshbuf *berr, char *buf, int len)
+process_escapes(struct ssh *ssh, Channel *c, struct sshbuf **binp,
+    struct sshbuf **boutp, struct sshbuf **berrp, char *buf, int len)
 {
-	char string[1024];
+	struct sshbuf *bin = *binp, *berr = *berrp;
 	pid_t pid;
 	int bytes = 0;
 	u_int i;
@@ -1103,10 +1107,10 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf *bin,
 			switch (ch) {
 			case '.':
 				/* Terminate the connection. */
-				snprintf(string, sizeof string, "%c.\r\n",
-				    escape_char);
-				buffer_append(berr, string, strlen(string));
-
+				if ((r = sshbuf_putf(berr, "%c.\r\n",
+				    escape_char)) != 0)
+					fatal("%s: buffer error: %s",
+					    __func__, ssh_err(r));
 				if (c && c->ctl_chan != -1) {
 					chan_read_failed(c);
 					chan_write_failed(c);
@@ -1126,31 +1130,33 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf *bin,
 						snprintf(b, sizeof b, "^Z");
 					else
 						snprintf(b, sizeof b, "%c", ch);
-					snprintf(string, sizeof string,
+					if ((r = sshbuf_putf(berr,
 					    "%c%s escape not available to "
 					    "multiplexed sessions\r\n",
-					    escape_char, b);
-					buffer_append(berr, string,
-					    strlen(string));
+					    escape_char, b)) != 0)
+						fatal("%s: buffer error: %s",
+						    __func__, ssh_err(r));
 					continue;
 				}
 				/* Suspend the program. Inform the user */
-				snprintf(string, sizeof string,
-				    "%c^Z [suspend ssh]\r\n", escape_char);
-				buffer_append(berr, string, strlen(string));
+				if ((r = sshbuf_putf(berr,
+				    "%c^Z [suspend ssh]\r\n",
+				    escape_char)) != 0)
+					fatal("%s: buffer error: %s",
+					    __func__, ssh_err(r));
 
 				/* Restore terminal modes and suspend. */
-				client_suspend_self(bin, bout, berr);
+				client_suspend_self(binp, boutp, berrp);
 
 				/* We have been continued. */
 				continue;
 
 			case 'B':
 				if (compat20) {
-					snprintf(string, sizeof string,
-					    "%cB\r\n", escape_char);
-					buffer_append(berr, string,
-					    strlen(string));
+					if ((r = sshbuf_putf(berr,
+					    "%cB\r\n", escape_char)) != 0)
+						fatal("%s: buffer error: %s",
+						    __func__, ssh_err(r));
 					channel_request_start(session_ident,
 					    "break", 0);
 					if ((r = sshpkt_put_u32(ssh, 1000))
@@ -1177,11 +1183,11 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf *bin,
 				if (c && c->ctl_chan != -1)
 					goto noescape;
 				if (!log_is_on_stderr()) {
-					snprintf(string, sizeof string,
+					if ((r = sshbuf_putf(berr,
 					    "%c%c [Logging to syslog]\r\n",
-					     escape_char, ch);
-					buffer_append(berr, string,
-					    strlen(string));
+					    escape_char, ch)) != 0)
+						fatal("%s: buffer error: %s",
+						    __func__, ssh_err(r));
 					continue;
 				}
 				if (ch == 'V' && options.log_level >
@@ -1190,10 +1196,11 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf *bin,
 				if (ch == 'v' && options.log_level <
 				    SYSLOG_LEVEL_DEBUG3)
 					log_change_level(++options.log_level);
-				snprintf(string, sizeof string,
+				if ((r = sshbuf_putf(berr,
 				    "%c%c [LogLevel %s]\r\n", escape_char, ch,
-				    log_level_name(options.log_level));
-				buffer_append(berr, string, strlen(string));
+				    log_level_name(options.log_level))) != 0)
+					fatal("%s: buffer error: %s",
+					    __func__, ssh_err(r));
 				continue;
 
 			case '&':
@@ -1211,9 +1218,10 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf *bin,
 				/* Stop listening for new connections. */
 				channel_stop_listening();
 
-				snprintf(string, sizeof string,
-				    "%c& [backgrounded]\n", escape_char);
-				buffer_append(berr, string, strlen(string));
+				if ((r = sshbuf_putf(berr,
+				    "%c& [backgrounded]\n", escape_char)) != 0)
+					fatal("%s: buffer error: %s",
+					    __func__, ssh_err(r));
 
 				/* Fork into background. */
 				pid = fork();
@@ -1227,8 +1235,10 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf *bin,
 				}
 				/* The child continues serving connections. */
 				if (compat20) {
-					buffer_append(bin, "\004", 1);
 					/* fake EOF on stdin */
+					if ((r = sshbuf_put_u8(bin, 4)) != 0)
+						fatal("%s: buffer error: %s",
+						    __func__, ssh_err(r));
 					return -1;
 				} else if (!stdin_eof) {
 					/*
@@ -1241,14 +1251,17 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf *bin,
 					    (r = sshpkt_put_string(ssh,
 					    "\004", 1)) != 0 ||
 					    (r = sshpkt_send(ssh)) != 0)
-						fatal("%s: %s", __func__, ssh_err(r));
+						fatal("%s: %s",
+						    __func__, ssh_err(r));
 					/* Close stdin. */
 					stdin_eof = 1;
-					if (buffer_len(bin) == 0) {
+					if (sshbuf_len(bin) == 0) {
 						if ((r = sshpkt_start(ssh,
 						    SSH_CMSG_EOF)) != 0 ||
 						    (r = sshpkt_send(ssh)) != 0)
-							fatal("%s: %s", __func__, ssh_err(r));
+							fatal("%s: %s",
+							    __func__,
+							    ssh_err(r));
 					}
 				}
 				continue;
@@ -1260,11 +1273,14 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf *bin,
 				continue;
 
 			case '#':
-				snprintf(string, sizeof string, "%c#\r\n",
-				    escape_char);
-				buffer_append(berr, string, strlen(string));
+				if ((r = sshbuf_putf(berr, "%c#\r\n",
+				    escape_char)) != 0)
+					fatal("%s: buffer error: %s",
+					    __func__, ssh_err(r));
 				s = channel_open_message();
-				buffer_append(berr, s, strlen(s));
+				if ((r = sshbuf_put(berr, s, strlen(s))) != 0)
+					fatal("%s: buffer error: %s",
+					    __func__, ssh_err(r));
 				xfree(s);
 				continue;
 
@@ -1276,7 +1292,10 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf *bin,
 
 			default:
 				if (ch != escape_char) {
-					buffer_put_char(bin, escape_char);
+					if ((r = sshbuf_put_u8(bin,
+					    escape_char)) != 0)
+						fatal("%s: buffer error: %s",
+						    __func__, ssh_err(r));
 					bytes++;
 				}
 				/* Escaped characters fall through here */
@@ -1302,7 +1321,8 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf *bin,
 		 * and append it to the buffer.
 		 */
 		last_was_cr = (ch == '\r' || ch == '\n');
-		buffer_put_char(bin, ch);
+		if ((r = sshbuf_put_u8(bin, ch)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		bytes++;
 	}
 	return bytes;
@@ -1327,9 +1347,10 @@ client_process_input(struct ssh *ssh, fd_set *readset)
 			 * if it was an error condition.
 			 */
 			if (len < 0) {
-				snprintf(buf, sizeof buf, "read: %.100s\r\n",
-				    strerror(errno));
-				buffer_append(&stderr_buffer, buf, strlen(buf));
+				if ((r = sshbuf_putf(stderr_buffer,
+				    "read: %.100s\r\n", strerror(errno))) != 0)
+					fatal("%s: buffer error: %s",
+					    __func__, ssh_err(r));
 			}
 			/* Mark that we have seen EOF. */
 			stdin_eof = 1;
@@ -1340,7 +1361,7 @@ client_process_input(struct ssh *ssh, fd_set *readset)
 			 * elsewhere will send the EOF when the buffer
 			 * becomes empty if stdin_eof is set.
 			 */
-			if (buffer_len(&stdin_buffer) == 0) {
+			if (sshbuf_len(stdin_buffer) == 0) {
 				if ((r = sshpkt_start(ssh, SSH_CMSG_EOF)) != 0 ||
 				    (r = sshpkt_send(ssh)) != 0)
 					fatal("%s: %s", __func__, ssh_err(r));
@@ -1350,7 +1371,9 @@ client_process_input(struct ssh *ssh, fd_set *readset)
 			 * Normal successful read, and no escape character.
 			 * Just append the data to buffer.
 			 */
-			buffer_append(&stdin_buffer, buf, len);
+			if ((r = sshbuf_put(stdin_buffer, buf, len)) != 0)
+				fatal("%s: buffer error: %s",
+				    __func__, ssh_err(r));
 		} else {
 			/*
 			 * Normal, successful read.  But we have an escape
@@ -1367,14 +1390,13 @@ client_process_input(struct ssh *ssh, fd_set *readset)
 static void
 client_process_output(struct ssh *ssh, fd_set *writeset)
 {
-	int len;
-	char buf[100];
+	int r, len;
 
 	/* Write buffered output to stdout. */
 	if (FD_ISSET(fileno(stdout), writeset)) {
 		/* Write as much data as possible. */
-		len = write(fileno(stdout), buffer_ptr(&stdout_buffer),
-		    buffer_len(&stdout_buffer));
+		len = write(fileno(stdout), sshbuf_ptr(stdout_buffer),
+		    sshbuf_len(stdout_buffer));
 		if (len <= 0) {
 			if (errno == EINTR || errno == EAGAIN)
 				len = 0;
@@ -1383,21 +1405,24 @@ client_process_output(struct ssh *ssh, fd_set *writeset)
 				 * An error or EOF was encountered.  Put an
 				 * error message to stderr buffer.
 				 */
-				snprintf(buf, sizeof buf,
-				    "write stdout: %.50s\r\n", strerror(errno));
-				buffer_append(&stderr_buffer, buf, strlen(buf));
+				if ((r = sshbuf_putf(stderr_buffer,
+				    "write stdout: %.50s\r\n",
+				    strerror(errno))) != 0)
+					fatal("%s: buffer error: %s",
+					    __func__, ssh_err(r));
 				quit_pending = 1;
 				return;
 			}
 		}
 		/* Consume printed data from the buffer. */
-		buffer_consume(&stdout_buffer, len);
+		if ((r = sshbuf_consume(stdout_buffer, len)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
 	/* Write buffered output to stderr. */
 	if (FD_ISSET(fileno(stderr), writeset)) {
 		/* Write as much data as possible. */
-		len = write(fileno(stderr), buffer_ptr(&stderr_buffer),
-		    buffer_len(&stderr_buffer));
+		len = write(fileno(stderr), sshbuf_ptr(stderr_buffer),
+		    sshbuf_len(stderr_buffer));
 		if (len <= 0) {
 			if (errno == EINTR || errno == EAGAIN)
 				len = 0;
@@ -1411,7 +1436,8 @@ client_process_output(struct ssh *ssh, fd_set *writeset)
 			}
 		}
 		/* Consume printed characters from the buffer. */
-		buffer_consume(&stderr_buffer, len);
+		if ((r = sshbuf_consume(stderr_buffer, len)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
 }
 
@@ -1465,7 +1491,7 @@ client_simple_escape_filter(Channel *c, char *buf, int len)
 	if (c->extended_usage != CHAN_EXTENDED_WRITE)
 		return 0;
 
-	return process_escapes(ssh, c, c->input, c->output, c->extended,
+	return process_escapes(ssh, c, &c->input, &c->output, &c->extended,
 	    buf, len);
 }
 
@@ -1524,9 +1550,10 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg, int ssh2_chan_id
 	escape_char1 = escape_char_arg;
 
 	/* Initialize buffers. */
-	buffer_init(&stdin_buffer);
-	buffer_init(&stdout_buffer);
-	buffer_init(&stderr_buffer);
+	if ((stdin_buffer = sshbuf_new()) == NULL ||
+	    (stdout_buffer = sshbuf_new()) == NULL ||
+	    (stderr_buffer = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 
 	client_init_dispatch(ssh);
 
@@ -1722,36 +1749,36 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg, int ssh2_chan_id
 	 * that the connection has been closed.
 	 */
 	if (have_pty && options.log_level != SYSLOG_LEVEL_QUIET) {
-		snprintf(buf, sizeof buf,
-		    "Connection to %.64s closed.\r\n", host);
-		buffer_append(&stderr_buffer, buf, strlen(buf));
+		if ((r = sshbuf_putf(stderr_buffer,
+		    "Connection to %.64s closed.\r\n", host)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
 
 	/* Output any buffered data for stdout. */
-	if (buffer_len(&stdout_buffer) > 0) {
+	if (sshbuf_len(stdout_buffer) > 0) {
 		len = atomicio(vwrite, fileno(stdout),
-		    buffer_ptr(&stdout_buffer), buffer_len(&stdout_buffer));
-		if (len < 0 || (u_int)len != buffer_len(&stdout_buffer))
+		    sshbuf_ptr(stdout_buffer), sshbuf_len(stdout_buffer));
+		if (len < 0 || (u_int)len != sshbuf_len(stdout_buffer))
 			error("Write failed flushing stdout buffer.");
-		else
-			buffer_consume(&stdout_buffer, len);
+		else if ((r = sshbuf_consume(stdout_buffer, len)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
 
 	/* Output any buffered data for stderr. */
-	if (buffer_len(&stderr_buffer) > 0) {
+	if (sshbuf_len(stderr_buffer) > 0) {
 		len = atomicio(vwrite, fileno(stderr),
-		    buffer_ptr(&stderr_buffer), buffer_len(&stderr_buffer));
-		if (len < 0 || (u_int)len != buffer_len(&stderr_buffer))
+		    sshbuf_ptr(stderr_buffer), sshbuf_len(stderr_buffer));
+		if (len < 0 || (u_int)len != sshbuf_len(stderr_buffer))
 			error("Write failed flushing stderr buffer.");
-		else
-			buffer_consume(&stderr_buffer, len);
+		else if ((r = sshbuf_consume(stderr_buffer, len)) != 0)
+			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
 
 	/* Clear and free any buffers. */
 	memset(buf, 0, sizeof(buf));
-	buffer_free(&stdin_buffer);
-	buffer_free(&stdout_buffer);
-	buffer_free(&stderr_buffer);
+	sshbuf_free(stdin_buffer);
+	sshbuf_free(stdout_buffer);
+	sshbuf_free(stderr_buffer);
 
 	/* Report bytes transferred, and transfer rates. */
 	total_time = get_current_time() - start_time;
@@ -1776,9 +1803,9 @@ client_input_stdout_data(int type, u_int32_t seq, struct ssh *ssh)
 	int r;
 
 	if ((r = sshpkt_get_string(ssh, &data, &data_len)) != 0 ||
-	    (r = sshpkt_get_end(ssh)) != 0)
+	    (r = sshpkt_get_end(ssh)) != 0 ||
+	    (r = sshbuf_put(stdout_buffer, data, data_len)) != 0)
 		goto out;
-	buffer_append(&stdout_buffer, data, data_len);
  out:
 	r = 0;
 	if (data) {
@@ -1795,9 +1822,9 @@ client_input_stderr_data(int type, u_int32_t seq, struct ssh *ssh)
 	int r;
 
 	if ((r = sshpkt_get_string(ssh, &data, &data_len)) != 0 ||
-	    (r = sshpkt_get_end(ssh)) != 0)
+	    (r = sshpkt_get_end(ssh)) != 0 ||
+	    (r = sshbuf_put(stderr_buffer, data, data_len)) != 0)
 		goto out;
-	buffer_append(&stderr_buffer, data, data_len);
 	r = 0;
  out:
 	if (data) {
@@ -2160,10 +2187,12 @@ client_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 }
 
 void
-client_session2_setup(struct ssh *ssh, int id, int want_tty, int want_subsystem,
-    const char *term, struct termios *tiop, int in_fd, Buffer *cmd, char **env)
+client_session2_setup(struct ssh *ssh, int id, int want_tty,
+    int want_subsystem, const char *term, struct termios *tiop,
+    int in_fd, struct sshbuf *cmd, char **env)
 {
-	int r, len;
+	int r;
+	size_t len;
 	Channel *c = NULL;
 
 	debug2("%s: id %d", __func__, id);
@@ -2237,22 +2266,23 @@ client_session2_setup(struct ssh *ssh, int id, int want_tty, int want_subsystem,
 		}
 	}
 
-	len = buffer_len(cmd);
+	len = sshbuf_len(cmd);
 	if (len > 0) {
 		if (len > 900)
 			len = 900;
 		if (want_subsystem) {
 			debug("Sending subsystem: %.*s",
-			    len, (u_char*)buffer_ptr(cmd));
+			    (int)len, (u_char*)sshbuf_ptr(cmd));
 			channel_request_start(id, "subsystem", 1);
 			client_expect_confirm(id, "subsystem", CONFIRM_CLOSE);
 		} else {
 			debug("Sending command: %.*s",
-			    len, (u_char*)buffer_ptr(cmd));
+			    (int)len, (u_char*)sshbuf_ptr(cmd));
 			channel_request_start(id, "exec", 1);
 			client_expect_confirm(id, "exec", CONFIRM_CLOSE);
 		}
-		if ((r = sshpkt_put_string(ssh, buffer_ptr(cmd), buffer_len(cmd))) != 0 ||
+		if ((r = sshpkt_put_string(ssh, sshbuf_ptr(cmd),
+		    sshbuf_len(cmd))) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
 	} else {
