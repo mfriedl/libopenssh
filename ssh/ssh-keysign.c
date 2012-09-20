@@ -125,7 +125,6 @@ valid_request(struct passwd *pw, char *host, struct sshkey **ret,
 	xfree(p);
 
 	/* local user */
-	p = buffer_get_string(&b, NULL);
 	if ((r = sshbuf_get_cstring(&b, &luser, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
