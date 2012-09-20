@@ -1951,7 +1951,7 @@ main(int ac, char **av)
 	    options.client_alive_count_max);
 
 	/* Start session. */
-	do_authenticated(authctxt);
+	do_authenticated(ssh);
 
 	/* The connection has been terminated. */
 	ssh_packet_get_bytes(active_state, &ibytes, &obytes);

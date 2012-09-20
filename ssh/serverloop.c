@@ -822,9 +822,8 @@ collect_children(void)
 }
 
 void
-server_loop2(Authctxt *authctxt)
+server_loop2(struct ssh *ssh)
 {
-	struct ssh *ssh = active_state;	/* XXX */
 	fd_set *readset = NULL, *writeset = NULL;
 	int r, rekeying = 0, max_fd, nalloc = 0;
 
@@ -1061,7 +1060,7 @@ server_request_session(struct ssh *ssh)
 	c = channel_new("session", SSH_CHANNEL_LARVAL,
 	    -1, -1, -1, /*window size*/0, CHAN_SES_PACKET_DEFAULT,
 	    0, "server-session", 1);
-	if (session_open(the_authctxt, c->self) != 1) {
+	if (session_open(ssh, c->self) != 1) {
 		debug("session open failed, free channel %d", c->self);
 		channel_free(c);
 		return NULL;

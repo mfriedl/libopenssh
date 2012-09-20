@@ -22,6 +22,6 @@
 #define SERVERLOOP_H
 
 void    server_loop(pid_t, int, int, int);
-void    server_loop2(Authctxt *);
+void    server_loop2(struct ssh *);
 
 #endif

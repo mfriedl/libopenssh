@@ -29,6 +29,8 @@
 #define TTYSZ 64
 typedef struct Session Session;
 struct Session {
+	struct ssh *ssh;
+
 	int	used;
 	int	self;
 	int	next_unused;
@@ -49,7 +51,7 @@ struct Session {
 	char	*auth_display;
 	char	*auth_proto;
 	char	*auth_data;
-	int	single_connection;
+	u_char	single_connection;
 
 	/* proto 2 */
 	int	chanid;
@@ -62,10 +64,10 @@ struct Session {
 	} *env;
 };
 
-void	 do_authenticated(Authctxt *);
+void	 do_authenticated(struct ssh *);
 void	 do_cleanup(Authctxt *);
 
-int	 session_open(Authctxt *, int);
+int	 session_open(struct ssh *, int);
 void	 session_unused(int);
 int	 session_input_channel_req(Channel *, const char *);
 void	 session_close_by_pid(pid_t, int);

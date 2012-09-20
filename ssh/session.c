@@ -58,6 +58,8 @@
 #include "ssh1.h"
 #include "ssh2.h"
 #include "sshpty.h"
+#define PACKET_SKIP_COMPAT
+#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "match.h"
 #include "uidswap.h"
@@ -110,8 +112,8 @@ void	do_child(Session *, const char *);
 void	do_motd(void);
 int	check_quietlogin(Session *, const char *);
 
-static void do_authenticated1(Authctxt *);
-static void do_authenticated2(Authctxt *);
+static void do_authenticated1(struct ssh *);
+static void do_authenticated2(struct ssh *);
 
 static int session_pty_req(Session *);
 
@@ -161,7 +163,7 @@ auth_sock_cleanup_proc(struct passwd *pw)
 }
 
 static int
-auth_input_request_forwarding(struct passwd * pw)
+auth_input_request_forwarding(Session *s)
 {
 	Channel *nc;
 	int sock = -1;
@@ -173,14 +175,14 @@ auth_input_request_forwarding(struct passwd * pw)
 	}
 
 	/* Temporarily drop privileged uid for mkdir/bind. */
-	temporarily_use_uid(pw);
+	temporarily_use_uid(s->pw);
 
 	/* Allocate a buffer for the socket name, and format the name. */
 	auth_sock_dir = xstrdup("/tmp/ssh-XXXXXXXXXX");
 
 	/* Create private directory for socket */
 	if (mkdtemp(auth_sock_dir) == NULL) {
-		packet_send_debug("Agent forwarding disabled: "
+		ssh_packet_send_debug(s->ssh, "Agent forwarding disabled: "
 		    "mkdtemp() failed: %.100s", strerror(errno));
 		restore_uid();
 		xfree(auth_sock_dir);
@@ -255,8 +257,10 @@ display_loginmsg(void)
 }
 
 void
-do_authenticated(Authctxt *authctxt)
+do_authenticated(struct ssh *ssh)
 {
+	Authctxt *authctxt = ssh->authctxt;
+
 	setproctitle("%s", authctxt->pw->pw_name);
 
 	/* setup the channel layer */
@@ -266,9 +270,9 @@ do_authenticated(Authctxt *authctxt)
 	auth_debug_send();
 
 	if (compat20)
-		do_authenticated2(authctxt);
+		do_authenticated2(ssh);
 	else
-		do_authenticated1(authctxt);
+		do_authenticated1(ssh);
 
 	do_cleanup(authctxt);
 }
@@ -280,21 +284,21 @@ do_authenticated(Authctxt *authctxt)
  * are requested, etc.
  */
 static void
-do_authenticated1(Authctxt *authctxt)
+do_authenticated1(struct ssh *ssh)
 {
 	Session *s;
 	char *command;
-	int r, success, type, screen_flag;
-	int enable_compression_after_reply = 0;
-	u_int proto_len, data_len, dlen, compression_level = 0;
+	int r, success, type, screen_flag, enable_compression_after_reply = 0;
+	u_int size, compression_level = 0;
 
 	s = session_new();
 	if (s == NULL) {
 		error("no more sessions");
 		return;
 	}
-	s->authctxt = authctxt;
-	s->pw = authctxt->pw;
+	s->ssh = ssh;
+	s->authctxt = ssh->authctxt;
+	s->pw = s->authctxt->pw;
 
 	/*
 	 * We stay in this loop until the client requests to execute a shell
@@ -304,15 +308,17 @@ do_authenticated1(Authctxt *authctxt)
 		success = 0;
 
 		/* Get a packet from the client. */
-		type = packet_read();
+		type = ssh_packet_read(ssh);
 
 		/* Process the packet. */
 		switch (type) {
 		case SSH_CMSG_REQUEST_COMPRESSION:
-			compression_level = packet_get_int();
-			packet_check_eom();
+			if ((r = sshpkt_get_u32(ssh, &compression_level)) != 0 ||
+			    (r = sshpkt_get_end(ssh)) != 0)
+				fatal("%s: %s", __func__, ssh_err(r));
 			if (compression_level < 1 || compression_level > 9) {
-				packet_send_debug("Received invalid compression level %d.",
+				ssh_packet_send_debug(ssh,
+				    "Received invalid compression level %d.",
 				    compression_level);
 				break;
 			}
@@ -330,22 +336,25 @@ do_authenticated1(Authctxt *authctxt)
 			break;
 
 		case SSH_CMSG_X11_REQUEST_FORWARDING:
-			s->auth_proto = packet_get_string(&proto_len);
-			s->auth_data = packet_get_string(&data_len);
+			if ((r = sshpkt_get_cstring(ssh, &s->auth_proto, NULL)) != 0 ||
+			    (r = sshpkt_get_cstring(ssh, &s->auth_data, NULL)) != 0)
+				fatal("%s: %s", __func__, ssh_err(r));
 
-			screen_flag = packet_get_protocol_flags() &
+			screen_flag = ssh_packet_get_protocol_flags(ssh) &
 			    SSH_PROTOFLAG_SCREEN_NUMBER;
 			debug2("SSH_PROTOFLAG_SCREEN_NUMBER: %d", screen_flag);
 
-			if (packet_remaining() == 4) {
+			if (ssh_packet_remaining(ssh) == 4) {
 				if (!screen_flag)
 					debug2("Buggy client: "
 					    "X11 screen flag missing");
-				s->screen = packet_get_int();
+				if ((r = sshpkt_get_u32(ssh, &s->screen)) != 0)
+					fatal("%s: %s", __func__, ssh_err(r));
 			} else {
 				s->screen = 0;
 			}
-			packet_check_eom();
+			if ((r = sshpkt_get_end(ssh)) != 0)
+				fatal("%s: %s", __func__, ssh_err(r));
 			success = session_setup_x11fwd(s);
 			if (!success) {
 				xfree(s->auth_proto);
@@ -362,7 +371,7 @@ do_authenticated1(Authctxt *authctxt)
 				break;
 			}
 			debug("Received authentication agent forwarding request.");
-			success = auth_input_request_forwarding(s->pw);
+			success = auth_input_request_forwarding(s);
 			break;
 
 		case SSH_CMSG_PORT_FORWARD_REQUEST:
@@ -384,25 +393,30 @@ do_authenticated1(Authctxt *authctxt)
 			break;
 
 		case SSH_CMSG_MAX_PACKET_SIZE:
-			if (packet_set_maxsize(packet_get_int()) > 0)
+			if ((r = sshpkt_get_u32(ssh, &size)) != 0)
+				fatal("%s: %s", __func__, ssh_err(r));
+			if (ssh_packet_set_maxsize(ssh, size) > 0)
 				success = 1;
 			break;
 
 		case SSH_CMSG_EXEC_SHELL:
 		case SSH_CMSG_EXEC_CMD:
 			if (type == SSH_CMSG_EXEC_CMD) {
-				command = packet_get_string(&dlen);
+				if ((r = sshpkt_get_cstring(ssh, &command, NULL)) != 0 ||
+				    (r = sshpkt_get_end(ssh)) != 0)
+					fatal("%s: %s", __func__, ssh_err(r));
 				debug("Exec command '%.500s'", command);
 				if (do_exec(s, command) != 0)
-					packet_disconnect(
+					ssh_packet_disconnect(ssh,
 					    "command execution failed");
-				xfree(command);
+				free(command);
 			} else {
+				if ((r = sshpkt_get_end(ssh)) != 0)
+					fatal("%s: %s", __func__, ssh_err(r));
 				if (do_exec(s, NULL) != 0)
-					packet_disconnect(
+					ssh_packet_disconnect(ssh,
 					    "shell execution failed");
 			}
-			packet_check_eom();
 			session_close(s);
 			return;
 
@@ -413,14 +427,17 @@ do_authenticated1(Authctxt *authctxt)
 			 */
 			logit("Unknown packet type received after authentication: %d", type);
 		}
-		packet_start(success ? SSH_SMSG_SUCCESS : SSH_SMSG_FAILURE);
-		packet_send();
-		packet_write_wait();
+		if ((r = sshpkt_start(ssh, success ?
+		    SSH_SMSG_SUCCESS : SSH_SMSG_FAILURE)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
+		ssh_packet_write_wait(ssh);
 
 		/* Enable compression now that we have replied if appropriate. */
 		if (enable_compression_after_reply) {
 			enable_compression_after_reply = 0;
-			if ((r = packet_start_compression(compression_level)) != 0)
+			if ((r = ssh_packet_start_compression(ssh,
+			     compression_level)) != 0)
 				fatal("%s: packet_start_compression: %s",
 				    __func__, ssh_err(r));
 		}
@@ -565,7 +582,7 @@ do_exec_no_pty(Session *s, const char *command)
 
 	s->pid = pid;
 	/* Set interactive/non-interactive mode. */
-	packet_set_interactive(s->display != NULL,
+	ssh_packet_set_interactive(s->ssh, s->display != NULL,
 	    options.ip_qos_interactive, options.ip_qos_bulk);
 
 #ifdef USE_PIPES
@@ -696,7 +713,7 @@ do_exec_pty(Session *s, const char *command)
 
 	/* Enter interactive session. */
 	s->ptymaster = ptymaster;
-	packet_set_interactive(1, 
+	ssh_packet_set_interactive(s->ssh, 1,
 	    options.ip_qos_interactive, options.ip_qos_bulk);
 	if (compat20) {
 		session_set_fds(s, ptyfd, fdout, -1, 1, 1);
@@ -767,7 +784,8 @@ do_login(Session *s, const char *command)
 {
 	socklen_t fromlen;
 	struct sockaddr_storage from;
-	struct passwd * pw = s->pw;
+	struct passwd *pw = s->pw;
+	struct ssh *ssh = s->ssh;
 	pid_t pid = getpid();
 
 	/*
@@ -776,8 +794,8 @@ do_login(Session *s, const char *command)
 	 */
 	memset(&from, 0, sizeof(from));
 	fromlen = sizeof(from);
-	if (packet_connection_is_on_socket()) {
-		if (getpeername(packet_get_connection_in(),
+	if (ssh_packet_connection_is_on_socket(s->ssh)) {
+		if (getpeername(ssh_packet_get_connection_in(ssh),
 		    (struct sockaddr *)&from, &fromlen) < 0) {
 			debug("getpeername: %.100s", strerror(errno));
 			cleanup_exit(255);
@@ -936,6 +954,7 @@ do_setup_env(Session *s, const char *shell)
 	u_int i, envsize;
 	char **env, *laddr;
 	struct passwd *pw = s->pw;
+	struct ssh *ssh = s->ssh;
 
 	/* Initialize the environment. */
 	envsize = 100;
@@ -993,12 +1012,12 @@ do_setup_env(Session *s, const char *shell)
 
 	/* SSH_CLIENT deprecated */
 	snprintf(buf, sizeof buf, "%.50s %d %d",
-	    get_remote_ipaddr(), get_remote_port(), get_local_port());
+	    ssh_remote_ipaddr(ssh), get_remote_port(), get_local_port());
 	child_set_env(&env, &envsize, "SSH_CLIENT", buf);
 
-	laddr = get_local_ipaddr(packet_get_connection_in());
+	laddr = get_local_ipaddr(ssh_packet_get_connection_in(ssh));
 	snprintf(buf, sizeof buf, "%.50s %d %.50s %d",
-	    get_remote_ipaddr(), get_remote_port(), laddr, get_local_port());
+	    ssh_remote_ipaddr(ssh), get_remote_port(), laddr, get_local_port());
 	xfree(laddr);
 	child_set_env(&env, &envsize, "SSH_CONNECTION", buf);
 
@@ -1256,13 +1275,14 @@ launch_login(struct passwd *pw, const char *hostname)
 }
 
 static void
-child_close_fds(void)
+child_close_fds(struct ssh *ssh)
 {
-	if (packet_get_connection_in() == packet_get_connection_out())
-		close(packet_get_connection_in());
+	if (ssh_packet_get_connection_in(ssh) ==
+	    ssh_packet_get_connection_out(ssh))
+		close(ssh_packet_get_connection_in(ssh));
 	else {
-		close(packet_get_connection_in());
-		close(packet_get_connection_out());
+		close(ssh_packet_get_connection_in(ssh));
+		close(ssh_packet_get_connection_out(ssh));
 	}
 	/*
 	 * Close all descriptors related to channels.  They will still remain
@@ -1308,7 +1328,7 @@ do_child(Session *s, const char *command)
 	/* Force a password change */
 	if (s->authctxt->force_pwchange) {
 		do_setusercontext(pw);
-		child_close_fds();
+		child_close_fds(s->ssh);
 		do_pwchange(s);
 		exit(1);
 	}
@@ -1351,7 +1371,7 @@ do_child(Session *s, const char *command)
 	 * closed before building the environment, as we call
 	 * get_remote_ipaddr there.
 	 */
-	child_close_fds();
+	child_close_fds(s->ssh);
 
 	/*
 	 * Must take new environment into use so that .ssh/rc,
@@ -1560,7 +1580,7 @@ session_dump(void)
 }
 
 int
-session_open(Authctxt *authctxt, int chanid)
+session_open(struct ssh *ssh, int chanid)
 {
 	Session *s = session_new();
 	debug("session_open: channel %d", chanid);
@@ -1568,9 +1588,10 @@ session_open(Authctxt *authctxt, int chanid)
 		error("no more sessions");
 		return 0;
 	}
-	s->authctxt = authctxt;
-	s->pw = authctxt->pw;
-	if (s->pw == NULL || !authctxt->valid)
+	s->ssh = ssh;
+	s->authctxt = ssh->authctxt;
+	s->pw = s->authctxt->pw;
+	if (s->pw == NULL || !s->authctxt->valid)
 		fatal("no user for session %d", s->self);
 	debug("session_open: session %d: link with channel %d", s->self, chanid);
 	s->chanid = chanid;
@@ -1651,11 +1672,15 @@ session_by_pid(pid_t pid)
 static int
 session_window_change_req(Session *s)
 {
-	s->col = packet_get_int();
-	s->row = packet_get_int();
-	s->xpixel = packet_get_int();
-	s->ypixel = packet_get_int();
-	packet_check_eom();
+	struct ssh *ssh = s->ssh;
+	int r;
+
+	if ((r = sshpkt_get_u32(ssh, &s->col)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &s->row)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &s->xpixel)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &s->ypixel)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	pty_change_window_size(s->ptyfd, s->row, s->col, s->xpixel, s->ypixel);
 	return 1;
 }
@@ -1663,32 +1688,33 @@ session_window_change_req(Session *s)
 static int
 session_pty_req(Session *s)
 {
-	u_int len;
-	int n_bytes;
+	struct ssh *ssh = s->ssh;
+	int r, n_bytes;
 
 	if (no_pty_flag) {
 		debug("Allocating a pty not permitted for this authentication.");
 		return 0;
 	}
 	if (s->ttyfd != -1) {
-		packet_disconnect("Protocol error: you already have a pty.");
+		ssh_packet_disconnect(ssh,
+		    "Protocol error: you already have a pty.");
 		return 0;
 	}
 
-	s->term = packet_get_string(&len);
+	if ((r = sshpkt_get_cstring(ssh, &s->term, NULL)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &s->col)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &s->row)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &s->xpixel)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &s->ypixel)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
-	if (compat20) {
-		s->col = packet_get_int();
-		s->row = packet_get_int();
-	} else {
-		s->row = packet_get_int();
-		s->col = packet_get_int();
+	if (!compat20) {
+		u_int tmp = s->col;
+		s->col = s->row;
+		s->row = tmp;
 	}
-	s->xpixel = packet_get_int();
-	s->ypixel = packet_get_int();
-
 	if (strcmp(s->term, "") == 0) {
-		xfree(s->term);
+		free(s->term);
 		s->term = NULL;
 	}
 
@@ -1708,8 +1734,11 @@ session_pty_req(Session *s)
 
 	/* for SSH1 the tty modes length is not given */
 	if (!compat20)
-		n_bytes = packet_remaining();
+		n_bytes = ssh_packet_remaining(ssh);
 	tty_parse_modes(s->ttyfd, &n_bytes);
+
+	if ((r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	if (!use_privsep)
 		pty_setowner(s->pw, s->tty);
@@ -1717,7 +1746,6 @@ session_pty_req(Session *s)
 	/* Set window size from the packet. */
 	pty_change_window_size(s->ptyfd, s->row, s->col, s->xpixel, s->ypixel);
 
-	packet_check_eom();
 	session_proctitle(s);
 	return 1;
 }
@@ -1725,13 +1753,14 @@ session_pty_req(Session *s)
 static int
 session_subsystem_req(Session *s)
 {
+	struct ssh *ssh = s->ssh;
 	struct stat st;
-	u_int len;
-	int success = 0;
-	char *prog, *cmd, *subsys = packet_get_string(&len);
+	char *prog, *cmd, *subsys;
 	u_int i;
+	int r, success = 0;
 
-	packet_check_eom();
+	if ((r = sshpkt_get_cstring(ssh, &subsys, NULL)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
 	logit("subsystem request for %.100s by user %s", subsys,
 	    s->pw->pw_name);
 
@@ -1758,30 +1787,32 @@ session_subsystem_req(Session *s)
 		logit("subsystem request for %.100s failed, subsystem not found",
 		    subsys);
 
-	xfree(subsys);
+	free(subsys);
 	return success;
 }
 
 static int
 session_x11_req(Session *s)
 {
-	int success;
+	struct ssh *ssh = s->ssh;
+	int r, success;
 
 	if (s->auth_proto != NULL || s->auth_data != NULL) {
 		error("session_x11_req: session %d: "
 		    "x11 forwarding already active", s->self);
 		return 0;
 	}
-	s->single_connection = packet_get_char();
-	s->auth_proto = packet_get_string(NULL);
-	s->auth_data = packet_get_string(NULL);
-	s->screen = packet_get_int();
-	packet_check_eom();
+	if ((r = sshpkt_get_u8(ssh, &s->single_connection)) != 0 ||
+	    (r = sshpkt_get_cstring(ssh, &s->auth_proto, NULL)) != 0 ||
+	    (r = sshpkt_get_cstring(ssh, &s->auth_data, NULL)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, &s->screen)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	success = session_setup_x11fwd(s);
 	if (!success) {
-		xfree(s->auth_proto);
-		xfree(s->auth_data);
+		free(s->auth_proto);
+		free(s->auth_data);
 		s->auth_proto = NULL;
 		s->auth_data = NULL;
 	}
@@ -1791,17 +1822,22 @@ session_x11_req(Session *s)
 static int
 session_shell_req(Session *s)
 {
-	packet_check_eom();
+	int r;
+
+	if ((r = sshpkt_get_end(s->ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	return do_exec(s, NULL) == 0;
 }
 
 static int
 session_exec_req(Session *s)
 {
-	u_int len, success;
+	int r, success;
+	char *command;
 
-	char *command = packet_get_string(&len);
-	packet_check_eom();
+	if ((r = sshpkt_get_cstring(s->ssh, &command, NULL)) != 0 ||
+	    (r = sshpkt_get_end(s->ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	success = do_exec(s, command) == 0;
 	xfree(command);
 	return success;
@@ -1810,10 +1846,11 @@ session_exec_req(Session *s)
 static int
 session_break_req(Session *s)
 {
+	int r;
 
-	packet_get_int();	/* ignored */
-	packet_check_eom();
-
+	if ((r = sshpkt_get_u32(s->ssh, NULL)) != 0 ||	/* ignored */
+	    (r = sshpkt_get_end(s->ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	if (s->ptymaster == -1 || tcsendbreak(s->ptymaster, 0) < 0)
 		return 0;
 	return 1;
@@ -1822,12 +1859,15 @@ session_break_req(Session *s)
 static int
 session_env_req(Session *s)
 {
+	struct ssh *ssh = s->ssh;
 	char *name, *val;
-	u_int name_len, val_len, i;
+	u_int i;
+	int r;
 
-	name = packet_get_string(&name_len);
-	val = packet_get_string(&val_len);
-	packet_check_eom();
+	if ((r = sshpkt_get_cstring(ssh, &name, NULL)) != 0 ||
+	    (r = sshpkt_get_cstring(ssh, &val, NULL)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 
 	/* Don't set too many environment variables */
 	if (s->num_env > 128) {
@@ -1858,7 +1898,10 @@ static int
 session_auth_agent_req(Session *s)
 {
 	static int called = 0;
-	packet_check_eom();
+	int r;
+
+	if ((r = sshpkt_get_end(s->ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	if (no_agent_forwarding_flag || !options.allow_agent_forwarding) {
 		debug("session_auth_agent_req: no_agent_forwarding_flag");
 		return 0;
@@ -1867,7 +1910,7 @@ session_auth_agent_req(Session *s)
 		return 0;
 	} else {
 		called = 1;
-		return auth_input_request_forwarding(s->pw);
+		return auth_input_request_forwarding(s);
 	}
 }
 
@@ -2055,7 +2098,9 @@ session_close_single_x11(int id, void *arg)
 static void
 session_exit_message(Session *s, int status)
 {
+	struct ssh *ssh = s->ssh;
 	Channel *c;
+	int r;
 
 	if ((c = channel_lookup(s->chanid)) == NULL)
 		fatal("session_exit_message: session %d: no channel %d",
@@ -2065,18 +2110,22 @@ session_exit_message(Session *s, int status)
 
 	if (WIFEXITED(status)) {
 		channel_request_start(s->chanid, "exit-status", 0);
-		packet_put_int(WEXITSTATUS(status));
-		packet_send();
+		if ((r = sshpkt_put_u32(ssh, WEXITSTATUS(status))) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 	} else if (WIFSIGNALED(status)) {
 		channel_request_start(s->chanid, "exit-signal", 0);
-		packet_put_cstring(sig2name(WTERMSIG(status)));
-		packet_put_char(WCOREDUMP(status)? 1 : 0);
-		packet_put_cstring("");
-		packet_put_cstring("");
-		packet_send();
+		if ((r = sshpkt_put_cstring(ssh,
+		    sig2name(WTERMSIG(status)))) != 0 ||
+		    (r = sshpkt_put_u8(ssh, WCOREDUMP(status)) ? 1 : 0) != 0 ||
+		    (r = sshpkt_put_cstring(ssh, "")) != 0 ||
+		    (r = sshpkt_put_cstring(ssh, "")) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 	} else {
 		/* Some weird exit cause.  Just exit. */
-		packet_disconnect("wait returned status %04x.", status);
+		ssh_packet_disconnect(ssh, "wait returned status %04x.",
+		    status);
 	}
 
 	/* disconnect channel */
@@ -2233,13 +2282,15 @@ session_proctitle(Session *s)
 int
 session_setup_x11fwd(Session *s)
 {
+	struct ssh *ssh = s->ssh;
 	struct stat st;
 	char display[512], auth_display[512];
 	char hostname[MAXHOSTNAMELEN];
 	u_int i;
 
 	if (no_x11_forwarding_flag) {
-		packet_send_debug("X11 forwarding disabled in user configuration file.");
+		ssh_packet_send_debug(ssh,
+		    "X11 forwarding disabled in user configuration file.");
 		return 0;
 	}
 	if (!options.x11_forwarding) {
@@ -2248,11 +2299,12 @@ session_setup_x11fwd(Session *s)
 	}
 	if (!options.xauth_location ||
 	    (stat(options.xauth_location, &st) == -1)) {
-		packet_send_debug("No xauth program; cannot forward with spoofing.");
+		ssh_packet_send_debug(ssh,
+		    "No xauth program; cannot forward with spoofing.");
 		return 0;
 	}
 	if (options.use_login) {
-		packet_send_debug("X11 forwarding disabled; "
+		ssh_packet_send_debug(ssh, "X11 forwarding disabled; "
 		    "not compatible with UseLogin=yes.");
 		return 0;
 	}
@@ -2297,9 +2349,9 @@ session_setup_x11fwd(Session *s)
 }
 
 static void
-do_authenticated2(Authctxt *authctxt)
+do_authenticated2(struct ssh *ssh)
 {
-	server_loop2(authctxt);
+	server_loop2(ssh);
 }
 
 void
