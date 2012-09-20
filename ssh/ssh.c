@@ -165,7 +165,7 @@ uid_t original_real_uid;
 uid_t original_effective_uid;
 
 /* command to be executed */
-Buffer command;
+struct sshbuf *command;
 
 /* Should we execute a command or invoke a subsystem? */
 int subsystem_flag = 0;
@@ -633,7 +633,8 @@ main(int ac, char **av)
 	ERR_load_crypto_strings();
 
 	/* Initialize the command to execute on remote host. */
-	buffer_init(&command);
+	if ((command = sshbuf_new()) == NULL)
+		fatal("sshbuf_new failed");
 
 	/*
 	 * Save the command to execute on the remote host in a buffer. There
@@ -651,13 +652,13 @@ main(int ac, char **av)
 		/* A command has been specified.  Store it into the buffer. */
 		for (i = 0; i < ac; i++) {
 			if (i)
-				buffer_append(&command, " ", 1);
-			buffer_append(&command, av[i], strlen(av[i]));
+				buffer_append(command, " ", 1);
+			buffer_append(command, av[i], strlen(av[i]));
 		}
 	}
 
 	/* Cannot fork to background if no command. */
-	if (fork_after_authentication_flag && buffer_len(&command) == 0 &&
+	if (fork_after_authentication_flag && buffer_len(command) == 0 &&
 	    !no_shell_flag)
 		fatal("Cannot fork into background without a command "
 		    "to execute.");
@@ -702,7 +703,7 @@ main(int ac, char **av)
 		tty_flag = 1;
 
 	/* Allocate a tty by default if no command specified. */
-	if (buffer_len(&command) == 0)
+	if (buffer_len(command) == 0)
 		tty_flag = options.request_tty != REQUEST_TTY_NO;
 
 	/* Force no tty */
@@ -1290,14 +1291,14 @@ ssh_session(struct ssh *ssh)
 	 * If a command was specified on the command line, execute the
 	 * command now. Otherwise request the server to start a shell.
 	 */
-	if (buffer_len(&command) > 0) {
-		int len = buffer_len(&command);
+	if (buffer_len(command) > 0) {
+		size_t len = sshbuf_len(command);
 		if (len > 900)
 			len = 900;
-		debug("Sending command: %.*s", len,
-		    (u_char *)buffer_ptr(&command));
+		debug("Sending command: %.*s", (int)len, sshbuf_ptr(command));
 		ssh_packet_start(ssh, SSH_CMSG_EXEC_CMD);
-		ssh_packet_put_string(ssh, buffer_ptr(&command), buffer_len(&command));
+		ssh_packet_put_string(ssh, sshbuf_ptr(command),
+		    sshbuf_len(command));
 		ssh_packet_send(ssh);
 		ssh_packet_write_wait(ssh);
 	} else {
@@ -1349,7 +1350,7 @@ ssh_session2_setup(int id, int success, void *arg)
 	}
 
 	client_session2_setup(ssh, id, tty_flag, subsystem_flag, getenv("TERM"),
-	    NULL, fileno(stdin), &command, environ);
+	    NULL, fileno(stdin), command, environ);
 	/* Tell the packet module whether this is an interactive session. */
 	ssh_packet_set_interactive(ssh, interactive,
 	    options.ip_qos_interactive, options.ip_qos_bulk);

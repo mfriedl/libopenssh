@@ -25,7 +25,8 @@
 #ifndef SSH_MSG_H
 #define SSH_MSG_H
 
-int	 ssh_msg_send(int, u_char, Buffer *);
-int	 ssh_msg_recv(int, Buffer *);
+struct sshbuf;
+int	 ssh_msg_send(int, u_char, struct sshbuf *);
+int	 ssh_msg_recv(int, struct sshbuf *);
 
 #endif
