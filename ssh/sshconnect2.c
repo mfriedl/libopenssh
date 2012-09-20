@@ -222,7 +222,7 @@ ssh_kex2(struct ssh *ssh, u_short port)
 	if ((r = sshpkt_start(ssh, SSH2_MSG_IGNORE)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, "markus")) != 0 ||
 	    (r = sshpkt_send(ssh)) != 0)
-		fatal("%s: : %s", __func__, ssh_err(r));
+		fatal("%s: %s", __func__, ssh_err(r));
 	ssh_packet_write_wait(ssh);
 #endif
 }
@@ -517,10 +517,8 @@ input_userauth_banner(int type, u_int32_t seq, struct ssh *ssh)
 	}
 	r = 0;
  out:
-	if (raw)
-		free(raw);
-	if (lang)
-		free(lang);
+	free(raw);
+	free(lang);
 	return r;
 }
 
@@ -583,8 +581,7 @@ input_userauth_failure(int type, u_int32_t seq, struct ssh *ssh)
 	authlist = NULL;
 	r = 0;
  out:
-	if (authlist)
-		free(authlist);
+	free(authlist);
 	return r;
 }
 
@@ -832,8 +829,7 @@ input_gssapi_response(int type, u_int32_t plen, struct ssh *ssh)
 	}
 	r = 0;
  out:
-	if (oidv)
-		free(oidv);
+	free(oidv);
 	return r;
 }
 
@@ -864,8 +860,7 @@ input_gssapi_token(int type, u_int32_t plen, struct ssh *ssh)
 		userauth(ssh, NULL);
 	r = 0;
  out:
-	if (p)
-		free(p);
+	free(p);
 	return r;
 }
 
@@ -897,8 +892,7 @@ input_gssapi_errtok(int type, u_int32_t plen, struct ssh *ssh)
 	    &recv_tok, &send_tok, NULL);
 	r = 0;
  out:
-	if (p)
-		free(p);
+	free(p);
 	gss_release_buffer(&ms, &send_tok);
 
 	/* Server will be returning a failed packet after this one */
@@ -922,10 +916,8 @@ input_gssapi_error(int type, u_int32_t plen, struct ssh *ssh)
 	r = sshpkt_get_end(ssh);
 	debug("Server GSSAPI Error:\n%s", msg);
  out:
-	if (msg)
-		free(msg);
-	if (lang)
-		free(lang);
+	free(msg);
+	free(lang);
 	return r;
 }
 #endif /* GSSAPI */
@@ -1065,10 +1057,8 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
 		memset(password, 0, strlen(password));
 		xfree(password);
 	}
-	if (info)
-		free(info);
-	if (lang)
-		free(lang);
+	free(info);
+	free(lang);
 	return r;
 }
 
@@ -1771,14 +1761,10 @@ input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 		memset(response, 0, strlen(response));
 		xfree(response);
 	}
-	if (prompt)
-		free(prompt);
-	if (name)
-		free(name);
-	if (inst)
-		free(inst);
-	if (lang)
-		free(lang);
+	free(prompt);
+	free(name);
+	free(inst);
+	free(lang);
 	return r;
 }
 

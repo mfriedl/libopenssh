@@ -2077,8 +2077,7 @@ client_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 	}
 	r = 0;
  out:
-	if (ctype != NULL)
-		free(ctype);
+	free(ctype);
 	return r;
 }
 static int
@@ -2133,8 +2132,7 @@ client_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 	}
 	r = 0;
  out:
-	if (rtype)
-		free(rtype);
+	free(rtype);
 	return r;
 }
 static int
@@ -2157,8 +2155,7 @@ client_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 	}
 	r = 0;
  out:
-	if (rtype)
-		free(rtype);
+	free(rtype);
 	return 0;
 }
 

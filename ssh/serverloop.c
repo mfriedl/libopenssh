@@ -1111,8 +1111,7 @@ server_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 	}
 	r = 0;
  out:
-	if (ctype)
-		free(ctype);
+	free(ctype);
 	return r;
 }
 
@@ -1180,12 +1179,9 @@ server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 	}
 	r = 0;
  out:
-	if (rtype)
-		free(rtype);
-	if (listen_address)
-		free(listen_address);
-	if (cancel_address)
-		free(cancel_address);
+	free(rtype);
+	free(listen_address);
+	free(cancel_address);
 	return r;
 }
 
