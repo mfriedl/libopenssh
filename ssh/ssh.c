@@ -74,6 +74,8 @@
 #include "canohost.h"
 #include "compat.h"
 #include "cipher.h"
+#define PACKET_SKIP_COMPAT
+#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "sshbuf.h"
 #include "channels.h"
@@ -896,7 +898,7 @@ main(int ac, char **av)
 
 	if (ssh_packet_connection_is_on_socket(ssh)) {
 		verbose("Authenticated to %s ([%s]:%d).", host,
-		    get_remote_ipaddr(), get_remote_port());
+		    ssh_remote_ipaddr(ssh), get_remote_port());
 	} else {
 		verbose("Authenticated to %s (via proxy).", host);
 	}
@@ -997,6 +999,7 @@ static void
 ssh_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 {
 	Forward *rfwd = (Forward *)ctxt;
+	int r;
 
 	/* XXX verbose() on failure? */
 	debug("remote forward %s for: listen %d, connect %s:%d",
@@ -1004,7 +1007,9 @@ ssh_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 	    rfwd->listen_port, rfwd->connect_host, rfwd->connect_port);
 	if (rfwd->listen_port == 0) {
 		if (type == SSH2_MSG_REQUEST_SUCCESS) {
-			rfwd->allocated_port = ssh_packet_get_int(ssh);
+			if ((r = sshpkt_get_u32(ssh, &rfwd->allocated_port))
+			    != 0)
+				fatal("%s: %s", __func__, ssh_err(r));
 			logit("Allocated port %u for remote forward to %s:%d",
 			    rfwd->allocated_port,
 			    rfwd->connect_host, rfwd->connect_port);
@@ -1146,9 +1151,7 @@ check_agent_present(void)
 static int
 ssh_session(struct ssh *ssh)
 {
-	int r, type;
-	int interactive = 0;
-	int have_tty = 0;
+	int r, type, interactive = 0, have_tty = 0;
 	struct winsize ws;
 	char *cp;
 	const char *display;
@@ -1164,9 +1167,10 @@ ssh_session(struct ssh *ssh)
 			    "9 (slow, best).");
 
 		/* Send the request. */
-		ssh_packet_start(ssh, SSH_CMSG_REQUEST_COMPRESSION);
-		ssh_packet_put_int(ssh, options.compression_level);
-		ssh_packet_send(ssh);
+		if ((r = sshpkt_start(ssh, SSH_CMSG_REQUEST_COMPRESSION)) != 0 ||
+		    (r = sshpkt_put_u32(ssh, options.compression_level)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		ssh_packet_write_wait(ssh);
 		type = ssh_packet_read(ssh);
 		if (type == SSH_SMSG_SUCCESS) {
@@ -1184,29 +1188,29 @@ ssh_session(struct ssh *ssh)
 	if (tty_flag) {
 		debug("Requesting pty.");
 
-		/* Start the packet. */
-		ssh_packet_start(ssh, SSH_CMSG_REQUEST_PTY);
-
 		/* Store TERM in the packet.  There is no limit on the
 		   length of the string. */
 		cp = getenv("TERM");
 		if (!cp)
 			cp = "";
-		ssh_packet_put_cstring(ssh, cp);
 
 		/* Store window size in the packet. */
 		if (ioctl(fileno(stdin), TIOCGWINSZ, &ws) < 0)
 			memset(&ws, 0, sizeof(ws));
-		ssh_packet_put_int(ssh, (u_int)ws.ws_row);
-		ssh_packet_put_int(ssh, (u_int)ws.ws_col);
-		ssh_packet_put_int(ssh, (u_int)ws.ws_xpixel);
-		ssh_packet_put_int(ssh, (u_int)ws.ws_ypixel);
+		if ((r = sshpkt_start(ssh, SSH_CMSG_REQUEST_PTY)) != 0 ||
+		    (r = sshpkt_put_cstring(ssh, cp)) != 0 ||
+		    (r = sshpkt_put_u32(ssh, (u_int)ws.ws_row)) != 0 ||
+		    (r = sshpkt_put_u32(ssh, (u_int)ws.ws_col)) != 0 ||
+		    (r = sshpkt_put_u32(ssh, (u_int)ws.ws_xpixel)) != 0 ||
+		    (r = sshpkt_put_u32(ssh, (u_int)ws.ws_ypixel)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 
 		/* Store tty modes in the packet. */
 		tty_make_modes(fileno(stdin), NULL);
 
 		/* Send the packet, and wait for it to leave. */
-		ssh_packet_send(ssh);
+		if ((r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		ssh_packet_write_wait(ssh);
 
 		/* Read response from the server. */
@@ -1261,9 +1265,11 @@ ssh_session(struct ssh *ssh)
 
 		/* Read response from the server. */
 		type = ssh_packet_read(ssh);
-		ssh_packet_check_eom(ssh);
+		if ((r = sshpkt_get_end(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		if (type != SSH_SMSG_SUCCESS)
-			logit("Warning: Remote host denied authentication agent forwarding.");
+			logit("Warning: Remote host denied authentication"
+			    " agent forwarding.");
 	}
 
 	/* Initiate port forwardings. */
@@ -1297,15 +1303,16 @@ ssh_session(struct ssh *ssh)
 		if (len > 900)
 			len = 900;
 		debug("Sending command: %.*s", (int)len, sshbuf_ptr(command));
-		ssh_packet_start(ssh, SSH_CMSG_EXEC_CMD);
-		ssh_packet_put_string(ssh, sshbuf_ptr(command),
-		    sshbuf_len(command));
-		ssh_packet_send(ssh);
+		if ((r = sshpkt_start(ssh, SSH_CMSG_EXEC_CMD)) != 0 ||
+		    (r = sshpkt_put_stringb(ssh, command)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		ssh_packet_write_wait(ssh);
 	} else {
 		debug("Requesting shell.");
-		ssh_packet_start(ssh, SSH_CMSG_EXEC_SHELL);
-		ssh_packet_send(ssh);
+		if ((r = sshpkt_start(ssh, SSH_CMSG_EXEC_SHELL)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		ssh_packet_write_wait(ssh);
 	}
 
@@ -1321,7 +1328,7 @@ ssh_session2_setup(int id, int success, void *arg)
 	struct ssh *ssh = arg;
 	extern char **environ;
 	const char *display;
-	int interactive = tty_flag;
+	int r, interactive = tty_flag;
 
 	if (!success)
 		return; /* No need for error message, channels code sens one */
@@ -1347,7 +1354,8 @@ ssh_session2_setup(int id, int success, void *arg)
 	if (options.forward_agent) {
 		debug("Requesting authentication agent forwarding.");
 		channel_request_start(id, "auth-agent-req@openssh.com", 0);
-		ssh_packet_send(ssh);
+		if ((r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 	}
 
 	client_session2_setup(ssh, id, tty_flag, subsystem_flag, getenv("TERM"),
@@ -1407,7 +1415,7 @@ ssh_session2_open(struct ssh *ssh)
 static int
 ssh_session2(struct ssh *ssh)
 {
-	int id = -1;
+	int r, id = -1;
 
 	/* XXX should be pre-session */
 	if (!options.control_persist)
@@ -1452,10 +1460,12 @@ ssh_session2(struct ssh *ssh)
 	if (options.control_master == SSHCTL_MASTER_NO &&
 	    (ssh->compat & SSH_NEW_OPENSSH)) {
 		debug("Requesting no-more-sessions@openssh.com");
-		ssh_packet_start(ssh, SSH2_MSG_GLOBAL_REQUEST);
-		ssh_packet_put_cstring(ssh, "no-more-sessions@openssh.com");
-		ssh_packet_put_char(ssh, 0);
-		ssh_packet_send(ssh);
+		if ((r = sshpkt_start(ssh, SSH2_MSG_GLOBAL_REQUEST)) != 0 ||
+		    (r = sshpkt_put_cstring(ssh,
+		    "no-more-sessions@openssh.com")) != 0 ||
+		    (r = sshpkt_put_u8(ssh, 0)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 	}
 
 	/* Execute a local command */

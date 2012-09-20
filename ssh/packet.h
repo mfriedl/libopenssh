@@ -322,6 +322,7 @@ int	sshpkt_put_u32(struct ssh *ssh, u_int32_t val);
 int	sshpkt_put_u64(struct ssh *ssh, u_int64_t val);
 int	sshpkt_put_string(struct ssh *ssh, const void *v, size_t len);
 int	sshpkt_put_cstring(struct ssh *ssh, const void *v);
+int	sshpkt_put_stringb(struct ssh *ssh, const struct sshbuf *v);
 int	sshpkt_put_ec(struct ssh *ssh, const EC_POINT *v, const EC_GROUP *g);
 int	sshpkt_put_bignum1(struct ssh *ssh, const BIGNUM *v);
 int	sshpkt_put_bignum2(struct ssh *ssh, const BIGNUM *v);
