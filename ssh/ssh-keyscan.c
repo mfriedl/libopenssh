@@ -27,7 +27,7 @@
 #include "xmalloc.h"
 #include "ssh.h"
 #include "ssh1.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "key.h"
 #include "cipher.h"
 #include "kex.h"
@@ -171,35 +171,43 @@ static struct sshkey *
 keygrab_ssh1(con *c)
 {
 	static struct sshkey *rsa;
-	static Buffer msg;
+	static struct sshbuf *msg;
+	int r;
+	u_char type;
 
 	if (rsa == NULL) {
 		if ((rsa = sshkey_new(KEY_RSA1)) == NULL) {
 			error("%s: sshkey_new failed", __func__);
 			return NULL;
 		}
-		buffer_init(&msg);
+		if ((msg = sshbuf_new()) == NULL)
+			fatal("%s: sshbuf_new failed", __func__);
 	}
-	buffer_append(&msg, c->c_data, c->c_plen);
-	buffer_consume(&msg, 8 - (c->c_plen & 7));	/* padding */
-	if (buffer_get_char(&msg) != (int) SSH_SMSG_PUBLIC_KEY) {
+	if ((r = sshbuf_put(msg, c->c_data, c->c_plen)) != 0 ||
+	    (r = sshbuf_consume(msg, 8 - (c->c_plen & 7))) != 0 || /* padding */
+	    (r = sshbuf_get_u8(msg, &type)) != 0)
+		goto buf_err;
+	if (type != (int) SSH_SMSG_PUBLIC_KEY) {
 		error("%s: invalid packet type", c->c_name);
-		buffer_clear(&msg);
+		sshbuf_reset(msg);
 		return NULL;
 	}
-	buffer_consume(&msg, 8);		/* cookie */
+	if ((r = sshbuf_consume(msg, 8)) != 0 || /* cookie */
+	    /* server key */
+	    (r = sshbuf_get_u32(msg, NULL)) != 0 ||
+	    (r = sshbuf_get_bignum1(msg, NULL)) != 0 ||
+	    (r = sshbuf_get_bignum1(msg, NULL)) != 0 ||
+	    /* host key */
+	    (r = sshbuf_get_u32(msg, NULL)) != 0 ||
+	    (r = sshbuf_get_bignum1(msg, rsa->rsa->e)) != 0 ||
+	    (r = sshbuf_get_bignum1(msg, rsa->rsa->n)) != 0) {
+ buf_err:
+		error("%s: buffer error: %s", __func__, ssh_err(r));
+		sshbuf_reset(msg);
+		return NULL;
+	}
 
-	/* server key */
-	(void) buffer_get_int(&msg);
-	buffer_get_bignum(&msg, rsa->rsa->e);
-	buffer_get_bignum(&msg, rsa->rsa->n);
-
-	/* host key */
-	(void) buffer_get_int(&msg);
-	buffer_get_bignum(&msg, rsa->rsa->e);
-	buffer_get_bignum(&msg, rsa->rsa->n);
-
-	buffer_clear(&msg);
+	sshbuf_reset(msg);
 
 	return (rsa);
 }
