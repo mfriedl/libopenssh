@@ -994,9 +994,8 @@ fork_postauth(void)
 
 /* Callback for remote forward global requests */
 static void
-ssh_confirm_remote_forward(int type, u_int32_t seq, void *ctxt)
+ssh_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	Forward *rfwd = (Forward *)ctxt;
 
 	/* XXX verbose() on failure? */
@@ -1110,7 +1109,8 @@ ssh_init_forwarding(struct ssh *ssh)
 				logit("Warning: Could not request remote "
 				    "forwarding.");
 		} else {
-			client_register_global_confirm(ssh_confirm_remote_forward,
+			client_register_global_confirm(
+			    ssh_confirm_remote_forward,
 			    &options.remote_forwards[i]);
 		}
 	}

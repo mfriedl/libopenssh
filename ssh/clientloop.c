@@ -184,6 +184,7 @@ struct global_confirm {
 	int ref_count;
 };
 TAILQ_HEAD(global_confirms, global_confirm);
+/* XXX this needs to go under struct ssh */
 static struct global_confirms global_confirms =
     TAILQ_HEAD_INITIALIZER(global_confirms);
 
@@ -551,7 +552,7 @@ client_global_request_reply(int type, u_int32_t seq, struct ssh *ssh)
 	if ((gc = TAILQ_FIRST(&global_confirms)) == NULL)
 		return 0;
 	if (gc->cb != NULL)
-		gc->cb(type, seq, gc->ctx);
+		gc->cb(ssh, type, seq, gc->ctx);
 	if (--gc->ref_count <= 0) {
 		TAILQ_REMOVE(&global_confirms, gc, entry);
 		bzero(gc, sizeof(*gc));

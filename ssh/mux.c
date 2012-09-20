@@ -50,6 +50,8 @@
 #include <util.h>
 #include <paths.h>
 
+#define PACKET_SKIP_COMPAT2
+#define PACKET_SKIP_COMPAT
 #include "atomicio.h"
 #include "xmalloc.h"
 #include "log.h"
@@ -580,7 +582,7 @@ compare_forward(Forward *a, Forward *b)
 }
 
 static void
-mux_confirm_remote_forward(int type, u_int32_t seq, void *ctxt)
+mux_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 {
 	struct mux_channel_confirm_ctx *fctx = ctxt;
 	char *failmsg = NULL;
@@ -606,6 +608,10 @@ mux_confirm_remote_forward(int type, u_int32_t seq, void *ctxt)
 	    rfwd->listen_port, rfwd->connect_host, rfwd->connect_port);
 	if (type == SSH2_MSG_REQUEST_SUCCESS) {
 		if (rfwd->listen_port == 0) {
+			if ((r = sshpkt_get_u32(ssh,
+			    &rfwd->allocated_port)) != 0)
+				fatal("%s: packet error: %s",
+				    __func__, ssh_err(r));
 			rfwd->allocated_port = packet_get_int();
 			logit("Allocated port %u for mux remote forward"
 			    " to %s:%d", rfwd->allocated_port,

@@ -22,6 +22,8 @@
 #define MAX_ROAMBUF	(2*1024*1024) /* XXX arbitrary */
 #define ROAMING_REQUEST	"roaming@appgate.com"
 
+struct ssh;
+
 extern int roaming_enabled;
 extern int resume_in_progress;
 
@@ -30,7 +32,7 @@ int	get_snd_buf_size(void);
 int	get_recv_buf_size(void);
 void	add_recv_bytes(u_int64_t);
 int	wait_for_roaming_reconnect(void);
-void	roaming_reply(int, u_int32_t, void *);
+void	roaming_reply(struct ssh *, int, u_int32_t, void *);
 void	set_out_buffer_size(size_t);
 ssize_t	roaming_write(int, const void *, size_t, int *);
 ssize_t	roaming_read(int, void *, size_t, int *);

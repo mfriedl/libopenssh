@@ -58,7 +58,7 @@ static u_int64_t lastseenchall;
 static u_int64_t key1, key2, oldkey1, oldkey2;
 
 void
-roaming_reply(int type, u_int32_t seq, void *ctxt)
+roaming_reply(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 {
 	if (type == SSH2_MSG_REQUEST_FAILURE) {
 		logit("Server denied roaming");
