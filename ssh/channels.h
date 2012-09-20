@@ -202,7 +202,8 @@ struct Channel {
 	c->efd != -1 && (!(c->flags & (CHAN_EOF_RCVD|CHAN_CLOSE_RCVD)) || \
 	sshbuf_len(c->extended) > 0))
 
-#define CHANNEL_BUFFER_ERROR(c, r) channel_buffer_error(c, r, __func__)
+#define CHANNEL_BUFFER_ERROR(c, r) channel_error(c, "buffer", r, __func__)
+#define CHANNEL_PACKET_ERROR(c, r) channel_error(c, "packet", r, __func__)
 
 /* channel management */
 
@@ -214,7 +215,7 @@ void	 channel_free(Channel *);
 void	 channel_free_all(void);
 void	 channel_stop_listening(void);
 
-void	 channel_buffer_error(Channel *, int, const char *);
+void	 channel_error(Channel *, char *, int, const char *);
 void	 channel_send_open(int);
 void	 channel_request_start(int, char *, int);
 void	 channel_register_cleanup(int, channel_callback_fn *, int);
