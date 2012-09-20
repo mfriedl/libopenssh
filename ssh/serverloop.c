@@ -279,8 +279,8 @@ client_alive_check(struct ssh *ssh)
  * for the duration of the wait (0 = infinite).
  */
 static void
-wait_until_can_do_something(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
-    u_int *nallocp, u_int max_time_milliseconds)
+wait_until_can_do_something(struct ssh *ssh, fd_set **readsetp, fd_set **writesetp,
+    int *maxfdp, u_int *nallocp, u_int max_time_milliseconds)
 {
 	struct timeval tv, *tvp;
 	int ret;
@@ -327,7 +327,7 @@ wait_until_can_do_something(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
 		 * If there is not too much data already buffered going to
 		 * the client, try to get some more data from the program.
 		 */
-		if (ssh_packet_not_very_much_data_to_write(active_state)) {
+		if (ssh_packet_not_very_much_data_to_write(ssh)) {
 			if (!fdout_eof)
 				FD_SET(fdout, *readsetp);
 			if (!fderr_eof)
@@ -346,14 +346,14 @@ wait_until_can_do_something(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
 	 * If we have buffered packet data going to the client, mark that
 	 * descriptor.
 	 */
-	if (ssh_packet_have_data_to_write(active_state))
+	if (ssh_packet_have_data_to_write(ssh))
 		FD_SET(connection_out, *writesetp);
 
 	/*
 	 * If child has terminated and there is enough buffer space to read
 	 * from it, then read as much as is available and exit.
 	 */
-	if (child_terminated && ssh_packet_not_very_much_data_to_write(active_state))
+	if (child_terminated && ssh_packet_not_very_much_data_to_write(ssh))
 		if (max_time_milliseconds == 0 || client_alive_scheduled)
 			max_time_milliseconds = 100;
 
@@ -374,7 +374,7 @@ wait_until_can_do_something(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
 		if (errno != EINTR)
 			error("select: %.100s", strerror(errno));
 	} else if (ret == 0 && client_alive_scheduled)
-		client_alive_check(active_state);
+		client_alive_check(ssh);
 
 	notify_done(*readsetp);
 }
@@ -689,7 +689,7 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 		max_fd = MAX(max_fd, notify_pipe[0]);
 
 		/* Sleep in select() until we can do something. */
-		wait_until_can_do_something(&readset, &writeset, &max_fd,
+		wait_until_can_do_something(ssh, &readset, &writeset, &max_fd,
 		    &nalloc, max_time_milliseconds);
 
 		if (received_sigterm) {
@@ -842,7 +842,7 @@ server_loop2(Authctxt *authctxt)
 
 		if (!rekeying && ssh_packet_not_very_much_data_to_write(ssh))
 			channel_output_poll();
-		wait_until_can_do_something(&readset, &writeset, &max_fd,
+		wait_until_can_do_something(ssh, &readset, &writeset, &max_fd,
 		    &nalloc, 0);
 
 		if (received_sigterm) {
