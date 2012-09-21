@@ -169,7 +169,6 @@ do_authentication2(struct ssh *ssh)
 	ssh_dispatch_set(ssh, SSH2_MSG_SERVICE_REQUEST, &input_service_request);
 	if ((r = ssh_dispatch_run(ssh, DISPATCH_BLOCK, &authctxt->success)) != 0)
 		fatal("%s: ssh_dispatch_run failed: %s", __func__, ssh_err(r));
-	ssh->authctxt = NULL;
 }
 
 /*ARGSUSED*/
