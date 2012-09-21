@@ -477,13 +477,12 @@ try_challenge_response_authentication(struct ssh *ssh)
 			xfree(response);
 			break;
 		}
-		if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_TIS_RESPONSE)) != 0)
+		if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_TIS_RESPONSE)) != 0 ||
+		    (r = ssh_put_password(ssh, response)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
-		ssh_put_password(active_state, response);
 		memset(response, 0, strlen(response));
 		xfree(response);
-		if ((r = sshpkt_send(ssh)) != 0)
-			fatal("%s: %s", __func__, ssh_err(r));
 		ssh_packet_write_wait(ssh);
 		type = ssh_packet_read(ssh);
 		if (type == SSH_SMSG_SUCCESS)
@@ -513,13 +512,12 @@ try_password_authentication(struct ssh *ssh, char *prompt)
 		if (i != 0)
 			error("Permission denied, please try again.");
 		password = read_passphrase(prompt, 0);
-		if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_PASSWORD)) != 0)
+		if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_PASSWORD)) != 0 ||
+		    (r = ssh_put_password(ssh, password)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
-		ssh_put_password(active_state, password);
 		memset(password, 0, strlen(password));
 		xfree(password);
-		if ((r = sshpkt_send(ssh)) != 0)
-			fatal("%s: %s", __func__, ssh_err(r));
 		ssh_packet_write_wait(ssh);
 
 		type = ssh_packet_read(ssh);

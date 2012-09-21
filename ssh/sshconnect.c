@@ -1185,22 +1185,22 @@ ssh_login(struct ssh *ssh, Sensitive *sensitive, const char *orighost,
 	xfree(local_user);
 }
 
-void
+int
 ssh_put_password(struct ssh *ssh, char *password)
 {
-	int size;
+	int r, size;
 	char *padded;
 
-	if (ssh->compat & SSH_BUG_PASSWORDPAD) {
-		packet_put_cstring(password);
-		return;
-	}
+	if (ssh->compat & SSH_BUG_PASSWORDPAD)
+		return sshpkt_put_cstring(ssh, password);
 	size = roundup(strlen(password) + 1, 32);
-	padded = xcalloc(1, size);
+	if ((padded = calloc(1, size)) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
 	strlcpy(padded, password, size);
-	packet_put_string(padded, size);
+	r = sshpkt_put_string(ssh, padded, size);
 	memset(padded, 0, size);
 	xfree(padded);
+	return r;
 }
 
 /* print all known host keys for a given host, but skip keys of given type */
