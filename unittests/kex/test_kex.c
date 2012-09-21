@@ -16,6 +16,7 @@
 
 #include "err.h"
 #include "ssh_api.h"
+#include "sshbuf.h"
 #include "packet.h"
 #include "myproposal.h"
 
