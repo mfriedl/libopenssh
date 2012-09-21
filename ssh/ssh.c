@@ -1206,7 +1206,7 @@ ssh_session(struct ssh *ssh)
 			fatal("%s: %s", __func__, ssh_err(r));
 
 		/* Store tty modes in the packet. */
-		tty_make_modes(fileno(stdin), NULL);
+		tty_make_modes(ssh, fileno(stdin), NULL);
 
 		/* Send the packet, and wait for it to leave. */
 		if ((r = sshpkt_send(ssh)) != 0)

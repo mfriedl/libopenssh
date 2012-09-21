@@ -2222,7 +2222,7 @@ client_session2_setup(struct ssh *ssh, int id, int want_tty,
 			fatal("%s: %s", __func__, ssh_err(r));
 		if (tiop == NULL)
 			tiop = get_saved_tio();
-		tty_make_modes(-1, tiop);
+		tty_make_modes(ssh, -1, tiop);
 		if ((r = sshpkt_send(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
 		/* XXX wait for reply */

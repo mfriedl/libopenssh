@@ -50,6 +50,8 @@
 #include <termios.h>
 #include <stdarg.h>
 
+#define PACKET_SKIP_COMPAT2
+#define PACKET_SKIP_COMPAT
 #include "packet.h"
 #include "log.h"
 #include "ssh1.h"
@@ -263,13 +265,35 @@ put2(struct sshbuf *b, u_int v)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 }
 
+static u_int
+get1(struct ssh *ssh)
+{
+	int r;
+	u_char v;
+
+	if ((r = sshpkt_get_u8(ssh, &v)) != 0)
+		fatal("%s: packet error: %s", __func__, ssh_err(r));
+	return v;
+}
+
+static u_int
+get2(struct ssh *ssh)
+{
+	int r;
+	u_int v;
+
+	if ((r = sshpkt_get_u32(ssh, &v)) != 0)
+		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	return v;
+}
+
 /*
  * Encodes terminal modes for the terminal referenced by fd
  * or tiop in a portable manner, and appends the modes to a packet
  * being constructed.
  */
 void
-tty_make_modes(int fd, struct termios *tiop)
+tty_make_modes(struct ssh *ssh, int fd, struct termios *tiop)
 {
 	struct termios tio;
 	struct sshbuf *buf;
@@ -329,10 +353,8 @@ end:
 	/* Mark end of mode data. */
 	if ((r = sshbuf_put_u8(buf, TTY_OP_END)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	if (compat20)
-		packet_put_string(sshbuf_ptr(buf), sshbuf_len(buf));
-	else
-		packet_put_raw(sshbuf_ptr(buf), sshbuf_len(buf));
+	if ((r = (compat20 ? sshpkt_put_stringb : sshpkt_putb)(ssh, buf)) != 0)
+		fatal("%s: packet error: %s", __func__, ssh_err(r));
 	sshbuf_free(buf);
 }
 
@@ -341,23 +363,28 @@ end:
  * manner from a packet being read.
  */
 void
-tty_parse_modes(int fd, int *n_bytes_ptr)
+tty_parse_modes(struct ssh *ssh, int fd, int *n_bytes_ptr)
 {
 	struct termios tio;
-	int opcode, baud;
+	u_char opcode;
+	u_int baud;
 	int n_bytes = 0;
 	int failure = 0;
-	u_int (*get_arg)(void);
+	u_int (*get_arg)(struct ssh *);
+	u_int u;
 	int arg_size;
+	int r;
 
 	if (compat20) {
-		*n_bytes_ptr = packet_get_int();
+		if ((r = sshpkt_get_u32(ssh, &u)) != 0)
+			fatal("%s: packet error: %s", __func__, ssh_err(r));
+		*n_bytes_ptr = u;
 		if (*n_bytes_ptr == 0)
 			return;
-		get_arg = packet_get_int;
+		get_arg = get2;
 		arg_size = 4;
 	} else {
-		get_arg = packet_get_char;
+		get_arg = get1;
 		arg_size = 1;
 	}
 
@@ -373,7 +400,8 @@ tty_parse_modes(int fd, int *n_bytes_ptr)
 
 	for (;;) {
 		n_bytes += 1;
-		opcode = packet_get_char();
+		if ((r = sshpkt_get_u8(ssh, &opcode)) != 0)
+			fatal("%s: packet error: %s", __func__, ssh_err(r));
 		switch (opcode) {
 		case TTY_OP_END:
 			goto set;
@@ -382,7 +410,9 @@ tty_parse_modes(int fd, int *n_bytes_ptr)
 		case TTY_OP_ISPEED_PROTO1:
 		case TTY_OP_ISPEED_PROTO2:
 			n_bytes += 4;
-			baud = packet_get_int();
+			if ((r = sshpkt_get_u32(ssh, &baud)) != 0)
+				fatal("%s: packet error: %s",
+				    __func__, ssh_err(r));
 			if (failure != -1 &&
 			    cfsetispeed(&tio, baud_to_speed(baud)) == -1)
 				error("cfsetispeed failed for %d", baud);
@@ -392,7 +422,9 @@ tty_parse_modes(int fd, int *n_bytes_ptr)
 		case TTY_OP_OSPEED_PROTO1:
 		case TTY_OP_OSPEED_PROTO2:
 			n_bytes += 4;
-			baud = packet_get_int();
+			if ((r = sshpkt_get_u32(ssh, &baud)) != 0)
+				fatal("%s: packet error: %s",
+				    __func__, ssh_err(r));
 			if (failure != -1 &&
 			    cfsetospeed(&tio, baud_to_speed(baud)) == -1)
 				error("cfsetospeed failed for %d", baud);
@@ -401,12 +433,12 @@ tty_parse_modes(int fd, int *n_bytes_ptr)
 #define TTYCHAR(NAME, OP) \
 	case OP: \
 	  n_bytes += arg_size; \
-	  tio.c_cc[NAME] = get_arg(); \
+	  tio.c_cc[NAME] = get_arg(ssh); \
 	  break;
 #define TTYMODE(NAME, FIELD, OP) \
 	case OP: \
 	  n_bytes += arg_size; \
-	  if (get_arg()) \
+	  if (get_arg(ssh)) \
 	    tio.FIELD |= NAME; \
 	  else \
 	    tio.FIELD &= ~NAME;	\
@@ -430,22 +462,29 @@ tty_parse_modes(int fd, int *n_bytes_ptr)
 				 */
 				if (opcode > 0 && opcode < 128) {
 					n_bytes += 1;
-					(void) packet_get_char();
+					if ((r = sshpkt_get_u8(ssh, NULL)) != 0)
+					    fatal("%s: packet error: %s",
+					    __func__, ssh_err(r));
 					break;
 				} else if (opcode >= 128 && opcode < 160) {
 					n_bytes += 4;
-					(void) packet_get_int();
+					if ((r = sshpkt_get_u32(ssh,
+					    NULL)) != 0)
+					    fatal("%s: packet error: %s",
+					    __func__, ssh_err(r));
 					break;
 				} else {
 					/*
-					 * It is a truly undefined opcode (160 to 255).
-					 * We have no idea about its arguments.  So we
-					 * must stop parsing.  Note that some data
-					 * may be left in the packet; hopefully there
-					 * is nothing more coming after the mode data.
+					 * It is a truly undefined opcode
+					 * (160 to 255). We have no idea about
+					 * its arguments. So we must stop
+					 * parsing.  Note that some data may be
+					 * left in the packet; hopefully there
+					 * is nothing more coming after the
+					 * mode data.
 					 */
-					logit("parse_tty_modes: unknown opcode %d",
-					    opcode);
+					logit("%s: unknown opcode %d",
+					    __func__, opcode);
 					goto set;
 				}
 			} else {
@@ -458,11 +497,14 @@ tty_parse_modes(int fd, int *n_bytes_ptr)
 				 */
 				if (opcode > 0 && opcode < 160) {
 					n_bytes += 4;
-					(void) packet_get_int();
+					if ((r = sshpkt_get_u32(ssh,
+					    NULL)) != 0)
+					    fatal("%s: packet error: %s",
+					    __func__, ssh_err(r));
 					break;
 				} else {
-					logit("parse_tty_modes: unknown opcode %d",
-					    opcode);
+					logit("%s: unknown opcode %d",
+					    __func__, opcode);
 					goto set;
 				}
 			}

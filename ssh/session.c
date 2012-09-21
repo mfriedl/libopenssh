@@ -1735,7 +1735,7 @@ session_pty_req(Session *s)
 	/* for SSH1 the tty modes length is not given */
 	if (!compat20)
 		n_bytes = ssh_packet_remaining(ssh);
-	tty_parse_modes(s->ttyfd, &n_bytes);
+	tty_parse_modes(s->ssh, s->ttyfd, &n_bytes);
 
 	if ((r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));

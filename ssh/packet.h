@@ -150,8 +150,8 @@ int	 ssh_packet_connection_is_on_socket(struct ssh *);
 int	 ssh_packet_remaining(struct ssh *);
 void	 ssh_packet_send_ignore(struct ssh *, int);
 
-void	 tty_make_modes(int, struct termios *);
-void	 tty_parse_modes(int, int *);
+void	 tty_make_modes(struct ssh *, int, struct termios *);
+void	 tty_parse_modes(struct ssh *, int, int *);
 
 void	 ssh_packet_set_alive_timeouts(struct ssh *, int);
 int	 ssh_packet_inc_alive_timeouts(struct ssh *);
@@ -317,6 +317,7 @@ int     sshpkt_disconnect(struct ssh *, const char *fmt, ...) __attribute__((for
 int	sshpkt_add_padding(struct ssh *, u_char);
 
 int	sshpkt_put(struct ssh *ssh, const void *v, size_t len);
+int	sshpkt_putb(struct ssh *ssh, const struct sshbuf *b);
 int	sshpkt_put_u8(struct ssh *ssh, u_char val);
 int	sshpkt_put_u32(struct ssh *ssh, u_int32_t val);
 int	sshpkt_put_u64(struct ssh *ssh, u_int64_t val);

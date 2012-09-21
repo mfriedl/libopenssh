@@ -2712,6 +2712,12 @@ sshpkt_put(struct ssh *ssh, const void *v, size_t len)
 }
 
 int
+sshpkt_putb(struct ssh *ssh, const struct sshbuf *b)
+{
+	return sshbuf_putb(ssh->state->outgoing_packet, b);
+}
+
+int
 sshpkt_put_u8(struct ssh *ssh, u_char val)
 {
 	return sshbuf_put_u8(ssh->state->outgoing_packet, val);
