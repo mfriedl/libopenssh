@@ -180,6 +180,7 @@ check_ip_options(int sock, char *ipaddr)
 const char *
 get_canonical_hostname(int use_dns)
 {
+	struct ssh *ssh = active_state;	/* XXX */
 	char *host;
 	static char *canonical_host_name = NULL;
 	static char *remote_ip = NULL;
@@ -191,8 +192,9 @@ get_canonical_hostname(int use_dns)
 		return remote_ip;
 
 	/* Get the real hostname if socket; otherwise return UNKNOWN. */
-	if (packet_connection_is_on_socket())
-		host = get_remote_hostname(packet_get_connection_in(), use_dns);
+	if (ssh_packet_connection_is_on_socket(ssh))
+		host = get_remote_hostname(
+		   ssh_packet_get_connection_in(ssh), use_dns);
 	else
 		host = "UNKNOWN";
 
@@ -287,11 +289,13 @@ clear_cached_addr(void)
 const char *
 get_remote_name_or_ip(u_int utmp_len, int use_dns)
 {
+	struct ssh *ssh = active_state;	/* XXX */
 	static const char *remote = "";
+
 	if (utmp_len > 0)
 		remote = get_canonical_hostname(use_dns);
 	if (utmp_len == 0 || strlen(remote) > utmp_len)
-		remote = get_remote_ipaddr();
+		remote = ssh_remote_ipaddr(ssh);
 	return remote;
 }
 
@@ -332,15 +336,16 @@ get_sock_port(int sock, int local)
 static int
 get_port(int local)
 {
+	struct ssh *ssh = active_state;			/* XXX */
 	/*
 	 * If the connection is not a socket, return 65535.  This is
 	 * intentionally chosen to be an unprivileged port number.
 	 */
-	if (!packet_connection_is_on_socket())
+	if (!ssh_packet_connection_is_on_socket(ssh))
 		return 65535;
 
 	/* Get socket and return the port number. */
-	return get_sock_port(packet_get_connection_in(), local);
+	return get_sock_port(ssh_packet_get_connection_in(ssh), local);
 }
 
 int

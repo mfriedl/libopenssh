@@ -46,9 +46,9 @@ int roaming_enabled = 0;
 int resume_in_progress = 0;
 
 int
-get_snd_buf_size()
+get_snd_buf_size(struct ssh *ssh)
 {
-	int fd = packet_get_connection_out();
+	int fd = ssh_packet_get_connection_out(ssh);
 	int optval;
 	socklen_t optvallen = sizeof(optval);
 
@@ -58,9 +58,9 @@ get_snd_buf_size()
 }
 
 int
-get_recv_buf_size()
+get_recv_buf_size(struct ssh *ssh)
 {
-	int fd = packet_get_connection_in();
+	int fd = ssh_packet_get_connection_in(ssh);
 	int optval;
 	socklen_t optvallen = sizeof(optval);
 

@@ -64,8 +64,6 @@
 #include "ssh.h"
 #include "ssh1.h"
 #include "ssh2.h"
-#define PACKET_SKIP_COMPAT
-#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "log.h"
 #include "misc.h"

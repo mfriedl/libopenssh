@@ -37,8 +37,6 @@
 #include "log.h"
 #include "match.h"
 #include "misc.h"
-#define PACKET_SKIP_COMPAT
-#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "ssh.h"
 #include "key.h"
@@ -79,7 +77,7 @@ roaming_reply(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 		fatal("%s: %s", __func__, ssh_err(r));
 	key1 = oldkey1;
 	key2 = oldkey2;
-	set_out_buffer_size(size + get_snd_buf_size());
+	set_out_buffer_size(size + get_snd_buf_size(ssh));
 	roaming_enabled = 1;
 }
 
@@ -91,7 +89,7 @@ request_roaming(struct ssh *ssh)
 	if ((r = sshpkt_start(ssh, SSH2_MSG_GLOBAL_REQUEST)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, ROAMING_REQUEST)) != 0 ||
 	    (r = sshpkt_put_u8(ssh, 1)) != 0 ||
-	    (r = sshpkt_put_u32(ssh, get_recv_buf_size())) != 0 ||
+	    (r = sshpkt_put_u32(ssh, get_recv_buf_size(ssh))) != 0 ||
 	    (r = sshpkt_send(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
 	client_register_global_confirm(roaming_reply, NULL);

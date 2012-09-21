@@ -78,6 +78,7 @@ static struct sshbuf *auth_debug;
 int
 allowed_user(struct passwd * pw)
 {
+	struct ssh *ssh = active_state;		/* XXX */
 	struct stat st;
 	const char *hostname = NULL, *ipaddr = NULL;
 	u_int i;
@@ -114,7 +115,7 @@ allowed_user(struct passwd * pw)
 	if (options.num_deny_users > 0 || options.num_allow_users > 0 ||
 	    options.num_deny_groups > 0 || options.num_allow_groups > 0) {
 		hostname = get_canonical_hostname(options.use_dns);
-		ipaddr = get_remote_ipaddr();
+		ipaddr = ssh_remote_ipaddr(ssh);
 	}
 
 	/* Return false if user is listed in DenyUsers */
@@ -204,7 +205,7 @@ auth_log(Authctxt *authctxt, int authenticated, char *method, char *info)
 	    method,
 	    authctxt->valid ? "" : "invalid user ",
 	    authctxt->user,
-	    get_remote_ipaddr(),
+	    ssh_remote_ipaddr(active_state),	/* XXX */
 	    get_remote_port(),
 	    info);
 }
@@ -215,6 +216,8 @@ auth_log(Authctxt *authctxt, int authenticated, char *method, char *info)
 int
 auth_root_allowed(char *method)
 {
+	struct ssh *ssh = active_state;		/* XXX */
+
 	switch (options.permit_root_login) {
 	case PERMIT_YES:
 		return 1;
@@ -229,7 +232,7 @@ auth_root_allowed(char *method)
 		}
 		break;
 	}
-	logit("ROOT LOGIN REFUSED FROM %.200s", get_remote_ipaddr());
+	logit("ROOT LOGIN REFUSED FROM %.200s", ssh_remote_ipaddr(ssh));
 	return 0;
 }
 
@@ -448,6 +451,7 @@ auth_openprincipals(const char *file, struct passwd *pw, int strict_modes)
 struct passwd *
 getpwnamallow(const char *user)
 {
+	struct ssh *ssh = active_state;		/* XXX */
 	extern login_cap_t *lc;
 	auth_session_t *as;
 	struct passwd *pw;
@@ -459,7 +463,7 @@ getpwnamallow(const char *user)
 	pw = getpwnam(user);
 	if (pw == NULL) {
 		logit("Invalid user %.100s from %.100s",
-		    user, get_remote_ipaddr());
+		    user, ssh_remote_ipaddr(ssh));
 		return (NULL);
 	}
 	if (!allowed_user(pw))
@@ -531,6 +535,7 @@ auth_debug_add(const char *fmt,...)
 void
 auth_debug_send(void)
 {
+	struct ssh *ssh = active_state;		/* XXX */
 	char *msg;
 	int r;
 
@@ -540,7 +545,7 @@ auth_debug_send(void)
 		if ((r = sshbuf_get_cstring(auth_debug, &msg, NULL)) != 0)
 			fatal("%s: sshbuf_get_cstring: %s",
 			    __func__, ssh_err(r));
-		packet_send_debug("%s", msg);
+		ssh_packet_send_debug(ssh, "%s", msg);
 		xfree(msg);
 	}
 }

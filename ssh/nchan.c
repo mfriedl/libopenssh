@@ -236,13 +236,17 @@ chan_obuf_empty(Channel *c)
 static void
 chan_send_ieof1(Channel *c)
 {
+	struct ssh *ssh = active_state;	/* XXX */
+	int r;
+
 	debug2("channel %d: send ieof", c->self);
 	switch (c->istate) {
 	case CHAN_INPUT_OPEN:
 	case CHAN_INPUT_WAIT_DRAIN:
-		packet_start(SSH_MSG_CHANNEL_INPUT_EOF);
-		packet_put_int(c->remote_id);
-		packet_send();
+		if ((r = sshpkt_start(ssh, SSH_MSG_CHANNEL_INPUT_EOF)) != 0 ||
+		    (r = sshpkt_put_u32(ssh, c->remote_id)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			CHANNEL_PACKET_ERROR(c, r);
 		break;
 	default:
 		error("channel %d: cannot send ieof for istate %d",
@@ -253,14 +257,18 @@ chan_send_ieof1(Channel *c)
 static void
 chan_send_oclose1(Channel *c)
 {
+	struct ssh *ssh = active_state;	/* XXX */
+	int r;
+
 	debug2("channel %d: send oclose", c->self);
 	switch (c->ostate) {
 	case CHAN_OUTPUT_OPEN:
 	case CHAN_OUTPUT_WAIT_DRAIN:
 		sshbuf_reset(c->output);
-		packet_start(SSH_MSG_CHANNEL_OUTPUT_CLOSE);
-		packet_put_int(c->remote_id);
-		packet_send();
+		if ((r = sshpkt_start(ssh, SSH_MSG_CHANNEL_OUTPUT_CLOSE)) != 0||
+		    (r = sshpkt_put_u32(ssh, c->remote_id)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			CHANNEL_PACKET_ERROR(c, r);
 		break;
 	default:
 		error("channel %d: cannot send oclose for ostate %d",
@@ -350,12 +358,16 @@ chan_write_failed2(Channel *c)
 static void
 chan_send_eof2(Channel *c)
 {
+	struct ssh *ssh = active_state;	/* XXX */
+	int r;
+
 	debug2("channel %d: send eof", c->self);
 	switch (c->istate) {
 	case CHAN_INPUT_WAIT_DRAIN:
-		packet_start(SSH2_MSG_CHANNEL_EOF);
-		packet_put_int(c->remote_id);
-		packet_send();
+		if ((r = sshpkt_start(ssh, SSH2_MSG_CHANNEL_EOF)) != 0 ||
+		    (r = sshpkt_put_u32(ssh, c->remote_id)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			CHANNEL_PACKET_ERROR(c, r);
 		c->flags |= CHAN_EOF_SENT;
 		break;
 	default:
@@ -367,6 +379,9 @@ chan_send_eof2(Channel *c)
 static void
 chan_send_close2(Channel *c)
 {
+	struct ssh *ssh = active_state;	/* XXX */
+	int r;
+
 	debug2("channel %d: send close", c->self);
 	if (c->ostate != CHAN_OUTPUT_CLOSED ||
 	    c->istate != CHAN_INPUT_CLOSED) {
@@ -375,15 +390,19 @@ chan_send_close2(Channel *c)
 	} else if (c->flags & CHAN_CLOSE_SENT) {
 		error("channel %d: already sent close", c->self);
 	} else {
-		packet_start(SSH2_MSG_CHANNEL_CLOSE);
-		packet_put_int(c->remote_id);
-		packet_send();
+		if ((r = sshpkt_start(ssh, SSH2_MSG_CHANNEL_CLOSE)) != 0 ||
+		    (r = sshpkt_put_u32(ssh, c->remote_id)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			CHANNEL_PACKET_ERROR(c, r);
 		c->flags |= CHAN_CLOSE_SENT;
 	}
 }
 static void
 chan_send_eow2(Channel *c)
 {
+	struct ssh *ssh = active_state;	/* XXX */
+	int r;
+
 	debug2("channel %d: send eow", c->self);
 	if (c->ostate == CHAN_OUTPUT_CLOSED) {
 		error("channel %d: must not sent eow on closed output",
@@ -392,11 +411,12 @@ chan_send_eow2(Channel *c)
 	}
 	if (!(ssh->compat & SSH_NEW_OPENSSH))
 		return;
-	packet_start(SSH2_MSG_CHANNEL_REQUEST);
-	packet_put_int(c->remote_id);
-	packet_put_cstring("eow@openssh.com");
-	packet_put_char(0);
-	packet_send();
+	if ((r = sshpkt_start(ssh, SSH2_MSG_CHANNEL_REQUEST)) != 0 ||
+	    (r = sshpkt_put_u32(ssh, c->remote_id)) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, "eow@openssh.com")) != 0 ||
+	    (r = sshpkt_put_u8(ssh, 0)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		CHANNEL_PACKET_ERROR(c, r);
 }
 
 /* shared */

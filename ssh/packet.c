@@ -204,6 +204,8 @@ struct session_state {
 	TAILQ_HEAD(, packet) outgoing;
 };
 
+struct ssh *active_state;	/* XXX */
+
 struct ssh *
 ssh_alloc_session_state(void)
 {
@@ -795,99 +797,6 @@ ssh_packet_set_encryption_key(struct ssh *ssh, const u_char *key, u_int keylen, 
 	}
 }
 
-/* Start constructing a packet to send. */
-void
-ssh_packet_start(struct ssh *ssh, u_char type)
-{
-	int r;
-
-	if ((r = sshpkt_start(ssh, type)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-}
-
-/* Append payload. */
-void
-ssh_packet_put_char(struct ssh *ssh, int value)
-{
-	char ch = value;
-	int r;
-
-	if ((r = sshbuf_put(ssh->state->outgoing_packet, &ch, 1)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-}
-
-void
-ssh_packet_put_int(struct ssh *ssh, u_int value)
-{
-	int r;
-
-	if ((r = sshpkt_put_u32(ssh, value)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-}
-
-void
-ssh_packet_put_int64(struct ssh *ssh, u_int64_t value)
-{
-	int r;
-
-	if ((r = sshpkt_put_u64(ssh, value)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-}
-
-void
-ssh_packet_put_string(struct ssh *ssh, const void *buf, u_int len)
-{
-	int r;
-
-	if ((r = sshpkt_put_string(ssh, buf, len)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-}
-
-void
-ssh_packet_put_cstring(struct ssh *ssh, const char *str)
-{
-	int r;
-
-	if ((r = sshpkt_put_cstring(ssh, str)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-}
-
-void
-ssh_packet_put_raw(struct ssh *ssh, const void *buf, u_int len)
-{
-	int r;
-
-	if ((r = sshpkt_put(ssh, buf, len)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-}
-
-void
-ssh_packet_put_bignum(struct ssh *ssh, BIGNUM * value)
-{
-	int r;
-
-	if ((r = sshpkt_put_bignum1(ssh, value)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-}
-
-void
-ssh_packet_put_bignum2(struct ssh *ssh, BIGNUM * value)
-{
-	int r;
-
-	if ((r = sshpkt_put_bignum2(ssh, value)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-}
-
-void
-ssh_packet_put_ecpoint(struct ssh *ssh, const EC_GROUP *curve, const EC_POINT *point)
-{
-	int r;
-
-	if ((r = sshpkt_put_ec(ssh, point, curve)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-}
-
 /*
  * Finalizes and sends the packet.  If the encryption key has been set,
  * encrypts the packet before sending.
@@ -1305,16 +1214,6 @@ ssh_packet_send2(struct ssh *ssh)
 	return 0;
 }
 
-void
-ssh_packet_send(struct ssh *ssh)
-{
-	int r;
-
-	if ((r = sshpkt_send(ssh)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-	DBG(debug("packet_send done"));
-}
-
 /*
  * Waits until a packet has been received, and returns its type.  Note that
  * no other data is processed until this returns, so this function should not
@@ -1344,21 +1243,18 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	for (;;) {
 		/* Try to read a packet from the buffer. */
 		r = ssh_packet_read_poll_seqnr(ssh, typep, seqnr_p);
-		if (r != 0) {
-			free(setp);
-			return r;
-		}
+		if (r != 0)
+			break;
 		if (!compat20 && (
 		    *typep == SSH_SMSG_SUCCESS
 		    || *typep == SSH_SMSG_FAILURE
 		    || *typep == SSH_CMSG_EOF
 		    || *typep == SSH_CMSG_EXIT_CONFIRMATION))
-			ssh_packet_check_eom(ssh);
+			if ((r = sshpkt_get_end(ssh)) != 0)
+				break;
 		/* If we got a packet, return it. */
-		if (*typep != SSH_MSG_NONE) {
-			free(setp);
-			return 0;
-		}
+		if (*typep != SSH_MSG_NONE)
+			break;
 		/*
 		 * Otherwise, wait for some data to arrive, add it to the
 		 * buffer, and try again.
@@ -1411,7 +1307,8 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		/* Append it to the buffer. */
 		ssh_packet_process_incoming(ssh, buf, len);
 	}
-	/* NOTREACHED */
+	free(setp);
+	return r;
 }
 
 int
@@ -1838,131 +1735,10 @@ ssh_packet_process_incoming(struct ssh *ssh, const char *buf, u_int len)
 		fatal("%s: %s", __func__, ssh_err(r));
 }
 
-/* Returns a character from the packet. */
-
-u_int
-ssh_packet_get_char(struct ssh *ssh)
-{
-	u_char ch;
-	int r;
-
-	if ((r = sshpkt_get_u8(ssh, &ch)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-	return ch;
-}
-
-/* Returns an integer from the packet data. */
-
-u_int
-ssh_packet_get_int(struct ssh *ssh)
-{
-	u_int val;
-	int r;
-
-	if ((r = sshpkt_get_u32(ssh, &val)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-	return val;
-}
-
-/* Returns an 64 bit integer from the packet data. */
-
-u_int64_t
-ssh_packet_get_int64(struct ssh *ssh)
-{
-	u_int64_t val;
-	int r;
-
-	if ((r = sshpkt_get_u64(ssh, &val)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-	return val;
-}
-
-/*
- * Returns an arbitrary precision integer from the packet data.  The integer
- * must have been initialized before this call.
- */
-
-void
-ssh_packet_get_bignum(struct ssh *ssh, BIGNUM * value)
-{
-	int r;
-
-	if ((r = sshpkt_get_bignum1(ssh, value)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-}
-
-void
-ssh_packet_get_bignum2(struct ssh *ssh, BIGNUM * value)
-{
-	int r;
-
-	if ((r = sshpkt_get_bignum2(ssh, value)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-}
-
-void
-ssh_packet_get_ecpoint(struct ssh *ssh, const EC_GROUP *curve, EC_POINT *point)
-{
-	int r;
-
-	if ((r = sshpkt_get_ec(ssh, point, curve)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-}
-
 int
 ssh_packet_remaining(struct ssh *ssh)
 {
 	return sshbuf_len(ssh->state->incoming_packet);
-}
-
-/*
- * Returns a string from the packet data.  The string is allocated using
- * malloc; it is the responsibility of the calling program to free it when
- * no longer needed.  The length_ptr argument may be NULL, or point to an
- * integer into which the length of the string is stored.
- */
-
-void *
-ssh_packet_get_string(struct ssh *ssh, u_int *length_ptr)
-{
-	int r;
-	size_t len;
-	u_char *val;
-
-	if ((r = sshpkt_get_string(ssh, &val, &len)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-	if (length_ptr != NULL)
-		*length_ptr = (u_int)len;
-	return val;
-}
-
-const void *
-ssh_packet_get_string_ptr(struct ssh *ssh, u_int *length_ptr)
-{
-	int r;
-	size_t len;
-	const u_char *val;
-
-	if ((r = sshpkt_get_string_direct(ssh, &val, &len)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-	if (length_ptr != NULL)
-		*length_ptr = (u_int)len;
-	return val;
-}
-
-/* Ensures the returned string has no embedded \0 characters in it. */
-char *
-ssh_packet_get_cstring(struct ssh *ssh, u_int *length_ptr)
-{
-	int r;
-	size_t len;
-	char *val;
-
-	if ((r = sshpkt_get_cstring(ssh, &val, &len)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-	if (length_ptr != NULL)
-		*length_ptr = (u_int)len;
-	return val;
 }
 
 /*
@@ -1979,6 +1755,7 @@ ssh_packet_send_debug(struct ssh *ssh, const char *fmt,...)
 {
 	char buf[1024];
 	va_list args;
+	int r;
 
 	if (compat20 && (ssh->compat & SSH_BUG_DEBUG))
 		return;
@@ -1988,15 +1765,18 @@ ssh_packet_send_debug(struct ssh *ssh, const char *fmt,...)
 	va_end(args);
 
 	if (compat20) {
-		ssh_packet_start(ssh, SSH2_MSG_DEBUG);
-		ssh_packet_put_char(ssh, 0); /* bool: always display */
-		ssh_packet_put_cstring(ssh, buf);
-		ssh_packet_put_cstring(ssh, "");
+		if ((r = sshpkt_start(ssh, SSH2_MSG_DEBUG)) != 0 ||
+		    (r = sshpkt_put_u8(ssh, 0)) != 0 || /* always display */
+		    (r = sshpkt_put_cstring(ssh, buf)) != 0 ||
+		    (r = sshpkt_put_cstring(ssh, "")) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 	} else {
-		ssh_packet_start(ssh, SSH_MSG_DEBUG);
-		ssh_packet_put_cstring(ssh, buf);
+		if ((r = sshpkt_start(ssh, SSH_MSG_DEBUG)) != 0 ||
+		    (r = sshpkt_put_cstring(ssh, buf)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 	}
-	ssh_packet_send(ssh);
 	ssh_packet_write_wait(ssh);
 }
 
@@ -2013,6 +1793,7 @@ ssh_packet_disconnect(struct ssh *ssh, const char *fmt,...)
 	char buf[1024];
 	va_list args;
 	static int disconnecting = 0;
+	int r;
 
 	if (disconnecting)	/* Guard against recursive invocations. */
 		fatal("packet_disconnect called recursively.");
@@ -2031,15 +1812,18 @@ ssh_packet_disconnect(struct ssh *ssh, const char *fmt,...)
 
 	/* Send the disconnect message to the other side, and wait for it to get sent. */
 	if (compat20) {
-		ssh_packet_start(ssh, SSH2_MSG_DISCONNECT);
-		ssh_packet_put_int(ssh, SSH2_DISCONNECT_PROTOCOL_ERROR);
-		ssh_packet_put_cstring(ssh, buf);
-		ssh_packet_put_cstring(ssh, "");
+		if ((r = sshpkt_start(ssh, SSH2_MSG_DISCONNECT)) != 0 ||
+		    (r = sshpkt_put_u32(ssh, SSH2_DISCONNECT_PROTOCOL_ERROR)) != 0 ||
+		    (r = sshpkt_put_cstring(ssh, buf)) != 0 ||
+		    (r = sshpkt_put_cstring(ssh, "")) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 	} else {
-		ssh_packet_start(ssh, SSH_MSG_DISCONNECT);
-		ssh_packet_put_cstring(ssh, buf);
+		if ((r = sshpkt_start(ssh, SSH_MSG_DISCONNECT)) != 0 ||
+		    (r = sshpkt_put_cstring(ssh, buf)) != 0 ||
+		    (r = sshpkt_send(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 	}
-	ssh_packet_send(ssh);
 	ssh_packet_write_wait(ssh);
 
 	/* Close the connection. */
@@ -2252,15 +2036,17 @@ void
 ssh_packet_send_ignore(struct ssh *ssh, int nbytes)
 {
 	u_int32_t rnd = 0;
-	int i;
+	int r, i;
 
-	ssh_packet_start(ssh, compat20 ? SSH2_MSG_IGNORE :
-	    SSH_MSG_IGNORE);
-	ssh_packet_put_int(ssh, nbytes);
+	if ((r = sshpkt_start(ssh, compat20 ?
+	    SSH2_MSG_IGNORE : SSH_MSG_IGNORE)) != 0 ||
+	    (r = sshpkt_put_u32(ssh, nbytes)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	for (i = 0; i < nbytes; i++) {
 		if (i % 4 == 0)
 			rnd = arc4random();
-		ssh_packet_put_char(ssh, (u_char)rnd & 0xff);
+		if ((r = sshpkt_put_u8(ssh, (u_char)rnd & 0xff)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 		rnd >>= 8;
 	}
 }

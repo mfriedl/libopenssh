@@ -63,6 +63,7 @@ int
 auth_rhosts_rsa(Authctxt *authctxt, char *cuser,
     struct sshkey *client_host_key)
 {
+	struct ssh *ssh = active_state;		/* XXX */
 	char *chost;
 	struct passwd *pw = authctxt->pw;
 
@@ -78,7 +79,8 @@ auth_rhosts_rsa(Authctxt *authctxt, char *cuser,
 
 	if (!PRIVSEP(auth_rhosts_rsa_key_allowed(pw, cuser, chost, client_host_key))) {
 		debug("Rhosts with RSA host authentication denied: unknown or invalid host key");
-		packet_send_debug("Your host key cannot be verified: unknown or invalid host key.");
+		ssh_packet_send_debug(ssh,
+		    "Your host key cannot be verified: unknown or invalid host key.");
 		return 0;
 	}
 	/* A matching host key was found and is known. */
@@ -96,6 +98,6 @@ auth_rhosts_rsa(Authctxt *authctxt, char *cuser,
 
 	verbose("Rhosts with RSA host authentication accepted for %.100s, %.100s on %.700s.",
 	    pw->pw_name, cuser, chost);
-	packet_send_debug("Rhosts with RSA host authentication accepted.");
+	ssh_packet_send_debug(ssh, "Rhosts with RSA host authentication accepted.");
 	return 1;
 }

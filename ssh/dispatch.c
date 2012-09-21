@@ -39,12 +39,15 @@
 int
 dispatch_protocol_error(int type, u_int32_t seq, struct ssh *ssh)
 {
+	int r;
+
 	logit("dispatch_protocol_error: type %d seq %u", type, seq);
 	if (!compat20)
 		fatal("protocol error");
-	ssh_packet_start(ssh, SSH2_MSG_UNIMPLEMENTED);
-	ssh_packet_put_int(ssh, seq);
-	ssh_packet_send(ssh);
+	if ((r = sshpkt_start(ssh, SSH2_MSG_UNIMPLEMENTED)) != 0 ||
+	    (r = sshpkt_put_u32(ssh, seq)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	ssh_packet_write_wait(ssh);
 	return 0;
 }

@@ -34,6 +34,7 @@
 #include "servconf.h"
 #include "compat.h"
 #include "ssh2.h"
+#include "err.h"
 #ifdef GSSAPI
 #include "ssh-gss.h"
 #endif
@@ -48,8 +49,11 @@ static int none_enabled = 1;
 static int
 userauth_none(struct ssh *ssh)
 {
+	int r;
+
 	none_enabled = 0;
-	ssh_packet_check_eom(ssh);
+	if ((r = sshpkt_get_end(ssh)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
 	if (options.permit_empty_passwd && options.password_authentication)
 		return (PRIVSEP(auth_password(ssh->authctxt, "")));
 	return (0);

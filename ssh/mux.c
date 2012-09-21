@@ -50,8 +50,6 @@
 #include <util.h>
 #include <paths.h>
 
-#define PACKET_SKIP_COMPAT2
-#define PACKET_SKIP_COMPAT
 #include "atomicio.h"
 #include "xmalloc.h"
 #include "log.h"

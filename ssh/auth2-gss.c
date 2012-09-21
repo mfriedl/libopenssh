@@ -38,8 +38,6 @@
 #include "sshbuf.h"
 #include "err.h"
 #include "servconf.h"
-#define PACKET_SKIP_COMPAT
-#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "ssh-gss.h"
 #include "monitor_wrap.h"

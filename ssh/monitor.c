@@ -1139,6 +1139,7 @@ mm_answer_keyverify(int sock, struct sshbuf *m)
 static void
 mm_record_login(Session *s, struct passwd *pw)
 {
+	struct ssh *ssh = active_state;			/* XXX */
 	socklen_t fromlen;
 	struct sockaddr_storage from;
 
@@ -1148,8 +1149,8 @@ mm_record_login(Session *s, struct passwd *pw)
 	 */
 	memset(&from, 0, sizeof(from));
 	fromlen = sizeof(from);
-	if (packet_connection_is_on_socket()) {
-		if (getpeername(packet_get_connection_in(),
+	if (ssh_packet_connection_is_on_socket(ssh)) {
+		if (getpeername(ssh_packet_get_connection_in(ssh),
 		    (struct sockaddr *)&from, &fromlen) < 0) {
 			debug("getpeername: %.100s", strerror(errno));
 			cleanup_exit(255);
@@ -1475,11 +1476,12 @@ mm_answer_term(int sock, struct sshbuf *req)
 void
 monitor_apply_keystate(struct monitor *pmonitor)
 {
+	struct ssh *ssh = active_state;	/* XXX */
 	Kex *kex;
 	int r;
 
 	debug3("%s: packet_set_state", __func__);
-	if ((r = packet_set_state(child_state)) != 0)
+	if ((r = ssh_packet_set_state(ssh, child_state)) != 0)
                 fatal("%s: packet_set_state: %s", __func__, ssh_err(r));
 	sshbuf_free(child_state);
 	child_state = NULL;
@@ -1498,7 +1500,7 @@ monitor_apply_keystate(struct monitor *pmonitor)
 
 	/* Update with new address */
 	if (options.compression) {
-		packet_set_compress_hooks(pmonitor->m_zlib,
+		ssh_packet_set_compress_hooks(ssh, pmonitor->m_zlib,
 		    (ssh_packet_comp_alloc_func *)mm_zalloc,
 		    (ssh_packet_comp_free_func *)mm_zfree);
 	}
@@ -1555,6 +1557,7 @@ monitor_openfds(struct monitor *mon, int do_logfds)
 struct monitor *
 monitor_init(void)
 {
+	struct ssh *ssh = active_state;			/* XXX */
 	struct monitor *mon;
 
 	mon = xcalloc(1, sizeof(*mon));
@@ -1567,7 +1570,7 @@ monitor_init(void)
 		mon->m_zlib = mm_create(mon->m_zback, 20 * MM_MEMSIZE);
 
 		/* Compression needs to share state across borders */
-		packet_set_compress_hooks(mon->m_zlib,
+		ssh_packet_set_compress_hooks(ssh, mon->m_zlib,
 		    (ssh_packet_comp_alloc_func *)mm_zalloc,
 		    (ssh_packet_comp_free_func *)mm_zfree);
 	}

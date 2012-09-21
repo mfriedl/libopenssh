@@ -20,7 +20,7 @@ SRCS=	authfd.c authfile.c canohost.c \
 	err.c
 
 SRCS+=	kexdhs.c kexgexs.c kexecdhs.c
-SRCS+=	opacket.c ssh_api.c
+SRCS+=	ssh_api.c
 SRCS+=	roaming_dummy.c
 
 DEBUGLIBS= no

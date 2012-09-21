@@ -26,8 +26,6 @@
 #include <sys/types.h>
 
 #include "xmalloc.h"
-#define PACKET_SKIP_COMPAT
-#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "key.h"
 #include "hostfile.h"

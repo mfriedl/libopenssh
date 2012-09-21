@@ -181,10 +181,11 @@ check_rhosts_file(const char *filename, const char *hostname,
 int
 auth_rhosts(struct passwd *pw, const char *client_user)
 {
+	struct ssh *ssh = active_state;	/* XXX */
 	const char *hostname, *ipaddr;
 
 	hostname = get_canonical_hostname(options.use_dns);
-	ipaddr = get_remote_ipaddr();
+	ipaddr = ssh_remote_ipaddr(ssh);
 	return auth_rhosts2(pw, client_user, hostname, ipaddr);
 }
 

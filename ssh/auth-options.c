@@ -94,6 +94,7 @@ auth_clear_options(void)
 int
 auth_parse_options(struct passwd *pw, char *opts, char *file, u_long linenum)
 {
+	struct ssh *ssh = active_state;		/* XXX */
 	const char *cp;
 	int i;
 
@@ -247,7 +248,7 @@ auth_parse_options(struct passwd *pw, char *opts, char *file, u_long linenum)
 		}
 		cp = "from=\"";
 		if (strncasecmp(opts, cp, strlen(cp)) == 0) {
-			const char *remote_ip = get_remote_ipaddr();
+			const char *remote_ip = ssh_remote_ipaddr(ssh);
 			const char *remote_host = get_canonical_hostname(
 			    options.use_dns);
 			char *patterns = xmalloc(strlen(opts) + 1);
@@ -430,6 +431,7 @@ parse_option_list(const struct sshbuf *oblob, struct passwd *pw,
     char **cert_forced_command,
     int *cert_source_address_done)
 {
+	struct ssh *ssh = active_state;		/* XXX */
 	char *command, *allowed;
 	const char *remote_ip;
 	char *name = NULL;
@@ -508,7 +510,7 @@ parse_option_list(const struct sshbuf *oblob, struct passwd *pw,
 					xfree(allowed);
 					goto out;
 				}
-				remote_ip = get_remote_ipaddr();
+				remote_ip = ssh_remote_ipaddr(ssh);
 				switch (addr_match_cidr_list(remote_ip,
 				    allowed)) {
 				case 1:

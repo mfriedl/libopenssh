@@ -44,8 +44,6 @@
 #include "hostfile.h"
 #include "auth.h"
 #include "sshbuf.h"
-#define PACKET_SKIP_COMPAT
-#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "dispatch.h"
 #include "log.h"

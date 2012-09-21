@@ -507,13 +507,14 @@ add_one_listen_addr(ServerOptions *options, char *addr, int port)
 struct connection_info *
 get_connection_info(int populate, int use_dns)
 {
+	struct ssh *ssh = active_state;		/* XXX */
 	static struct connection_info ci;
 
 	if (!populate)
 		return &ci;
 	ci.host = get_canonical_hostname(use_dns);
-	ci.address = get_remote_ipaddr();
-	ci.laddress = get_local_ipaddr(packet_get_connection_in());
+	ci.address = ssh_remote_ipaddr(ssh);
+	ci.laddress = get_local_ipaddr(ssh_packet_get_connection_in(ssh));
 	ci.lport = get_local_port();
 	return &ci;
 }
