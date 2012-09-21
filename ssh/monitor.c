@@ -1484,7 +1484,7 @@ monitor_apply_keystate(struct monitor *pmonitor)
 	sshbuf_free(child_state);
 	child_state = NULL;
 
-	if ((kex = active_state->kex) != 0) {
+	if ((kex = ssh->kex) != 0) {
 		/* XXX set callbacks */
 		kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
 		kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;

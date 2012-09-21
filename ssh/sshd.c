@@ -1954,7 +1954,7 @@ main(int ac, char **av)
 	do_authenticated(ssh);
 
 	/* The connection has been terminated. */
-	ssh_packet_get_bytes(active_state, &ibytes, &obytes);
+	ssh_packet_get_bytes(ssh, &ibytes, &obytes);
 	verbose("Transferred: sent %llu, received %llu bytes",
 	    (unsigned long long)obytes, (unsigned long long)ibytes);
 

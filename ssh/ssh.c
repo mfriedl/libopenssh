@@ -1453,7 +1453,7 @@ ssh_session2(struct ssh *ssh)
 	if (options.control_persist && muxserver_sock == -1)
 		ssh_init_stdio_forwarding();
 
-	if (!no_shell_flag || (active_state->compat & SSH_BUG_DUMMYCHAN))
+	if (!no_shell_flag || (ssh->compat & SSH_BUG_DUMMYCHAN))
 		id = ssh_session2_open(ssh);
 
 	/* If we don't expect to open a new session, then disallow it */
