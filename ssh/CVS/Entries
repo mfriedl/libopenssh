@@ -41,11 +41,6 @@ D/sshd////
 /authfd.c/1.86/Fri Jan  6 10:00:45 2012//
 /authfd.h/1.37/Fri Jan  6 10:00:45 2012//
 /authfile.h/1.16/Fri Jan  6 10:00:45 2012//
-/bufaux.c/1.50/Fri Jan  6 10:00:45 2012//
-/bufbn.c/1.6/Fri Jan  6 10:00:45 2012//
-/bufec.c/1.1/Fri Jan  6 10:00:45 2012//
-/buffer.c/1.32/Fri Jan  6 10:00:45 2012//
-/buffer.h/1.21/Fri Jan  6 10:00:45 2012//
 /canohost.c/1.66/Fri Jan  6 10:00:45 2012//
 /canohost.h/1.11/Fri Jan  6 10:00:45 2012//
 /cipher-3des1.c/1.7/Fri Jan  6 10:00:45 2012//
@@ -66,7 +61,6 @@ D/sshd////
 /match.c/1.27/Fri Jan  6 10:00:47 2012//
 /misc.c/1.86/Fri Jan  6 10:00:47 2012//
 /misc.h/1.48/Fri Jan  6 10:00:47 2012//
-/monitor_wrap.c/1.73/Fri Jan  6 10:00:48 2012//
 /monitor_wrap.h/1.23/Fri Jan  6 10:00:48 2012//
 /nchan.c/1.63/Fri Jan  6 10:00:48 2012//
 /readconf.c/1.194/Fri Jan  6 10:00:48 2012//
@@ -115,7 +109,6 @@ D/sshd////
 /gss-serv.c/1.23/Mon Mar 19 16:04:54 2012//
 /jpake.h/1.2/Mon Mar 19 16:04:54 2012//
 /key.h/1.34/Result of merge//
-/mac.c/1.18/Result of merge//
 /match.h/1.15/Mon Mar 19 16:04:54 2012//
 /monitor.h/1.16/Mon Mar 19 16:04:54 2012//
 /monitor_fdpass.c/1.19/Mon Mar 19 16:04:54 2012//
@@ -133,7 +126,6 @@ D/sshd////
 /readpass.c/1.48/Mon Mar 19 16:04:54 2012//
 /roaming.h/1.6/Mon Mar 19 16:04:54 2012//
 /roaming_common.c/1.9/Mon Mar 19 16:04:54 2012//
-/roaming_serv.c/1.1/Mon Mar 19 16:04:54 2012//
 /sandbox-rlimit.c/1.3/Mon Mar 19 16:04:54 2012//
 /schnorr.c/1.5/Wed Mar 21 09:25:01 2012//
 /schnorr.h/1.1/Mon Mar 19 16:04:54 2012//
@@ -174,7 +166,6 @@ D/sshd////
 /ttymodes.h/1.14/Mon Mar 19 16:04:54 2012//
 /uidswap.c/1.35/Mon Mar 19 16:04:54 2012//
 /uidswap.h/1.13/Mon Mar 19 16:04:54 2012//
-/umac.h/1.1/Wed Mar 21 09:25:01 2012//
 /uuencode.c/1.26/Mon Mar 19 16:04:54 2012//
 /uuencode.h/1.14/Mon Mar 19 16:04:54 2012//
 /xmalloc.c/1.27/Mon Mar 19 16:04:54 2012//
@@ -189,29 +180,38 @@ D/sshd////
 /jpake.c/1.7/Thu Aug  9 18:41:57 2012//
 /key.c/1.99/Result of merge//
 /log.c/1.43/Result of merge//
-/log.h/1.19/Fri Sep 14 16:41:13 2012//
 /moduli.c/1.26/Thu Aug  9 18:41:57 2012//
 /monitor.c/1.117/Result of merge//
 /mux.c/1.37/Result of merge//
-/myproposal.h/1.29/Thu Aug  9 18:41:57 2012//
-/packet.c/1.176/Result of merge//
 /packet.h/1.57/Result of merge//
 /sandbox-systrace.c/1.6/Thu Aug  9 18:41:57 2012//
 /servconf.c/1.230/Fri Sep 14 16:41:14 2012//
 /servconf.h/1.103/Thu Aug  9 18:41:57 2012//
 /sftp-client.c/1.97/Thu Aug  9 18:41:57 2012//
-/sftp.c/1.136/Thu Aug  9 18:41:57 2012//
-/ssh-keygen.1/1.110/Fri Sep 14 16:41:14 2012//
-/ssh-keygen.c/1.217/Result of merge//
 /ssh-keyscan.1/1.30/Thu Aug  9 18:41:57 2012//
 /ssh-pkcs11-helper.c/1.4/Result of merge//
-/ssh.1/1.328/Fri Sep 14 16:41:15 2012//
 /ssh.c/1.370/Result of merge//
-/ssh_config.5/1.157/Thu Aug  9 18:41:57 2012//
-/sshd.8/1.266/Thu Aug  9 18:41:57 2012//
 /sshd.c/1.393/Result of merge//
 /sshd_config/1.87/Thu Aug  9 18:41:57 2012//
-/sshd_config.5/1.144/Thu Aug  9 18:41:57 2012//
 /version.h/1.65/Thu Aug  9 18:41:57 2012//
 /kex.c/1.87/Result of merge//
 /sshconnect.c/1.236/Result of merge//
+/bufaux.c/1.50/Tue Sep 25 15:24:07 2012//
+/bufbn.c/1.6/Tue Sep 25 15:24:07 2012//
+/bufec.c/1.1/Tue Sep 25 15:24:07 2012//
+/buffer.c/1.32/Tue Sep 25 15:24:07 2012//
+/buffer.h/1.21/Tue Sep 25 15:24:07 2012//
+/log.h/1.19/Mon Sep 17 19:41:04 2012//
+/roaming_serv.c/1.1/Thu Sep 20 21:50:47 2012//
+/ssh-keygen.1/1.110/Mon Sep 17 19:41:04 2012//
+/packet.c/1.177/Result of merge//
+/mac.c/1.19/Result of merge//
+/ssh-keygen.c/1.218/Result of merge//
+/monitor_wrap.c/1.74/Result of merge//
+/myproposal.h/1.30/Thu Oct  4 13:30:40 2012//
+/sftp.c/1.141/Result of merge//
+/ssh.1/1.330/Thu Oct  4 13:30:40 2012//
+/ssh_config.5/1.158/Thu Oct  4 13:30:40 2012//
+/sshd.8/1.267/Thu Oct  4 13:30:40 2012//
+/sshd_config.5/1.145/Thu Oct  4 13:30:40 2012//
+/umac.h/1.2/Thu Oct  4 13:30:40 2012//

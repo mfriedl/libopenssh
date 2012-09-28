@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.176 2012/01/25 19:40:09 markus Exp $ */
+/* $OpenBSD: packet.c,v 1.177 2012/09/17 13:04:11 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -925,6 +925,9 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 		mac  = &state->newkeys[mode]->mac;
 		comp = &state->newkeys[mode]->comp;
 		mac_clear(mac);
+		memset(enc->iv,  0, enc->block_size);
+		memset(enc->key, 0, enc->key_len);
+		memset(mac->key, 0, mac->key_len);
 		free(enc->name);
 		free(enc->iv);
 		free(enc->key);

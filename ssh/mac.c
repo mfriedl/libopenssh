@@ -1,4 +1,4 @@
-/* $OpenBSD: mac.c,v 1.18 2012/06/28 05:07:45 dtucker Exp $ */
+/* $OpenBSD: mac.c,v 1.19 2012/10/04 13:21:50 markus Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
@@ -42,6 +42,7 @@
 
 #define SSH_EVP		1	/* OpenSSL EVP-based MAC */
 #define SSH_UMAC	2	/* UMAC (not integrated with OpenSSL) */
+#define SSH_UMAC128	3
 
 struct {
 	char		*name;
@@ -60,6 +61,7 @@ struct {
 	{ "hmac-ripemd160",		SSH_EVP, EVP_ripemd160, 0, -1, -1 },
 	{ "hmac-ripemd160@openssh.com",	SSH_EVP, EVP_ripemd160, 0, -1, -1 },
 	{ "umac-64@openssh.com",	SSH_UMAC, NULL, 0, 128, 64 },
+	{ "umac-128@openssh.com",	SSH_UMAC128, NULL, 0, 128, 128 },
 	{ NULL,				0, NULL, 0, -1, -1 }
 };
 
@@ -118,6 +120,9 @@ mac_init(Mac *mac)
 		if ((mac->umac_ctx = umac_new(mac->key)) == NULL)
 			return SSH_ERR_ALLOC_FAIL;
 		return 0;
+	case SSH_UMAC128:
+		mac->umac_ctx = umac128_new(mac->key);
+		return 0;
 	default:
 		return SSH_ERR_INVALID_ARGUMENT;
 	}
@@ -148,6 +153,11 @@ mac_compute(Mac *mac, u_int32_t seqno, u_char *data, int datalen,
 		umac_update(mac->umac_ctx, data, datalen);
 		umac_final(mac->umac_ctx, m, nonce);
 		break;
+	case SSH_UMAC128:
+		put_u64(nonce, seqno);
+		umac128_update(mac->umac_ctx, data, datalen);
+		umac128_final(mac->umac_ctx, m, nonce);
+		break;
 	default:
 		return SSH_ERR_INVALID_ARGUMENT;
 	}
@@ -165,6 +175,9 @@ mac_clear(Mac *mac)
 	if (mac->type == SSH_UMAC) {
 		if (mac->umac_ctx != NULL)
 			umac_delete(mac->umac_ctx);
+	} else if (mac->type == SSH_UMAC128) {
+		if (mac->umac_ctx != NULL)
+			umac128_delete(mac->umac_ctx);
 	} else if (mac->evp_md != NULL)
 		HMAC_cleanup(&mac->evp_ctx);
 	mac->evp_md = NULL;
