@@ -79,6 +79,20 @@ sshbuf_get_bignum1(struct sshbuf *buf, BIGNUM *v)
 	return 0;
 }
 
+static int
+get_ec(const u_char *d, size_t len, EC_POINT *v, const EC_GROUP *g)
+{
+	/* Refuse overlong bignums */
+	if (len == 0 || len > SSHBUF_MAX_ECPOINT)
+		return SSH_ERR_ECPOINT_TOO_LARGE;
+	/* Only handle uncompressed points */
+	if (*d != POINT_CONVERSION_UNCOMPRESSED)
+		return SSH_ERR_INVALID_FORMAT;
+	if (v != NULL && EC_POINT_oct2point(g, v, d, len, NULL) != 1)
+		return SSH_ERR_INVALID_FORMAT; /* XXX assumption */
+	return 0;
+}
+
 int
 sshbuf_get_ec(struct sshbuf *buf, EC_POINT *v, const EC_GROUP *g)
 {
@@ -88,14 +102,8 @@ sshbuf_get_ec(struct sshbuf *buf, EC_POINT *v, const EC_GROUP *g)
 
 	if ((r = sshbuf_peek_string_direct(buf, &d, &len)) < 0)
 		return r;
-	/* Refuse overlong bignums */
-	if (len == 0 || len > SSHBUF_MAX_ECPOINT)
-		return SSH_ERR_ECPOINT_TOO_LARGE;
-	/* Only handle uncompressed points */
-	if (*d != POINT_CONVERSION_UNCOMPRESSED)
-		return SSH_ERR_INVALID_FORMAT;
-	if (v != NULL && EC_POINT_oct2point(g, v, d, len, NULL) != 1)
-		return SSH_ERR_INVALID_FORMAT; /* XXX assumption */
+	if ((r = get_ec(d, len, v, g)) != 0)
+		return r;
 	/* Skip string */
 	if (sshbuf_get_string_direct(buf, NULL, NULL) != 0) {
 		/* Shouldn't happen */
@@ -111,20 +119,29 @@ sshbuf_get_eckey(struct sshbuf *buf, EC_KEY *v)
 {
 	EC_POINT *pt = EC_POINT_new(EC_KEY_get0_group(v));
 	int r;
-	size_t ooff = buf->off; /* NB. uses buffer internals to rewind on err */
+	const u_char *d;
+	size_t len;
 
 	if (pt == NULL) {
 		SSHBUF_DBG(("SSH_ERR_ALLOC_FAIL"));
 		return SSH_ERR_ALLOC_FAIL;
 	}
-	if ((r = sshbuf_get_ec(buf, pt, EC_KEY_get0_group(v))) < 0)
+	if ((r = sshbuf_peek_string_direct(buf, &d, &len)) < 0)
+		return r;
+	if ((r = get_ec(d, len, pt, EC_KEY_get0_group(v))) != 0)
 		return r;
 	if (EC_KEY_set_public_key(v, pt) != 1) {
-		buf->off = ooff;
 		EC_POINT_free(pt);
 		return SSH_ERR_ALLOC_FAIL; /* XXX assumption */
 	}
 	EC_POINT_free(pt);
+	/* Skip string */
+	if (sshbuf_get_string_direct(buf, NULL, NULL) != 0) {
+		/* Shouldn't happen */
+		SSHBUF_DBG(("SSH_ERR_INTERNAL_ERROR"));
+		SSHBUF_ABORT();
+		return SSH_ERR_INTERNAL_ERROR;
+	}
 	return 0;	
 }
 

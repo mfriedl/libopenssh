@@ -213,7 +213,7 @@ sshbuf_tests(void)
 	ASSERT_MEM_FILLED_EQ(cdp, 0xd7, 1000);
 	ASSERT_MEM_FILLED_EQ(cdp + 1000, 0x7d, 223);
 	ASSERT_MEM_FILLED_EQ(cdp + 1223, 0xff, 1);
-	ASSERT_SIZE_T_EQ(p1->alloc % SSHBUF_SIZE_INC, 0);
+	ASSERT_SIZE_T_EQ(sshbuf_alloc(p1) % SSHBUF_SIZE_INC, 0);
 	sshbuf_free(p1);
 	TEST_DONE();
 

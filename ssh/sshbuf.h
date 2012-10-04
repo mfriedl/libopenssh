@@ -32,29 +32,7 @@
 #define SSHBUF_MAX_BIGNUM	(8192 / 8)	/* Max bignum *bytes* */
 #define SSHBUF_MAX_ECPOINT	((528 * 2 / 8) + 1) /* Max EC point *bytes* */
 
-/*
- * NB. do not depend on the internals of this. It will be made opaque
- * one day.
- */
-struct sshbuf {
-	u_char *d;		/* Data */
-	const u_char *cd;	/* Const data */
-	size_t off;		/* First available byte is buf->d + buf->off */
-	size_t size;		/* Last byte is buf->d + buf->size - 1 */
-	size_t max_size;	/* Maximum size of buffer */
-	size_t alloc;		/* Total bytes allocated to buf->d */
-	int freeme;		/* Kludge to support sshbuf_init */
-	int readonly;		/* Refers to external, const data */
-};
-
-#ifndef SSHBUF_NO_DEPREACTED
-/*
- * NB. Please do not use sshbuf_init() in new code. Please use sshbuf_new()
- * instead. sshbuf_init() is deprectated and will go away soon (it is
- * only included to allow compat with buffer_* in OpenSSH)
- */
-void sshbuf_init(struct sshbuf *buf);
-#endif
+struct sshbuf;
 
 /*
  * Create a new sshbuf buffer.
@@ -271,6 +249,11 @@ int	sshbuf_b64tod(struct sshbuf *buf, const char *b64);
 
 /* Internal definitions follow. Exposed for regress tests */
 #ifdef SSHBUF_INTERNAL
+
+/*
+ * Return the allocation size of buf
+ */
+size_t	sshbuf_alloc(const struct sshbuf *buf);
 
 # define SSHBUF_SIZE_INIT		256		/* Initial allocation */
 # define SSHBUF_SIZE_INC		256		/* Preferred increment length */

@@ -25,6 +25,20 @@
 #define SSHBUF_INTERNAL
 #include "sshbuf.h"
 
+/*
+ * NB. do not depend on the internals of this. It will be made opaque
+ * one day.
+ */
+struct sshbuf {
+	u_char *d;		/* Data */
+	const u_char *cd;	/* Const data */
+	size_t off;		/* First available byte is buf->d + buf->off */
+	size_t size;		/* Last byte is buf->d + buf->size - 1 */
+	size_t max_size;	/* Maximum size of buffer */
+	size_t alloc;		/* Total bytes allocated to buf->d */
+	int readonly;		/* Refers to external, const data */
+};
+
 static inline int
 sshbuf_check_sanity(const struct sshbuf *buf)
 {
@@ -32,7 +46,6 @@ sshbuf_check_sanity(const struct sshbuf *buf)
 	if (__predict_false(buf == NULL ||
 	    (!buf->readonly && buf->d != buf->cd) ||
 	    buf->cd == NULL ||
-	    (!buf->freeme && buf->readonly) ||
 	    buf->max_size > SSHBUF_SIZE_MAX ||
 	    buf->alloc > buf->max_size ||
 	    buf->size > buf->alloc ||
@@ -69,7 +82,6 @@ sshbuf_new(void)
 		return NULL;
 	ret->alloc = SSHBUF_SIZE_INIT;
 	ret->max_size = SSHBUF_SIZE_MAX;
-	ret->freeme = 1;
 	ret->readonly = 0;
 	if ((ret->cd = ret->d = calloc(1, ret->alloc)) == NULL) {
 		free(ret);
@@ -87,7 +99,6 @@ sshbuf_from(const void *blob, size_t len)
 	    (ret = calloc(sizeof(*ret), 1)) == NULL)
 		return NULL;
 	ret->alloc = ret->size = ret->max_size = len;
-	ret->freeme = 1;
 	ret->readonly = 1;
 	ret->cd = blob;
 	ret->d = NULL;
@@ -107,21 +118,8 @@ sshbuf_fromb(const struct sshbuf *buf)
 }
 
 void
-sshbuf_init(struct sshbuf *ret)
-{
-	bzero(ret, sizeof(*ret));
-	ret->alloc = SSHBUF_SIZE_INIT;
-	ret->max_size = SSHBUF_SIZE_MAX;
-	ret->readonly = 0;
-	if ((ret->cd = ret->d = calloc(1, ret->alloc)) == NULL)
-		ret->alloc = 0;
-}
-
-void
 sshbuf_free(struct sshbuf *buf)
 {
-	int freeme;
-
 	if (buf == NULL)
 		return;
 	/*
@@ -136,10 +134,8 @@ sshbuf_free(struct sshbuf *buf)
 		bzero(buf->d, buf->alloc);
 		free(buf->d);
 	}
-	freeme = buf->freeme;
 	bzero(buf, sizeof(buf));
-	if (freeme)
-		free(buf);
+	free(buf);
 }
 
 void
@@ -167,6 +163,12 @@ size_t
 sshbuf_max_size(const struct sshbuf *buf)
 {
 	return buf->max_size;
+}
+
+size_t
+sshbuf_alloc(const struct sshbuf *buf)
+{
+	return buf->alloc;
 }
 
 int
