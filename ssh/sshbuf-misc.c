@@ -33,7 +33,7 @@
 void
 sshbuf_dump(struct sshbuf *buf, FILE *f)
 {
-	u_char *p = sshbuf_ptr(buf);
+	const u_char *p = sshbuf_ptr(buf);
 	size_t i, j, len = sshbuf_len(buf);
 
 	fprintf(f, "buffer %p len = %zu\n", buf, len);
@@ -62,7 +62,7 @@ char *
 sshbuf_dtob16(struct sshbuf *buf)
 {
 	size_t i, j, len = sshbuf_len(buf);
-	u_char *p = sshbuf_ptr(buf);
+	const u_char *p = sshbuf_ptr(buf);
 	char *ret;
 	const char hex[] = "0123456789abcdef";
 
@@ -82,7 +82,7 @@ char *
 sshbuf_dtob64(struct sshbuf *buf)
 {
 	size_t len = sshbuf_len(buf), plen;
-	u_char *p = sshbuf_ptr(buf);
+	const u_char *p = sshbuf_ptr(buf);
 	char *ret;
 	int r;
 

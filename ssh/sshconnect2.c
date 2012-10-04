@@ -768,7 +768,7 @@ process_gssapi_token(struct ssh *ssh, gss_buffer_t recv_tok)
 			ssh_gssapi_buildmic(b, authctxt->server_user,
 			    authctxt->service, "gssapi-with-mic");
 
-			gssbuf.value = sshbuf_ptr(b);
+			gssbuf.value = sshbuf_mutable_ptr(b);
 			gssbuf.length = sshbuf_len(b);
 
 			status = ssh_gssapi_sign(gssctxt, &gssbuf, &mic);
@@ -1301,7 +1301,7 @@ input_userauth_jpake_server_confirm(int type, u_int32_t seq, struct ssh *ssh)
 
 static int
 identity_sign(Identity *id, u_char **sigp, size_t *lenp,
-    u_char *data, size_t datalen, u_int compat)
+    const u_char *data, size_t datalen, u_int compat)
 {
 	struct sshkey *prv;
 	int ret;
@@ -1773,7 +1773,7 @@ input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 
 static int
 ssh_keysign(struct ssh *ssh, struct sshkey *key, u_char **sigp, size_t *lenp,
-    u_char *data, size_t datalen)
+    const u_char *data, size_t datalen)
 {
 	struct sshbuf *b;
 	struct stat st;

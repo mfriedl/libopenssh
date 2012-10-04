@@ -136,7 +136,7 @@ ssh_request_reply(int sock, struct sshbuf *request, struct sshbuf *reply)
 
 	/* Send the length and then the packet to the agent. */
 	if (atomicio(vwrite, sock, buf, 4) != 4 ||
-	    atomicio(vwrite, sock, sshbuf_ptr(request),
+	    atomicio(vwrite, sock, sshbuf_mutable_ptr(request),
 	    sshbuf_len(request)) != sshbuf_len(request))
 		return SSH_ERR_AGENT_COMMUNICATION;
 	/*
@@ -425,7 +425,7 @@ ssh_decrypt_challenge(int sock, struct sshkey* key, BIGNUM *challenge,
 int
 ssh_agent_sign(int sock, struct sshkey *key,
     u_char **sigp, size_t *lenp,
-    u_char *data, size_t datalen, u_int compat)
+    const u_char *data, size_t datalen, u_int compat)
 {
 	struct sshbuf *msg;
 	u_char *blob, type;

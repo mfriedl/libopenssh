@@ -216,7 +216,7 @@ process(void)
 	u_int buf_len;
 	u_int consumed;
 	u_char type;
-	u_char *cp;
+	const u_char *cp;
 	int r;
 
 	buf_len = sshbuf_len(iqueue);

@@ -50,7 +50,7 @@ public_fuzz(struct sshkey *k)
 	ASSERT_INT_EQ(sshkey_to_blob_buf(k, buf), 0);
 	fuzz = fuzz_begin(FUZZ_1_BIT_FLIP | FUZZ_1_BYTE_FLIP |
 	    FUZZ_TRUNCATE_START | FUZZ_TRUNCATE_END,
-	    sshbuf_ptr(buf), sshbuf_len(buf));
+	    sshbuf_mutable_ptr(buf), sshbuf_len(buf));
 	ASSERT_INT_EQ(sshkey_from_blob(sshbuf_ptr(buf), sshbuf_len(buf),
 	    &k1), 0);
 	sshkey_free(k1);
@@ -75,7 +75,7 @@ sshkey_fuzz_tests(void)
 	buf = load_file("rsa1_1");
 	fuzz = fuzz_begin(FUZZ_1_BIT_FLIP | FUZZ_1_BYTE_FLIP |
 	    FUZZ_TRUNCATE_START | FUZZ_TRUNCATE_END,
-	    sshbuf_ptr(buf), sshbuf_len(buf));
+	    sshbuf_mutable_ptr(buf), sshbuf_len(buf));
 	ASSERT_INT_EQ(sshkey_parse_private(buf, "", "key", &k1, NULL), 0);
 	sshkey_free(k1);
 	sshbuf_free(buf);
@@ -96,7 +96,7 @@ sshkey_fuzz_tests(void)
 	buf = load_file("rsa1_1_pw");
 	fuzz = fuzz_begin(FUZZ_1_BIT_FLIP | FUZZ_1_BYTE_FLIP |
 	    FUZZ_TRUNCATE_START | FUZZ_TRUNCATE_END,
-	    sshbuf_ptr(buf), sshbuf_len(buf));
+	    sshbuf_mutable_ptr(buf), sshbuf_len(buf));
 	ASSERT_INT_EQ(sshkey_parse_public_rsa1(buf, &k1, NULL), 0);
 	sshkey_free(k1);
 	sshbuf_free(buf);
@@ -115,7 +115,8 @@ sshkey_fuzz_tests(void)
 
 	TEST_START("fuzz RSA private");
 	buf = load_file("rsa_1");
-	fuzz = fuzz_begin(FUZZ_BASE64, sshbuf_ptr(buf), sshbuf_len(buf));
+	fuzz = fuzz_begin(FUZZ_BASE64, sshbuf_mutable_ptr(buf),
+	    sshbuf_len(buf));
 	ASSERT_INT_EQ(sshkey_parse_private(buf, "", "key", &k1, NULL), 0);
 	sshkey_free(k1);
 	sshbuf_free(buf);
@@ -134,7 +135,8 @@ sshkey_fuzz_tests(void)
 
 	TEST_START("fuzz DSA private");
 	buf = load_file("dsa_1");
-	fuzz = fuzz_begin(FUZZ_BASE64, sshbuf_ptr(buf), sshbuf_len(buf));
+	fuzz = fuzz_begin(FUZZ_BASE64, sshbuf_mutable_ptr(buf),
+	    sshbuf_len(buf));
 	ASSERT_INT_EQ(sshkey_parse_private(buf, "", "key", &k1, NULL), 0);
 	sshkey_free(k1);
 	sshbuf_free(buf);
@@ -153,7 +155,8 @@ sshkey_fuzz_tests(void)
 
 	TEST_START("fuzz ECDSA private");
 	buf = load_file("ecdsa_1");
-	fuzz = fuzz_begin(FUZZ_BASE64, sshbuf_ptr(buf), sshbuf_len(buf));
+	fuzz = fuzz_begin(FUZZ_BASE64, sshbuf_mutable_ptr(buf),
+	    sshbuf_len(buf));
 	ASSERT_INT_EQ(sshkey_parse_private(buf, "", "key", &k1, NULL), 0);
 	sshkey_free(k1);
 	sshbuf_free(buf);

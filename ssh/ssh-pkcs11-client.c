@@ -49,7 +49,7 @@ send_msg(struct sshbuf *m)
 
 	POKE_U32(buf, mlen);
 	if (atomicio(vwrite, fd, buf, 4) != 4 ||
-	    atomicio(vwrite, fd, sshbuf_ptr(m),
+	    atomicio(vwrite, fd, (u_char *)sshbuf_ptr(m),
 	    sshbuf_len(m)) != sshbuf_len(m))
 		error("write to helper failed");
 	if ((r = sshbuf_consume(m, mlen)) != 0)

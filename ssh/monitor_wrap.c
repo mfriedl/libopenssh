@@ -101,7 +101,7 @@ mm_log_handler(LogLevel level, const char *msg, void *ctx)
 	    (r = sshbuf_put_cstring(log_msg, msg)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	POKE_U32(sshbuf_ptr(log_msg), sshbuf_len(log_msg) - 4);
-	if (atomicio(vwrite, mon->m_log_sendfd, sshbuf_ptr(log_msg),
+	if (atomicio(vwrite, mon->m_log_sendfd, (u_char *)sshbuf_ptr(log_msg),
 	    sshbuf_len(log_msg)) != sshbuf_len(log_msg))
 		fatal("%s: write: %s", __func__, strerror(errno));
 	sshbuf_free(log_msg);
@@ -129,7 +129,7 @@ mm_request_send(int sock, enum monitor_reqtype type, struct sshbuf *m)
 	buf[4] = (u_char) type;		/* 1st byte of payload is mesg-type */
 	if (atomicio(vwrite, sock, buf, sizeof(buf)) != sizeof(buf))
 		fatal("%s: write: %s", __func__, strerror(errno));
-	if (atomicio(vwrite, sock, sshbuf_ptr(m), mlen) != mlen)
+	if (atomicio(vwrite, sock, (u_char *)sshbuf_ptr(m), mlen) != mlen)
 		fatal("%s: write: %s", __func__, strerror(errno));
 }
 
@@ -470,7 +470,7 @@ mm_key_allowed(enum mm_keytype type, char *user, char *host,
 
 int
 mm_sshkey_verify(struct sshkey *key, u_char *sig, size_t siglen,
-    u_char *data, size_t datalen, u_int compat)
+    const u_char *data, size_t datalen, u_int compat)
 {
 	struct sshbuf *m;
 	u_char *blob;

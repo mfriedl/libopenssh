@@ -22,6 +22,7 @@ void
 sshbuf_getput_basic_tests(void)
 {
 	struct sshbuf *p1, *p2;
+	const u_char *cd;
 	u_char *d, d2[32], x[] = {
 		0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x00, 0x99
 	};
@@ -68,13 +69,13 @@ sshbuf_getput_basic_tests(void)
 	ASSERT_PTR_NE(p1, NULL);
 	ASSERT_INT_EQ(sshbuf_put(p1, x, 5), 0);
 	ASSERT_SIZE_T_EQ(sshbuf_len(p1), 5);
-	d = sshbuf_ptr(p1);
-	ASSERT_PTR_NE(d, NULL);
-	ASSERT_U8_EQ(d[0], 0x11);
-	ASSERT_U8_EQ(d[1], 0x22);
-	ASSERT_U8_EQ(d[2], 0x33);
-	ASSERT_U8_EQ(d[3], 0x44);
-	ASSERT_U8_EQ(d[4], 0x55);
+	cd = sshbuf_ptr(p1);
+	ASSERT_PTR_NE(cd, NULL);
+	ASSERT_U8_EQ(cd[0], 0x11);
+	ASSERT_U8_EQ(cd[1], 0x22);
+	ASSERT_U8_EQ(cd[2], 0x33);
+	ASSERT_U8_EQ(cd[3], 0x44);
+	ASSERT_U8_EQ(cd[4], 0x55);
 	TEST_DONE();
 
 	TEST_START("sshbuf_get");

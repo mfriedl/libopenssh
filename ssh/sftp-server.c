@@ -1302,7 +1302,8 @@ process(void)
 	u_int msg_len;
 	u_int buf_len;
 	u_int consumed;
-	u_char type, *cp;
+	u_char type;
+	const u_char *cp;
 	int r;
 
 	buf_len = sshbuf_len(iqueue);

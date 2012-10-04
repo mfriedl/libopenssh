@@ -34,5 +34,5 @@ struct deattack_ctx {
 };
 
 void	 deattack_init(struct deattack_ctx *);
-int	 detect_attack(struct deattack_ctx *, u_char *, u_int32_t);
+int	 detect_attack(struct deattack_ctx *, const u_char *, u_int32_t);
 #endif

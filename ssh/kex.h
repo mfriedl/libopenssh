@@ -161,17 +161,21 @@ int	 kexgex_server(struct ssh *);
 int	 kexecdh_client(struct ssh *);
 int	 kexecdh_server(struct ssh *);
 
-int
-kex_dh_hash(char *, char *, char *, size_t, char *, size_t, u_char *, size_t,
-    BIGNUM *, BIGNUM *, BIGNUM *, u_char **, size_t *);
-int
-kexgex_hash(const EVP_MD *, char *, char *, char *, size_t, char *,
-    size_t, u_char *, size_t, int, int, int, BIGNUM *, BIGNUM *, BIGNUM *,
-    BIGNUM *, BIGNUM *, u_char **, size_t *);
-int
-kex_ecdh_hash(const EVP_MD *, const EC_GROUP *, char *, char *, char *, size_t,
-    char *, size_t, u_char *, size_t, const EC_POINT *, const EC_POINT *,
-    const BIGNUM *, u_char **, size_t *);
+
+int	 kex_dh_hash(const char *, const char *,
+    const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
+    const BIGNUM *, const BIGNUM *, const BIGNUM *, u_char **, size_t *);
+
+int	 kexgex_hash(const EVP_MD *, const char *, const char *,
+    const char *, size_t, const char *, size_t, const u_char *, size_t,
+    int, int, int,
+    const BIGNUM *, const BIGNUM *, const BIGNUM *,
+    const BIGNUM *, const BIGNUM *,
+    u_char **, size_t *);
+
+int kex_ecdh_hash(const EVP_MD *, const EC_GROUP *, const char *, const char *,
+    const char *, size_t, const char *, size_t, const u_char *, size_t,
+    const EC_POINT *, const EC_POINT *, const BIGNUM *, u_char **, size_t *);
 
 int	kex_ecdh_name_to_nid(const char *);
 const EVP_MD *kex_ecdh_name_to_evpmd(const char *);

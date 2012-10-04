@@ -919,7 +919,7 @@ x11_open_helper(struct sshbuf *b)
 		return 0;
 
 	/* Parse the lengths of variable-length fields. */
-	ucp = sshbuf_ptr(b);
+	ucp = sshbuf_mutable_ptr(b);
 	if (ucp[0] == 0x42) {	/* Byte order MSB first. */
 		proto_len = 256 * ucp[6] + ucp[7];
 		data_len = 256 * ucp[8] + ucp[9];
@@ -1057,7 +1057,8 @@ channel_error(Channel *c, char *msg, int r, const char *func)
 static int
 channel_decode_socks4(Channel *c, fd_set *readset, fd_set *writeset)
 {
-	char *p, *host;
+	const char *p;
+	char *host;
 	u_int len, have, i, found, need;
 	char username[256];
 	struct {
@@ -1181,7 +1182,8 @@ channel_decode_socks5(Channel *c, fd_set *readset, fd_set *writeset)
 		u_int8_t atyp;
 	} s5_req, s5_rsp;
 	u_int16_t dest_port;
-	u_char *p, dest_addr[255+1], ntop[INET6_ADDRSTRLEN];
+	const u_char *p;
+	u_char dest_addr[255+1], ntop[INET6_ADDRSTRLEN];
 	u_int have, need, i, found, nmethods, addrlen, af;
 	int r;
 
@@ -1321,7 +1323,7 @@ channel_connect_stdio_fwd(const char *host_to_connect, u_short port_to_connect,
 static void
 channel_pre_dynamic(Channel *c, fd_set *readset, fd_set *writeset)
 {
-	u_char *p;
+	const u_char *p;
 	u_int have;
 	int ret;
 
@@ -1734,7 +1736,7 @@ channel_handle_wfd(Channel *c, fd_set *readset, fd_set *writeset)
 				CHANNEL_BUFFER_ERROR(c, r);
 			data = buf;
 		} else {
-			buf = data = sshbuf_ptr(c->output);
+			buf = data = sshbuf_mutable_ptr(c->output);
 			dlen = sshbuf_len(c->output);
 		}
 

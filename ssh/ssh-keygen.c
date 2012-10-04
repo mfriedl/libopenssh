@@ -1822,10 +1822,8 @@ show_options(const struct sshbuf *optbuf, int v00, int in_critical)
 	struct sshbuf *options, *option;
 	int r;
 
-	if ((options = sshbuf_new()) == NULL)
+	if ((options = sshbuf_fromb(optbuf)) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
-	if ((r = sshbuf_putb(options, optbuf)) != 0)
-		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	if ((option = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);

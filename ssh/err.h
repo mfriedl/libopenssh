@@ -69,6 +69,7 @@
 #define SSH_ERR_KEY_NOT_FOUND			-45
 #define SSH_ERR_AGENT_NOT_PRESENT		-46
 #define SSH_ERR_AGENT_NO_IDENTITIES		-47
+#define SSH_ERR_BUFFER_READ_ONLY		-48
 
 
 /* Translate a numeric error code to a human-readable error string */

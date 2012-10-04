@@ -129,7 +129,7 @@ mac_init(Mac *mac)
 }
 
 int
-mac_compute(Mac *mac, u_int32_t seqno, u_char *data, int datalen,
+mac_compute(Mac *mac, u_int32_t seqno, const u_char *data, int datalen,
     u_char *digest, size_t dlen)
 {
 	static u_char m[MAC_DIGEST_LEN_MAX];

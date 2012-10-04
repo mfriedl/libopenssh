@@ -50,7 +50,8 @@ int mm_user_key_allowed(struct passwd *, struct sshkey *);
 int mm_hostbased_key_allowed(struct passwd *, char *, char *, struct sshkey *);
 int mm_auth_rhosts_rsa_key_allowed(struct passwd *, char *, char *,
     struct sshkey *);
-int mm_sshkey_verify(struct sshkey *, u_char *, size_t, u_char *, size_t, u_int);
+int mm_sshkey_verify(struct sshkey *, u_char *, size_t,
+    const u_char *, size_t, u_int);
 int mm_auth_rsa_key_allowed(struct passwd *, BIGNUM *, struct sshkey **);
 int mm_auth_rsa_verify_response(struct sshkey *, BIGNUM *, u_char *);
 BIGNUM *mm_auth_rsa_generate_challenge(struct sshkey *);

@@ -102,7 +102,7 @@ send_msg(struct sftp_conn *conn, struct sshbuf *m)
 	put_u32(mlen, sshbuf_len(m));
 	iov[0].iov_base = mlen;
 	iov[0].iov_len = sizeof(mlen);
-	iov[1].iov_base = sshbuf_ptr(m);
+	iov[1].iov_base = (u_char *)sshbuf_ptr(m);
 	iov[1].iov_len = sshbuf_len(m);
 
 	if (atomiciov6(writev, conn->fd_out, iov, 2,

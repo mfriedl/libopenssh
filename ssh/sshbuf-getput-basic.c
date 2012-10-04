@@ -27,7 +27,7 @@
 int
 sshbuf_get(struct sshbuf *buf, void *v, size_t len)
 {
-	u_char *p = sshbuf_ptr(buf);
+	const u_char *p = sshbuf_ptr(buf);
 	int r;
 
 	if ((r = sshbuf_consume(buf, len)) < 0)
@@ -40,7 +40,7 @@ sshbuf_get(struct sshbuf *buf, void *v, size_t len)
 int
 sshbuf_get_u64(struct sshbuf *buf, u_int64_t *valp)
 {
-	u_char *p = sshbuf_ptr(buf);
+	const u_char *p = sshbuf_ptr(buf);
 	int r;
 
 	if ((r = sshbuf_consume(buf, 8)) < 0)
@@ -53,7 +53,7 @@ sshbuf_get_u64(struct sshbuf *buf, u_int64_t *valp)
 int
 sshbuf_get_u32(struct sshbuf *buf, u_int32_t *valp)
 {
-	u_char *p = sshbuf_ptr(buf);
+	const u_char *p = sshbuf_ptr(buf);
 	int r;
 
 	if ((r = sshbuf_consume(buf, 4)) < 0)
@@ -66,7 +66,7 @@ sshbuf_get_u32(struct sshbuf *buf, u_int32_t *valp)
 int
 sshbuf_get_u16(struct sshbuf *buf, u_int16_t *valp)
 {
-	u_char *p = sshbuf_ptr(buf);
+	const u_char *p = sshbuf_ptr(buf);
 	int r;
 
 	if ((r = sshbuf_consume(buf, 2)) < 0)
@@ -79,7 +79,7 @@ sshbuf_get_u16(struct sshbuf *buf, u_int16_t *valp)
 int
 sshbuf_get_u8(struct sshbuf *buf, u_char *valp)
 {
-	u_char *p = sshbuf_ptr(buf);
+	const u_char *p = sshbuf_ptr(buf);
 	int r;
 
 	if ((r = sshbuf_consume(buf, 1)) < 0)
@@ -138,7 +138,7 @@ sshbuf_peek_string_direct(const struct sshbuf *buf, const u_char **valp,
     size_t *lenp)
 {
 	u_int32_t len;
-	u_char *p = sshbuf_ptr(buf);
+	const u_char *p = sshbuf_ptr(buf);
 
 	if (sshbuf_len(buf) < 4) {
 		SSHBUF_DBG(("SSH_ERR_MESSAGE_INCOMPLETE"));
@@ -160,7 +160,7 @@ int
 sshbuf_get_cstring(struct sshbuf *buf, char **valp, size_t *lenp)
 {
 	u_int32_t len;
-	u_char *p = sshbuf_ptr(buf), *z;
+	const u_char *p = sshbuf_ptr(buf), *z;
 	int r;
 
 	if (sshbuf_len(buf) < 4) {
@@ -350,5 +350,29 @@ int
 sshbuf_put_stringb(struct sshbuf *buf, const struct sshbuf *v)
 {
 	return sshbuf_put_string(buf, sshbuf_ptr(v), sshbuf_len(v));
+}
+
+int
+sshbuf_froms(struct sshbuf *buf, struct sshbuf **bufp)
+{
+	const u_char *p;
+	size_t len;
+	struct sshbuf *ret;
+	int r;
+
+	/* XXX see comment in sshbuf_fromb() */
+	if (buf == NULL || bufp == NULL)
+		return SSH_ERR_INVALID_ARGUMENT;
+	*bufp = NULL;
+	if ((r = sshbuf_peek_string_direct(buf, &p, &len)) != 0)
+		return r;
+	if ((ret = sshbuf_from(p, len)) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if ((r = sshbuf_consume(buf, len + 4)) != 0) { /* Shouldn't happen */
+		free(ret);
+		return r;
+	}
+	*bufp = ret;
+	return 0;
 }
 

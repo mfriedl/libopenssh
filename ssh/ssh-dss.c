@@ -146,10 +146,8 @@ ssh_dss_verify(const struct sshkey *key,
 		len = signaturelen;
 	} else {
 		/* ietf-drafts */
-		if ((b = sshbuf_new()) == NULL)
+		if ((b = sshbuf_from(signature, signaturelen)) == NULL)
 			return SSH_ERR_ALLOC_FAIL;
-		if ((ret = sshbuf_put(b, signature, signaturelen)) != 0)
-			goto out;
 		if (sshbuf_get_cstring(b, &ktype, NULL) != 0 ||
 		    sshbuf_get_string(b, &sigblob, &len) != 0) {
 			ret = SSH_ERR_INVALID_FORMAT;

@@ -295,7 +295,7 @@ input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh)
 	ssh_gssapi_buildmic(b, authctxt->user, authctxt->service,
 	    "gssapi-with-mic");
 
-	gssbuf.value = sshbuf_ptr(b);
+	gssbuf.value = sshbuf_mutable_ptr(b);
 	gssbuf.length = sshbuf_len(b);
 
 	if (!GSS_ERROR(PRIVSEP(ssh_gssapi_checkmic(gssctxt, &gssbuf, &mic))))

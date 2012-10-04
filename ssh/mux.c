@@ -1389,7 +1389,7 @@ mux_client_write_packet(int fd, struct sshbuf *m)
 	struct sshbuf *queue;
 	u_int have, need;
 	int oerrno, len, r;
-	u_char *ptr;
+	const u_char *ptr;
 	struct pollfd pfd;
 
 	pfd.fd = fd;

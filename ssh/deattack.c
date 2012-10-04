@@ -75,10 +75,10 @@ crc_update(u_int32_t *a, u_int32_t b)
 
 /* detect if a block is used in a particular pattern */
 static int
-check_crc(u_char *S, u_char *buf, u_int32_t len)
+check_crc(const u_char *S, const u_char *buf, u_int32_t len)
 {
 	u_int32_t crc;
-	u_char *c;
+	const u_char *c;
 
 	crc = 0;
 	for (c = buf; c < buf + len; c += SSH_BLOCKSIZE) {
@@ -102,11 +102,11 @@ deattack_init(struct deattack_ctx *dctx)
 
 /* Detect a crc32 compensation attack on a packet */
 int
-detect_attack(struct deattack_ctx *dctx, u_char *buf, u_int32_t len)
+detect_attack(struct deattack_ctx *dctx, const u_char *buf, u_int32_t len)
 {
 	u_int16_t *tmp;
 	u_int32_t i, j, l, same;
-	u_char *c, *d;
+	const u_char *c, *d;
 
 	if (len > (SSH_MAXBLOCKS * SSH_BLOCKSIZE) ||
 	    len % SSH_BLOCKSIZE != 0)

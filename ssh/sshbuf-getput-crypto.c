@@ -56,7 +56,7 @@ sshbuf_get_bignum2(struct sshbuf *buf, BIGNUM *v)
 int
 sshbuf_get_bignum1(struct sshbuf *buf, BIGNUM *v)
 {
-	u_char *d = sshbuf_ptr(buf);
+	const u_char *d = sshbuf_ptr(buf);
 	u_int16_t len_bits;
 	size_t len_bytes;
 

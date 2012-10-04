@@ -294,7 +294,8 @@ int
 ssh_packet_fwd(struct side *from, struct side *to)
 {
 	struct sshbuf *b;
-	u_char *data, type;
+	const u_char *data;
+	u_char type;
 	size_t len;
 	int ret;
 

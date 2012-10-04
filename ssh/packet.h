@@ -180,6 +180,6 @@ int	sshpkt_get_ec(struct ssh *ssh, EC_POINT *v, const EC_GROUP *g);
 int	sshpkt_get_bignum1(struct ssh *ssh, BIGNUM *v);
 int	sshpkt_get_bignum2(struct ssh *ssh, BIGNUM *v);
 int	sshpkt_get_end(struct ssh *ssh);
-u_char	*sshpkt_ptr(struct ssh *, size_t *lenp);
+const u_char	*sshpkt_ptr(struct ssh *, size_t *lenp);
 
 #endif				/* PACKET_H */

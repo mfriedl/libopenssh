@@ -126,10 +126,8 @@ ssh_rsa_verify(const struct sshkey *key,
 	    BN_num_bits(key->rsa->n) < SSH_RSA_MINIMUM_MODULUS_SIZE)
 		return SSH_ERR_INVALID_ARGUMENT;
 
-	if ((b = sshbuf_new()) == NULL)
+	if ((b = sshbuf_from(signature, signaturelen)) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
-	if ((ret = sshbuf_put(b, signature, signaturelen)) != 0)
-		goto out;
 	if (sshbuf_get_cstring(b, &ktype, NULL) != 0) {
 		ret = SSH_ERR_INVALID_FORMAT;
 		goto out;

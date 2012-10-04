@@ -24,6 +24,7 @@ void
 sshbuf_tests(void)
 {
 	struct sshbuf *p1;
+	const u_char *cdp;
 	u_char *dp;
 	size_t sz;
 	int r;
@@ -94,12 +95,12 @@ sshbuf_tests(void)
 	TEST_DONE();
 
 	TEST_START("sshbuf_ptr on filled buffer");
-	dp = sshbuf_ptr(p1);
-	ASSERT_PTR_NE(dp, NULL);
-	ASSERT_U8_EQ(dp[0], 0x11);
-	ASSERT_U8_EQ(dp[1], 0x22);
-	ASSERT_U8_EQ(dp[2], 0x33);
-	ASSERT_U8_EQ(dp[3], 0x44);
+	cdp = sshbuf_ptr(p1);
+	ASSERT_PTR_NE(cdp, NULL);
+	ASSERT_U8_EQ(cdp[0], 0x11);
+	ASSERT_U8_EQ(cdp[1], 0x22);
+	ASSERT_U8_EQ(cdp[2], 0x33);
+	ASSERT_U8_EQ(cdp[3], 0x44);
 	TEST_DONE();
 
 	TEST_START("consume on filled buffer");
@@ -111,14 +112,14 @@ sshbuf_tests(void)
 	ASSERT_SIZE_T_EQ(sshbuf_len(p1), 4);
 	ASSERT_INT_EQ(sshbuf_consume(p1, 1), 0);
 	ASSERT_SIZE_T_EQ(sshbuf_len(p1), 3);
-	dp = sshbuf_ptr(p1);
+	cdp = sshbuf_ptr(p1);
 	ASSERT_PTR_NE(p1, NULL);
-	ASSERT_U8_EQ(dp[0], 0x22);
+	ASSERT_U8_EQ(cdp[0], 0x22);
 	ASSERT_INT_EQ(sshbuf_consume(p1, 2), 0);
 	ASSERT_SIZE_T_EQ(sshbuf_len(p1), 1);
-	dp = sshbuf_ptr(p1);
+	cdp = sshbuf_ptr(p1);
 	ASSERT_PTR_NE(p1, NULL);
-	ASSERT_U8_EQ(dp[0], 0x44);
+	ASSERT_U8_EQ(cdp[0], 0x44);
 	r = sshbuf_consume(p1, 2);
 	ASSERT_INT_EQ(r, SSH_ERR_MESSAGE_INCOMPLETE);
 	ASSERT_SIZE_T_EQ(sshbuf_len(p1), 1);
@@ -145,9 +146,9 @@ sshbuf_tests(void)
 	ASSERT_SIZE_T_EQ(sshbuf_len(p1), 4);
 	ASSERT_INT_EQ(sshbuf_consume_end(p1, 3), 0);
 	ASSERT_SIZE_T_EQ(sshbuf_len(p1), 1);
-	dp = sshbuf_ptr(p1);
-	ASSERT_PTR_NE(dp, NULL);
-	ASSERT_U8_EQ(*dp, 0x11);
+	cdp = sshbuf_ptr(p1);
+	ASSERT_PTR_NE(cdp, NULL);
+	ASSERT_U8_EQ(*cdp, 0x11);
 	r = sshbuf_consume_end(p1, 2);
 	ASSERT_INT_EQ(r, SSH_ERR_MESSAGE_INCOMPLETE);
 	ASSERT_INT_EQ(sshbuf_consume_end(p1, 1), 0);
@@ -185,10 +186,10 @@ sshbuf_tests(void)
 	ASSERT_INT_EQ(r, 0);
 	ASSERT_PTR_NE(dp, NULL);
 	memset(dp, 0x7d, 223);
-	dp = sshbuf_ptr(p1);
-	ASSERT_PTR_NE(dp, NULL);
-	ASSERT_MEM_FILLED_EQ(dp, 0xd7, 1000);
-	ASSERT_MEM_FILLED_EQ(dp + 1000, 0x7d, 223);
+	cdp = sshbuf_ptr(p1);
+	ASSERT_PTR_NE(cdp, NULL);
+	ASSERT_MEM_FILLED_EQ(cdp, 0xd7, 1000);
+	ASSERT_MEM_FILLED_EQ(cdp + 1000, 0x7d, 223);
 	TEST_DONE();
 
 	TEST_START("resize full buffer");
@@ -207,11 +208,11 @@ sshbuf_tests(void)
 	ASSERT_INT_EQ(r, 0);
 	ASSERT_PTR_NE(dp, NULL);
 	*dp = 0xff;
-	dp = sshbuf_ptr(p1);
-	ASSERT_PTR_NE(dp, NULL);
-	ASSERT_MEM_FILLED_EQ(dp, 0xd7, 1000);
-	ASSERT_MEM_FILLED_EQ(dp + 1000, 0x7d, 223);
-	ASSERT_MEM_FILLED_EQ(dp + 1223, 0xff, 1);
+	cdp = sshbuf_ptr(p1);
+	ASSERT_PTR_NE(cdp, NULL);
+	ASSERT_MEM_FILLED_EQ(cdp, 0xd7, 1000);
+	ASSERT_MEM_FILLED_EQ(cdp + 1000, 0x7d, 223);
+	ASSERT_MEM_FILLED_EQ(cdp + 1223, 0xff, 1);
 	ASSERT_SIZE_T_EQ(p1->alloc % SSHBUF_SIZE_INC, 0);
 	sshbuf_free(p1);
 	TEST_DONE();

@@ -407,8 +407,8 @@ monitor_read_log(struct monitor *pmonitor)
 	/* Read length */
 	if ((r = sshbuf_reserve(logmsg, 4, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	if (atomicio(read, pmonitor->m_log_recvfd,
-	    sshbuf_ptr(logmsg), sshbuf_len(logmsg)) != sshbuf_len(logmsg)) {
+	if (atomicio(read, pmonitor->m_log_recvfd, sshbuf_mutable_ptr(logmsg),
+	    sshbuf_len(logmsg)) != sshbuf_len(logmsg)) {
 		if (errno == EPIPE) {
 			sshbuf_free(logmsg);
 			debug("%s: child log fd closed", __func__);
@@ -427,8 +427,8 @@ monitor_read_log(struct monitor *pmonitor)
 	sshbuf_reset(logmsg);
 	if ((r = sshbuf_reserve(logmsg, len, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	if (atomicio(read, pmonitor->m_log_recvfd,
-	    sshbuf_ptr(logmsg), sshbuf_len(logmsg)) != sshbuf_len(logmsg))
+	if (atomicio(read, pmonitor->m_log_recvfd, sshbuf_mutable_ptr(logmsg),
+	    sshbuf_len(logmsg)) != sshbuf_len(logmsg))
 		fatal("%s: log fd read: %s", __func__, strerror(errno));
 
 	/* Log it */
@@ -955,7 +955,7 @@ monitor_valid_userblob(u_char *data, u_int datalen)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	if (active_state->compat & SSH_OLD_SESSIONID) {
-		p = sshbuf_ptr(b);
+		p = sshbuf_mutable_ptr(b);
 		len = sshbuf_len(b);
 		if ((session_id2 == NULL) ||
 		    (len < session_id2_len) ||

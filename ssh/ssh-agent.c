@@ -1016,7 +1016,8 @@ static void
 process_message(SocketEntry *e)
 {
 	u_int msg_len;
-	u_char type, *cp;
+	u_char type;
+	const char *cp;
 	int r;
 
 	if (sshbuf_len(e->input) < 5)

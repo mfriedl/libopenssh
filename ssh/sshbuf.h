@@ -38,11 +38,13 @@
  */
 struct sshbuf {
 	u_char *d;		/* Data */
+	const u_char *cd;	/* Const data */
 	size_t off;		/* First available byte is buf->d + buf->off */
 	size_t size;		/* Last byte is buf->d + buf->size - 1 */
 	size_t max_size;	/* Maximum size of buffer */
 	size_t alloc;		/* Total bytes allocated to buf->d */
 	int freeme;		/* Kludge to support sshbuf_init */
+	int readonly;		/* Refers to external, const data */
 };
 
 #ifndef SSHBUF_NO_DEPREACTED
@@ -59,6 +61,29 @@ void sshbuf_init(struct sshbuf *buf);
  * Returns pointer to buffer on success, or NULL on allocation failure.
  */
 struct sshbuf *sshbuf_new(void);
+
+/*
+ * Create a new, read-only sshbuf buffer from existing data.
+ * Returns pointer to buffer on success, or NULL on allocation failure.
+ */
+struct sshbuf *sshbuf_from(const void *blob, size_t len);
+
+/*
+ * Create a new, read-only sshbuf buffer from the contents of an existing
+ * buffer. The contents of "buf" must not change in the lifetime of the
+ * resultant buffer.
+ * Returns pointer to buffer on success, or NULL on allocation failure.
+ */
+struct sshbuf *sshbuf_fromb(const struct sshbuf *buf);
+
+/*
+ * Create a new, read-only sshbuf buffer from the contents of a string in
+ * an existing buffer (the string is consumed in the process).
+ * The contents of "buf" must not change in the lifetime of the resultant
+ * buffer.
+ * Returns pointer to buffer on success, or NULL on allocation failure.
+ */
+int	sshbuf_froms(struct sshbuf *buf, struct sshbuf **bufp);
 
 /*
  * Clear and free buf
@@ -92,9 +117,15 @@ size_t	sshbuf_len(const struct sshbuf *buf);
 size_t	sshbuf_avail(const struct sshbuf *buf);
 
 /*
- * Returns pointer to the start of the the data in buf
+ * Returns a read-only pointer to the start of the the data in buf
  */
-u_char *sshbuf_ptr(const struct sshbuf *buf);
+const u_char *sshbuf_ptr(const struct sshbuf *buf);
+
+/*
+ * Returns a mutable pointer to the start of the the data in buf, or
+ * NULL if the buffer is read-only.
+ */
+u_char *sshbuf_mutable_ptr(const struct sshbuf *buf);
 
 /*
  * Check whether a reservation of size len will succeed in buf

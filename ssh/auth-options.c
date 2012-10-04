@@ -438,21 +438,16 @@ parse_option_list(const struct sshbuf *oblob, struct passwd *pw,
 	struct sshbuf *c = NULL, *data = NULL;
 	int r, ret = -1, found;
 
-	if ((data = sshbuf_new()) == NULL ||
-	    (c = sshbuf_new()) == NULL) {
+	if ((c = sshbuf_fromb(oblob)) == NULL) {
 		error("%s: sshbuf_new failed", __func__);
 		goto out;
 	}
 
-	/* Make copy to avoid altering original */
-	if ((r = sshbuf_putb(c, oblob)) != 0) {
-		error("%s: sshbuf_put: %s", __func__, ssh_err(r));
-		goto out;
-	}
-
 	while (sshbuf_len(c) > 0) {
+		sshbuf_free(data);
+		data = NULL;
 		if ((r = sshbuf_get_cstring(c, &name, NULL)) != 0 ||
-		    (r = sshbuf_get_stringb(c, data)) != 0) {
+		    (r = sshbuf_froms(c, &data)) != 0) {
 			error("Unable to parse certificate options: %s",
 			    ssh_err(r));
 			goto out;

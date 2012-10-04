@@ -62,7 +62,7 @@ int umac_reset(struct umac_ctx *ctx);
 /* Reset a umac_ctx to begin authenicating a new message */
 #endif
 
-int umac_update(struct umac_ctx *ctx, u_char *input, long len);
+int umac_update(struct umac_ctx *ctx, const u_char *input, long len);
 /* Incorporate len bytes pointed to by input into context ctx */
 
 int umac_final(struct umac_ctx *ctx, u_char tag[], u_char nonce[8]);

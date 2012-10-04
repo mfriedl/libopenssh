@@ -39,15 +39,17 @@
 int
 kexgex_hash(
     const EVP_MD *evp_md,
-    char *client_version_string,
-    char *server_version_string,
-    char *ckexinit, size_t ckexinitlen,
-    char *skexinit, size_t skexinitlen,
-    u_char *serverhostkeyblob, size_t sbloblen,
-    int min, int wantbits, int max, BIGNUM *prime, BIGNUM *gen,
-    BIGNUM *client_dh_pub,
-    BIGNUM *server_dh_pub,
-    BIGNUM *shared_secret,
+    const char *client_version_string,
+    const char *server_version_string,
+    const char *ckexinit, size_t ckexinitlen,
+    const char *skexinit, size_t skexinitlen,
+    const u_char *serverhostkeyblob, size_t sbloblen,
+    int min, int wantbits, int max,
+    const BIGNUM *prime,
+    const BIGNUM *gen,
+    const BIGNUM *client_dh_pub,
+    const BIGNUM *server_dh_pub,
+    const BIGNUM *shared_secret,
     u_char **hash, size_t *hashlen)
 {
 	struct sshbuf *b;

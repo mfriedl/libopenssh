@@ -231,7 +231,7 @@ ssh_packet_next(struct ssh *ssh, u_char *typep)
 	}
 }
 
-u_char *
+const u_char *
 ssh_packet_payload(struct ssh *ssh, size_t *lenp)
 {
 	return sshpkt_ptr(ssh, lenp);
@@ -255,7 +255,7 @@ ssh_output_ptr(struct ssh *ssh, size_t *len)
 	struct sshbuf *output = ssh_packet_get_output(ssh);
 
 	*len = sshbuf_len(output);
-	return (sshbuf_ptr(output));
+	return (sshbuf_mutable_ptr(output));
 }
 
 int
@@ -281,7 +281,8 @@ int
 _ssh_read_banner(struct ssh *ssh, char **bannerp)
 {
 	struct sshbuf *input;
-	char *s, buf[256], remote_version[256];	/* must be same size! */
+	const char *s;
+	char buf[256], remote_version[256];	/* must be same size! */
 	const char *mismatch = "Protocol mismatch.\r\n";
 	int r, remote_major, remote_minor;
 	size_t i, n, j, len;

@@ -53,7 +53,7 @@ ssh_msg_send(int fd, u_char type, struct sshbuf *m)
 		error("ssh_msg_send: write");
 		return (-1);
 	}
-	if (atomicio(vwrite, fd, sshbuf_ptr(m), mlen) != mlen) {
+	if (atomicio(vwrite, fd, (u_char *)sshbuf_ptr(m), mlen) != mlen) {
 		error("ssh_msg_send: write");
 		return (-1);
 	}

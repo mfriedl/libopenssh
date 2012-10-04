@@ -684,10 +684,10 @@ client_suspend_self(struct sshbuf **bin, struct sshbuf **bout,
 {
 	/* Flush stdout and stderr buffers. */
 	if (sshbuf_len(*bout) > 0)
-		atomicio(vwrite, fileno(stdout), sshbuf_ptr(*bout),
+		atomicio(vwrite, fileno(stdout), (u_char *)sshbuf_ptr(*bout),
 		    sshbuf_len(*bout));
 	if (sshbuf_len(*berr) > 0)
-		atomicio(vwrite, fileno(stderr), sshbuf_ptr(*berr),
+		atomicio(vwrite, fileno(stderr), (u_char *)sshbuf_ptr(*berr),
 		    sshbuf_len(*berr));
 
 	leave_raw_mode(options.request_tty == REQUEST_TTY_FORCE);
@@ -1755,7 +1755,8 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg, int ssh2_chan_id
 	/* Output any buffered data for stdout. */
 	if (sshbuf_len(stdout_buffer) > 0) {
 		len = atomicio(vwrite, fileno(stdout),
-		    sshbuf_ptr(stdout_buffer), sshbuf_len(stdout_buffer));
+		    (u_char *)sshbuf_ptr(stdout_buffer),
+		    sshbuf_len(stdout_buffer));
 		if (len < 0 || (u_int)len != sshbuf_len(stdout_buffer))
 			error("Write failed flushing stdout buffer.");
 		else if ((r = sshbuf_consume(stdout_buffer, len)) != 0)
@@ -1765,7 +1766,8 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg, int ssh2_chan_id
 	/* Output any buffered data for stderr. */
 	if (sshbuf_len(stderr_buffer) > 0) {
 		len = atomicio(vwrite, fileno(stderr),
-		    sshbuf_ptr(stderr_buffer), sshbuf_len(stderr_buffer));
+		    (u_char *)sshbuf_ptr(stderr_buffer),
+		    sshbuf_len(stderr_buffer));
 		if (len < 0 || (u_int)len != sshbuf_len(stderr_buffer))
 			error("Write failed flushing stderr buffer.");
 		else if ((r = sshbuf_consume(stderr_buffer, len)) != 0)

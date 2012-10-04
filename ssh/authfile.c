@@ -230,7 +230,7 @@ sshkey_save_private_blob(struct sshbuf *keybuf, const char *filename)
 
 	if ((fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0600)) < 0)
 		return SSH_ERR_SYSTEM_ERROR;
-	if (atomicio(vwrite, fd, sshbuf_ptr(keybuf),
+	if (atomicio(vwrite, fd, (u_char *)sshbuf_ptr(keybuf),
 	    sshbuf_len(keybuf)) != sshbuf_len(keybuf)) {
 		close(fd);
 		unlink(filename);
@@ -305,12 +305,10 @@ sshkey_parse_public_rsa1(struct sshbuf *blob,
 	if (memcmp(sshbuf_ptr(blob), authfile_id_string,
 	    sizeof(authfile_id_string)) != 0)
 		return SSH_ERR_INVALID_FORMAT;
-	if ((copy = sshbuf_new()) == NULL)
-		return SSH_ERR_ALLOC_FAIL;
-
 	/* Make a working copy of the keyblob and skip past the magic */
-	if ((r = sshbuf_putb(copy, blob)) != 0 ||
-	    (r = sshbuf_consume(copy, sizeof(authfile_id_string))) != 0)
+	if ((copy = sshbuf_fromb(blob)) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if ((r = sshbuf_consume(copy, sizeof(authfile_id_string))) != 0)
 		goto out;
 
 	/* Skip cipher type, reserved data and key bits. */
@@ -443,17 +441,16 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 	    sizeof(authfile_id_string)) != 0)
 		return SSH_ERR_INVALID_FORMAT;
 
-	if ((copy = sshbuf_new()) == NULL ||
-	    (decrypted = sshbuf_new()) == NULL) {
-		r = SSH_ERR_ALLOC_FAIL;
-		goto out;
-	}
 	if ((prv = sshkey_new_private(KEY_RSA1)) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-	if ((r = sshbuf_putb(copy, blob)) != 0 ||
-	    (r = sshbuf_consume(copy, sizeof(authfile_id_string))) != 0)
+	if ((copy = sshbuf_fromb(blob)) == NULL ||
+	    (decrypted = sshbuf_new()) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
+	if ((r = sshbuf_consume(copy, sizeof(authfile_id_string))) != 0)
 		goto out;
 
 	/* Read cipher type. */
@@ -548,7 +545,8 @@ sshkey_parse_private_pem(struct sshbuf *blob, int type, const char *passphrase,
 	if (commentp != NULL)
 		*commentp = NULL;
 
-	if ((bio = BIO_new_mem_buf(sshbuf_ptr(blob), sshbuf_len(blob))) == NULL)
+	if ((bio = BIO_new_mem_buf(sshbuf_mutable_ptr(blob),
+	    sshbuf_len(blob))) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	
 	if ((pk = PEM_read_bio_PrivateKey(bio, NULL, NULL,

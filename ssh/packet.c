@@ -687,7 +687,7 @@ compress_buffer(struct ssh *ssh, struct sshbuf *in, struct sshbuf *out)
 		return 0;
 
 	/* Input is the contents of the input buffer. */
-	ssh->state->compression_out_stream.next_in = sshbuf_ptr(in);
+	ssh->state->compression_out_stream.next_in = sshbuf_mutable_ptr(in);
 	ssh->state->compression_out_stream.avail_in = sshbuf_len(in);
 
 	/* Loop compressing until deflate() returns with avail_out != 0. */
@@ -726,7 +726,7 @@ uncompress_buffer(struct ssh *ssh, struct sshbuf *in, struct sshbuf *out)
 	if (ssh->state->compression_in_started != 1)
 		return SSH_ERR_INTERNAL_ERROR;
 
-	ssh->state->compression_in_stream.next_in = sshbuf_ptr(in);
+	ssh->state->compression_in_stream.next_in = sshbuf_mutable_ptr(in);
 	ssh->state->compression_in_stream.avail_in = sshbuf_len(in);
 
 	for (;;) {
@@ -838,7 +838,7 @@ ssh_packet_send1(struct ssh *ssh)
 	/* Insert padding. Initialized to zero in packet_start1() */
 	padding = 8 - len % 8;
 	if (!state->send_context.plaintext) {
-		cp = sshbuf_ptr(state->outgoing_packet);
+		cp = sshbuf_mutable_ptr(state->outgoing_packet);
 		for (i = 0; i < padding; i++) {
 			if (i % 4 == 0)
 				rnd = arc4random();
@@ -1048,8 +1048,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	}
 	block_size = enc ? enc->block_size : 8;
 
-	cp = sshbuf_ptr(state->outgoing_packet);
-	type = cp[5];
+	type = (sshbuf_ptr(state->outgoing_packet))[5];
 
 #ifdef PACKET_DEBUG
 	fprintf(stderr, "plain:     ");
@@ -1112,7 +1111,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	}
 	/* packet_length includes payload, padding and padding length field */
 	packet_length = sshbuf_len(state->outgoing_packet) - 4;
-	cp = sshbuf_ptr(state->outgoing_packet);
+	cp = sshbuf_mutable_ptr(state->outgoing_packet);
 	POKE_U32(cp, packet_length);
 	cp[4] = padlen;
 	DBG(debug("send: len %d (includes padlen %d)", packet_length+4, padlen));
@@ -1167,11 +1166,10 @@ ssh_packet_send2(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
 	struct packet *p;
-	u_char type, *cp;
+	u_char type;
 	int r;
 
-	cp = sshbuf_ptr(state->outgoing_packet);
-	type = cp[5];
+	type = sshbuf_ptr(state->outgoing_packet)[5];
 
 	/* during rekeying we can only send key exchange messages */
 	if (state->rekeying) {
@@ -1366,8 +1364,7 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 	if (sshbuf_len(state->input) < 4 + 8)
 		return 0;
 	/* Get length of incoming packet. */
-	cp = sshbuf_ptr(state->input);
-	len = PEEK_U32(cp);
+	len = PEEK_U32(sshbuf_ptr(state->input));
 	if (len < 1 + 2 + 2 || len > 256 * 1024)
 		ssh_packet_disconnect(ssh, "Bad packet length %u.",
 		    len);
@@ -1504,8 +1501,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		if ((r = cipher_crypt(&state->receive_context, cp,
 		    sshbuf_ptr(state->input), block_size)) != 0)
 			goto out;
-		cp = sshbuf_ptr(state->incoming_packet);
-		state->packlen = PEEK_U32(cp);
+		state->packlen = PEEK_U32(sshbuf_ptr(state->incoming_packet));
 		if (state->packlen < 1 + 4 ||
 		    state->packlen > PACKET_MAX_SIZE) {
 #ifdef PACKET_DEBUG
@@ -1584,8 +1580,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	state->p_read.bytes += state->packlen + 4;
 
 	/* get padlen */
-	cp = sshbuf_ptr(state->incoming_packet);
-	padlen = cp[4];
+	padlen = sshbuf_ptr(state->incoming_packet)[4];
 	DBG(debug("input: padlen %d", padlen));
 	if (padlen < 4)
 		ssh_packet_disconnect(ssh,
@@ -2133,7 +2128,6 @@ ssh_packet_restore_state(struct ssh *ssh,
     struct ssh *backup_state)
 {
 	struct ssh *tmp;
-	void *buf;
 	u_int len;
 	int r;
 
@@ -2146,8 +2140,8 @@ ssh_packet_restore_state(struct ssh *ssh,
 	backup_state->state->connection_out = -1;
 	len = sshbuf_len(backup_state->state->input);
 	if (len > 0) {
-		buf = sshbuf_ptr(backup_state->state->input);
-		if ((r = sshbuf_put(ssh->state->input, buf, len)) != 0)
+		if ((r = sshbuf_putb(ssh->state->input,
+		    backup_state->state->input)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
 		sshbuf_reset(backup_state->state->input);
 		add_recv_bytes(len);
@@ -2630,12 +2624,12 @@ sshpkt_get_end(struct ssh *ssh)
 	return 0;
 }
 
-u_char *
+const u_char *
 sshpkt_ptr(struct ssh *ssh, size_t *lenp)
 {
         if (lenp != NULL)
                 *lenp = sshbuf_len(ssh->state->incoming_packet);
-        return sshbuf_ptr(ssh->state->incoming_packet);
+        return sshbuf_mutable_ptr(ssh->state->incoming_packet);
 }
 
 

@@ -112,11 +112,10 @@ ssh_ecdsa_verify(const struct sshkey *key,
 	ECDSA_SIG *sig = NULL;
 	const EVP_MD *evp_md;
 	EVP_MD_CTX md;
-	u_char digest[EVP_MAX_MD_SIZE], *sigblob = NULL;
-	size_t len;
+	u_char digest[EVP_MAX_MD_SIZE];
 	u_int dlen;
 	int ret = SSH_ERR_INTERNAL_ERROR;
-	struct sshbuf *b = NULL, *bb = NULL;
+	struct sshbuf *b = NULL, *sigbuf = NULL;
 	char *ktype = NULL;
 
 	if (key == NULL || key->ecdsa == NULL ||
@@ -126,12 +125,10 @@ ssh_ecdsa_verify(const struct sshkey *key,
 		return SSH_ERR_INTERNAL_ERROR;
 
 	/* fetch signature */
-	if ((b = sshbuf_new()) == NULL)
+	if ((b = sshbuf_from(signature, signaturelen)) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
-	if ((ret = sshbuf_put(b, signature, signaturelen)) != 0)
-		goto out;
-	if (sshbuf_get_cstring(b, &ktype, NULL) !=0 ||
-	    sshbuf_get_string(b, &sigblob, &len) != 0) {
+	if (sshbuf_get_cstring(b, &ktype, NULL) != 0 ||
+	    sshbuf_froms(b, &sigbuf) != 0) {
 		ret = SSH_ERR_INVALID_FORMAT;
 		goto out;
 	}
@@ -151,18 +148,12 @@ ssh_ecdsa_verify(const struct sshkey *key,
 		ret = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-	if ((bb = sshbuf_new()) == NULL) {
-		ret = SSH_ERR_ALLOC_FAIL;
-		goto out;
-	}
-	if ((ret = sshbuf_put(bb, sigblob, len)) != 0)
-		goto out;
-	if (sshbuf_get_bignum2(bb, sig->r) != 0 ||
-	    sshbuf_get_bignum2(bb, sig->s) != 0) {
+	if (sshbuf_get_bignum2(sigbuf, sig->r) != 0 ||
+	    sshbuf_get_bignum2(sigbuf, sig->s) != 0) {
 		ret = SSH_ERR_INVALID_FORMAT;
 		goto out;
 	}
-	if (sshbuf_len(bb) != 0) {
+	if (sshbuf_len(sigbuf) != 0) {
 		ret = SSH_ERR_UNEXPECTED_TRAILING_DATA;
 		goto out;
 	}
@@ -188,17 +179,13 @@ ssh_ecdsa_verify(const struct sshkey *key,
 
  out:
 	memset(digest, 'd', sizeof(digest));
-	if (bb != NULL)
-		sshbuf_free(bb);
+	if (sigbuf != NULL)
+		sshbuf_free(sigbuf);
 	if (b != NULL)
 		sshbuf_free(b);
 	if (sig != NULL)
 		ECDSA_SIG_free(sig);
 	if (ktype != NULL)
 		free(ktype);
-	if (sigblob != NULL) {
-		memset(sigblob, 0, len);
-		free(sigblob);
-	}
 	return ret;
 }

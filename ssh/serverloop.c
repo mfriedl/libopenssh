@@ -455,7 +455,7 @@ static void
 process_output(struct ssh *ssh, fd_set *writeset)
 {
 	struct termios tio;
-	u_char *data;
+	const u_char *data;
 	u_int dlen;
 	int r, len;
 

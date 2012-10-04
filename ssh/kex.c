@@ -119,12 +119,11 @@ kex_buf2prop(struct sshbuf *raw, int *first_kex_follows, char ***propp)
 
 	if ((proposal = calloc(PROPOSAL_MAX, sizeof(char *))) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
-	if ((b = sshbuf_new()) == NULL) {
+	if ((b = sshbuf_fromb(raw)) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-	if ((r = sshbuf_putb(b, raw)) != 0 ||
-	    (r = sshbuf_consume(b, KEX_COOKIE_LEN)) != 0) /* skip cookie */
+	if ((r = sshbuf_consume(b, KEX_COOKIE_LEN)) != 0) /* skip cookie */
 		goto out;
 	/* extract kex init proposal strings */
 	for (i = 0; i < PROPOSAL_MAX; i++) {
@@ -225,7 +224,7 @@ kex_send_kexinit(struct ssh *ssh)
 	/* generate a random cookie */
 	if (sshbuf_len(kex->my) < KEX_COOKIE_LEN)
 		return SSH_ERR_INVALID_FORMAT;
-	if ((cookie = sshbuf_ptr(kex->my)) == NULL)
+	if ((cookie = sshbuf_mutable_ptr(kex->my)) == NULL)
 		return SSH_ERR_INTERNAL_ERROR;
 	arc4random_buf(cookie, KEX_COOKIE_LEN);
 
@@ -246,7 +245,7 @@ int
 kex_input_kexinit(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Kex *kex = ssh->kex;
-	u_char *ptr;
+	const u_char *ptr;
 	u_int i;
 	size_t dlen;
 	int r;

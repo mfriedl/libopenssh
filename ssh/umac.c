@@ -320,7 +320,7 @@ typedef struct {
 
 #if (UMAC_OUTPUT_LEN == 4)
 
-static void nh_aux(void *kp, void *dp, void *hp, UINT32 dlen)
+static void nh_aux(const void *kp, const void *dp, void *hp, UINT32 dlen)
 /* NH hashing primitive. Previous (partial) hash result is loaded and     
 * then stored via hp pointer. The length of the data pointed at by "dp",
 * "dlen", is guaranteed to be divisible by L1_PAD_BOUNDARY (32).  Key
@@ -329,8 +329,8 @@ static void nh_aux(void *kp, void *dp, void *hp, UINT32 dlen)
 {
     UINT64 h;
     UWORD c = dlen / 32;
-    UINT32 *k = (UINT32 *)kp;
-    UINT32 *d = (UINT32 *)dp;
+    const UINT32 *k = (UINT32 *)kp;
+    const UINT32 *d = (UINT32 *)dp;
     UINT32 d0,d1,d2,d3,d4,d5,d6,d7;
     UINT32 k0,k1,k2,k3,k4,k5,k6,k7;
     
@@ -355,15 +355,15 @@ static void nh_aux(void *kp, void *dp, void *hp, UINT32 dlen)
 
 #elif (UMAC_OUTPUT_LEN == 8)
 
-static void nh_aux(void *kp, void *dp, void *hp, UINT32 dlen)
+static void nh_aux(const void *kp, const void *dp, void *hp, UINT32 dlen)
 /* Same as previous nh_aux, but two streams are handled in one pass,
  * reading and writing 16 bytes of hash-state per call.
  */
 {
   UINT64 h1,h2;
   UWORD c = dlen / 32;
-  UINT32 *k = (UINT32 *)kp;
-  UINT32 *d = (UINT32 *)dp;
+  const UINT32 *k = (UINT32 *)kp;
+  const UINT32 *d = (UINT32 *)dp;
   UINT32 d0,d1,d2,d3,d4,d5,d6,d7;
   UINT32 k0,k1,k2,k3,k4,k5,k6,k7,
         k8,k9,k10,k11;
@@ -402,15 +402,15 @@ static void nh_aux(void *kp, void *dp, void *hp, UINT32 dlen)
 
 #elif (UMAC_OUTPUT_LEN == 12)
 
-static void nh_aux(void *kp, void *dp, void *hp, UINT32 dlen)
+static void nh_aux(const void *kp, const void *dp, void *hp, UINT32 dlen)
 /* Same as previous nh_aux, but two streams are handled in one pass,
  * reading and writing 24 bytes of hash-state per call.
 */
 {
     UINT64 h1,h2,h3;
     UWORD c = dlen / 32;
-    UINT32 *k = (UINT32 *)kp;
-    UINT32 *d = (UINT32 *)dp;
+    const UINT32 *k = (UINT32 *)kp;
+    const UINT32 *d = (UINT32 *)dp;
     UINT32 d0,d1,d2,d3,d4,d5,d6,d7;
     UINT32 k0,k1,k2,k3,k4,k5,k6,k7,
         k8,k9,k10,k11,k12,k13,k14,k15;
@@ -457,15 +457,15 @@ static void nh_aux(void *kp, void *dp, void *hp, UINT32 dlen)
 
 #elif (UMAC_OUTPUT_LEN == 16)
 
-static void nh_aux(void *kp, void *dp, void *hp, UINT32 dlen)
+static void nh_aux(const void *kp, const void *dp, void *hp, UINT32 dlen)
 /* Same as previous nh_aux, but two streams are handled in one pass,
  * reading and writing 24 bytes of hash-state per call.
 */
 {
     UINT64 h1,h2,h3,h4;
     UWORD c = dlen / 32;
-    UINT32 *k = (UINT32 *)kp;
-    UINT32 *d = (UINT32 *)dp;
+    const UINT32 *k = (UINT32 *)kp;
+    const UINT32 *d = (UINT32 *)dp;
     UINT32 d0,d1,d2,d3,d4,d5,d6,d7;
     UINT32 k0,k1,k2,k3,k4,k5,k6,k7,
         k8,k9,k10,k11,k12,k13,k14,k15,
@@ -526,7 +526,7 @@ static void nh_aux(void *kp, void *dp, void *hp, UINT32 dlen)
 
 /* ---------------------------------------------------------------------- */
 
-static void nh_transform(nh_ctx *hc, UINT8 *buf, UINT32 nbytes)
+static void nh_transform(nh_ctx *hc, const UINT8 *buf, UINT32 nbytes)
 /* This function is a wrapper for the primitive NH hash functions. It takes
  * as argument "hc" the current hash context and a buffer which must be a
  * multiple of L1_PAD_BOUNDARY. The key passed to nh_aux is offset
@@ -601,7 +601,7 @@ static void nh_init(nh_ctx *hc, aes_int_key prf_key)
 
 /* ---------------------------------------------------------------------- */
 
-static void nh_update(nh_ctx *hc, UINT8 *buf, UINT32 nbytes)
+static void nh_update(nh_ctx *hc, const UINT8 *buf, UINT32 nbytes)
 /* Incorporate nbytes of data into a nh_ctx, buffer whatever is not an    */
 /* even multiple of HASH_BUF_BYTES.                                       */
 {
@@ -696,7 +696,7 @@ static void nh_final(nh_ctx *hc, UINT8 *result)
 
 /* ---------------------------------------------------------------------- */
 
-static void nh(nh_ctx *hc, UINT8 *buf, UINT32 padded_len,
+static void nh(nh_ctx *hc, const UINT8 *buf, UINT32 padded_len,
                UINT32 unpadded_len, UINT8 *result)
 /* All-in-one nh_update() and nh_final() equivalent.
  * Assumes that padded_len is divisible by L1_PAD_BOUNDARY and result is
@@ -1034,7 +1034,7 @@ static int uhash_free(uhash_ctx_t ctx)
 #endif
 /* ---------------------------------------------------------------------- */
 
-static int uhash_update(uhash_ctx_t ctx, u_char *input, long len)
+static int uhash_update(uhash_ctx_t ctx, const u_char *input, long len)
 /* Given len bytes of data, we parse it into L1_KEY_LEN chunks and
  * hash each one with NH, calling the polyhash on each NH output.
  */
@@ -1241,7 +1241,7 @@ int umac_final(struct umac_ctx *ctx, u_char tag[], u_char nonce[8])
 
 /* ---------------------------------------------------------------------- */
 
-int umac_update(struct umac_ctx *ctx, u_char *input, long len)
+int umac_update(struct umac_ctx *ctx, const u_char *input, long len)
 /* Given len bytes of data, we parse it into L1_KEY_LEN chunks and   */
 /* hash each one, calling the PDF on the hashed output whenever the hash- */
 /* output buffer is full.                                                 */
