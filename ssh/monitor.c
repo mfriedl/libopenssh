@@ -980,7 +980,7 @@ monitor_valid_userblob(u_char *data, u_int datalen)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (strcmp(authctxt->user, username) != 0) {
 		logit("wrong user name sent to monitor: expected %s != %.100s",
-		    authctxt->user, p);
+		    authctxt->user, username);
 		fail++;
 	}
 	xfree(username);
