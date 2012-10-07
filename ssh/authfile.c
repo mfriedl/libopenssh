@@ -545,7 +545,7 @@ sshkey_parse_private_pem(struct sshbuf *blob, int type, const char *passphrase,
 	if (commentp != NULL)
 		*commentp = NULL;
 
-	if ((bio = BIO_new_mem_buf(sshbuf_mutable_ptr(blob),
+	if ((bio = BIO_new_mem_buf((u_char *)sshbuf_ptr(blob),
 	    sshbuf_len(blob))) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	

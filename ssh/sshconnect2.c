@@ -768,7 +768,8 @@ process_gssapi_token(struct ssh *ssh, gss_buffer_t recv_tok)
 			ssh_gssapi_buildmic(b, authctxt->server_user,
 			    authctxt->service, "gssapi-with-mic");
 
-			gssbuf.value = sshbuf_mutable_ptr(b);
+			if ((gssbuf.value = sshbuf_mutable_ptr(b)) == NULL)
+				fatal("%s: sshbuf_mutable_ptr failed", __func__);
 			gssbuf.length = sshbuf_len(b);
 
 			status = ssh_gssapi_sign(gssctxt, &gssbuf, &mic);

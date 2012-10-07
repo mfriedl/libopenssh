@@ -376,7 +376,7 @@ output_cb(int fd, short type, void *arg)
 	ssize_t len, olen;
 	int pending;
 	const char *tag;
-	char *obuf;
+	const u_char *obuf;
 
 	if (fd == s->client.fd) {
 		tag = "client";

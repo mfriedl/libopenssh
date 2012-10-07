@@ -687,7 +687,9 @@ compress_buffer(struct ssh *ssh, struct sshbuf *in, struct sshbuf *out)
 		return 0;
 
 	/* Input is the contents of the input buffer. */
-	ssh->state->compression_out_stream.next_in = sshbuf_mutable_ptr(in);
+	if ((ssh->state->compression_out_stream.next_in =
+	    sshbuf_mutable_ptr(in)) == NULL)
+		return SSH_ERR_INTERNAL_ERROR;
 	ssh->state->compression_out_stream.avail_in = sshbuf_len(in);
 
 	/* Loop compressing until deflate() returns with avail_out != 0. */
@@ -726,7 +728,9 @@ uncompress_buffer(struct ssh *ssh, struct sshbuf *in, struct sshbuf *out)
 	if (ssh->state->compression_in_started != 1)
 		return SSH_ERR_INTERNAL_ERROR;
 
-	ssh->state->compression_in_stream.next_in = sshbuf_mutable_ptr(in);
+	if ((ssh->state->compression_in_stream.next_in =
+	    sshbuf_mutable_ptr(in)) == NULL)
+		return SSH_ERR_INTERNAL_ERROR;
 	ssh->state->compression_in_stream.avail_in = sshbuf_len(in);
 
 	for (;;) {
@@ -807,9 +811,8 @@ ssh_packet_send1(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
 	u_char buf[8], *cp;
-	int r, i, padding, len;
+	int r, padding, len;
 	u_int checksum;
-	u_int32_t rnd = 0;
 
 	/*
 	 * If using packet compression, compress the payload of the outgoing
@@ -839,12 +842,11 @@ ssh_packet_send1(struct ssh *ssh)
 	padding = 8 - len % 8;
 	if (!state->send_context.plaintext) {
 		cp = sshbuf_mutable_ptr(state->outgoing_packet);
-		for (i = 0; i < padding; i++) {
-			if (i % 4 == 0)
-				rnd = arc4random();
-			cp[7 - i] = rnd & 0xff;
-			rnd >>= 8;
+		if (cp == NULL) {
+			r = SSH_ERR_INTERNAL_ERROR;
+			goto out;
 		}
+		arc4random_buf(cp + 8 - padding, padding);
 	}
 	if ((r = sshbuf_consume(state->outgoing_packet, 8 - padding)) != 0)
 		goto out;
@@ -1034,8 +1036,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	u_char type, *cp, macbuf[MAC_DIGEST_LEN_MAX];
 	u_char padlen, pad;
 	u_int packet_length = 0;
-	u_int i, len;
-	u_int32_t rnd = 0;
+	u_int len;
 	Enc *enc   = NULL;
 	Mac *mac   = NULL;
 	Comp *comp = NULL;
@@ -1099,12 +1100,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 		goto out;
 	if (enc && !state->send_context.plaintext) {
 		/* random padding */
-		for (i = 0; i < padlen; i++) {
-			if (i % 4 == 0)
-				rnd = arc4random();
-			cp[i] = rnd & 0xff;
-			rnd >>= 8;
-		}
+		arc4random_buf(cp, padlen);
 	} else {
 		/* clear padding */
 		memset(cp, 0, padlen);
@@ -1112,6 +1108,10 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	/* packet_length includes payload, padding and padding length field */
 	packet_length = sshbuf_len(state->outgoing_packet) - 4;
 	cp = sshbuf_mutable_ptr(state->outgoing_packet);
+	if (cp == NULL) {
+		r = SSH_ERR_INTERNAL_ERROR;
+		goto out;
+	}
 	POKE_U32(cp, packet_length);
 	cp[4] = padlen;
 	DBG(debug("send: len %d (includes padlen %d)", packet_length+4, padlen));
@@ -1354,7 +1354,8 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 {
 	struct session_state *state = ssh->state;
 	u_int len, padded_len;
-	u_char *cp;
+	const u_char *cp;
+	u_char *p;
 	u_int checksum, stored_checksum;
 	int r;
 
@@ -1404,9 +1405,9 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 
 	/* Decrypt data to incoming_packet. */
 	sshbuf_reset(state->incoming_packet);
-	if ((r = sshbuf_reserve(state->incoming_packet, padded_len, &cp)) != 0)
+	if ((r = sshbuf_reserve(state->incoming_packet, padded_len, &p)) != 0)
 		goto out;
-	if ((r = cipher_crypt(&state->receive_context, cp,
+	if ((r = cipher_crypt(&state->receive_context, p,
 	    sshbuf_ptr(state->input), padded_len)) != 0)
 		goto out;
 
@@ -1432,7 +1433,7 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 		    "packet_read_poll1: len %d != sshbuf_len %zd.",
 		    len, sshbuf_len(state->incoming_packet));
 
-	cp = (u_char *)sshbuf_ptr(state->incoming_packet) + len - 4;
+	cp = sshbuf_ptr(state->incoming_packet) + len - 4;
 	stored_checksum = PEEK_U32(cp);
 	if (checksum != stored_checksum)
 		ssh_packet_disconnect(ssh,
@@ -2629,7 +2630,7 @@ sshpkt_ptr(struct ssh *ssh, size_t *lenp)
 {
         if (lenp != NULL)
                 *lenp = sshbuf_len(ssh->state->incoming_packet);
-        return sshbuf_mutable_ptr(ssh->state->incoming_packet);
+        return sshbuf_ptr(ssh->state->incoming_packet);
 }
 
 

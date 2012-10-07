@@ -919,7 +919,8 @@ x11_open_helper(struct sshbuf *b)
 		return 0;
 
 	/* Parse the lengths of variable-length fields. */
-	ucp = sshbuf_mutable_ptr(b);
+	if ((ucp = sshbuf_mutable_ptr(b)) == NULL)
+		return -1;
 	if (ucp[0] == 0x42) {	/* Byte order MSB first. */
 		proto_len = 256 * ucp[6] + ucp[7];
 		data_len = 256 * ucp[8] + ucp[9];
@@ -1736,7 +1737,7 @@ channel_handle_wfd(Channel *c, fd_set *readset, fd_set *writeset)
 				CHANNEL_BUFFER_ERROR(c, r);
 			data = buf;
 		} else {
-			buf = data = sshbuf_mutable_ptr(c->output);
+			buf = data = (u_char *)sshbuf_ptr(c->output);
 			dlen = sshbuf_len(c->output);
 		}
 

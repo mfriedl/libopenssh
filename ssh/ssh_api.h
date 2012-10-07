@@ -107,7 +107,7 @@ int	ssh_output_space(struct ssh *ssh, size_t len);
  * network. the number of bytes that have been successfully sent can
  * be removed from the output byte-stream with ssh_output_consume().
  */
-void	*ssh_output_ptr(struct ssh *ssh, size_t *len);
+const u_char	*ssh_output_ptr(struct ssh *ssh, size_t *len);
 
 /*
  * ssh_output_consume() removes the given number of bytes from

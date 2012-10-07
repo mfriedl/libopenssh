@@ -398,6 +398,7 @@ monitor_read_log(struct monitor *pmonitor)
 {
 	struct sshbuf *logmsg;
 	u_int len, level;
+	u_char *p;
 	char *msg;
 	int r;
 
@@ -405,10 +406,9 @@ monitor_read_log(struct monitor *pmonitor)
 		fatal("%s: sshbuf_new failed", __func__);
 
 	/* Read length */
-	if ((r = sshbuf_reserve(logmsg, 4, NULL)) != 0)
+	if ((r = sshbuf_reserve(logmsg, 4, &p)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	if (atomicio(read, pmonitor->m_log_recvfd, sshbuf_mutable_ptr(logmsg),
-	    sshbuf_len(logmsg)) != sshbuf_len(logmsg)) {
+	if (atomicio(read, pmonitor->m_log_recvfd, p, 4) != 4) {
 		if (errno == EPIPE) {
 			sshbuf_free(logmsg);
 			debug("%s: child log fd closed", __func__);
@@ -425,10 +425,9 @@ monitor_read_log(struct monitor *pmonitor)
 
 	/* Read severity, message */
 	sshbuf_reset(logmsg);
-	if ((r = sshbuf_reserve(logmsg, len, NULL)) != 0)
+	if ((r = sshbuf_reserve(logmsg, len, &p)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	if (atomicio(read, pmonitor->m_log_recvfd, sshbuf_mutable_ptr(logmsg),
-	    sshbuf_len(logmsg)) != sshbuf_len(logmsg))
+	if (atomicio(read, pmonitor->m_log_recvfd, p, len) != len)
 		fatal("%s: log fd read: %s", __func__, strerror(errno));
 
 	/* Log it */
@@ -944,7 +943,8 @@ static int
 monitor_valid_userblob(u_char *data, u_int datalen)
 {
 	struct sshbuf *b;
-	u_char c, *p;
+	u_char *p, c;
+	const u_char *cp;
 	size_t len;
 	int r, fail = 0;
 	char *username, *methodname;
@@ -955,11 +955,11 @@ monitor_valid_userblob(u_char *data, u_int datalen)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	if (active_state->compat & SSH_OLD_SESSIONID) {
-		p = sshbuf_mutable_ptr(b);
+		cp = sshbuf_ptr(b);
 		len = sshbuf_len(b);
 		if ((session_id2 == NULL) ||
 		    (len < session_id2_len) ||
-		    (timingsafe_bcmp(p, session_id2, session_id2_len) != 0))
+		    (timingsafe_bcmp(cp, session_id2, session_id2_len) != 0))
 			fail++;
 		if ((r = sshbuf_consume(b, session_id2_len)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));

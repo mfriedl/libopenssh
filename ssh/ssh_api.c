@@ -249,13 +249,13 @@ ssh_packet_put(struct ssh *ssh, int type, const char *data, size_t len)
 	return 0;
 }
 
-void *
+const u_char *
 ssh_output_ptr(struct ssh *ssh, size_t *len)
 {
 	struct sshbuf *output = ssh_packet_get_output(ssh);
 
 	*len = sshbuf_len(output);
-	return (sshbuf_mutable_ptr(output));
+	return sshbuf_ptr(output);
 }
 
 int
