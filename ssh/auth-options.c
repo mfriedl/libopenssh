@@ -549,7 +549,6 @@ parse_option_list(const struct sshbuf *oblob, struct passwd *pw,
 			    "(extra data)", name);
 			goto out;
 		}
-		sshbuf_reset(data);
 		xfree(name);
 		name = NULL;
 	}
