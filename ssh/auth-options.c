@@ -421,7 +421,7 @@ bad_option:
 #define OPTIONS_CRITICAL	1
 #define OPTIONS_EXTENSIONS	2
 static int
-parse_option_list(const struct sshbuf *oblob, struct passwd *pw,
+parse_option_list(struct sshbuf *oblob, struct passwd *pw,
     u_int which, int crit,
     int *cert_no_port_forwarding_flag,
     int *cert_no_agent_forwarding_flag,

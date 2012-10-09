@@ -1816,18 +1816,17 @@ add_cert_option(char *opt)
 }
 
 static void
-show_options(const struct sshbuf *optbuf, int v00, int in_critical)
+show_options(struct sshbuf *optbuf, int v00, int in_critical)
 {
 	char *name, *data;
-	struct sshbuf *options, *option;
+	struct sshbuf *options, *option = NULL;
 	int r;
 
 	if ((options = sshbuf_fromb(optbuf)) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
-
-	if ((option = sshbuf_new()) == NULL)
-		fatal("%s: sshbuf_new failed", __func__);
 	while (sshbuf_len(options) != 0) {
+		sshbuf_free(option);
+		option = NULL;
 		if ((r = sshbuf_get_cstring(options, &name, NULL)) != 0 ||
 		    (r = sshbuf_get_stringb(options, option)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));

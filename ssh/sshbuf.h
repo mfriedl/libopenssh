@@ -29,6 +29,7 @@
 #endif
 
 #define SSHBUF_SIZE_MAX		0x20000000	/* Hard maximum size */
+#define SSHBUF_REFS_MAX		0x100000	/* Max child buffers */
 #define SSHBUF_MAX_BIGNUM	(8192 / 8)	/* Max bignum *bytes* */
 #define SSHBUF_MAX_ECPOINT	((528 * 2 / 8) + 1) /* Max EC point *bytes* */
 
@@ -52,7 +53,7 @@ struct sshbuf *sshbuf_from(const void *blob, size_t len);
  * resultant buffer.
  * Returns pointer to buffer on success, or NULL on allocation failure.
  */
-struct sshbuf *sshbuf_fromb(const struct sshbuf *buf);
+struct sshbuf *sshbuf_fromb(struct sshbuf *buf);
 
 /*
  * Create a new, read-only sshbuf buffer from the contents of a string in
@@ -254,6 +255,21 @@ int	sshbuf_b64tod(struct sshbuf *buf, const char *b64);
  * Return the allocation size of buf
  */
 size_t	sshbuf_alloc(const struct sshbuf *buf);
+
+/*
+ * Increment the reference count of buf.
+ */
+int	sshbuf_set_parent(struct sshbuf *child, struct sshbuf *parent);
+
+/*
+ * Return the parent buffer of buf, or NULL if it has no parent.
+ */
+const struct sshbuf *sshbuf_parent(const struct sshbuf *buf);
+
+/*
+ * Return the reference count of buf
+ */
+u_int	sshbuf_refcount(const struct sshbuf *buf);
 
 # define SSHBUF_SIZE_INIT		256		/* Initial allocation */
 # define SSHBUF_SIZE_INC		256		/* Preferred increment length */

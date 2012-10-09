@@ -14,6 +14,7 @@
 
 #include "test_helper.h"
 
+#define SSHBUF_INTERNAL 1  /* access internals for testing */
 #include "sshbuf.h"
 #include "err.h"
 
@@ -58,6 +59,35 @@ sshbuf_fixed(void)
 	ASSERT_STRING_EQ(s, "hello");
 	ASSERT_SIZE_T_EQ(l, 5);
 	sshbuf_free(p1);
+	TEST_DONE();
+
+	TEST_START("sshbuf_fromb ");
+	p1 = sshbuf_new();
+	ASSERT_PTR_NE(p1, NULL);
+	ASSERT_U_INT_EQ(sshbuf_refcount(p1), 1);
+	ASSERT_PTR_EQ(sshbuf_parent(p1), NULL);
+	ASSERT_INT_EQ(sshbuf_put(p1, test_buf, sizeof(test_buf) - 1), 0);
+	p2 = sshbuf_fromb(p1);
+	ASSERT_PTR_NE(p2, NULL);
+	ASSERT_U_INT_EQ(sshbuf_refcount(p1), 2);
+	ASSERT_PTR_EQ(sshbuf_parent(p1), NULL);
+	ASSERT_PTR_EQ(sshbuf_parent(p2), p1);
+	ASSERT_PTR_EQ(sshbuf_ptr(p2), sshbuf_ptr(p1));
+	ASSERT_PTR_EQ(sshbuf_mutable_ptr(p2), NULL);
+	ASSERT_SIZE_T_EQ(sshbuf_len(p1), sshbuf_len(p2));
+	ASSERT_INT_EQ(sshbuf_get_u8(p2, &c), 0);
+	ASSERT_PTR_EQ(sshbuf_ptr(p2), sshbuf_ptr(p1) + 1);
+	ASSERT_U8_EQ(c, 1);
+	ASSERT_INT_EQ(sshbuf_get_u32(p2, &i), 0);
+	ASSERT_PTR_EQ(sshbuf_ptr(p2), sshbuf_ptr(p1) + 5);
+	ASSERT_U32_EQ(i, 0x12345678);
+	ASSERT_INT_EQ(sshbuf_get_cstring(p2, &s, &l), 0);
+	ASSERT_SIZE_T_EQ(sshbuf_len(p2), 0);
+	ASSERT_STRING_EQ(s, "hello");
+	ASSERT_SIZE_T_EQ(l, 5);
+	sshbuf_free(p1);
+	ASSERT_U_INT_EQ(sshbuf_refcount(p1), 1);
+	sshbuf_free(p2);
 	TEST_DONE();
 
 	TEST_START("sshbuf_froms");

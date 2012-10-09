@@ -368,8 +368,9 @@ sshbuf_froms(struct sshbuf *buf, struct sshbuf **bufp)
 		return r;
 	if ((ret = sshbuf_from(p, len)) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
-	if ((r = sshbuf_consume(buf, len + 4)) != 0) { /* Shouldn't happen */
-		free(ret);
+	if ((r = sshbuf_consume(buf, len + 4)) != 0 ||  /* Shouldn't happen */
+	    (r = sshbuf_set_parent(ret, buf)) != 0) {
+		sshbuf_free(ret);
 		return r;
 	}
 	*bufp = ret;

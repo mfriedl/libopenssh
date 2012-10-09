@@ -37,6 +37,8 @@ struct sshbuf {
 	size_t max_size;	/* Maximum size of buffer */
 	size_t alloc;		/* Total bytes allocated to buf->d */
 	int readonly;		/* Refers to external, const data */
+	u_int refcount;		/* Tracks self and number of child buffers */
+	struct sshbuf *parent;	/* If child, pointer to parent */
 };
 
 static inline int
@@ -45,6 +47,7 @@ sshbuf_check_sanity(const struct sshbuf *buf)
 	SSHBUF_TELL("sanity");
 	if (__predict_false(buf == NULL ||
 	    (!buf->readonly && buf->d != buf->cd) ||
+	    buf->refcount < 1 || buf->refcount > SSHBUF_REFS_MAX ||
 	    buf->cd == NULL ||
 	    buf->max_size > SSHBUF_SIZE_MAX ||
 	    buf->alloc > buf->max_size ||
@@ -62,7 +65,7 @@ sshbuf_maybe_pack(struct sshbuf *buf, int force)
 {
 	SSHBUF_DBG(("force %d", force));
 	SSHBUF_TELL("pre-pack");
-	if (buf->readonly)
+	if (buf->readonly || buf->refcount > 1)
 		return;
 	if (force ||
 	    (buf->off >= SSHBUF_PACK_MIN && buf->off >= buf->size / 2)) {
@@ -83,6 +86,8 @@ sshbuf_new(void)
 	ret->alloc = SSHBUF_SIZE_INIT;
 	ret->max_size = SSHBUF_SIZE_MAX;
 	ret->readonly = 0;
+	ret->refcount = 1;
+	ret->parent = NULL;
 	if ((ret->cd = ret->d = calloc(1, ret->alloc)) == NULL) {
 		free(ret);
 		return NULL;
@@ -100,21 +105,39 @@ sshbuf_from(const void *blob, size_t len)
 		return NULL;
 	ret->alloc = ret->size = ret->max_size = len;
 	ret->readonly = 1;
+	ret->refcount = 1;
+	ret->parent = NULL;
 	ret->cd = blob;
 	ret->d = NULL;
 	return ret;
 }
 
-struct sshbuf *
-sshbuf_fromb(const struct sshbuf *buf)
+int
+sshbuf_set_parent(struct sshbuf *child, struct sshbuf *parent)
 {
-	/*
-	 * XXX - we could detect modification of the parent buffer by
-	 * registering a linkage between the two. E.g. have a sshbuf->parent
-	 * pointer and a sshbuf->nchildren counter. Possibly overkill for
-	 * regular use, but perhaps a good idea for diagnostics?
-	 */
-	return sshbuf_from(sshbuf_ptr(buf), sshbuf_len(buf));
+	int r;
+
+	if ((r = sshbuf_check_sanity(child)) != 0 ||
+	    (r = sshbuf_check_sanity(parent)) != 0)
+		return r;
+	child->parent = parent;
+	child->parent->refcount++;
+	return 0;
+}
+
+struct sshbuf *
+sshbuf_fromb(struct sshbuf *buf)
+{
+	struct sshbuf *ret;
+
+	if (sshbuf_check_sanity(buf) != 0)
+		return NULL;
+	ret = sshbuf_from(sshbuf_ptr(buf), sshbuf_len(buf));
+	if (sshbuf_set_parent(ret, buf) != 0) {
+		sshbuf_free(ret);
+		return NULL;
+	}
+	return ret;
 }
 
 void
@@ -128,7 +151,23 @@ sshbuf_free(struct sshbuf *buf)
 	 * have been passed to us and continuing to scribble over memory would
 	 * be bad.
 	 */
-	if (sshbuf_check_sanity(buf) == 0)
+	if (sshbuf_check_sanity(buf) != 0)
+		return;
+	/*
+	 * If we are a child, the free our parent to decrement its reference
+	 * count and possibly free it.
+	 */
+	if (buf->parent != NULL) {
+		sshbuf_free(buf->parent);
+		buf->parent = NULL;
+	}
+	/*
+	 * If we are a parent with still-extant children, then don't free just
+	 * yet. The last child's call to sshbuf_free should decrement our
+	 * refcount to 0 and trigger the actual free.
+	 */
+	buf->refcount--;
+	if (buf->refcount > 0)
 		return;
 	if (!buf->readonly) {
 		bzero(buf->d, buf->alloc);
@@ -143,7 +182,7 @@ sshbuf_reset(struct sshbuf *buf)
 {
 	u_char *d;
 
-	if (buf->readonly) {
+	if (buf->readonly || buf->refcount > 1) {
 		/* Nonsensical. Just make buffer appear empty */
 		buf->off = buf->size;
 		return;
@@ -171,6 +210,18 @@ sshbuf_alloc(const struct sshbuf *buf)
 	return buf->alloc;
 }
 
+const struct sshbuf *
+sshbuf_parent(const struct sshbuf *buf)
+{
+	return buf->parent;
+}
+
+u_int
+sshbuf_refcount(const struct sshbuf *buf)
+{
+	return buf->refcount;
+}
+
 int
 sshbuf_set_max_size(struct sshbuf *buf, size_t max_size)
 {
@@ -179,11 +230,11 @@ sshbuf_set_max_size(struct sshbuf *buf, size_t max_size)
 	int r;
 
 	SSHBUF_DBG(("set max buf = %p len = %zu", buf, max_size));
-	if ((r = sshbuf_check_sanity(buf)) < 0)
+	if ((r = sshbuf_check_sanity(buf)) != 0)
 		return r;
 	if (max_size == buf->max_size)
 		return 0;
-	if (buf->readonly)
+	if (buf->readonly || buf->refcount > 1)
 		return SSH_ERR_BUFFER_READ_ONLY;
 	if (max_size > SSHBUF_SIZE_MAX)
 		return SSH_ERR_NO_BUFFER_SPACE;
@@ -219,7 +270,7 @@ sshbuf_len(const struct sshbuf *buf)
 size_t
 sshbuf_avail(const struct sshbuf *buf)
 {
-	if (sshbuf_check_sanity(buf) != 0 || buf->readonly)
+	if (sshbuf_check_sanity(buf) != 0 || buf->readonly || buf->refcount > 1)
 		return 0;
 	return buf->max_size - (buf->size - buf->off);
 }
@@ -235,7 +286,7 @@ sshbuf_ptr(const struct sshbuf *buf)
 u_char *
 sshbuf_mutable_ptr(const struct sshbuf *buf)
 {
-	if (sshbuf_check_sanity(buf) != 0 || buf->readonly)
+	if (sshbuf_check_sanity(buf) != 0 || buf->readonly || buf->refcount > 1)
 		return NULL;
 	return buf->d + buf->off;
 }
@@ -245,9 +296,9 @@ sshbuf_check_reserve(const struct sshbuf *buf, size_t len)
 {
 	int r;
 
-	if ((r = sshbuf_check_sanity(buf)) < 0)
+	if ((r = sshbuf_check_sanity(buf)) != 0)
 		return r;
-	if (buf->readonly)
+	if (buf->readonly || buf->refcount > 1)
 		return SSH_ERR_BUFFER_READ_ONLY;
 	SSHBUF_TELL("check");
 	/* Slightly odd test construction is to prevent unsigned overflows */
@@ -264,7 +315,7 @@ sshbuf_reserve(struct sshbuf *buf, size_t len, u_char **dpp)
 	int r;
 
 	SSHBUF_DBG(("reserve buf = %p len = %zu", buf, len));
-	if ((r = sshbuf_check_reserve(buf, len)) < 0) {	/* does sanity check */
+	if ((r = sshbuf_check_reserve(buf, len)) != 0) {
 		if (dpp != NULL)
 			*dpp = NULL;
 		return r;
@@ -312,7 +363,7 @@ sshbuf_consume(struct sshbuf *buf, size_t len)
 	int r;
 
 	SSHBUF_DBG(("len = %zu", len));
-	if ((r = sshbuf_check_sanity(buf)) < 0)
+	if ((r = sshbuf_check_sanity(buf)) != 0)
 		return r;
 	if (len == 0)
 		return 0;
@@ -329,7 +380,7 @@ sshbuf_consume_end(struct sshbuf *buf, size_t len)
 	int r;
 
 	SSHBUF_DBG(("len = %zu", len));
-	if ((r = sshbuf_check_sanity(buf)) < 0)
+	if ((r = sshbuf_check_sanity(buf)) != 0)
 		return r;
 	if (len == 0)
 		return 0;
