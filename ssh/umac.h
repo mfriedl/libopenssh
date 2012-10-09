@@ -118,7 +118,7 @@ int uhash(uhash_ctx_t ctx,
 
 /* matching umac-128 API, we reuse umac_ctx, since it's opaque */
 struct umac_ctx *umac128_new(u_char key[]);
-int umac128_update(struct umac_ctx *ctx, u_char *input, long len);
+int umac128_update(struct umac_ctx *ctx, const u_char *input, long len);
 int umac128_final(struct umac_ctx *ctx, u_char tag[], u_char nonce[8]);
 int umac128_delete(struct umac_ctx *ctx);
 
