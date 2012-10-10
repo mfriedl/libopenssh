@@ -73,6 +73,9 @@ sshbuf_fixed(void)
 	ASSERT_PTR_EQ(sshbuf_parent(p1), NULL);
 	ASSERT_PTR_EQ(sshbuf_parent(p2), p1);
 	ASSERT_PTR_EQ(sshbuf_ptr(p2), sshbuf_ptr(p1));
+	ASSERT_PTR_NE(sshbuf_ptr(p1), NULL);
+	ASSERT_PTR_NE(sshbuf_ptr(p2), NULL);
+	ASSERT_PTR_EQ(sshbuf_mutable_ptr(p1), NULL);
 	ASSERT_PTR_EQ(sshbuf_mutable_ptr(p2), NULL);
 	ASSERT_SIZE_T_EQ(sshbuf_len(p1), sshbuf_len(p2));
 	ASSERT_INT_EQ(sshbuf_get_u8(p2, &c), 0);
@@ -115,5 +118,3 @@ sshbuf_fixed(void)
 	sshbuf_free(p2);
 	sshbuf_free(p1);
 }
-
-
