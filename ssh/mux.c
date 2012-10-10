@@ -1013,7 +1013,7 @@ static int
 mux_master_read_cb(Channel *c)
 {
 	struct mux_master_state *state = (struct mux_master_state *)c->mux_ctx;
-	struct sshbuf *in, *out;
+	struct sshbuf *in = NULL, *out = NULL;
 	u_int type, rid, i;
 	int r, ret = -1;
 
@@ -1036,13 +1036,8 @@ mux_master_read_cb(Channel *c)
 		return 0;
 	}
 
-	if ((in = sshbuf_new()) == NULL)
-		fatal("%s: sshbuf_new failed", __func__);
-	if ((out = sshbuf_new()) == NULL)
-		fatal("%s: sshbuf_new failed", __func__);
-
 	/* Channel code ensures that we receive whole packets */
-	if ((r = sshbuf_get_stringb(c->input, in)) != 0) {
+	if ((r = sshbuf_froms(c->input, &in)) != 0) {
  malf:
 		error("%s: malformed message: %s", __func__, ssh_err(r));
 		goto out;
@@ -1064,6 +1059,9 @@ mux_master_read_cb(Channel *c)
 		if ((r = sshbuf_get_u32(in, &rid)) != 0)
 			goto malf;
 	}
+
+	if ((out = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 
 	for (i = 0; mux_master_handlers[i].handler != NULL; i++) {
 		if (type == mux_master_handlers[i].type) {
