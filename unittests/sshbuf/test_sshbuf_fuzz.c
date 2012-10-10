@@ -113,8 +113,7 @@ sshbuf_fuzz_tests(void)
 				goto fuzz_reserve;
 			}
 		}
-		dp = sshbuf_ptr(p1);
-		ASSERT_PTR_NE(dp, NULL);
+		ASSERT_PTR_NE(sshbuf_ptr(p1), NULL);
 		ASSERT_SIZE_T_LE(sshbuf_max_size(p1), 16 * 1024);
 	}
 	ASSERT_PTR_NE(sshbuf_ptr(p1), NULL);

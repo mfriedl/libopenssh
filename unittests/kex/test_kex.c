@@ -28,7 +28,7 @@ do_send_and_receive(struct ssh *from, struct ssh *to)
 {
 	u_char type;
 	size_t len;
-	char *buf;
+	const u_char *buf;
 	int r;
 
 	for (;;) {

@@ -47,7 +47,7 @@ struct sshbuf *
 load_text_file(const char *name)
 {
 	struct sshbuf *ret = load_file(name);
-	u_char *p;
+	const u_char *p;
 
 	/* Trim whitespace at EOL */
 	for (p = sshbuf_ptr(ret); sshbuf_len(ret) > 0;) {
