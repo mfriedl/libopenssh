@@ -1828,7 +1828,7 @@ show_options(struct sshbuf *optbuf, int v00, int in_critical)
 		sshbuf_free(option);
 		option = NULL;
 		if ((r = sshbuf_get_cstring(options, &name, NULL)) != 0 ||
-		    (r = sshbuf_get_stringb(options, option)) != 0)
+		    (r = sshbuf_froms(options, &option)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		printf("                %s", name);
 		if ((v00 || !in_critical) && 
