@@ -419,14 +419,12 @@ static int
 ssh_packet_set_compress_state(struct ssh *ssh, struct sshbuf *m)
 {
 	struct session_state *state = ssh->state;
-	struct sshbuf *b;
+	struct sshbuf *b = NULL;
 	int r;
 	const u_char *inblob, *outblob;
 	size_t inl, outl;
 
-	if ((b = sshbuf_new()) == NULL)
-		return SSH_ERR_ALLOC_FAIL;
-	if ((r = sshbuf_get_stringb(m, b)) != 0)
+	if ((r = sshbuf_froms(m, &b)) != 0)
 		goto out;
 	if ((r = sshbuf_get_string_direct(b, &inblob, &inl)) != 0 ||
 	    (r = sshbuf_get_string_direct(b, &outblob, &outl)) != 0)
@@ -2313,12 +2311,11 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 	size_t keylen, ivlen, maclen;
 	int r;
 
-	if ((b = sshbuf_new()) == NULL ||
-	    (newkey = calloc(1, sizeof(*newkey))) == NULL) {
+	if ((newkey = calloc(1, sizeof(*newkey))) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-	if ((r = sshbuf_get_stringb(m, b)) != 0)
+	if ((r = sshbuf_froms(m, &b)) != 0)
 		goto out;
 #ifdef DEBUG_PK
 	sshbuf_dump(b, stderr);
