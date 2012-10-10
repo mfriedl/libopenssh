@@ -392,10 +392,9 @@ do_convert_private_ssh2_from_blob(u_char *blob, u_int blen)
 	size_t slen;
 	u_long e;
 
-	if ((b = sshbuf_new()) == NULL)
-		fatal("%s: sshbuf_new failed", __func__);
-	if ((r = sshbuf_put(b, blob, blen)) != 0 ||
-	    (r = sshbuf_get_u32(b, &magic)) != 0)
+	if ((b = sshbuf_from(blob, blen)) == NULL)
+		fatal("%s: sshbuf_from failed", __func__);
+	if ((r = sshbuf_get_u32(b, &magic)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	if (magic != SSH_COM_PRIVATE_KEY_MAGIC) {
@@ -1823,7 +1822,7 @@ show_options(struct sshbuf *optbuf, int v00, int in_critical)
 	int r;
 
 	if ((options = sshbuf_fromb(optbuf)) == NULL)
-		fatal("%s: sshbuf_new failed", __func__);
+		fatal("%s: sshbuf_fromb failed", __func__);
 	while (sshbuf_len(options) != 0) {
 		sshbuf_free(option);
 		option = NULL;

@@ -949,10 +949,8 @@ monitor_valid_userblob(u_char *data, u_int datalen)
 	int r, fail = 0;
 	char *username, *methodname;
 
-	if ((b = sshbuf_new()) == NULL)
-		fatal("%s: sshbuf_new failed", __func__);
-	if ((r = sshbuf_put(b, data, datalen)) != 0)
-		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if ((b = sshbuf_from(data, datalen)) == NULL)
+		fatal("%s: sshbuf_from failed", __func__);
 
 	if (active_state->compat & SSH_OLD_SESSIONID) {
 		cp = sshbuf_ptr(b);
@@ -1022,10 +1020,9 @@ monitor_valid_hostbasedblob(u_char *data, u_int datalen, char *cuser,
 	size_t len;
 	int r, fail = 0;
 
-	if ((b = sshbuf_new()) == NULL)
-		fatal("%s: sshbuf_new failed", __func__);
-	if ((r = sshbuf_put(b, data, datalen)) != 0 ||
-	    (r = sshbuf_get_string(b, &sid, &len)) != 0)
+	if ((b = sshbuf_from(data, datalen)) == NULL)
+		fatal("%s: sshbuf_from failed", __func__);
+	if ((r = sshbuf_get_string(b, &sid, &len)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	if ((session_id2 == NULL) ||

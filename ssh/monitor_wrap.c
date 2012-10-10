@@ -720,14 +720,11 @@ void
 mm_ssh1_session_id(u_char session_id[16])
 {
 	struct sshbuf *m;
-	int r;
 
 	debug3("%s entering", __func__);
 
-	if ((m = sshbuf_new()) == NULL)
-		fatal("%s: sshbuf_new failed", __func__);
-	if ((r = sshbuf_put(m, session_id, 16)) != 0)
-		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if ((m = sshbuf_from(session_id, 16)) == NULL)
+		fatal("%s: sshbuf_from failed", __func__);
 
 	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_SESSID, m);
 	sshbuf_free(m);

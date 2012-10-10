@@ -68,10 +68,8 @@ valid_request(struct passwd *pw, char *host, struct sshkey **ret,
 
 	fail = 0;
 
-	if ((b = sshbuf_new()) == NULL)
-		fatal("%s: sshbuf_new failed", __func__);
-	if ((r = sshbuf_put(b, data, datalen)) != 0)
-		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if ((b = sshbuf_from(data, datalen)) == NULL)
+		fatal("%s: sshbuf_from failed", __func__);
 
 	/* session id, currently limited to SHA1 (20 bytes) or SHA256 (32) */
 	if ((r = sshbuf_get_string(b, &sid, &len)) != 0)

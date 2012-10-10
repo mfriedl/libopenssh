@@ -751,9 +751,7 @@ dump_digest(char *msg, u_char *digest, int len)
 	struct sshbuf *b;
 
 	fprintf(stderr, "%s\n", msg);
-	if ((b = sshbuf_new()) == NULL)
-		return;
-	if (sshbuf_put(b, digest, len) == 0)
+	if ((b = sshbuf_from(digest, len)) != NULL)
 		sshbuf_dump(b, stderr);
 	sshbuf_free(b);
 }

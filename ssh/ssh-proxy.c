@@ -313,9 +313,8 @@ ssh_packet_fwd(struct side *from, struct side *to)
 		    from->fd, to->fd, type, len);
 		if ((dump_packets && type != 50) ||
 		    dump_packets > 1) {
-			if ((b = sshbuf_new()) != NULL) {
-				if (sshbuf_put(b, data, len) == 0)
-					sshbuf_dump(b, stderr);
+			if ((b = sshbuf_from(data, len)) != NULL) {
+				sshbuf_dump(b, stderr);
 				sshbuf_free(b);
 			}
 		}

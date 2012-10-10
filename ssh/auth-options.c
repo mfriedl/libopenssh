@@ -439,7 +439,7 @@ parse_option_list(struct sshbuf *oblob, struct passwd *pw,
 	int r, ret = -1, found;
 
 	if ((c = sshbuf_fromb(oblob)) == NULL) {
-		error("%s: sshbuf_new failed", __func__);
+		error("%s: sshbuf_fromb failed", __func__);
 		goto out;
 	}
 
