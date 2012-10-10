@@ -40,9 +40,6 @@
 #include <unistd.h>
 #include <vis.h>
 
-#define PACKET_SKIP_COMPAT
-#define PACKET_SKIP_COMPAT2
-
 #include "xmalloc.h"
 #include "ssh.h"
 #include "ssh2.h"

@@ -50,8 +50,6 @@
 #include <termios.h>
 #include <stdarg.h>
 
-#define PACKET_SKIP_COMPAT2
-#define PACKET_SKIP_COMPAT
 #include "packet.h"
 #include "log.h"
 #include "ssh1.h"

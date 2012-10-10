@@ -74,8 +74,6 @@
 #include "canohost.h"
 #include "compat.h"
 #include "cipher.h"
-#define PACKET_SKIP_COMPAT
-#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "sshbuf.h"
 #include "channels.h"

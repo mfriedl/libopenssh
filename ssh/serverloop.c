@@ -54,8 +54,6 @@
 #include <stdarg.h>
 
 #include "xmalloc.h"
-#define PACKET_SKIP_COMPAT
-#define PACKET_SKIP_COMPAT2
 #include "packet.h"
 #include "sshbuf.h"
 #include "log.h"
