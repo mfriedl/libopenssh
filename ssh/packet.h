@@ -27,7 +27,6 @@
 #include "cipher.h"
 #include "dispatch.h"
 #include "key.h"
-#include "kex.h"
 #include "ssh.h"
 
 struct key_entry {
@@ -36,6 +35,7 @@ struct key_entry {
 };
 
 struct session_state;	/* private session data */
+struct kex;
 
 struct ssh {
 	/* Session state */
