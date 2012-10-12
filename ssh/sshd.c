@@ -223,7 +223,7 @@ struct monitor *pmonitor = NULL;
 int privsep_is_preauth = 1;
 
 /* global authentication context */
-Authctxt *the_authctxt = NULL;
+static Authctxt *the_authctxt = NULL;	/* XXX */
 
 /* sshd_config buffer */
 struct sshbuf *cfg;

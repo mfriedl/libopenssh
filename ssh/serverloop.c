@@ -78,7 +78,6 @@
 
 extern ServerOptions options;
 
-extern Authctxt *the_authctxt;
 extern int use_privsep;
 
 static struct sshbuf *stdin_buffer;	/* Buffer for stdin data. */
@@ -1141,10 +1140,9 @@ server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 
 	/* -R style forwarding */
 	if (strcmp(rtype, "tcpip-forward") == 0) {
-		struct passwd *pw;
+		Authctxt *authctxt = ssh->authctxt;
 
-		pw = the_authctxt->pw;
-		if (pw == NULL || !the_authctxt->valid)
+		if (authctxt->pw == NULL || !authctxt->valid)
 			fatal("server_input_global_request: no/invalid user");
 		if ((r = sshpkt_get_cstring(ssh, &listen_address, NULL)) != 0 ||
 		    (r = sshpkt_get_u32(ssh, &listen_port)) != 0)
@@ -1157,7 +1155,7 @@ server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 		    no_port_forwarding_flag ||
 		    (!want_reply && listen_port == 0) ||
 		    (listen_port != 0 && listen_port < IPPORT_RESERVED &&
-		    pw->pw_uid != 0)) {
+		    authctxt->pw->pw_uid != 0)) {
 			success = 0;
 			ssh_packet_send_debug(ssh,
 			    "Server has disabled port forwarding.");
