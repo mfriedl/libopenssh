@@ -936,9 +936,10 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 		free(comp->name);
 		free(state->newkeys[mode]);
 	}
-	state->newkeys[mode] = kex_get_newkeys(ssh, mode);
-	if (state->newkeys[mode] == NULL)
+	/* move newkeys from kex to state */
+	if ((state->newkeys[mode] = ssh->kex->newkeys[mode]) == NULL)
 		return SSH_ERR_INTERNAL_ERROR;
+	ssh->kex->newkeys[mode] = NULL;
 	enc  = &state->newkeys[mode]->enc;
 	mac  = &state->newkeys[mode]->mac;
 	comp = &state->newkeys[mode]->comp;
@@ -2350,7 +2351,7 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 		goto out;
 	}
 	enc->key_len = keylen;
-	ssh->current_keys[mode] = newkey;
+	ssh->kex->newkeys[mode] = newkey;
 	newkey = NULL;
 	r = 0;
  out:
@@ -2445,6 +2446,7 @@ ssh_packet_set_state(struct ssh *ssh, struct sshbuf *m)
 		    (r = sshbuf_get_u32(m, &state->p_read.packets)) != 0 ||
 		    (r = sshbuf_get_u64(m, &state->p_read.bytes)) != 0)
 			return r;
+		/* XXX ssh_set_newkeys overrides p_read.packets? XXX */
 		if ((r = ssh_set_newkeys(ssh, MODE_IN)) != 0 ||
 		    (r = ssh_set_newkeys(ssh, MODE_OUT)) != 0)
 			return r;

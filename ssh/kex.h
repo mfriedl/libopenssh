@@ -146,15 +146,12 @@ int	 kex_input_kexinit(int, u_int32_t, struct ssh *);
 int	 kex_derive_keys(struct ssh *, u_char *, u_int, BIGNUM *);
 int	 kex_send_newkeys(struct ssh *);
 
-struct newkeys *kex_get_newkeys(struct ssh *, int);
-
 int	 kexdh_client(struct ssh *);
 int	 kexdh_server(struct ssh *);
 int	 kexgex_client(struct ssh *);
 int	 kexgex_server(struct ssh *);
 int	 kexecdh_client(struct ssh *);
 int	 kexecdh_server(struct ssh *);
-
 
 int	 kex_dh_hash(const char *, const char *,
     const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,

@@ -687,26 +687,13 @@ kex_derive_keys(struct ssh *ssh, u_char *hash, u_int hashlen,
 		}
 	}
 	for (mode = 0; mode < MODE_MAX; mode++) {
-		kex_free_newkeys(ssh->current_keys[mode]);
-		ssh->current_keys[mode] = kex->newkeys[mode];
-		kex->newkeys[mode] = NULL;
 		ctos = (!kex->server && mode == MODE_OUT) ||
 		    (kex->server && mode == MODE_IN);
-		ssh->current_keys[mode]->enc.iv  = keys[ctos ? 0 : 1];
-		ssh->current_keys[mode]->enc.key = keys[ctos ? 2 : 3];
-		ssh->current_keys[mode]->mac.key = keys[ctos ? 4 : 5];
+		kex->newkeys[mode]->enc.iv  = keys[ctos ? 0 : 1];
+		kex->newkeys[mode]->enc.key = keys[ctos ? 2 : 3];
+		kex->newkeys[mode]->mac.key = keys[ctos ? 4 : 5];
 	}
 	return 0;
-}
-
-struct newkeys *
-kex_get_newkeys(struct ssh *ssh, int mode)
-{
-	struct newkeys *ret;
-
-	ret = ssh->current_keys[mode];
-	ssh->current_keys[mode] = NULL;
-	return ret;
 }
 
 int
