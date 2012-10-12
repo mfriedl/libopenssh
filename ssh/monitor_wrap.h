@@ -74,7 +74,7 @@ void mm_ssh1_session_id(u_char *);
 int mm_ssh1_session_key(BIGNUM *);
 
 /* Key export functions */
-struct Newkeys *mm_newkeys_from_blob(u_char *, int);
+struct newkeys *mm_newkeys_from_blob(u_char *, int);
 int mm_newkeys_to_blob(int, u_char **, u_int *);
 
 void monitor_apply_keystate(struct monitor *);

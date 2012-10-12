@@ -166,7 +166,7 @@ struct session_state {
 	int packet_timeout_ms;
 
 	/* Session key information for Encryption and MAC */
-	Newkeys *newkeys[MODE_MAX];
+	struct newkeys *newkeys[MODE_MAX];
 	struct packet_state p_read, p_send;
 
 	u_int64_t max_blocks_in, max_blocks_out;
@@ -2200,7 +2200,7 @@ newkeys_to_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 	Comp *comp;
 	Enc *enc;
 	Mac *mac;
-	Newkeys *newkey;
+	struct newkeys *newkey;
 	int r;
 
 	if ((newkey = ssh->state->newkeys[mode]) == NULL)
@@ -2307,7 +2307,7 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 	Comp *comp;
 	Enc *enc;
 	Mac *mac;
-	Newkeys *newkey = NULL;
+	struct newkeys *newkey = NULL;
 	size_t keylen, ivlen, maclen;
 	int r;
 

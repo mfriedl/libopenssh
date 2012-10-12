@@ -320,7 +320,7 @@ kex_new(struct ssh *ssh, char *proposal[PROPOSAL_MAX], struct kex **kexp)
 }
 
 void
-kex_free_newkeys(Newkeys *newkeys)
+kex_free_newkeys(struct newkeys *newkeys)
 {
 	if (newkeys == NULL)
 		return;
@@ -518,7 +518,7 @@ proposals_match(char *my[PROPOSAL_MAX], char *peer[PROPOSAL_MAX])
 static int
 kex_choose_conf(struct ssh *ssh)
 {
-	Newkeys *newkeys;
+	struct newkeys *newkeys;
 	char **my = NULL, **peer = NULL;
 	char **cprop, **sprop;
 	int nenc, nmac, ncomp;
@@ -699,10 +699,10 @@ kex_derive_keys(struct ssh *ssh, u_char *hash, u_int hashlen,
 	return 0;
 }
 
-Newkeys *
+struct newkeys *
 kex_get_newkeys(struct ssh *ssh, int mode)
 {
-	Newkeys *ret;
+	struct newkeys *ret;
 
 	ret = ssh->current_keys[mode];
 	ssh->current_keys[mode] = NULL;

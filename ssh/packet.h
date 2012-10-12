@@ -49,7 +49,7 @@ struct ssh {
 
 	/* Key exchange */
 	struct kex *kex;
-	Newkeys *current_keys[MODE_MAX];
+	struct newkeys *current_keys[MODE_MAX];
 
 	/* Host key verification */
 	char *host;
