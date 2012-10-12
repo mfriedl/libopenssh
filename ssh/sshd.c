@@ -2213,7 +2213,7 @@ do_ssh1_kex(struct ssh *ssh)
 static void
 do_ssh2_kex(struct ssh *ssh)
 {
-	Kex *kex;
+	struct kex *kex;
 	int r;
 
 	if (options.ciphers != NULL) {

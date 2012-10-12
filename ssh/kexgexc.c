@@ -50,7 +50,7 @@ static int input_kex_dh_gex_reply(int, u_int32_t, struct ssh *);
 int
 kexgex_client(struct ssh *ssh)
 {
-	Kex *kex = ssh->kex;
+	struct kex *kex = ssh->kex;
 	int r, nbits;
 
 	nbits = dh_estimate(kex->we_need * 8);
@@ -91,7 +91,7 @@ kexgex_client(struct ssh *ssh)
 static int
 input_kex_dh_gex_group(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Kex *kex = ssh->kex;
+	struct kex *kex = ssh->kex;
 	BIGNUM *p = NULL, *g = NULL;
 	int r;
 
@@ -143,7 +143,7 @@ out:
 static int
 input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Kex *kex = ssh->kex;
+	struct kex *kex = ssh->kex;
 	BIGNUM *dh_server_pub = NULL, *shared_secret = NULL;
 	struct sshkey *server_host_key;
 	u_char *kbuf = NULL, *hash, *signature = NULL, *server_host_key_blob = NULL;

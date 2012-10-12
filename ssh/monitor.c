@@ -1474,7 +1474,7 @@ void
 monitor_apply_keystate(struct monitor *pmonitor)
 {
 	struct ssh *ssh = active_state;	/* XXX */
-	Kex *kex;
+	struct kex *kex;
 	int r;
 
 	debug3("%s: packet_set_state", __func__);

@@ -192,7 +192,7 @@ kex_send_newkeys(struct ssh *ssh)
 static int
 kex_input_newkeys(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Kex *kex = ssh->kex;
+	struct kex *kex = ssh->kex;
 	int r;
 
 	debug("SSH2_MSG_NEWKEYS received");
@@ -212,7 +212,7 @@ int
 kex_send_kexinit(struct ssh *ssh)
 {
 	u_char *cookie;
-	Kex *kex = ssh->kex;
+	struct kex *kex = ssh->kex;
 	int r;
 
 	if (kex == NULL)
@@ -244,7 +244,7 @@ kex_send_kexinit(struct ssh *ssh)
 int
 kex_input_kexinit(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Kex *kex = ssh->kex;
+	struct kex *kex = ssh->kex;
 	const u_char *ptr;
 	u_int i;
 	size_t dlen;
@@ -294,9 +294,9 @@ kex_input_kexinit(int type, u_int32_t seq, struct ssh *ssh)
 }
 
 int
-kex_new(struct ssh *ssh, char *proposal[PROPOSAL_MAX], Kex **kexp)
+kex_new(struct ssh *ssh, char *proposal[PROPOSAL_MAX], struct kex **kexp)
 {
-	Kex *kex;
+	struct kex *kex;
 	int r;
 
 	*kexp = NULL;
@@ -351,7 +351,7 @@ kex_free_newkeys(Newkeys *newkeys)
 }
 
 void
-kex_free(Kex *kex)
+kex_free(struct kex *kex)
 {
 	u_int mode;
 
@@ -448,7 +448,7 @@ choose_comp(Comp *comp, char *client, char *server)
 }
 
 static int
-choose_kex(Kex *k, char *client, char *server)
+choose_kex(struct kex *k, char *client, char *server)
 {
 	k->name = match_list(client, server, NULL);
 
@@ -478,7 +478,7 @@ choose_kex(Kex *k, char *client, char *server)
 }
 
 static int
-choose_hostkeyalg(Kex *k, char *client, char *server)
+choose_hostkeyalg(struct kex *k, char *client, char *server)
 {
 	char *hostkeyalg = match_list(client, server, NULL);
 
@@ -524,7 +524,7 @@ kex_choose_conf(struct ssh *ssh)
 	int nenc, nmac, ncomp;
 	u_int mode, ctos, need;
 	int r, first_kex_follows;
-	Kex *kex = ssh->kex;
+	struct kex *kex = ssh->kex;
 
 	if ((r = kex_buf2prop(kex->my, NULL, &my)) != 0 ||
 	    (r = kex_buf2prop(kex->peer, &first_kex_follows, &peer)) != 0)
@@ -607,7 +607,7 @@ static int
 derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
     BIGNUM *shared_secret, u_char **keyp)
 {
-	Kex *kex = ssh->kex;
+	struct kex *kex = ssh->kex;
 	struct sshbuf *b = NULL;
 	EVP_MD_CTX md;
 	char c = id;
@@ -673,7 +673,7 @@ int
 kex_derive_keys(struct ssh *ssh, u_char *hash, u_int hashlen,
     BIGNUM *shared_secret)
 {
-	Kex *kex = ssh->kex;
+	struct kex *kex = ssh->kex;
 	u_char *keys[NKEYS];
 	u_int i, j, mode, ctos;
 	int r;

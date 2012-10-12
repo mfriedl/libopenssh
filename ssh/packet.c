@@ -2173,7 +2173,7 @@ ssh_packet_set_postauth(struct ssh *ssh)
 
 /* turn kex into a blob for packet state serialization */
 static int
-kex_to_blob(struct sshbuf *m, Kex *kex)
+kex_to_blob(struct sshbuf *m, struct kex *kex)
 {
 	int r;
 
@@ -2363,12 +2363,12 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 
 /* restore kex from blob for packet state de-serialization */
 static int
-kex_from_blob(struct sshbuf *m, Kex **kexp)
+kex_from_blob(struct sshbuf *m, struct kex **kexp)
 {
-	Kex *kex;
+	struct kex *kex;
 	int r;
 
-	if ((kex = calloc(1, sizeof(Kex))) == NULL ||
+	if ((kex = calloc(1, sizeof(struct kex))) == NULL ||
 	    (kex->my = sshbuf_new()) == NULL ||
 	    (kex->peer = sshbuf_new()) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;

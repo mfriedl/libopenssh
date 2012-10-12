@@ -48,7 +48,7 @@ static int input_kex_dh(int, u_int32_t, struct ssh *);
 int
 kexdh_client(struct ssh *ssh)
 {
-	Kex *kex = ssh->kex;
+	struct kex *kex = ssh->kex;
 	int r;
 
 	/* generate and send 'e', client DH public key */
@@ -89,7 +89,7 @@ kexdh_client(struct ssh *ssh)
 static int
 input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Kex *kex = ssh->kex;
+	struct kex *kex = ssh->kex;
 	BIGNUM *dh_server_pub = NULL, *shared_secret = NULL;
 	struct sshkey *server_host_key = NULL;
 	u_char *kbuf = NULL, *server_host_key_blob = NULL, *signature = NULL;

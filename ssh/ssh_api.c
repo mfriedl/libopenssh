@@ -382,7 +382,7 @@ _ssh_send_banner(struct ssh *ssh, char **bannerp)
 int
 _ssh_exchange_banner(struct ssh *ssh)
 {
-	Kex *kex = ssh->kex;
+	struct kex *kex = ssh->kex;
 	int r;
 
 	/*

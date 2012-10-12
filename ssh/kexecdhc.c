@@ -49,7 +49,7 @@ static int input_kex_ecdh_reply(int, u_int32_t, struct ssh *);
 int
 kexecdh_client(struct ssh *ssh)
 {
-	Kex *kex = ssh->kex;
+	struct kex *kex = ssh->kex;
 	EC_KEY *client_key = NULL;
 	const EC_GROUP *group;
 	const EC_POINT *public_key;
@@ -96,7 +96,7 @@ kexecdh_client(struct ssh *ssh)
 static int
 input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Kex *kex = ssh->kex;
+	struct kex *kex = ssh->kex;
 	const EC_GROUP *group;
 	EC_POINT *server_public = NULL;
 	EC_KEY *client_key;

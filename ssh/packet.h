@@ -48,7 +48,7 @@ struct ssh {
 	void *app_data;
 
 	/* Key exchange */
-	Kex *kex;
+	struct kex *kex;
 	Newkeys *current_keys[MODE_MAX];
 
 	/* Host key verification */

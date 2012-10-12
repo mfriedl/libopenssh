@@ -216,7 +216,7 @@ int
 mm_sshkey_sign(struct sshkey *key, u_char **sigp, size_t *lenp,
     u_char *data, size_t datalen, u_int compat)
 {
-	Kex *kex = *pmonitor->m_pkex;
+	struct kex *kex = *pmonitor->m_pkex;
 	struct sshbuf *m;
 	int r;
 

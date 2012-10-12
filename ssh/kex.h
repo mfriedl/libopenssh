@@ -79,7 +79,6 @@ enum kex_exchange {
 
 #define KEX_INIT_SENT	0x0001
 
-typedef struct Kex Kex;
 typedef struct sshmac Mac;
 typedef struct Comp Comp;
 typedef struct Enc Enc;
@@ -107,7 +106,7 @@ struct Newkeys {
 
 struct ssh;
 
-struct Kex {
+struct kex {
 	u_char	*session_id;
 	size_t	session_id_len;
 	Newkeys	*newkeys[MODE_MAX];
@@ -138,10 +137,10 @@ struct Kex {
 
 int	 kex_names_valid(const char *);
 
-int	 kex_new(struct ssh *, char *[PROPOSAL_MAX], Kex **);
+int	 kex_new(struct ssh *, char *[PROPOSAL_MAX], struct kex **);
 int	 kex_setup(struct ssh *, char *[PROPOSAL_MAX]);
 void	 kex_free_newkeys(Newkeys *);
-void	 kex_free(Kex *);
+void	 kex_free(struct kex *);
 
 int	 kex_buf2prop(struct sshbuf *, int *, char ***);
 int	 kex_prop2buf(struct sshbuf *, char *proposal[PROPOSAL_MAX]);

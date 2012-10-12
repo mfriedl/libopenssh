@@ -70,7 +70,7 @@ struct monitor {
 	int			 m_log_sendfd;
 	struct mm_master	*m_zback;
 	struct mm_master	*m_zlib;
-	struct Kex		**m_pkex;
+	struct kex		**m_pkex;
 	pid_t			 m_pid;
 };
 
