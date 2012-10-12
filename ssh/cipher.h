@@ -60,14 +60,13 @@
 #define CIPHER_ENCRYPT		1
 #define CIPHER_DECRYPT		0
 
-typedef struct sshcipher Cipher;
 typedef struct sshcipher_ctx CipherContext;
 
 struct sshcipher;
 struct sshcipher_ctx {
 	int	plaintext;
 	EVP_CIPHER_CTX evp;
-	Cipher *cipher;
+	struct sshcipher *cipher;
 };
 
 u_int	 cipher_mask_ssh1(int);

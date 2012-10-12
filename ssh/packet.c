@@ -266,7 +266,7 @@ struct ssh *
 ssh_packet_set_connection(struct ssh *ssh, int fd_in, int fd_out)
 {
 	struct session_state *state;
-	Cipher *none = cipher_by_name("none");
+	struct sshcipher *none = cipher_by_name("none");
 	int r;
 
 	if (none == NULL)
@@ -774,7 +774,7 @@ void
 ssh_packet_set_encryption_key(struct ssh *ssh, const u_char *key, u_int keylen, int number)
 {
 	struct session_state *state = ssh->state;
-	Cipher *cipher = cipher_by_number(number);
+	struct sshcipher *cipher = cipher_by_number(number);
 	int r;
 	const char *wmsg;
 

@@ -81,7 +81,7 @@ enum kex_exchange {
 
 struct sshenc {
 	char	*name;
-	Cipher	*cipher;
+	struct sshcipher *cipher;
 	int	enabled;
 	u_int	key_len;
 	u_int	block_size;
