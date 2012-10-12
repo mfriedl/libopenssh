@@ -83,7 +83,7 @@ sshkey_private_rsa1_to_blob(struct sshkey *key, struct sshbuf *blob,
 	struct sshbuf *buffer = NULL, *encrypted = NULL;
 	u_char buf[8];
 	int r, cipher_num;
-	CipherContext ciphercontext;
+	struct sshcipher_ctx ciphercontext;
 	struct sshcipher *cipher;
 	u_char *cp;
 
@@ -421,7 +421,7 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 	struct sshbuf *decrypted = NULL, *copy = NULL;
 	u_char *cp;
 	char *comment = NULL;
-	CipherContext ciphercontext;
+	struct sshcipher_ctx ciphercontext;
 	struct sshcipher *cipher;
 	struct sshkey *prv = NULL;
 

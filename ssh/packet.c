@@ -111,10 +111,10 @@ struct session_state {
 	u_int remote_protocol_flags;
 
 	/* Encryption context for receiving data.  Only used for decryption. */
-	CipherContext receive_context;
+	struct sshcipher_ctx receive_context;
 
 	/* Encryption context for sending data.  Only used for encryption. */
-	CipherContext send_context;
+	struct sshcipher_ctx send_context;
 
 	/* Buffer for raw input data from the socket. */
 	struct sshbuf *input;
@@ -899,7 +899,7 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	struct sshenc *enc;
 	struct sshmac *mac;
 	struct sshcomp *comp;
-	CipherContext *cc;
+	struct sshcipher_ctx *cc;
 	u_int64_t *max_blocks;
 	int crypt_type, r;
 	const char *wmsg;
@@ -2197,7 +2197,7 @@ static int
 newkeys_to_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 {
 	struct sshbuf *b;
-	CipherContext *cc;
+	struct sshcipher_ctx *cc;
 	struct sshcomp *comp;
 	struct sshenc *enc;
 	struct sshmac *mac;

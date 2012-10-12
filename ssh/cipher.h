@@ -60,8 +60,6 @@
 #define CIPHER_ENCRYPT		1
 #define CIPHER_DECRYPT		0
 
-typedef struct sshcipher_ctx CipherContext;
-
 struct sshcipher;
 struct sshcipher_ctx {
 	int	plaintext;
