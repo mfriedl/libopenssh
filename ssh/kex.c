@@ -392,7 +392,7 @@ kex_setup(struct ssh *ssh, char *proposal[PROPOSAL_MAX])
 }
 
 static int
-choose_enc(Enc *enc, char *client, char *server)
+choose_enc(struct sshenc *enc, char *client, char *server)
 {
 	char *name = match_list(client, server, NULL);
 
