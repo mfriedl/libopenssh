@@ -57,7 +57,6 @@
 #include "key.h"
 #include "authfd.h"
 #include "cipher.h"
-#include "kex.h"
 #include "compat.h"
 #include "log.h"
 #include "atomicio.h"

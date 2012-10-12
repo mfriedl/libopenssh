@@ -32,7 +32,6 @@
 
 #include "cipher.h"
 #include "key.h"
-#include "kex.h"
 #include "mac.h"
 #include "misc.h"
 #include "err.h"
