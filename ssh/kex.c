@@ -410,7 +410,7 @@ choose_enc(Enc *enc, char *client, char *server)
 }
 
 static int
-choose_mac(struct ssh *ssh, Mac *mac, char *client, char *server)
+choose_mac(struct ssh *ssh, struct sshmac *mac, char *client, char *server)
 {
 	char *name = match_list(client, server, NULL);
 

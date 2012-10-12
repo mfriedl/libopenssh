@@ -66,7 +66,7 @@ struct {
 };
 
 static int
-mac_setup_by_id(Mac *mac, int which)
+mac_setup_by_id(struct sshmac *mac, int which)
 {
 	int evp_len;
 	mac->type = macs[which].type;
@@ -86,7 +86,7 @@ mac_setup_by_id(Mac *mac, int which)
 }
 
 int
-mac_setup(Mac *mac, char *name)
+mac_setup(struct sshmac *mac, char *name)
 {
 	int i;
 
@@ -101,7 +101,7 @@ mac_setup(Mac *mac, char *name)
 }
 
 int
-mac_init(Mac *mac)
+mac_init(struct sshmac *mac)
 {
 	if (mac->key == NULL)
 		return SSH_ERR_INVALID_ARGUMENT;
@@ -129,7 +129,7 @@ mac_init(Mac *mac)
 }
 
 int
-mac_compute(Mac *mac, u_int32_t seqno, const u_char *data, int datalen,
+mac_compute(struct sshmac *mac, u_int32_t seqno, const u_char *data, int datalen,
     u_char *digest, size_t dlen)
 {
 	static u_char m[MAC_DIGEST_LEN_MAX];
@@ -170,7 +170,7 @@ mac_compute(Mac *mac, u_int32_t seqno, const u_char *data, int datalen,
 }
 
 void
-mac_clear(Mac *mac)
+mac_clear(struct sshmac *mac)
 {
 	if (mac->type == SSH_UMAC) {
 		if (mac->umac_ctx != NULL)

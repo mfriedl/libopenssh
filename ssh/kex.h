@@ -79,7 +79,6 @@ enum kex_exchange {
 
 #define KEX_INIT_SENT	0x0001
 
-typedef struct sshmac Mac;
 typedef struct Comp Comp;
 typedef struct Enc Enc;
 
@@ -99,7 +98,7 @@ struct Comp {
 };
 struct newkeys {
 	Enc	enc;
-	Mac	mac;
+	struct sshmac	mac;
 	Comp	comp;
 };
 

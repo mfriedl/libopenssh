@@ -181,7 +181,7 @@ struct session_state {
 
 	/* XXX discard incoming data after MAC error */
 	u_int packet_discard;
-	Mac *packet_discard_mac;
+	struct sshmac *packet_discard_mac;
 
 	/* Used in packet_read_poll2() */
 	u_int packlen;
@@ -328,7 +328,7 @@ ssh_packet_stop_discard(struct ssh *ssh)
 }
 
 int
-ssh_packet_start_discard(struct ssh *ssh, Enc *enc, Mac *mac,
+ssh_packet_start_discard(struct ssh *ssh, Enc *enc, struct sshmac *mac,
     u_int packet_length, u_int discard)
 {
 	struct session_state *state = ssh->state;
@@ -897,7 +897,7 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 {
 	struct session_state *state = ssh->state;
 	Enc *enc;
-	Mac *mac;
+	struct sshmac *mac;
 	Comp *comp;
 	CipherContext *cc;
 	u_int64_t *max_blocks;
@@ -1036,7 +1036,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	u_int packet_length = 0;
 	u_int len;
 	Enc *enc   = NULL;
-	Mac *mac   = NULL;
+	struct sshmac *mac   = NULL;
 	Comp *comp = NULL;
 	int r, block_size;
 
@@ -1469,7 +1469,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	u_char macbuf[MAC_DIGEST_LEN_MAX], *cp;
 	u_int maclen, block_size;
 	Enc *enc   = NULL;
-	Mac *mac   = NULL;
+	struct sshmac *mac   = NULL;
 	Comp *comp = NULL;
 	int r;
 
@@ -2199,7 +2199,7 @@ newkeys_to_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 	CipherContext *cc;
 	Comp *comp;
 	Enc *enc;
-	Mac *mac;
+	struct sshmac *mac;
 	struct newkeys *newkey;
 	int r;
 
@@ -2306,7 +2306,7 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 	struct sshbuf *b = NULL;
 	Comp *comp;
 	Enc *enc;
-	Mac *mac;
+	struct sshmac *mac;
 	struct newkeys *newkey = NULL;
 	size_t keylen, ivlen, maclen;
 	int r;
