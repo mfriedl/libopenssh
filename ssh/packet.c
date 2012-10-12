@@ -898,7 +898,7 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	struct session_state *state = ssh->state;
 	struct sshenc *enc;
 	struct sshmac *mac;
-	Comp *comp;
+	struct sshcomp *comp;
 	CipherContext *cc;
 	u_int64_t *max_blocks;
 	int crypt_type, r;
@@ -995,7 +995,7 @@ static int
 ssh_packet_enable_delayed_compress(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
-	Comp *comp = NULL;
+	struct sshcomp *comp = NULL;
 	int r, mode;
 
 	/*
@@ -1037,7 +1037,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	u_int len;
 	struct sshenc *enc   = NULL;
 	struct sshmac *mac   = NULL;
-	Comp *comp = NULL;
+	struct sshcomp *comp = NULL;
 	int r, block_size;
 
 	if (state->newkeys[MODE_OUT] != NULL) {
@@ -1470,7 +1470,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	u_int maclen, block_size;
 	struct sshenc *enc   = NULL;
 	struct sshmac *mac   = NULL;
-	Comp *comp = NULL;
+	struct sshcomp *comp = NULL;
 	int r;
 
 	*typep = SSH_MSG_NONE;
@@ -2151,7 +2151,7 @@ ssh_packet_restore_state(struct ssh *ssh,
 static int
 ssh_packet_set_postauth(struct ssh *ssh)
 {
-	Comp *comp;
+	struct sshcomp *comp;
 	int r, mode;
 
 	debug("%s: called", __func__);
@@ -2197,7 +2197,7 @@ newkeys_to_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 {
 	struct sshbuf *b;
 	CipherContext *cc;
-	Comp *comp;
+	struct sshcomp *comp;
 	struct sshenc *enc;
 	struct sshmac *mac;
 	struct newkeys *newkey;
@@ -2304,7 +2304,7 @@ static int
 newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 {
 	struct sshbuf *b = NULL;
-	Comp *comp;
+	struct sshcomp *comp;
 	struct sshenc *enc;
 	struct sshmac *mac;
 	struct newkeys *newkey = NULL;

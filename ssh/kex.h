@@ -79,8 +79,6 @@ enum kex_exchange {
 
 #define KEX_INIT_SENT	0x0001
 
-typedef struct Comp Comp;
-
 struct sshenc {
 	char	*name;
 	Cipher	*cipher;
@@ -90,7 +88,7 @@ struct sshenc {
 	u_char	*key;
 	u_char	*iv;
 };
-struct Comp {
+struct sshcomp {
 	int	type;
 	int	enabled;
 	char	*name;
@@ -98,7 +96,7 @@ struct Comp {
 struct newkeys {
 	struct sshenc	enc;
 	struct sshmac	mac;
-	Comp	comp;
+	struct sshcomp  comp;
 };
 
 struct ssh;
