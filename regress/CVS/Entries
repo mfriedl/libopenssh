@@ -9,7 +9,6 @@
 /broken-pipe.sh/1.4/Mon Mar 26 21:06:58 2012//
 /brokenkeys.sh/1.1/Mon Mar 26 21:06:58 2012//
 /cert-hostkey.sh/1.6/Mon Mar 26 21:06:58 2012//
-/cert-userkey.sh/1.8/Mon Mar 26 21:06:58 2012//
 /cfgmatch.sh/1.6/Mon Mar 26 21:06:58 2012//
 /conch-ciphers.sh/1.2/Mon Mar 26 21:06:58 2012//
 /connect.sh/1.4/Mon Mar 26 21:06:58 2012//
@@ -62,8 +61,9 @@
 /connect-privsep.sh/1.4/Thu Aug  9 18:41:57 2012//
 /forwarding.sh/1.8/Thu Aug  9 18:41:57 2012//
 /sftp-cmds.sh/1.12/Thu Aug  9 18:41:57 2012//
-/cipher-speed.sh/1.6/Fri Oct  5 12:38:36 2012//
-/multiplex.sh/1.17/Fri Oct  5 12:38:36 2012//
 /sshd-log-wrapper.sh/1.2/Fri Sep 21 10:04:07 2012//
-/try-ciphers.sh/1.15/Fri Oct  5 12:38:36 2012//
+/cert-userkey.sh/1.9/Sat Nov 10 15:25:43 2012//
+/cipher-speed.sh/1.6/Tue Oct  9 21:24:24 2012//
+/multiplex.sh/1.17/Tue Oct  9 21:24:24 2012//
+/try-ciphers.sh/1.15/Tue Oct  9 21:24:24 2012//
 D

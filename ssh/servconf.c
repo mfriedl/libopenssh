@@ -1,5 +1,5 @@
 
-/* $OpenBSD: servconf.c,v 1.230 2012/09/13 23:37:36 dtucker Exp $ */
+/* $OpenBSD: servconf.c,v 1.232 2012/11/04 11:09:15 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -47,6 +47,8 @@
 #include "canohost.h"
 #include "packet.h"
 #include "err.h"
+#include "hostfile.h"
+#include "auth.h"
 
 static void add_listen_addr(ServerOptions *, char *, int);
 static void add_one_listen_addr(ServerOptions *, char *, int);
@@ -129,6 +131,8 @@ initialize_server_options(ServerOptions *options)
 	options->num_permitted_opens = -1;
 	options->adm_forced_command = NULL;
 	options->chroot_directory = NULL;
+	options->authorized_keys_command = NULL;
+	options->authorized_keys_command_user = NULL;
 	options->zero_knowledge_password_authentication = -1;
 	options->revoked_keys_file = NULL;
 	options->trusted_user_ca_keys = NULL;
@@ -303,6 +307,8 @@ typedef enum {
 	sZeroKnowledgePasswordAuthentication, sHostCertificate,
 	sRevokedKeys, sTrustedUserCAKeys, sAuthorizedPrincipalsFile,
 	sKexAlgorithms, sIPQoS, sVersionAddendum,
+	sAuthorizedKeysCommand, sAuthorizedKeysCommandUser,
+	sAuthenticationMethods,
 	sDeprecated, sUnsupported
 } ServerOpCodes;
 
@@ -415,7 +421,10 @@ static struct {
 	{ "authorizedprincipalsfile", sAuthorizedPrincipalsFile, SSHCFG_ALL },
 	{ "kexalgorithms", sKexAlgorithms, SSHCFG_GLOBAL },
 	{ "ipqos", sIPQoS, SSHCFG_ALL },
+	{ "authorizedkeyscommand", sAuthorizedKeysCommand, SSHCFG_ALL },
+	{ "authorizedkeyscommanduser", sAuthorizedKeysCommandUser, SSHCFG_ALL },
 	{ "versionaddendum", sVersionAddendum, SSHCFG_GLOBAL },
+	{ "authenticationmethods", sAuthenticationMethods, SSHCFG_ALL },
 	{ NULL, sBadOption, 0 }
 };
 
@@ -1455,6 +1464,43 @@ process_server_config_line(ServerOptions *options, char *line,
 		}
 		return 0;
 
+	case sAuthorizedKeysCommand:
+		len = strspn(cp, WHITESPACE);
+		if (*activep && options->authorized_keys_command == NULL) {
+			if (cp[len] != '/' && strcasecmp(cp + len, "none") != 0)
+				fatal("%.200s line %d: AuthorizedKeysCommand "
+				    "must be an absolute path",
+				    filename, linenum);
+			options->authorized_keys_command = xstrdup(cp + len);
+		}
+		return 0;
+
+	case sAuthorizedKeysCommandUser:
+		charptr = &options->authorized_keys_command_user;
+
+		arg = strdelim(&cp);
+		if (*activep && *charptr == NULL)
+			*charptr = xstrdup(arg);
+		break;
+
+	case sAuthenticationMethods:
+		if (*activep && options->num_auth_methods == 0) {
+			while ((arg = strdelim(&cp)) && *arg != '\0') {
+				if (options->num_auth_methods >=
+				    MAX_AUTH_METHODS)
+					fatal("%s line %d: "
+					    "too many authentication methods.",
+					    filename, linenum);
+				if (auth2_methods_valid(arg, 0) != 0)
+					fatal("%s line %d: invalid "
+					    "authentication method list.",
+					    filename, linenum);
+				options->auth_methods[
+				    options->num_auth_methods++] = xstrdup(arg);
+			}
+		}
+		return 0;
+
 	case sDeprecated:
 		logit("%s line %d: Deprecated option %s",
 		    filename, linenum, arg);
@@ -1606,6 +1652,8 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 	M_CP_INTOPT(hostbased_uses_name_from_packet_only);
 	M_CP_INTOPT(kbd_interactive_authentication);
 	M_CP_INTOPT(zero_knowledge_password_authentication);
+	M_CP_STROPT(authorized_keys_command);
+	M_CP_STROPT(authorized_keys_command_user);
 	M_CP_INTOPT(permit_root_login);
 	M_CP_INTOPT(permit_empty_passwd);
 
@@ -1861,6 +1909,8 @@ dump_config(ServerOptions *o)
 	dump_cfg_string(sAuthorizedPrincipalsFile,
 	    o->authorized_principals_file);
 	dump_cfg_string(sVersionAddendum, o->version_addendum);
+	dump_cfg_string(sAuthorizedKeysCommand, o->authorized_keys_command);
+	dump_cfg_string(sAuthorizedKeysCommandUser, o->authorized_keys_command_user);
 
 	/* string arguments requiring a lookup */
 	dump_cfg_string(sLogLevel, log_level_name(o->log_level));
@@ -1878,6 +1928,8 @@ dump_config(ServerOptions *o)
 	dump_cfg_strarray(sAllowGroups, o->num_allow_groups, o->allow_groups);
 	dump_cfg_strarray(sDenyGroups, o->num_deny_groups, o->deny_groups);
 	dump_cfg_strarray(sAcceptEnv, o->num_accept_env, o->accept_env);
+	dump_cfg_strarray_oneline(sAuthenticationMethods,
+	    o->num_auth_methods, o->auth_methods);
 
 	/* other arguments */
 	for (i = 0; i < o->num_subsystems; i++)

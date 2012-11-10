@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.h,v 1.69 2011/05/23 03:30:07 djm Exp $ */
+/* $OpenBSD: auth.h,v 1.71 2012/11/04 11:09:15 djm Exp $ */
 
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
@@ -58,6 +58,8 @@ struct Authctxt {
 	void		*kbdintctxt;
 	void		*jpake_ctx;
 	auth_session_t	*as;
+	char		**auth_methods;	/* modified from server config */
+	u_int		 num_auth_methods;
 #ifdef KRB5
 	krb5_context	 krb5_ctx;
 	krb5_ccache	 krb5_fwd_ccache;
@@ -114,6 +116,10 @@ int	 hostbased_key_allowed(struct passwd *, const char *, char *,
     struct sshkey *);
 int	 user_key_allowed(struct passwd *, struct sshkey *);
 
+struct stat;
+int	 auth_secure_path(const char *, struct stat *, const char *, uid_t,
+    char *, size_t);
+
 #ifdef KRB5
 int	auth_krb5(Authctxt *authctxt, krb5_data *auth, char **client, krb5_data *);
 int	auth_krb5_tgt(Authctxt *authctxt, krb5_data *tgt);
@@ -129,6 +135,9 @@ void	userauth_finish(struct ssh *, int, char *);
 int	auth_root_allowed(char *);
 
 char	*auth2_read_banner(void);
+int	 auth2_methods_valid(const char *, int);
+int	 auth2_update_methods_lists(Authctxt *, const char *);
+int	 auth2_setup_methods_lists(Authctxt *);
 
 void	privsep_challenge_enable(void);
 
