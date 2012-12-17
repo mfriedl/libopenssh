@@ -1,4 +1,4 @@
-/* $OpenBSD: cipher.c,v 1.83 2012/12/11 22:31:18 markus Exp $ */
+/* $OpenBSD: cipher.c,v 1.84 2012/12/12 16:46:10 naddy Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -47,9 +47,7 @@
 
 extern const EVP_CIPHER *evp_ssh1_bf(void);
 extern const EVP_CIPHER *evp_ssh1_3des(void);
-extern const EVP_CIPHER *evp_aes_128_ctr(void);
 extern int ssh1_3des_iv(EVP_CIPHER_CTX *, int, u_char *, int);
-extern int ssh_aes_ctr_iv(EVP_CIPHER_CTX *, int, u_char *, u_int);
 
 struct sshcipher {
 	char	*name;
@@ -76,9 +74,9 @@ struct sshcipher {
 	{ "aes256-cbc",		SSH_CIPHER_SSH2, 16, 32, 0, 1, EVP_aes_256_cbc },
 	{ "rijndael-cbc@lysator.liu.se",
 				SSH_CIPHER_SSH2, 16, 32, 0, 1, EVP_aes_256_cbc },
-	{ "aes128-ctr",		SSH_CIPHER_SSH2, 16, 16, 0, 0, evp_aes_128_ctr },
-	{ "aes192-ctr",		SSH_CIPHER_SSH2, 16, 24, 0, 0, evp_aes_128_ctr },
-	{ "aes256-ctr",		SSH_CIPHER_SSH2, 16, 32, 0, 0, evp_aes_128_ctr },
+	{ "aes128-ctr",		SSH_CIPHER_SSH2, 16, 16, 0, 0, EVP_aes_128_ctr },
+	{ "aes192-ctr",		SSH_CIPHER_SSH2, 16, 24, 0, 0, EVP_aes_192_ctr },
+	{ "aes256-ctr",		SSH_CIPHER_SSH2, 16, 32, 0, 0, EVP_aes_256_ctr },
 	{ "acss@openssh.org",	SSH_CIPHER_SSH2, 16, 5, 0, 0, EVP_acss },
 
 	{ NULL,			SSH_CIPHER_INVALID, 0, 0, 0, 0, NULL }
@@ -353,10 +351,7 @@ cipher_get_keyiv(struct sshcipher_ctx *cc, u_char *iv, u_int len)
 			return SSH_ERR_LIBCRYPTO_ERROR;
 		if ((u_int)evplen != len)
 			return SSH_ERR_INVALID_ARGUMENT;
-		if (c->evptype == evp_aes_128_ctr)
-			return ssh_aes_ctr_iv(&cc->evp, 0, iv, len);
-		else
-			memcpy(iv, cc->evp.iv, len);
+		memcpy(iv, cc->evp.iv, len);
 		return 0;
 	case SSH_CIPHER_3DES:
 		return ssh1_3des_iv(&cc->evp, 0, iv, 24);
@@ -378,10 +373,7 @@ cipher_set_keyiv(struct sshcipher_ctx *cc, const u_char *iv)
 		evplen = EVP_CIPHER_CTX_iv_length(&cc->evp);
 		if (evplen <= 0)
 			return SSH_ERR_LIBCRYPTO_ERROR;
-		if (c->evptype == evp_aes_128_ctr)
-			return ssh_aes_ctr_iv(&cc->evp, 1, (u_char *)iv, evplen);
-		else
-			memcpy(cc->evp.iv, iv, evplen);
+		memcpy(cc->evp.iv, iv, evplen);
 		return 0;
 	case SSH_CIPHER_3DES:
 		return ssh1_3des_iv(&cc->evp, 1, (u_char *)iv, 24);

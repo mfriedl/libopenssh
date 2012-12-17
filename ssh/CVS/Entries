@@ -186,32 +186,32 @@ D/sshd////
 /xmalloc.h/1.13/Fri Oct 12 15:53:56 2012//
 /PROTOCOL/1.18/Fri Dec 14 16:50:35 2012//
 /auth-options.c/1.57/Result of merge//
-/auth.c/1.98/Result of merge//
-/auth.h/1.72/Result of merge+Fri Dec 14 16:50:35 2012//
 /auth1.c/1.77/Result of merge//
-/auth2-chall.c/1.36/Result of merge+Fri Dec 14 16:50:35 2012//
-/auth2-gss.c/1.18/Result of merge+Fri Dec 14 16:50:35 2012//
-/auth2-jpake.c/1.5/Result of merge+Fri Dec 14 16:50:35 2012//
 /auth2-pubkey.c/1.33/Result of merge//
-/auth2.c/1.126/Result of merge+Fri Dec 14 16:50:36 2012//
-/authfile.c/1.94/Result of merge+Fri Dec 14 16:50:36 2012//
 /channels.c/1.319/Result of merge//
-/cipher.c/1.83/Result of merge+Fri Dec 14 16:50:36 2012//
-/cipher.h/1.38/Result of merge+Fri Dec 14 16:50:36 2012//
-/kex.h/1.53/Result of merge+Fri Dec 14 16:50:36 2012//
-/mac.c/1.21/Result of merge+Fri Dec 14 16:50:36 2012//
 /monitor.c/1.120/Result of merge//
 /monitor.h/1.17/Result of merge//
 /myproposal.h/1.31/Fri Dec 14 16:50:37 2012//
-/packet.c/1.178/Result of merge+Fri Dec 14 16:50:37 2012//
 /servconf.c/1.233/Result of merge//
 /servconf.h/1.106/Result of merge//
 /serverloop.c/1.164/Result of merge//
 /session.c/1.261/Result of merge//
 /ssh-add.1/1.58/Fri Dec 14 16:50:37 2012//
-/ssh-add.c/1.105/Result of merge+Fri Dec 14 16:50:37 2012//
-/ssh-keygen.c/1.220/Result of merge+Fri Dec 14 16:50:37 2012//
 /ssh_config.5/1.160/Fri Dec 14 16:50:37 2012//
-/sshconnect2.c/1.190/Result of merge+Fri Dec 14 16:50:37 2012//
 /sshd_config/1.88/Sun Nov 11 09:45:29 2012//
 /sshd_config.5/1.152/Fri Dec 14 16:50:37 2012//
+/auth.c/1.99/Result of merge//
+/auth.h/1.72/Result of merge//
+/auth2-chall.c/1.36/Result of merge//
+/auth2-gss.c/1.18/Result of merge//
+/auth2-jpake.c/1.5/Result of merge//
+/auth2.c/1.126/Result of merge//
+/authfile.c/1.94/Result of merge//
+/cipher.c/1.84/Result of merge+Mon Dec 17 20:16:06 2012//
+/cipher.h/1.38/Result of merge//
+/kex.h/1.53/Result of merge//
+/mac.c/1.21/Result of merge//
+/packet.c/1.179/Result of merge+Mon Dec 17 20:16:06 2012//
+/ssh-add.c/1.105/Result of merge//
+/ssh-keygen.c/1.220/Result of merge//
+/sshconnect2.c/1.190/Result of merge//
