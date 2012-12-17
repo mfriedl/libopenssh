@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.58 2011/01/06 22:46:21 djm Exp $
+#	$OpenBSD: Makefile,v 1.61 2012/12/11 22:42:11 markus Exp $
 
 REGRESS_TARGETS=	t1 t2 t3 t4 t5 t6 t7 t8 t9
 
@@ -49,7 +49,10 @@ LTESTS= 	connect \
 		kextype \
 		cert-hostkey \
 		cert-userkey \
-		host-expand
+		host-expand \
+		keys-command \
+		forward-control \
+		integrity
 
 # works only with s-bits
 #		agent-ptrace \
@@ -68,7 +71,8 @@ CLEANFILES+=	authorized_keys_${USER} known_hosts pidfile \
 		scp-ssh-wrapper.exe ssh_proxy_envpass remote_pid \
 		sshd_proxy_bak rsa_ssh2_cr.prv rsa_ssh2_crnl.prv \
 		known_hosts-cert host_ca_key* cert_host_key* \
-		authorized_principals_${USER} expect actual
+		authorized_principals_${USER} expect actual ready \
+		sshd_proxy.* authorized_keys_${USER}.*
 
 # Enable all malloc(3) randomisations and checks
 TEST_ENV=      "MALLOC_OPTIONS=AFGJPRX"
@@ -141,6 +145,10 @@ t9.out:
 t9: t9.out
 	ssh-keygen -lf t9.out > /dev/null
 	ssh-keygen -Bf t9.out > /dev/null
+
+modpipe: modpipe.c
+
+t-integrity: modpipe
 
 .for t in ${LTESTS} ${INTEROP_TESTS}
 t-${t}:

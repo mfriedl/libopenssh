@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.118 2012/11/04 11:09:15 djm Exp $ */
+/* $OpenBSD: monitor.c,v 1.120 2012/12/11 22:16:21 markus Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -137,6 +137,7 @@ static int key_blobtype = MM_NOKEY;
 static char *hostbased_cuser = NULL;
 static char *hostbased_chost = NULL;
 static char *auth_method = "unknown";
+static char *auth_submethod = NULL;
 static u_int session_id2_len = 0;
 static u_char *session_id2 = NULL;
 static pid_t monitor_child_pid;
@@ -248,7 +249,7 @@ void
 monitor_child_preauth(Authctxt *_authctxt, struct monitor *pmonitor)
 {
 	struct mon_table *ent;
-	int authenticated = 0;
+	int authenticated = 0, partial = 0;
 
 	debug3("preauth child monitor started");
 
@@ -273,7 +274,9 @@ monitor_child_preauth(Authctxt *_authctxt, struct monitor *pmonitor)
 
 	/* The first few requests do not require asynchronous access */
 	while (!authenticated) {
+		partial = 0;
 		auth_method = "unknown";
+		auth_submethod = NULL;
 		authenticated = (monitor_read(pmonitor, mon_dispatch, &ent) == 1);
 
 		/* Special handling for multiple required authentications */
@@ -287,6 +290,7 @@ monitor_child_preauth(Authctxt *_authctxt, struct monitor *pmonitor)
 				debug3("%s: method %s: partial", __func__,
 				    auth_method);
 				authenticated = 0;
+				partial = 1;
 			}
 		}
 
@@ -299,7 +303,8 @@ monitor_child_preauth(Authctxt *_authctxt, struct monitor *pmonitor)
 				authenticated = 0;
 		}
 		if (ent->flags & (MON_AUTHDECIDE|MON_ALOG)) {
-			auth_log(authctxt, authenticated, auth_method,
+			auth_log(authctxt, authenticated, partial,
+			    auth_method, auth_submethod,
 			    compat20 ? " ssh2" : "");
 			if (!authenticated)
 				authctxt->failures++;
@@ -315,10 +320,6 @@ monitor_child_preauth(Authctxt *_authctxt, struct monitor *pmonitor)
 #endif
 	}
 
-	/* Drain any buffered messages from the child */
-	while (pmonitor->m_log_recvfd != -1 && monitor_read_log(pmonitor) == 0)
-		;
-
 	if (!authctxt->valid)
 		fatal("%s: authenticated invalid user", __func__);
 	if (strcmp(auth_method, "unknown") == 0)
@@ -328,6 +329,10 @@ monitor_child_preauth(Authctxt *_authctxt, struct monitor *pmonitor)
 	    __func__, authctxt->user);
 
 	mm_get_keystate(pmonitor);
+
+	/* Drain any buffered messages from the child */
+	while (pmonitor->m_log_recvfd != -1 && monitor_read_log(pmonitor) == 0)
+		;
 
 	close(pmonitor->m_sendfd);
 	close(pmonitor->m_log_recvfd);
@@ -868,7 +873,7 @@ mm_answer_bsdauthrespond(int sock, struct sshbuf *m)
 	mm_request_send(sock, MONITOR_ANS_BSDAUTHRESPOND, m);
 
 	if (compat20)
-		auth_method = "keyboard-interactive";
+		auth_method = "keyboard-interactive"; /* XXX auth_submethod */
 	else
 		auth_method = "bsdauth";
 
@@ -944,7 +949,8 @@ mm_answer_keyallowed(int sock, struct sshbuf *m)
 		hostbased_chost = chost;
 	} else {
 		/* Log failed attempt */
-		auth_log(authctxt, 0, auth_method, compat20 ? " ssh2" : "");
+		auth_log(authctxt, 0, 0, auth_method, NULL,
+		    compat20 ? " ssh2" : "");
 		xfree(blob);
 		xfree(cuser);
 		xfree(chost);

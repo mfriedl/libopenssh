@@ -1,4 +1,4 @@
-/* $OpenBSD: serverloop.c,v 1.162 2012/06/20 04:42:58 djm Exp $ */
+/* $OpenBSD: serverloop.c,v 1.164 2012/12/07 01:51:35 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -704,7 +704,7 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 		    &nalloc, max_time_milliseconds);
 
 		if (received_sigterm) {
-			logit("Exiting on signal %d", received_sigterm);
+			logit("Exiting on signal %d", (int)received_sigterm);
 			/* Clean up sessions, utmp, etc. */
 			cleanup_exit(255);
 		}
@@ -856,7 +856,7 @@ server_loop2(struct ssh *ssh)
 		    &nalloc, 0);
 
 		if (received_sigterm) {
-			logit("Exiting on signal %d", received_sigterm);
+			logit("Exiting on signal %d", (int)received_sigterm);
 			/* Clean up sessions, utmp, etc. */
 			cleanup_exit(255);
 		}
@@ -967,7 +967,7 @@ server_input_window_size(int type, u_int32_t seq, struct ssh *ssh)
 static Channel *
 server_request_direct_tcpip(struct ssh *ssh)
 {
-	Channel *c;
+	Channel *c = NULL;
 	char *target, *originator;
 	u_int target_port, originator_port;
 	int r;
@@ -982,9 +982,16 @@ server_request_direct_tcpip(struct ssh *ssh)
 	debug("server_request_direct_tcpip: originator %s port %d, target %s "
 	    "port %d", originator, originator_port, target, target_port);
 
-	/* XXX check permission */
-	c = channel_connect_to(target, target_port,
-	    "direct-tcpip", "direct-tcpip");
+	/* XXX fine grained permissions */
+	if ((options.allow_tcp_forwarding & FORWARD_LOCAL) != 0 &&
+	    !no_port_forwarding_flag) {
+		c = channel_connect_to(target, target_port,
+		    "direct-tcpip", "direct-tcpip");
+	} else {
+		logit("refused local port forward: "
+		    "originator %s port %d, target %s port %d",
+		    originator, originator_port, target, target_port);
+	}
 
 	xfree(originator);
 	xfree(target);
@@ -1151,7 +1158,7 @@ server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 		    listen_address, listen_port);
 
 		/* check permissions */
-		if (!options.allow_tcp_forwarding ||
+		if ((options.allow_tcp_forwarding & FORWARD_REMOTE) == 0 ||
 		    no_port_forwarding_flag ||
 		    (!want_reply && listen_port == 0) ||
 		    (listen_port != 0 && listen_port < IPPORT_RESERVED &&

@@ -1,4 +1,3 @@
-/Makefile/1.58/Thu Jan  6 22:46:21 2011//
 /host-expand.sh/1.1/Thu Jan  6 22:46:21 2011//
 /agent-getpeereid.sh/1.4/Mon Mar 26 21:06:58 2012//
 /agent-pkcs11.sh/1.1/Mon Mar 26 21:06:58 2012//
@@ -62,8 +61,13 @@
 /forwarding.sh/1.8/Thu Aug  9 18:41:57 2012//
 /sftp-cmds.sh/1.12/Thu Aug  9 18:41:57 2012//
 /sshd-log-wrapper.sh/1.2/Fri Sep 21 10:04:07 2012//
-/cert-userkey.sh/1.9/Sat Nov 10 15:25:43 2012//
 /cipher-speed.sh/1.6/Tue Oct  9 21:24:24 2012//
 /multiplex.sh/1.17/Tue Oct  9 21:24:24 2012//
-/try-ciphers.sh/1.15/Tue Oct  9 21:24:24 2012//
+/Makefile/1.61/Result of merge//
+/cert-userkey.sh/1.9/Sun Nov 11 09:45:29 2012//
+/forward-control.sh/1.1/Sun Dec  2 20:47:48 2012//
+/integrity.sh/1.1/Tue Dec 11 22:42:11 2012//
+/keys-command.sh/1.2/Thu Dec  6 06:06:54 2012//
+/modpipe.c/1.2/Tue Dec 11 23:48:07 2012//
+/try-ciphers.sh/1.17/Mon Dec 17 20:23:14 2012//
 D

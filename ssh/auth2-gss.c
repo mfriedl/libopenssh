@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-gss.c,v 1.17 2011/03/10 02:52:57 djm Exp $ */
+/* $OpenBSD: auth2-gss.c,v 1.18 2012/12/02 20:34:09 djm Exp $ */
 
 /*
  * Copyright (c) 2001-2003 Simon Wilkinson. All rights reserved.
@@ -169,7 +169,7 @@ input_gssapi_token(int type, u_int32_t plen, struct ssh *ssh)
 		}
 		authctxt->postponed = 0;
 		ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_TOKEN, NULL);
-		userauth_finish(ssh, 0, "gssapi-with-mic");
+		userauth_finish(ssh, 0, "gssapi-with-mic", NULL);
 	} else {
 		if (send_tok.length != 0) {
 			if ((r = sshpkt_start(ssh,
@@ -266,7 +266,7 @@ input_gssapi_exchange_complete(int type, u_int32_t plen, struct ssh *ssh)
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_ERRTOK, NULL);
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_MIC, NULL);
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_EXCHANGE_COMPLETE, NULL);
-	userauth_finish(ssh, authenticated, "gssapi-with-mic");
+	userauth_finish(ssh, authenticated, "gssapi-with-mic", NULL);
 	return 0;
 }
 
@@ -312,7 +312,7 @@ input_gssapi_mic(int type, u_int32_t plen, struct ssh *ssh)
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_ERRTOK, NULL);
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_MIC, NULL);
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_GSSAPI_EXCHANGE_COMPLETE, NULL);
-	userauth_finish(ssh, authenticated, "gssapi-with-mic");
+	userauth_finish(ssh, authenticated, "gssapi-with-mic", NULL);
 	return 0;
 }
 

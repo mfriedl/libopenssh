@@ -1,4 +1,4 @@
-/* $OpenBSD: authfile.c,v 1.93 2012/01/25 19:36:31 markus Exp $ */
+/* $OpenBSD: authfile.c,v 1.94 2012/12/11 22:31:18 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -154,7 +154,7 @@ sshkey_private_rsa1_to_blob(struct sshkey *key, struct sshbuf *blob,
 	    CIPHER_ENCRYPT)) != 0)
 		goto out;
 	if ((r = cipher_crypt(&ciphercontext, cp,
-	    sshbuf_ptr(buffer), sshbuf_len(buffer))) != 0)
+	    sshbuf_ptr(buffer), sshbuf_len(buffer), 0)) != 0)
 		goto out;
 	if ((r = cipher_cleanup(&ciphercontext)) != 0)
 		goto out;
@@ -480,7 +480,7 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 	    CIPHER_DECRYPT)) != 0)
 		goto out;
 	if ((r = cipher_crypt(&ciphercontext, cp,
-	    sshbuf_ptr(copy), sshbuf_len(copy))) != 0) {
+	    sshbuf_ptr(copy), sshbuf_len(copy), 0)) != 0) {
 		cipher_cleanup(&ciphercontext);
 		goto out;
 	}

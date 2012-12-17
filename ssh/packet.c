@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.177 2012/09/17 13:04:11 markus Exp $ */
+/* $OpenBSD: packet.c,v 1.179 2012/12/12 16:45:52 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -334,7 +334,7 @@ ssh_packet_start_discard(struct ssh *ssh, struct sshenc *enc,
 	struct session_state *state = ssh->state;
 	int r;
 
-	if (enc == NULL || !cipher_is_cbc(enc->cipher)) {
+	if (enc == NULL || !cipher_is_cbc(enc->cipher) || (mac && mac->etm)) {
 		if ((r = sshpkt_disconnect(ssh, "Packet corrupt")) != 0)
 			return r;
 		return SSH_ERR_MAC_INVALID;
@@ -870,7 +870,7 @@ ssh_packet_send1(struct ssh *ssh)
 		goto out;
 	if ((r = cipher_crypt(&state->send_context, cp,
 	    sshbuf_ptr(state->outgoing_packet),
-	    sshbuf_len(state->outgoing_packet))) != 0)
+	    sshbuf_len(state->outgoing_packet), 0)) != 0)
 		goto out;
 
 #ifdef PACKET_DEBUG
@@ -1033,8 +1033,8 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
 	u_char type, *cp, macbuf[MAC_DIGEST_LEN_MAX];
-	u_char padlen, pad;
-	u_int packet_length = 0;
+	u_char padlen, pad = 0;
+	u_int aadlen = 0;
 	u_int len;
 	struct sshenc *enc   = NULL;
 	struct sshmac *mac   = NULL;
@@ -1047,6 +1047,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 		comp = &state->newkeys[MODE_OUT]->comp;
 	}
 	block_size = enc ? enc->block_size : 8;
+	aadlen = mac && mac->enabled && mac->etm ? 4 : 0;
 
 	type = (sshbuf_ptr(state->outgoing_packet))[5];
 
@@ -1081,6 +1082,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	 * calc size of padding, alloc space, get random data,
 	 * minimum padding is 4 bytes
 	 */
+	len -= aadlen; /* packet length is not encrypted for EtM modes */
 	padlen = block_size - (len % block_size);
 	if (padlen < 4)
 		padlen += block_size;
@@ -1104,22 +1106,23 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 		/* clear padding */
 		memset(cp, 0, padlen);
 	}
-	/* packet_length includes payload, padding and padding length field */
-	packet_length = sshbuf_len(state->outgoing_packet) - 4;
+	/* sizeof (packet_len + pad_len + payload + padding) */
+	len = sshbuf_len(state->outgoing_packet);
 	cp = sshbuf_mutable_ptr(state->outgoing_packet);
 	if (cp == NULL) {
 		r = SSH_ERR_INTERNAL_ERROR;
 		goto out;
 	}
-	POKE_U32(cp, packet_length);
+	/* packet_length includes payload, padding and padding length field */
+	POKE_U32(cp, len - 4);
 	cp[4] = padlen;
-	DBG(debug("send: len %d (includes padlen %d)", packet_length+4, padlen));
+	DBG(debug("send: len %d (includes padlen %d, aadlen %d)",
+	    len, padlen, aadlen));
 
 	/* compute MAC over seqnr and packet(length fields, payload, padding) */
-	if (mac && mac->enabled) {
+	if (mac && mac->enabled && !mac->etm) {
 		if ((r = mac_compute(mac, state->p_send.seqnr,
-		    sshbuf_ptr(state->outgoing_packet),
-		    sshbuf_len(state->outgoing_packet),
+		    sshbuf_ptr(state->outgoing_packet), len,
 		    macbuf, sizeof(macbuf))) != 0)
 			goto out;
 		DBG(debug("done calc MAC out #%d", state->p_send.seqnr));
@@ -1130,12 +1133,20 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 		goto out;
 	if ((r = cipher_crypt(&state->send_context, cp,
 	    sshbuf_ptr(state->outgoing_packet),
-	    sshbuf_len(state->outgoing_packet))) != 0)
+	    len - aadlen, aadlen)) != 0)
 		goto out;
 	/* append unencrypted MAC */
-	if (mac && mac->enabled)
+	if (mac && mac->enabled) {
+		if (mac->etm) {
+			if ((r = mac_compute(mac, state->p_send.seqnr,
+			    cp, len, macbuf, sizeof(macbuf))) != 0)
+				goto out;
+			DBG(debug("done calc MAC(EtM) out #%d",
+			    state->p_send.seqnr));
+		}
 		if ((r = sshbuf_put(state->output, macbuf, mac->mac_len)) != 0)
 			goto out;
+	}
 #ifdef PACKET_DEBUG
 	fprintf(stderr, "encrypted: ");
 	sshbuf_dump(state->output, stderr);
@@ -1146,8 +1157,8 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	if (++state->p_send.packets == 0)
 		if (!(ssh->compat & SSH_BUG_NOREKEY))
 			return SSH_ERR_NEED_REKEY;
-	state->p_send.blocks += (packet_length + 4) / block_size;
-	state->p_send.bytes += packet_length + 4;
+	state->p_send.blocks += len / block_size;
+	state->p_send.bytes += len;
 	sshbuf_reset(state->outgoing_packet);
 
 	if (type == SSH2_MSG_NEWKEYS)
@@ -1407,7 +1418,7 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 	if ((r = sshbuf_reserve(state->incoming_packet, padded_len, &p)) != 0)
 		goto out;
 	if ((r = cipher_crypt(&state->receive_context, p,
-	    sshbuf_ptr(state->input), padded_len)) != 0)
+	    sshbuf_ptr(state->input), padded_len, 0)) != 0)
 		goto out;
 
 	if ((r = sshbuf_consume(state->input, padded_len)) != 0)
@@ -1468,7 +1479,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	struct session_state *state = ssh->state;
 	u_int padlen, need;
 	u_char macbuf[MAC_DIGEST_LEN_MAX], *cp;
-	u_int maclen, block_size;
+	u_int maclen, aadlen = 0, block_size;
 	struct sshenc *enc   = NULL;
 	struct sshmac *mac   = NULL;
 	struct sshcomp *comp = NULL;
@@ -1486,8 +1497,23 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	}
 	maclen = mac && mac->enabled ? mac->mac_len : 0;
 	block_size = enc ? enc->block_size : 8;
+	aadlen = mac && mac->enabled && mac->etm ? 4 : 0;
 
-	if (state->packlen == 0) {
+	if (aadlen && state->packlen == 0) {
+		if (sshbuf_len(state->input) < 4)
+			return 0;
+		state->packlen = PEEK_U32(sshbuf_ptr(state->input));
+		if (state->packlen < 1 + 4 ||
+		    state->packlen > PACKET_MAX_SIZE) {
+#ifdef PACKET_DEBUG
+			sshbuf_dump(state->input, stderr);
+#endif
+			logit("Bad packet length %u.", state->packlen);
+			if ((r = sshpkt_disconnect(ssh, "Packet corrupt")) != 0)
+				return r;
+		}
+		sshbuf_reset(state->incoming_packet);
+	} else if (state->packlen == 0) {
 		/*
 		 * check if input size is less than the cipher block size,
 		 * decrypt first block and extract length of incoming packet
@@ -1499,7 +1525,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		    &cp)) != 0)
 			goto out;
 		if ((r = cipher_crypt(&state->receive_context, cp,
-		    sshbuf_ptr(state->input), block_size)) != 0)
+		    sshbuf_ptr(state->input), block_size, 0)) != 0)
 			goto out;
 		state->packlen = PEEK_U32(sshbuf_ptr(state->incoming_packet));
 		if (state->packlen < 1 + 4 ||
@@ -1514,14 +1540,23 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 			return ssh_packet_start_discard(ssh, enc, mac,
 			    state->packlen, PACKET_MAX_SIZE);
 		}
-		DBG(debug("input: packet len %u", state->packlen+4));
 		if ((r = sshbuf_consume(state->input, block_size)) != 0)
 			goto out;
 	}
-	/* we have a partial packet of block_size bytes */
-	need = 4 + state->packlen - block_size;
-	DBG(debug("partial packet %d, need %d, maclen %d", block_size,
-	    need, maclen));
+	DBG(debug("input: packet len %u", state->packlen+4));
+
+	if (aadlen) {
+		/* only the payload is encrypted */
+		need = state->packlen;
+	} else {
+		/*
+		 * the payload size and the payload are encrypted, but we
+		 * have a partial packet of block_size bytes
+		 */
+		need = 4 + state->packlen - block_size;
+	}
+	DBG(debug("partial packet: block %d, need %d, maclen %d, aadlen %d",
+	    block_size, need, maclen, aadlen));
 	if (need % block_size != 0) {
 		logit("padding error: need %d block %d mod %d",
 		    need, block_size, need % block_size);
@@ -1530,31 +1565,43 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	}
 	/*
 	 * check if the entire packet has been received and
-	 * decrypt into incoming_packet
+	 * decrypt into incoming_packet:
+	 * 'aadlen' bytes are unencrypted, but authenticated.
+	 * 'need' bytes are encrypted, followed by
+	 * 'maclen' bytes of message authentication code.
 	 */
-	if (sshbuf_len(state->input) < need + maclen)
+	if (sshbuf_len(state->input) < aadlen + need + maclen)
 		return 0;
 #ifdef PACKET_DEBUG
 	fprintf(stderr, "read_poll enc/full: ");
 	sshbuf_dump(state->input, stderr);
 #endif
-	if ((r = sshbuf_reserve(state->incoming_packet, need, &cp)) != 0)
+	/* EtM: compute mac over encrypted input */
+	if (mac && mac->enabled && mac->etm) {
+		if ((r = mac_compute(mac, state->p_read.seqnr,
+		    sshbuf_ptr(state->input), aadlen + need,
+		    macbuf, sizeof(macbuf))) != 0)
+			goto out;
+	}
+	if ((r = sshbuf_reserve(state->incoming_packet, aadlen + need,
+	    &cp)) != 0)
 		goto out;
 	if ((r = cipher_crypt(&state->receive_context, cp,
-	    sshbuf_ptr(state->input), need)) != 0)
+	    sshbuf_ptr(state->input), need, aadlen)) != 0)
 		goto out;
-	if ((r = sshbuf_consume(state->input, need)) != 0)
+	if ((r = sshbuf_consume(state->input, aadlen + need)) != 0)
 		goto out;
 	/*
 	 * compute MAC over seqnr and packet,
 	 * increment sequence number for incoming packet
 	 */
 	if (mac && mac->enabled) {
-		if ((r = mac_compute(mac, state->p_read.seqnr,
-		    sshbuf_ptr(state->incoming_packet),
-		    sshbuf_len(state->incoming_packet),
-		    macbuf, sizeof(macbuf))) != 0)
-			goto out;
+		if (!mac->etm)
+			if ((r = mac_compute(mac, state->p_read.seqnr,
+			    sshbuf_ptr(state->incoming_packet),
+			    sshbuf_len(state->incoming_packet),
+			    macbuf, sizeof(macbuf))) != 0)
+				goto out;
 		if (timingsafe_bcmp(macbuf, sshbuf_ptr(state->input),
 		    mac->mac_len) != 0) {
 			logit("Corrupted MAC on input.");

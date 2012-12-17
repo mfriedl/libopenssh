@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keygen.c,v 1.218 2012/10/02 07:07:45 djm Exp $ */
+/* $OpenBSD: ssh-keygen.c,v 1.220 2012/12/03 00:14:06 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1994 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -100,7 +100,7 @@ char *identity_comment = NULL;
 char *ca_key_path = NULL;
 
 /* Certificate serial number */
-long long cert_serial = 0;
+unsigned long long cert_serial = 0;
 
 /* Key type when certifying */
 u_int cert_key_type = SSH2_CERT_TYPE_USER;
@@ -1982,7 +1982,7 @@ main(int argc, char **argv)
 {
 	char dotsshdir[MAXPATHLEN], comment[1024], *passphrase1, *passphrase2;
 	char *checkpoint = NULL;
-	char out_file[MAXPATHLEN], *rr_hostname = NULL;
+	char out_file[MAXPATHLEN], *rr_hostname = NULL, *ep;
 	struct sshkey *private, *public;
 	struct passwd *pw;
 	struct stat st;
@@ -2186,9 +2186,11 @@ main(int argc, char **argv)
 			parse_cert_times(optarg);
 			break;
 		case 'z':
-			cert_serial = strtonum(optarg, 0, LLONG_MAX, &errstr);
-			if (errstr)
-				fatal("Invalid serial number: %s", errstr);
+			errno = 0;
+			cert_serial = strtoull(optarg, &ep, 10);
+			if (*optarg < '0' || *optarg > '9' || *ep != '\0' ||
+			    (errno == ERANGE && cert_serial == ULLONG_MAX))
+				fatal("Invalid serial number \"%s\"", optarg);
 			break;
 		case '?':
 		default:

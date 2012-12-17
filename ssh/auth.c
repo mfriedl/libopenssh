@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.c,v 1.97 2012/10/30 21:29:54 djm Exp $ */
+/* $OpenBSD: auth.c,v 1.99 2012/12/14 05:26:43 dtucker Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -180,7 +180,8 @@ allowed_user(struct passwd * pw)
 }
 
 void
-auth_log(Authctxt *authctxt, int authenticated, char *method, char *info)
+auth_log(Authctxt *authctxt, int authenticated, int partial,
+    const char *method, const char *submethod, const char *info)
 {
 	void (*authlog) (const char *fmt,...) = verbose;
 	char *authmsg;
@@ -197,12 +198,15 @@ auth_log(Authctxt *authctxt, int authenticated, char *method, char *info)
 
 	if (authctxt->postponed)
 		authmsg = "Postponed";
+	else if (partial)
+		authmsg = "Partial";
 	else
 		authmsg = authenticated ? "Accepted" : "Failed";
 
-	authlog("%s %s for %s%.100s from %.200s port %d%s",
+	authlog("%s %s%s%s for %s%.100s from %.200s port %d%s",
 	    authmsg,
 	    method,
+	    submethod != NULL ? "/" : "", submethod == NULL ? "" : submethod,
 	    authctxt->valid ? "" : "invalid user ",
 	    authctxt->user,
 	    ssh_remote_ipaddr(active_state),	/* XXX */
@@ -214,7 +218,7 @@ auth_log(Authctxt *authctxt, int authenticated, char *method, char *info)
  * Check whether root logins are disallowed.
  */
 int
-auth_root_allowed(char *method)
+auth_root_allowed(const char *method)
 {
 	struct ssh *ssh = active_state;		/* XXX */
 
@@ -403,13 +407,12 @@ static int
 secure_filename(FILE *f, const char *file, struct passwd *pw,
     char *err, size_t errlen)
 {
-	char buf[MAXPATHLEN];
 	struct stat st;
 
 	/* check the open file to avoid races */
 	if (fstat(fileno(f), &st) < 0) {
 		snprintf(err, errlen, "cannot stat file %s: %s",
-		    buf, strerror(errno));
+		    file, strerror(errno));
 		return -1;
 	}
 	return auth_secure_path(file, &st, pw->pw_dir, pw->pw_uid, err, errlen);

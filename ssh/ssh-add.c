@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-add.c,v 1.103 2011/10/18 23:37:42 djm Exp $ */
+/* $OpenBSD: ssh-add.c,v 1.105 2012/12/05 15:42:52 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -92,10 +92,10 @@ clear_pass(void)
 }
 
 static int
-delete_file(int agent_fd, const char *filename)
+delete_file(int agent_fd, const char *filename, int key_only)
 {
-	struct sshkey *public;
-	char *comment = NULL;
+	struct sshkey *public, *cert = NULL;
+	char *certpath = NULL, *comment = NULL;
 	int r, ret = -1;
 
 	if ((r = sshkey_load_public(filename, &public,  &comment)) != 0) {
@@ -109,8 +109,33 @@ delete_file(int agent_fd, const char *filename)
 		fprintf(stderr, "Could not remove identity \"%s\": %s\n",
 		    filename, ssh_err(r));
 
-	sshkey_free(public);
-	xfree(comment);
+	if (key_only)
+		goto out;
+
+	/* Now try to delete the corresponding certificate too */
+	free(comment);
+	comment = NULL;
+	xasprintf(&certpath, "%s-cert.pub", filename);
+	if ((r = sshkey_load_public(certpath, &cert, &comment)) == 0)
+		goto out;
+	if (!sshkey_equal_public(cert, public))
+		fatal("Certificate %s does not match private key %s",
+		    certpath, filename);
+
+	if (ssh_remove_identity(agent_fd, cert)) {
+		fprintf(stderr, "Identity removed: %s (%s)\n", certpath,
+		    comment);
+		ret = 0;
+	} else
+		fprintf(stderr, "Could not remove identity: %s\n", certpath);
+
+ out:
+	if (cert != NULL)
+		sshkey_free(cert);
+	if (public != NULL)
+		sshkey_free(public);
+	free(certpath);
+	free(comment);
 
 	return ret;
 }
@@ -398,7 +423,7 @@ static int
 do_file(int agent_fd, int deleting, int key_only, char *file)
 {
 	if (deleting) {
-		if (delete_file(agent_fd, file) == -1)
+		if (delete_file(agent_fd, file, key_only) == -1)
 			return -1;
 	} else {
 		if (add_file(agent_fd, file, key_only) == -1)

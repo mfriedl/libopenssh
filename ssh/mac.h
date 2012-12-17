@@ -39,6 +39,7 @@ struct sshmac {
 	u_char	*key;
 	u_int	key_len;
 	int	type;
+	int	etm;		/* Encrypt-then-MAC */
 	const EVP_MD	*evp_md;
 	HMAC_CTX	evp_ctx;
 	struct umac_ctx *umac_ctx;

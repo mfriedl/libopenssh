@@ -1,5 +1,5 @@
 
-/* $OpenBSD: servconf.c,v 1.232 2012/11/04 11:09:15 djm Exp $ */
+/* $OpenBSD: servconf.c,v 1.233 2012/12/02 20:46:11 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -237,7 +237,7 @@ fill_default_server_options(ServerOptions *options)
 	if (options->compression == -1)
 		options->compression = COMP_DELAYED;
 	if (options->allow_tcp_forwarding == -1)
-		options->allow_tcp_forwarding = 1;
+		options->allow_tcp_forwarding = FORWARD_ALLOW;
 	if (options->allow_agent_forwarding == -1)
 		options->allow_agent_forwarding = 1;
 	if (options->gateway_ports == -1)
@@ -749,6 +749,14 @@ static const struct multistate multistate_privsep[] = {
 	{ "no",				PRIVSEP_OFF },
 	{ NULL, -1 }
 };
+static const struct multistate multistate_tcpfwd[] = {
+	{ "yes",			FORWARD_ALLOW },
+	{ "all",			FORWARD_ALLOW },
+	{ "no",				FORWARD_DENY },
+	{ "remote",			FORWARD_REMOTE },
+	{ "local",			FORWARD_LOCAL },
+	{ NULL, -1 }
+};
 
 int
 process_server_config_line(ServerOptions *options, char *line,
@@ -1100,7 +1108,8 @@ process_server_config_line(ServerOptions *options, char *line,
 
 	case sAllowTcpForwarding:
 		intptr = &options->allow_tcp_forwarding;
-		goto parse_flag;
+		multistate_ptr = multistate_tcpfwd;
+		goto parse_multistate;
 
 	case sAllowAgentForwarding:
 		intptr = &options->allow_agent_forwarding;
@@ -1380,7 +1389,6 @@ process_server_config_line(ServerOptions *options, char *line,
 		}
 		if (strcmp(arg, "none") == 0) {
 			if (*activep && n == -1) {
-				channel_clear_adm_permitted_opens();
 				options->num_permitted_opens = 1;
 				channel_disable_adm_local_opens();
 			}
@@ -1738,6 +1746,8 @@ fmt_intarg(ServerOpCodes code, int val)
 		return fmt_multistate_int(val, multistate_compression);
 	case sUsePrivilegeSeparation:
 		return fmt_multistate_int(val, multistate_privsep);
+	case sAllowTcpForwarding:
+		return fmt_multistate_int(val, multistate_tcpfwd);
 	case sProtocol:
 		switch (val) {
 		case SSH_PROTO_1:
