@@ -228,11 +228,6 @@ ssh_kex2(struct ssh *ssh, u_short port)
  * Authenticate user
  */
 
-typedef struct Authctxt Authctxt;
-typedef struct Authmethod Authmethod;
-typedef struct identity Identity;
-typedef struct idlist Idlist;
-
 struct identity {
 	TAILQ_ENTRY(identity) next;
 	int	agent_fd;		/* >=0 if agent supports key */
@@ -243,17 +238,17 @@ struct identity {
 };
 TAILQ_HEAD(idlist, identity);
 
-struct Authctxt {
+struct cauthctxt {
 	const char *server_user;
 	const char *local_user;
 	const char *host;
 	const char *service;
-	Authmethod *method;
+	struct cauthmethod *method;
 	sig_atomic_t success;
 	char *authlist;
 	int attempt;
 	/* pubkey */
-	Idlist keys;
+	struct idlist keys;
 	int agent_fd;
 	/* hostbased */
 	Sensitive *sensitive;
@@ -266,7 +261,8 @@ struct Authctxt {
 	u_int gss_mech;
 #endif
 };
-struct Authmethod {
+
+struct cauthmethod {
 	char	*name;		/* string to compare against server's list */
 	int	(*userauth)(struct ssh *);
 	void	(*cleanup)(struct ssh *);
@@ -307,16 +303,16 @@ int	input_gssapi_errtok(int, u_int32_t, struct ssh *);
 
 void	userauth(struct ssh *, char *);
 
-static int sign_and_send_pubkey(struct ssh *, Identity *);
+static int sign_and_send_pubkey(struct ssh *, struct identity *);
 static void pubkey_prepare(struct ssh *);
 static void pubkey_cleanup(struct ssh *);
 static struct sshkey *load_identity_file(char *);
 
-static Authmethod *authmethod_get(char *authlist);
-static Authmethod *authmethod_lookup(const char *name);
+static struct cauthmethod *authmethod_get(char *authlist);
+static struct cauthmethod *authmethod_lookup(const char *name);
 static char *authmethods_get(void);
 
-Authmethod authmethods[] = {
+struct cauthmethod authmethods[] = {
 #ifdef GSSAPI
 	{"gssapi-with-mic",
 		userauth_gssapi,
@@ -363,7 +359,7 @@ void
 ssh_userauth2(struct ssh *ssh, const char *local_user, const char *server_user,
     Sensitive *sensitive)
 {
-	Authctxt *authctxt;
+	struct cauthctxt *authctxt;
 	int r;
 
 	if (options.challenge_response_authentication)
@@ -442,7 +438,7 @@ input_userauth_service_accept(int type, u_int32_t seq, struct ssh *ssh)
 void
 userauth(struct ssh *ssh, char *authlist)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 
 	if (authctxt->method != NULL && authctxt->method->cleanup != NULL)
 		authctxt->method->cleanup(ssh);
@@ -459,7 +455,7 @@ userauth(struct ssh *ssh, char *authlist)
 		authctxt->authlist = authlist;
 	}
 	for (;;) {
-		Authmethod *method = authmethod_get(authlist);
+		struct cauthmethod *method = authmethod_get(authlist);
 		if (method == NULL)
 			fatal("Permission denied (%s).", authlist);
 		authctxt->method = method;
@@ -523,7 +519,7 @@ input_userauth_banner(int type, u_int32_t seq, struct ssh *ssh)
 int
 input_userauth_success(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 
 	if (authctxt == NULL)
 		fatal("input_userauth_success: no authentication context");
@@ -544,7 +540,7 @@ input_userauth_success(int type, u_int32_t seq, struct ssh *ssh)
 int
 input_userauth_success_unexpected(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 
 	if (authctxt == NULL)
 		fatal("%s: no authentication context", __func__);
@@ -558,7 +554,7 @@ input_userauth_success_unexpected(int type, u_int32_t seq, struct ssh *ssh)
 int
 input_userauth_failure(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	char *authlist = NULL, partial;
 	int r;
 
@@ -586,10 +582,10 @@ input_userauth_failure(int type, u_int32_t seq, struct ssh *ssh)
 int
 input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	struct sshkey *key = NULL;
 	struct sshbuf *b = NULL;
-	Identity *id = NULL;
+	struct identity *id = NULL;
 	int pktype, sent = 0;
 	size_t alen, blen;
 	char *pkalg = NULL, *fp;
@@ -671,7 +667,7 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 int
 userauth_gssapi(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	Gssctxt *gssctxt = NULL;
 	gss_OID oid = NULL;
 	OM_uint32 min;
@@ -725,7 +721,7 @@ userauth_gssapi(struct ssh *ssh)
 static OM_uint32
 process_gssapi_token(struct ssh *ssh, gss_buffer_t recv_tok)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	Gssctxt *gssctxt = authctxt->methoddata;
 	gss_buffer_desc send_tok = GSS_C_EMPTY_BUFFER;
 	gss_buffer_desc mic = GSS_C_EMPTY_BUFFER;
@@ -792,7 +788,7 @@ process_gssapi_token(struct ssh *ssh, gss_buffer_t recv_tok)
 int
 input_gssapi_response(int type, u_int32_t plen, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	Gssctxt *gssctxt;
 	size_t oidlen;
 	u_char *oidv = NULL;
@@ -835,7 +831,7 @@ input_gssapi_response(int type, u_int32_t plen, struct ssh *ssh)
 int
 input_gssapi_token(int type, u_int32_t plen, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	gss_buffer_desc recv_tok;
 	u_char *p = NULL;
 	size_t len;
@@ -866,7 +862,7 @@ input_gssapi_token(int type, u_int32_t plen, struct ssh *ssh)
 int
 input_gssapi_errtok(int type, u_int32_t plen, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	Gssctxt *gssctxt;
 	gss_buffer_desc send_tok = GSS_C_EMPTY_BUFFER;
 	gss_buffer_desc recv_tok;
@@ -923,7 +919,7 @@ input_gssapi_error(int type, u_int32_t plen, struct ssh *ssh)
 int
 userauth_none(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	int r;
 
 	/* initial userauth request */
@@ -939,7 +935,7 @@ userauth_none(struct ssh *ssh)
 int
 userauth_passwd(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	char prompt[150];
 	char *password;
 	const char *host = options.host_key_alias ?  options.host_key_alias :
@@ -983,7 +979,7 @@ userauth_passwd(struct ssh *ssh)
 int
 input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	char *info = NULL, *lang = NULL, *password = NULL, *retype = NULL;
 	char prompt[150];
 	const char *host = options.host_key_alias ? options.host_key_alias :
@@ -1076,7 +1072,7 @@ pw_encrypt(const char *password, const char *crypt_scheme, const char *salt)
 }
 
 static BIGNUM *
-jpake_password_to_secret(Authctxt *authctxt, const char *crypt_scheme,
+jpake_password_to_secret(struct cauthctxt *authctxt, const char *crypt_scheme,
     const char *salt)
 {
 	char prompt[256], *password, *crypted;
@@ -1122,7 +1118,7 @@ jpake_password_to_secret(Authctxt *authctxt, const char *crypt_scheme,
 int
 input_userauth_jpake_server_step1(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->methoddata;
 	u_char *x3_proof = NULL, *x4_proof = NULL, *x2_s_proof = NULL;
 	size_t x3_proof_len, x4_proof_len, len;
@@ -1208,7 +1204,7 @@ input_userauth_jpake_server_step1(int type, u_int32_t seq, struct ssh *ssh)
 int
 input_userauth_jpake_server_step2(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->methoddata;
 	u_char *x4_s_proof = NULL;
 	size_t x4_s_proof_len;
@@ -1265,7 +1261,7 @@ input_userauth_jpake_server_step2(int type, u_int32_t seq, struct ssh *ssh)
 int
 input_userauth_jpake_server_confirm(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->methoddata;
 	size_t len;
 	int r;
@@ -1298,7 +1294,7 @@ input_userauth_jpake_server_confirm(int type, u_int32_t seq, struct ssh *ssh)
 #endif /* JPAKE */
 
 static int
-identity_sign(Identity *id, u_char **sigp, size_t *lenp,
+identity_sign(struct identity *id, u_char **sigp, size_t *lenp,
     const u_char *data, size_t datalen, u_int compat)
 {
 	struct sshkey *prv;
@@ -1324,9 +1320,9 @@ identity_sign(Identity *id, u_char **sigp, size_t *lenp,
 }
 
 static int
-sign_and_send_pubkey(struct ssh *ssh, Identity *id)
+sign_and_send_pubkey(struct ssh *ssh, struct identity *id)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	struct sshbuf *b;
 	u_char *blob, *signature;
 	size_t bloblen, slen, skip = 0;
@@ -1427,9 +1423,9 @@ sign_and_send_pubkey(struct ssh *ssh, Identity *id)
 }
 
 static int
-send_pubkey_test(struct ssh *ssh, Identity *id)
+send_pubkey_test(struct ssh *ssh, struct identity *id)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	u_char *blob;
 	size_t bloblen;
 	u_int have_sig = 0;
@@ -1529,9 +1525,9 @@ load_identity_file(char *filename)
 static void
 pubkey_prepare(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
-	Identity *id, *id2, *tmp;
-	Idlist agent, files, *preferred;
+	struct cauthctxt *authctxt = ssh->authctxt;
+	struct identity *id, *id2, *tmp;
+	struct idlist agent, files, *preferred;
 	struct sshkey *key;
 	int agent_fd, i, r, found;
 	size_t j;
@@ -1635,8 +1631,8 @@ pubkey_prepare(struct ssh *ssh)
 static void
 pubkey_cleanup(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
-	Identity *id;
+	struct cauthctxt *authctxt = ssh->authctxt;
+	struct identity *id;
 
 	if (authctxt->agent_fd != -1)
 		ssh_close_authentication_socket(authctxt->agent_fd);
@@ -1654,8 +1650,8 @@ pubkey_cleanup(struct ssh *ssh)
 int
 userauth_pubkey(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
-	Identity *id;
+	struct cauthctxt *authctxt = ssh->authctxt;
+	struct identity *id;
 	int sent = 0;
 
 	while ((id = TAILQ_FIRST(&authctxt->keys))) {
@@ -1695,7 +1691,7 @@ userauth_pubkey(struct ssh *ssh)
 int
 userauth_kbdint(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	int r;
 
 	if (authctxt->attempt++ >= options.number_of_password_prompts)
@@ -1728,7 +1724,7 @@ userauth_kbdint(struct ssh *ssh)
 int
 input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	char *name = NULL, *inst = NULL, *lang = NULL, *prompt = NULL;
 	char *response = NULL, echo = 0;
 	u_int num_prompts, i;
@@ -1883,7 +1879,7 @@ ssh_keysign(struct ssh *ssh, struct sshkey *key, u_char **sigp, size_t *lenp,
 int
 userauth_hostbased(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	struct sshkey *private = NULL;
 	Sensitive *sensitive = authctxt->sensitive;
 	struct sshbuf *b;
@@ -1983,7 +1979,7 @@ userauth_hostbased(struct ssh *ssh)
 int
 userauth_jpake(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx;
 	u_char *x1_proof, *x2_proof;
 	u_int x1_proof_len, x2_proof_len;
@@ -2048,7 +2044,7 @@ userauth_jpake(struct ssh *ssh)
 void
 userauth_jpake_cleanup(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct cauthctxt *authctxt = ssh->authctxt;
 	debug3("%s: clean up", __func__);
 	if (authctxt->methoddata != NULL) {
 		jpake_free(authctxt->methoddata);
@@ -2065,7 +2061,7 @@ userauth_jpake_cleanup(struct ssh *ssh)
  * in auth_ident field and return true, otherwise return false.
  */
 static int
-authmethod_is_enabled(Authmethod *method)
+authmethod_is_enabled(struct cauthmethod *method)
 {
 	if (method == NULL)
 		return 0;
@@ -2078,10 +2074,10 @@ authmethod_is_enabled(Authmethod *method)
 	return 1;
 }
 
-static Authmethod *
+static struct cauthmethod *
 authmethod_lookup(const char *name)
 {
-	Authmethod *method = NULL;
+	struct cauthmethod *method = NULL;
 	if (name != NULL)
 		for (method = authmethods; method->name != NULL; method++)
 			if (strcmp(name, method->name) == 0)
@@ -2091,7 +2087,7 @@ authmethod_lookup(const char *name)
 }
 
 /* XXX internal state */
-static Authmethod *current = NULL;
+static struct cauthmethod *current = NULL;
 static char *supported = NULL;
 static char *preferred = NULL;
 
@@ -2100,7 +2096,7 @@ static char *preferred = NULL;
  * next method we should try.  If the server initially sends a nil list,
  * use a built-in default list.
  */
-static Authmethod *
+static struct cauthmethod *
 authmethod_get(char *authlist)
 {
 	char *name = NULL;
@@ -2143,7 +2139,7 @@ authmethod_get(char *authlist)
 static char *
 authmethods_get(void)
 {
-	Authmethod *method = NULL;
+	struct cauthmethod *method = NULL;
 	struct sshbuf *b;
 	char *list;
 	int r;
