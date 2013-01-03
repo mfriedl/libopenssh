@@ -299,7 +299,7 @@ auth_rsa_key_allowed(struct passwd *pw, BIGNUM *client_n,
  * successful.  This may exit if there is a serious protocol violation.
  */
 int
-auth_rsa(Authctxt *authctxt, BIGNUM *client_n)
+auth_rsa(struct authctxt *authctxt, BIGNUM *client_n)
 {
 	struct ssh *ssh = active_state;
 	struct sshkey *key;

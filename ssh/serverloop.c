@@ -1147,7 +1147,7 @@ server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 
 	/* -R style forwarding */
 	if (strcmp(rtype, "tcpip-forward") == 0) {
-		Authctxt *authctxt = ssh->authctxt;
+		struct authctxt *authctxt = ssh->authctxt;
 
 		if (authctxt->pw == NULL || !authctxt->valid)
 			fatal("server_input_global_request: no/invalid user");

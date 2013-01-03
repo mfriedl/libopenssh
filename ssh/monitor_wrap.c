@@ -366,7 +366,7 @@ mm_inform_authserv(char *service, char *style)
 
 /* Do the password authentication */
 int
-mm_auth_password(Authctxt *authctxt, char *password)
+mm_auth_password(struct authctxt *authctxt, char *password)
 {
 	struct sshbuf *m;
 	int r, authenticated = 0;
@@ -949,7 +949,7 @@ mm_ssh_gssapi_userok(char *user)
 
 #ifdef JPAKE
 void
-mm_auth2_jpake_get_pwdata(Authctxt *authctxt, BIGNUM **s,
+mm_auth2_jpake_get_pwdata(struct authctxt *authctxt, BIGNUM **s,
     char **hash_scheme, char **salt)
 {
 	struct sshbuf *m;

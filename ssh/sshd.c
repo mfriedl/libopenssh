@@ -223,7 +223,7 @@ struct monitor *pmonitor = NULL;
 int privsep_is_preauth = 1;
 
 /* global authentication context */
-static Authctxt *the_authctxt = NULL;	/* XXX */
+static struct authctxt *the_authctxt = NULL;	/* XXX */
 
 /* sshd_config buffer */
 struct sshbuf *cfg;
@@ -629,7 +629,7 @@ privsep_preauth_child(void)
 }
 
 static int
-privsep_preauth(Authctxt *authctxt)
+privsep_preauth(struct authctxt *authctxt)
 {
 	int status;
 	pid_t pid;
@@ -697,7 +697,7 @@ privsep_preauth(Authctxt *authctxt)
 static void
 privsep_postauth(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	u_int32_t rnd[256];
 
 	if (authctxt->pw->pw_uid == 0 || options.use_login) {
@@ -1346,7 +1346,7 @@ main(int ac, char **av)
 	u_int64_t ibytes, obytes;
 	mode_t new_umask;
 	struct sshkey *key;
-	Authctxt *authctxt;
+	struct authctxt *authctxt;
 	struct connection_info *connection_info = get_connection_info(0, 0);
 
 	/* Save argv. */

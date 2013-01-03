@@ -82,7 +82,7 @@ extern u_int session_id2_len;
 static int
 userauth_jpake(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	int r, authenticated = 0;
 
 	if ((r = sshpkt_get_end(ssh)) != 0)
@@ -100,7 +100,7 @@ userauth_jpake(struct ssh *ssh)
 	return authenticated;
 }
 
-Authmethod method_jpake = {
+struct authmethod method_jpake = {
 	"jpake-01@openssh.com",
 	userauth_jpake,
 	&options.zero_knowledge_password_authentication
@@ -110,7 +110,7 @@ Authmethod method_jpake = {
 void
 auth2_jpake_stop(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	/* unregister callbacks */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP1, NULL);
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP2, NULL);
@@ -228,7 +228,7 @@ makesalt(u_int want, const char *user)
  * Prevents jpake method being used to infer the validity of accounts.
  */
 static void
-fake_salt_and_scheme(Authctxt *authctxt, char **salt, char **scheme)
+fake_salt_and_scheme(struct authctxt *authctxt, char **salt, char **scheme)
 {
 	char *rounds_s, *style;
 	long long rounds;
@@ -280,7 +280,7 @@ fake_salt_and_scheme(Authctxt *authctxt, char **salt, char **scheme)
  * salt will be returned.
  */
 void
-auth2_jpake_get_pwdata(Authctxt *authctxt, BIGNUM **s,
+auth2_jpake_get_pwdata(struct authctxt *authctxt, BIGNUM **s,
     char **hash_scheme, char **salt)
 {
 	char *cp;
@@ -382,7 +382,7 @@ auth2_jpake_get_pwdata(Authctxt *authctxt, BIGNUM **s,
 static int
 auth2_jpake_start(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	u_char *x3_proof, *x4_proof;
 	u_int x3_proof_len, x4_proof_len;
@@ -438,7 +438,7 @@ auth2_jpake_start(struct ssh *ssh)
 static int
 input_userauth_jpake_client_step1(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	u_char *x1_proof, *x2_proof, *x4_s_proof;
 	size_t len, x1_proof_len, x2_proof_len;
@@ -503,7 +503,7 @@ input_userauth_jpake_client_step1(int type, u_int32_t seq, struct ssh *ssh)
 static int
 input_userauth_jpake_client_step2(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	u_char *x2_s_proof;
 	size_t x2_s_proof_len;
@@ -559,7 +559,7 @@ input_userauth_jpake_client_step2(int type, u_int32_t seq, struct ssh *ssh)
 static int
 input_userauth_jpake_client_confirm(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	struct jpake_ctx *pctx = authctxt->jpake_ctx;
 	int r, authenticated = 0;
 	size_t len;

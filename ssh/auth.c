@@ -180,7 +180,7 @@ allowed_user(struct passwd * pw)
 }
 
 void
-auth_log(Authctxt *authctxt, int authenticated, int partial,
+auth_log(struct authctxt *authctxt, int authenticated, int partial,
     const char *method, const char *submethod, const char *info)
 {
 	void (*authlog) (const char *fmt,...) = verbose;

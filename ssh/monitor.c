@@ -127,7 +127,7 @@ int mm_answer_gss_checkmic(int, struct sshbuf *);
 
 static int monitor_read_log(struct monitor *);
 
-static Authctxt *authctxt;
+static struct authctxt *authctxt;
 static BIGNUM *ssh1_challenge = NULL;	/* used for ssh1 rsa auth */
 
 /* local state for key verify */
@@ -246,7 +246,7 @@ monitor_permit_authentications(int permit)
 }
 
 void
-monitor_child_preauth(Authctxt *_authctxt, struct monitor *pmonitor)
+monitor_child_preauth(struct authctxt *_authctxt, struct monitor *pmonitor)
 {
 	struct mon_table *ent;
 	int authenticated = 0, partial = 0;

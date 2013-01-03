@@ -35,7 +35,7 @@ struct Session {
 	int	self;
 	int	next_unused;
 	struct passwd *pw;
-	Authctxt *authctxt;
+	struct authctxt *authctxt;
 	pid_t	pid;
 
 	/* tty */
@@ -65,7 +65,7 @@ struct Session {
 };
 
 void	 do_authenticated(struct ssh *);
-void	 do_cleanup(Authctxt *);
+void	 do_cleanup(struct authctxt *);
 
 int	 session_open(struct ssh *, int);
 void	 session_unused(int);

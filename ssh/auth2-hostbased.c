@@ -56,7 +56,7 @@ extern u_int session_id2_len;
 static int
 userauth_hostbased(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	struct sshbuf *b;
 	struct sshkey *key = NULL;
 	char *pkalg, *cuser, *chost, *service;
@@ -219,7 +219,7 @@ hostbased_key_allowed(struct passwd *pw, const char *cuser, char *chost,
 	return (host_status == HOST_OK);
 }
 
-Authmethod method_hostbased = {
+struct authmethod method_hostbased = {
 	"hostbased",
 	userauth_hostbased,
 	&options.hostbased_authentication

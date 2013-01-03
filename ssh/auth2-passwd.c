@@ -66,7 +66,7 @@ userauth_passwd(struct ssh *ssh)
 	return authenticated;
 }
 
-Authmethod method_passwd = {
+struct authmethod method_passwd = {
 	"password",
 	userauth_passwd,
 	&options.password_authentication

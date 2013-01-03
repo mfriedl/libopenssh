@@ -33,11 +33,11 @@
 
 /* limited protocol v1 interface to kbd-interactive authentication */
 
-extern KbdintDevice *devices[];
-static KbdintDevice *device;
+extern struct kbdintdevice *devices[];
+static struct kbdintdevice *device;
 
 char *
-get_challenge(Authctxt *authctxt)
+get_challenge(struct authctxt *authctxt)
 {
 	char *challenge, *name, *info, **prompts;
 	u_int i, numprompts;
@@ -67,7 +67,7 @@ get_challenge(Authctxt *authctxt)
 	return (challenge);
 }
 int
-verify_response(Authctxt *authctxt, const char *response)
+verify_response(struct authctxt *authctxt, const char *response)
 {
 	char *resp[1];
 	int authenticated = 0;

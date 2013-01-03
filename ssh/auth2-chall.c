@@ -44,30 +44,28 @@ static int auth2_challenge_start(struct ssh *);
 static int send_userauth_info_request(struct ssh *);
 static int input_userauth_info_response(int, u_int32_t, struct ssh *);
 
-extern KbdintDevice bsdauth_device;
+extern struct kbdintdevice bsdauth_device;
 
-KbdintDevice *devices[] = {
+struct kbdintdevice *devices[] = {
 	&bsdauth_device,
 	NULL
 };
 
-typedef struct KbdintAuthctxt KbdintAuthctxt;
-struct KbdintAuthctxt
-{
+struct kbdintctxt {
 	char *devices;
 	void *ctxt;
-	KbdintDevice *device;
+	struct kbdintdevice *device;
 	u_int nreq;
 };
 
-static KbdintAuthctxt *
+static struct kbdintctxt *
 kbdint_alloc(const char *devs)
 {
-	KbdintAuthctxt *kbdintctxt;
+	struct kbdintctxt *kbdintctxt;
 	struct sshbuf *b;
 	int i, r;
 
-	kbdintctxt = xmalloc(sizeof(KbdintAuthctxt));
+	kbdintctxt = xmalloc(sizeof(struct kbdintctxt));
 	if (strcmp(devs, "") == 0) {
 		if ((b = sshbuf_new()) == NULL)
 			fatal("%s: sshbuf_new failed", __func__);
@@ -92,7 +90,7 @@ kbdint_alloc(const char *devs)
 	return kbdintctxt;
 }
 static void
-kbdint_reset_device(KbdintAuthctxt *kbdintctxt)
+kbdint_reset_device(struct kbdintctxt *kbdintctxt)
 {
 	if (kbdintctxt->ctxt) {
 		kbdintctxt->device->free_ctx(kbdintctxt->ctxt);
@@ -101,7 +99,7 @@ kbdint_reset_device(KbdintAuthctxt *kbdintctxt)
 	kbdintctxt->device = NULL;
 }
 static void
-kbdint_free(KbdintAuthctxt *kbdintctxt)
+kbdint_free(struct kbdintctxt *kbdintctxt)
 {
 	if (kbdintctxt->device)
 		kbdint_reset_device(kbdintctxt);
@@ -113,7 +111,7 @@ kbdint_free(KbdintAuthctxt *kbdintctxt)
 }
 /* get next device */
 static int
-kbdint_next_device(KbdintAuthctxt *kbdintctxt)
+kbdint_next_device(struct kbdintctxt *kbdintctxt)
 {
 	size_t len;
 	char *t;
@@ -147,7 +145,7 @@ kbdint_next_device(KbdintAuthctxt *kbdintctxt)
 int
 auth2_challenge(struct ssh *ssh, char *devs)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	debug("auth2_challenge: user=%s devs=%s",
 	    authctxt->user ? authctxt->user : "<nouser>",
 	    devs ? devs : "<no devs>");
@@ -163,7 +161,7 @@ auth2_challenge(struct ssh *ssh, char *devs)
 void
 auth2_challenge_stop(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	/* unregister callback */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_INFO_RESPONSE, NULL);
 	if (authctxt->kbdintctxt != NULL) {
@@ -176,8 +174,8 @@ auth2_challenge_stop(struct ssh *ssh)
 static int
 auth2_challenge_start(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
-	KbdintAuthctxt *kbdintctxt = authctxt->kbdintctxt;
+	struct authctxt *authctxt = ssh->authctxt;
+	struct kbdintctxt *kbdintctxt = authctxt->kbdintctxt;
 
 	debug2("auth2_challenge_start: devices %s",
 	    kbdintctxt->devices ?  kbdintctxt->devices : "<empty>");
@@ -207,8 +205,8 @@ auth2_challenge_start(struct ssh *ssh)
 static int
 send_userauth_info_request(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
-	KbdintAuthctxt *kbdintctxt = authctxt->kbdintctxt;
+	struct authctxt *authctxt = ssh->authctxt;
+	struct kbdintctxt *kbdintctxt = authctxt->kbdintctxt;
 	char *name, *instr, **prompts;
 	u_int r, i, *echo_on;
 
@@ -243,8 +241,8 @@ send_userauth_info_request(struct ssh *ssh)
 static int
 input_userauth_info_response(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
-	KbdintAuthctxt *kbdintctxt;
+	struct authctxt *authctxt = ssh->authctxt;
+	struct kbdintctxt *kbdintctxt;
 	int authenticated = 0, res;
 	int r;
 	u_int i, nresp;
@@ -317,7 +315,7 @@ input_userauth_info_response(int type, u_int32_t seq, struct ssh *ssh)
 void
 privsep_challenge_enable(void)
 {
-	extern KbdintDevice mm_bsdauth_device;
+	extern struct kbdintdevice mm_bsdauth_device;
 	/* As long as SSHv1 has devices[0] hard coded this is fine */
 	devices[0] = &mm_bsdauth_device;
 }

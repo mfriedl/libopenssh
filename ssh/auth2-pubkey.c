@@ -71,7 +71,7 @@ extern u_int session_id2_len;
 static int
 userauth_pubkey(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	struct sshbuf *b;
 	struct sshkey *key = NULL;
 	char *pkalg;
@@ -671,7 +671,7 @@ user_key_allowed(struct passwd *pw, struct sshkey *key)
 	return success;
 }
 
-Authmethod method_pubkey = {
+struct authmethod method_pubkey = {
 	"publickey",
 	userauth_pubkey,
 	&options.pubkey_authentication

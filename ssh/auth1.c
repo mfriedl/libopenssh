@@ -107,7 +107,7 @@ get_authname(int type)
 static int
 auth1_process_password(struct ssh *ssh, char *info, size_t infolen)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	int r, authenticated = 0;
 	u_char *password;
 	size_t dlen;
@@ -134,7 +134,7 @@ auth1_process_password(struct ssh *ssh, char *info, size_t infolen)
 static int
 auth1_process_rsa(struct ssh *ssh, char *info, size_t infolen)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	int r, authenticated = 0;
 	BIGNUM *n;
 
@@ -155,7 +155,7 @@ auth1_process_rsa(struct ssh *ssh, char *info, size_t infolen)
 static int
 auth1_process_rhosts_rsa(struct ssh *ssh, char *info, size_t infolen)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	int keybits, authenticated = 0;
 	u_int bits;
 	char *client_user;
@@ -199,7 +199,7 @@ auth1_process_rhosts_rsa(struct ssh *ssh, char *info, size_t infolen)
 static int
 auth1_process_tis_challenge(struct ssh *ssh, char *info, size_t infolen)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	char *challenge;
 	int r;
 
@@ -221,7 +221,7 @@ auth1_process_tis_challenge(struct ssh *ssh, char *info, size_t infolen)
 static int
 auth1_process_tis_response(struct ssh *ssh, char *info, size_t infolen)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	int authenticated = 0;
 	u_char *response;
 	size_t dlen;
@@ -244,7 +244,7 @@ auth1_process_tis_response(struct ssh *ssh, char *info, size_t infolen)
 static void
 do_authloop(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	int authenticated = 0;
 	char info[1024];
 	int r, type = 0;
@@ -332,7 +332,7 @@ do_authloop(struct ssh *ssh)
 void
 do_authentication(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	char *user, *style = NULL;
 	int r;
 

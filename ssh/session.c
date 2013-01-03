@@ -257,7 +257,7 @@ display_loginmsg(void)
 void
 do_authenticated(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 
 	setproctitle("%s", authctxt->pw->pw_name);
 
@@ -2356,7 +2356,7 @@ do_authenticated2(struct ssh *ssh)
 }
 
 void
-do_cleanup(Authctxt *authctxt)
+do_cleanup(struct authctxt *authctxt)
 {
 	static int called = 0;
 

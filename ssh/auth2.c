@@ -60,19 +60,19 @@ extern u_int session_id2_len;
 
 /* methods */
 
-extern Authmethod method_none;
-extern Authmethod method_pubkey;
-extern Authmethod method_passwd;
-extern Authmethod method_kbdint;
-extern Authmethod method_hostbased;
+extern struct authmethod method_none;
+extern struct authmethod method_pubkey;
+extern struct authmethod method_passwd;
+extern struct authmethod method_kbdint;
+extern struct authmethod method_hostbased;
 #ifdef GSSAPI
-extern Authmethod method_gssapi;
+extern struct authmethod method_gssapi;
 #endif
 #ifdef JPAKE
-extern Authmethod method_jpake;
+extern struct authmethod method_jpake;
 #endif
 
-Authmethod *authmethods[] = {
+struct authmethod *authmethods[] = {
 	&method_none,
 	&method_pubkey,
 #ifdef GSSAPI
@@ -93,9 +93,9 @@ static int input_service_request(int, u_int32_t, struct ssh *);
 static int input_userauth_request(int, u_int32_t, struct ssh *);
 
 /* helper */
-static Authmethod *authmethod_lookup(Authctxt *, const char *);
-static char *authmethods_get(Authctxt *authctxt);
-static int method_allowed(Authctxt *, const char *);
+static struct authmethod *authmethod_lookup(struct authctxt *, const char *);
+static char *authmethods_get(struct authctxt *authctxt);
+static int method_allowed(struct authctxt *, const char *);
 static int list_starts_with(const char *, const char *);
 
 char *
@@ -162,7 +162,7 @@ done:
 void
 do_authentication2(struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	int r;
 
 	ssh_dispatch_init(ssh, &dispatch_protocol_error);
@@ -175,7 +175,7 @@ do_authentication2(struct ssh *ssh)
 static int
 input_service_request(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	char *service = NULL;
 	int r, acceptit = 0;
 
@@ -216,8 +216,8 @@ input_service_request(int type, u_int32_t seq, struct ssh *ssh)
 static int
 input_userauth_request(int type, u_int32_t seq, struct ssh *ssh)
 {
-	Authctxt *authctxt = ssh->authctxt;
-	Authmethod *m = NULL;
+	struct authctxt *authctxt = ssh->authctxt;
+	struct authmethod *m = NULL;
 	char *user = NULL, *service = NULL, *method = NULL, *style = NULL;
 	int r, authenticated = 0;
 
@@ -295,7 +295,7 @@ void
 userauth_finish(struct ssh *ssh, int authenticated, const char *method,
     const char *submethod)
 {
-	Authctxt *authctxt = ssh->authctxt;
+	struct authctxt *authctxt = ssh->authctxt;
 	char *methods;
 	int r, partial = 0;
 
@@ -360,7 +360,7 @@ userauth_finish(struct ssh *ssh, int authenticated, const char *method,
  * 0 otherwise.
  */
 static int
-method_allowed(Authctxt *authctxt, const char *method)
+method_allowed(struct authctxt *authctxt, const char *method)
 {
 	u_int i;
 
@@ -378,7 +378,7 @@ method_allowed(Authctxt *authctxt, const char *method)
 }
 
 static char *
-authmethods_get(Authctxt *authctxt)
+authmethods_get(struct authctxt *authctxt)
 {
 	struct sshbuf *b;
 	char *list;
@@ -405,8 +405,8 @@ authmethods_get(Authctxt *authctxt)
 	return list;
 }
 
-static Authmethod *
-authmethod_lookup(Authctxt *authctxt, const char *name)
+static struct authmethod *
+authmethod_lookup(struct authctxt *authctxt, const char *name)
 {
 	int i;
 
@@ -475,7 +475,7 @@ auth2_methods_valid(const char *_methods, int need_enable)
  * enabled should consult options.num_auth_methods directly.
  */
 int
-auth2_setup_methods_lists(Authctxt *authctxt)
+auth2_setup_methods_lists(struct authctxt *authctxt)
 {
 	u_int i;
 
@@ -542,7 +542,7 @@ remove_method(char **methods, const char *method)
  * Returns 1 if the method completed any authentication list or 0 otherwise.
  */
 int
-auth2_update_methods_lists(Authctxt *authctxt, const char *method)
+auth2_update_methods_lists(struct authctxt *authctxt, const char *method)
 {
 	u_int i, found = 0;
 
