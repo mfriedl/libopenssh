@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.179 2012/12/12 16:45:52 markus Exp $ */
+/* $OpenBSD: packet.c,v 1.180 2013/01/08 18:49:04 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -870,7 +870,7 @@ ssh_packet_send1(struct ssh *ssh)
 		goto out;
 	if ((r = cipher_crypt(&state->send_context, cp,
 	    sshbuf_ptr(state->outgoing_packet),
-	    sshbuf_len(state->outgoing_packet), 0)) != 0)
+	    sshbuf_len(state->outgoing_packet), 0, 0)) != 0)
 		goto out;
 
 #ifdef PACKET_DEBUG
@@ -925,7 +925,7 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 		mac  = &state->newkeys[mode]->mac;
 		comp = &state->newkeys[mode]->comp;
 		mac_clear(mac);
-		memset(enc->iv,  0, enc->block_size);
+		memset(enc->iv,  0, enc->iv_len);
 		memset(enc->key, 0, enc->key_len);
 		memset(mac->key, 0, mac->key_len);
 		free(enc->name);
@@ -943,12 +943,14 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	enc  = &state->newkeys[mode]->enc;
 	mac  = &state->newkeys[mode]->mac;
 	comp = &state->newkeys[mode]->comp;
-	if ((r = mac_init(mac)) != 0)
-		return r;
+	if (cipher_authlen(enc->cipher) == 0) {
+		if ((r = mac_init(mac)) != 0)
+			return r;
+	}
 	mac->enabled = 1;
 	DBG(debug("cipher_init_context: %d", mode));
 	if ((r = cipher_init(cc, enc->cipher, enc->key, enc->key_len,
-	    enc->iv, enc->block_size, crypt_type)) != 0)
+	    enc->iv, enc->iv_len, crypt_type)) != 0)
 		return r;
 	if (!state->cipher_warning_done &&
 	    (wmsg = cipher_warning_message(cc)) != NULL) {
@@ -1034,7 +1036,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	struct session_state *state = ssh->state;
 	u_char type, *cp, macbuf[MAC_DIGEST_LEN_MAX];
 	u_char padlen, pad = 0;
-	u_int aadlen = 0;
+	u_int authlen = 0, aadlen = 0;
 	u_int len;
 	struct sshenc *enc   = NULL;
 	struct sshmac *mac   = NULL;
@@ -1045,9 +1047,12 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 		enc  = &state->newkeys[MODE_OUT]->enc;
 		mac  = &state->newkeys[MODE_OUT]->mac;
 		comp = &state->newkeys[MODE_OUT]->comp;
+		/* disable mac for authenticated encryption */
+		if ((authlen = cipher_authlen(enc->cipher)) != 0)
+			mac = NULL;
 	}
 	block_size = enc ? enc->block_size : 8;
-	aadlen = mac && mac->enabled && mac->etm ? 4 : 0;
+	aadlen = (mac && mac->enabled && mac->etm) || authlen ? 4 : 0;
 
 	type = (sshbuf_ptr(state->outgoing_packet))[5];
 
@@ -1129,11 +1134,11 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	}
 	/* encrypt packet and append to output buffer. */
 	if ((r = sshbuf_reserve(state->output,
-	    sshbuf_len(state->outgoing_packet), &cp)) != 0)
+	    sshbuf_len(state->outgoing_packet) + authlen, &cp)) != 0)
 		goto out;
 	if ((r = cipher_crypt(&state->send_context, cp,
 	    sshbuf_ptr(state->outgoing_packet),
-	    len - aadlen, aadlen)) != 0)
+	    len - aadlen, aadlen, authlen)) != 0)
 		goto out;
 	/* append unencrypted MAC */
 	if (mac && mac->enabled) {
@@ -1418,7 +1423,7 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 	if ((r = sshbuf_reserve(state->incoming_packet, padded_len, &p)) != 0)
 		goto out;
 	if ((r = cipher_crypt(&state->receive_context, p,
-	    sshbuf_ptr(state->input), padded_len, 0)) != 0)
+	    sshbuf_ptr(state->input), padded_len, 0, 0)) != 0)
 		goto out;
 
 	if ((r = sshbuf_consume(state->input, padded_len)) != 0)
@@ -1479,7 +1484,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	struct session_state *state = ssh->state;
 	u_int padlen, need;
 	u_char macbuf[MAC_DIGEST_LEN_MAX], *cp;
-	u_int maclen, aadlen = 0, block_size;
+	u_int maclen, aadlen = 0, authlen = 0, block_size;
 	struct sshenc *enc   = NULL;
 	struct sshmac *mac   = NULL;
 	struct sshcomp *comp = NULL;
@@ -1494,10 +1499,13 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		enc  = &state->newkeys[MODE_IN]->enc;
 		mac  = &state->newkeys[MODE_IN]->mac;
 		comp = &state->newkeys[MODE_IN]->comp;
+		/* disable mac for authenticated encryption */
+		if ((authlen = cipher_authlen(enc->cipher)) != 0)
+			mac = NULL;
 	}
 	maclen = mac && mac->enabled ? mac->mac_len : 0;
 	block_size = enc ? enc->block_size : 8;
-	aadlen = mac && mac->enabled && mac->etm ? 4 : 0;
+	aadlen = (mac && mac->enabled && mac->etm) || authlen ? 4 : 0;
 
 	if (aadlen && state->packlen == 0) {
 		if (sshbuf_len(state->input) < 4)
@@ -1525,7 +1533,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		    &cp)) != 0)
 			goto out;
 		if ((r = cipher_crypt(&state->receive_context, cp,
-		    sshbuf_ptr(state->input), block_size, 0)) != 0)
+		    sshbuf_ptr(state->input), block_size, 0, 0)) != 0)
 			goto out;
 		state->packlen = PEEK_U32(sshbuf_ptr(state->incoming_packet));
 		if (state->packlen < 1 + 4 ||
@@ -1555,8 +1563,8 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		 */
 		need = 4 + state->packlen - block_size;
 	}
-	DBG(debug("partial packet: block %d, need %d, maclen %d, aadlen %d",
-	    block_size, need, maclen, aadlen));
+	DBG(debug("partial packet: block %d, need %d, maclen %d, authlen %d,"
+	    " aadlen %d", block_size, need, maclen, authlen, aadlen));
 	if (need % block_size != 0) {
 		logit("padding error: need %d block %d mod %d",
 		    need, block_size, need % block_size);
@@ -1567,10 +1575,11 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	 * check if the entire packet has been received and
 	 * decrypt into incoming_packet:
 	 * 'aadlen' bytes are unencrypted, but authenticated.
-	 * 'need' bytes are encrypted, followed by
+	 * 'need' bytes are encrypted, followed by either
+	 * 'authlen' bytes of authentication tag or
 	 * 'maclen' bytes of message authentication code.
 	 */
-	if (sshbuf_len(state->input) < aadlen + need + maclen)
+	if (sshbuf_len(state->input) < aadlen + need + authlen + maclen)
 		return 0;
 #ifdef PACKET_DEBUG
 	fprintf(stderr, "read_poll enc/full: ");
@@ -1587,9 +1596,9 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	    &cp)) != 0)
 		goto out;
 	if ((r = cipher_crypt(&state->receive_context, cp,
-	    sshbuf_ptr(state->input), need, aadlen)) != 0)
+	    sshbuf_ptr(state->input), need, aadlen, authlen)) != 0)
 		goto out;
-	if ((r = sshbuf_consume(state->input, aadlen + need)) != 0)
+	if ((r = sshbuf_consume(state->input, aadlen + need + authlen)) != 0)
 		goto out;
 	/*
 	 * compute MAC over seqnr and packet,
@@ -2258,7 +2267,7 @@ newkeys_to_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 	comp = &newkey->comp;
 	cc = (mode == MODE_OUT) ? &ssh->state->send_context :
 	    &ssh->state->receive_context;
-	if ((r = cipher_get_keyiv(cc, enc->iv, enc->block_size)) != 0)
+	if ((r = cipher_get_keyiv(cc, enc->iv, enc->iv_len)) != 0)
 		return r;
 	if ((b = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
@@ -2268,11 +2277,15 @@ newkeys_to_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 	    (r = sshbuf_put_u32(b, enc->enabled)) != 0 ||
 	    (r = sshbuf_put_u32(b, enc->block_size)) != 0 ||
 	    (r = sshbuf_put_string(b, enc->key, enc->key_len)) != 0 ||
-	    (r = sshbuf_put_string(b, enc->iv, enc->block_size)) != 0 ||
-	    (r = sshbuf_put_cstring(b, mac->name)) != 0 ||
-	    (r = sshbuf_put_u32(b, mac->enabled)) != 0 ||
-	    (r = sshbuf_put_string(b, mac->key, mac->key_len)) != 0 ||
-	    (r = sshbuf_put_u32(b, comp->type)) != 0 ||
+	    (r = sshbuf_put_string(b, enc->iv, enc->iv_len)) != 0)
+		goto out;
+	if (cipher_authlen(enc->cipher) == 0) {
+		if ((r = sshbuf_put_cstring(b, mac->name)) != 0 ||
+		    (r = sshbuf_put_u32(b, mac->enabled)) != 0 ||
+		    (r = sshbuf_put_string(b, mac->key, mac->key_len)) != 0)
+			goto out;
+	}
+	if ((r = sshbuf_put_u32(b, comp->type)) != 0 ||
 	    (r = sshbuf_put_u32(b, comp->enabled)) != 0 ||
 	    (r = sshbuf_put_cstring(b, comp->name)) != 0)
 		goto out;
@@ -2377,27 +2390,37 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 	    (r = sshbuf_get_u32(b, &enc->enabled)) != 0 ||
 	    (r = sshbuf_get_u32(b, &enc->block_size)) != 0 ||
 	    (r = sshbuf_get_string(b, &enc->key, &keylen)) != 0 ||
-	    (r = sshbuf_get_string(b, &enc->iv, &ivlen)) != 0 ||
-	    (r = sshbuf_get_cstring(b, &mac->name, NULL)) != 0 ||
-	    (r = sshbuf_get_u32(b, &mac->enabled)) != 0 ||
-	    (r = sshbuf_get_string(b, &mac->key, &maclen)) != 0 ||
-	    (r = sshbuf_get_u32(b, &comp->type)) != 0 ||
+	    (r = sshbuf_get_string(b, &enc->iv, &ivlen)) != 0)
+		goto out;
+	if (cipher_authlen(enc->cipher) == 0) {
+		if ((r = sshbuf_get_cstring(b, &mac->name, NULL)) != 0)
+			goto out;
+		if ((r = mac_setup(mac, mac->name)) != 0)
+			goto out;
+		if ((r = sshbuf_get_u32(b, &mac->enabled)) != 0 ||
+		    (r = sshbuf_get_string(b, &mac->key, &maclen)) != 0)
+			goto out;
+		if (maclen > mac->key_len) {
+			r = SSH_ERR_INVALID_FORMAT;
+			goto out;
+		}
+		mac->key_len = maclen;
+	}
+	if ((r = sshbuf_get_u32(b, &comp->type)) != 0 ||
 	    (r = sshbuf_get_u32(b, &comp->enabled)) != 0 ||
 	    (r = sshbuf_get_cstring(b, &comp->name, NULL)) != 0)
 		goto out;
 	if (enc->name == NULL || mac->name == NULL ||
-	    ivlen != enc->block_size ||
 	    cipher_by_name(enc->name) != enc->cipher) {
 		r = SSH_ERR_INVALID_FORMAT;
 		goto out;
 	}
-	if ((r = mac_setup(mac, mac->name)) != 0)
-		goto out;
-	if (maclen > mac->key_len || sshbuf_len(b) != 0) {
+	if (sshbuf_len(b) != 0) {
 		r = SSH_ERR_INVALID_FORMAT;
 		goto out;
 	}
 	enc->key_len = keylen;
+	enc->iv_len = ivlen;
 	ssh->kex->newkeys[mode] = newkey;
 	newkey = NULL;
 	r = 0;

@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.c,v 1.87 2012/08/17 01:22:56 djm Exp $ */
+/* $OpenBSD: kex.c,v 1.88 2013/01/08 18:49:04 markus Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  *
@@ -403,6 +403,7 @@ choose_enc(struct sshenc *enc, char *client, char *server)
 	enc->name = name;
 	enc->enabled = 0;
 	enc->iv = NULL;
+	enc->iv_len = cipher_ivlen(enc->cipher);
 	enc->key = NULL;
 	enc->key_len = cipher_keylen(enc->cipher);
 	enc->block_size = cipher_blocksize(enc->cipher);
@@ -522,7 +523,7 @@ kex_choose_conf(struct ssh *ssh)
 	char **my = NULL, **peer = NULL;
 	char **cprop, **sprop;
 	int nenc, nmac, ncomp;
-	u_int mode, ctos, need;
+	u_int mode, ctos, need, authlen;
 	int r, first_kex_follows;
 	struct kex *kex = ssh->kex;
 
@@ -562,16 +563,21 @@ kex_choose_conf(struct ssh *ssh)
 		nmac  = ctos ? PROPOSAL_MAC_ALGS_CTOS  : PROPOSAL_MAC_ALGS_STOC;
 		ncomp = ctos ? PROPOSAL_COMP_ALGS_CTOS : PROPOSAL_COMP_ALGS_STOC;
 		if ((r = choose_enc(&newkeys->enc, cprop[nenc],
-		    sprop[nenc])) != 0 ||
+		    sprop[nenc])) != 0)
+			goto out;
+		authlen = cipher_authlen(newkeys->enc.cipher);
+		/* ignore mac for authenticated encryption */
+		if (authlen == 0 &&
 		    (r = choose_mac(ssh, &newkeys->mac, cprop[nmac],
-		    sprop[nmac])) != 0 ||
-		    (r = choose_comp(&newkeys->comp, cprop[ncomp],
+		    sprop[nmac])) != 0)
+			goto out;
+		if ((r = choose_comp(&newkeys->comp, cprop[ncomp],
 		    sprop[ncomp])) != 0)
 			goto out;
 		debug("kex: %s %s %s %s",
 		    ctos ? "client->server" : "server->client",
 		    newkeys->enc.name,
-		    newkeys->mac.name,
+		    authlen == 0 ? newkeys->mac.name : "<implicit>",
 		    newkeys->comp.name);
 	}
 	if ((r = choose_kex(kex, cprop[PROPOSAL_KEX_ALGS],
@@ -586,6 +592,8 @@ kex_choose_conf(struct ssh *ssh)
 			need = newkeys->enc.key_len;
 		if (need < newkeys->enc.block_size)
 			need = newkeys->enc.block_size;
+		if (need < newkeys->enc.iv_len)
+			need = newkeys->enc.iv_len;
 		if (need < newkeys->mac.key_len)
 			need = newkeys->mac.key_len;
 	}
