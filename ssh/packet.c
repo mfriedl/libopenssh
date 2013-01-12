@@ -2410,7 +2410,7 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 	    (r = sshbuf_get_u32(b, &comp->enabled)) != 0 ||
 	    (r = sshbuf_get_cstring(b, &comp->name, NULL)) != 0)
 		goto out;
-	if (enc->name == NULL || mac->name == NULL ||
+	if (enc->name == NULL || 
 	    cipher_by_name(enc->name) != enc->cipher) {
 		r = SSH_ERR_INVALID_FORMAT;
 		goto out;
