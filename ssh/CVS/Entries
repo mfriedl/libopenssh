@@ -140,7 +140,6 @@ D/sshd////
 /bufec.c/1.1/Fri Jan 11 05:56:25 2013//
 /buffer.c/1.32/Fri Jan 11 05:56:25 2013//
 /buffer.h/1.21/Fri Jan 11 05:56:25 2013//
-/cipher.c/1.85/Result of merge+Fri Jan 11 05:56:25 2013//
 /cipher.h/1.39/Result of merge+Fri Jan 11 05:56:25 2013//
 /cleanup.c/1.5/Wed Jan 11 09:23:58 2012//
 /clientloop.c/1.248/Result of merge//
@@ -214,3 +213,4 @@ D/sshd////
 /version.h/1.65/Mon Aug 27 07:22:40 2012//
 /xmalloc.c/1.27/Wed Jan 11 09:23:58 2012//
 /xmalloc.h/1.13/Wed Jan 11 09:23:58 2012//
+/cipher.c/1.86/Result of merge+Sat Jan 12 11:25:30 2013//

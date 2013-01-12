@@ -1,4 +1,4 @@
-/* $OpenBSD: cipher.c,v 1.85 2013/01/08 18:49:04 markus Exp $ */
+/* $OpenBSD: cipher.c,v 1.86 2013/01/12 11:22:04 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -332,7 +332,8 @@ cipher_crypt(struct sshcipher_ctx *cc, u_char *dest, const u_char *src,
 	if (authlen) {
 		/* compute tag (on encrypt) or verify tag (on decrypt) */
 		if (EVP_Cipher(&cc->evp, NULL, NULL, 0) < 0)
-			return SSH_ERR_MAC_INVALID;
+			return cc->encrypt ?
+			    SSH_ERR_LIBCRYPTO_ERROR : SSH_ERR_MAC_INVALID;
 		if (cc->encrypt &&
 		    !EVP_CIPHER_CTX_ctrl(&cc->evp, EVP_CTRL_GCM_GET_TAG,
 		    authlen, dest + aadlen + len))

@@ -12,7 +12,6 @@
 /cert-hostkey.sh/1.6/Wed Jan 11 09:23:58 2012//
 /cert-userkey.sh/1.9/Fri Jan 11 05:39:45 2013//
 /cfgmatch.sh/1.6/Wed Jan 11 09:23:58 2012//
-/cipher-speed.sh/1.6/Wed Oct 10 22:39:35 2012//
 /conch-ciphers.sh/1.2/Wed Jan 11 09:23:58 2012//
 /connect-privsep.sh/1.4/Mon Aug 27 07:22:40 2012//
 /connect.sh/1.4/Wed Sep 19 14:47:15 2012//
@@ -24,7 +23,6 @@
 /forcecommand.sh/1.1/Wed Jan 11 09:23:58 2012//
 /forward-control.sh/1.1/Fri Jan 11 05:39:45 2013//
 /forwarding.sh/1.8/Mon Aug 27 07:22:40 2012//
-/integrity.sh/1.1/Fri Jan 11 05:39:45 2013//
 /kextype.sh/1.1/Wed Jan 11 09:23:58 2012//
 /key-options.sh/1.2/Wed Jan 11 09:23:58 2012//
 /keygen-change.sh/1.2/Wed Jan 11 09:23:58 2012//
@@ -66,8 +64,10 @@
 /stderr-data.sh/1.2/Wed Jan 11 09:23:58 2012//
 /t4.ok/1.1/Wed Jan 11 09:23:58 2012//
 /t5.ok/1.1/Wed Jan 11 09:23:58 2012//
-/test-exec.sh/1.37/Fri Sep 21 09:30:59 2012//
 /transfer.sh/1.1/Wed Jan 11 09:23:58 2012//
-/try-ciphers.sh/1.17/Fri Jan 11 05:39:45 2013//
 /yes-head.sh/1.4/Wed Jan 11 09:23:58 2012//
+/cipher-speed.sh/1.7/Sat Jan 12 11:26:47 2013//
+/integrity.sh/1.2/Sat Jan 12 11:26:47 2013//
+/test-exec.sh/1.37/Sat Jan 12 11:25:19 2013//
+/try-ciphers.sh/1.18/Sat Jan 12 11:26:47 2013//
 D
