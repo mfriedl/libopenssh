@@ -311,7 +311,7 @@ ssh_packet_stop_discard(struct ssh *ssh)
 
 	if (state->packet_discard_mac) {
 		char buf[1024];
-		
+
 		memset(buf, 'a', sizeof(buf));
 		while (sshbuf_len(state->incoming_packet) <
 		    PACKET_MAX_SIZE)
@@ -1619,7 +1619,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 			return ssh_packet_start_discard(ssh, enc, mac,
 			    state->packlen, PACKET_MAX_SIZE - need);
 		}
-				
+
 		DBG(debug("MAC #%d ok", state->p_read.seqnr));
 		if ((r = sshbuf_consume(state->input, mac->mac_len)) != 0)
 			goto out;
@@ -2410,7 +2410,7 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 	    (r = sshbuf_get_u32(b, &comp->enabled)) != 0 ||
 	    (r = sshbuf_get_cstring(b, &comp->name, NULL)) != 0)
 		goto out;
-	if (enc->name == NULL || 
+	if (enc->name == NULL ||
 	    cipher_by_name(enc->name) != enc->cipher) {
 		r = SSH_ERR_INVALID_FORMAT;
 		goto out;
