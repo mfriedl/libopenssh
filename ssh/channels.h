@@ -292,7 +292,7 @@ int	 deny_input_open(int, u_int32_t, struct ssh *);
 
 /* agent forwarding */
 
-void	 auth_request_forwarding(void);
+void	 auth_request_forwarding(struct ssh *);
 
 /* channel close */
 

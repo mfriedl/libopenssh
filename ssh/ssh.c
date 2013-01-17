@@ -1259,7 +1259,7 @@ ssh_session(struct ssh *ssh)
 
 	if (options.forward_agent) {
 		debug("Requesting authentication agent forwarding.");
-		auth_request_forwarding();
+		auth_request_forwarding(ssh);
 
 		/* Read response from the server. */
 		type = ssh_packet_read(ssh);

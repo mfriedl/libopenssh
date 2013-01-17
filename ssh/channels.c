@@ -3928,9 +3928,8 @@ x11_request_forwarding_with_spoofing(int client_session_id, const char *disp,
 /* Sends a message to the server to request authentication fd forwarding. */
 
 void
-auth_request_forwarding(void)
+auth_request_forwarding(struct ssh *ssh)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	int r;
 
 	if ((r = sshpkt_start(ssh, SSH_CMSG_AGENT_REQUEST_FORWARDING)) != 0 ||
