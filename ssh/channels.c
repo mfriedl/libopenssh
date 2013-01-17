@@ -1302,11 +1302,10 @@ channel_decode_socks5(Channel *c, fd_set *readset, fd_set *writeset)
 }
 
 Channel *
-channel_connect_stdio_fwd(const char *host_to_connect, u_short port_to_connect,
-    int in, int out)
+channel_connect_stdio_fwd(struct ssh *ssh, const char *host_to_connect,
+    u_short port_to_connect, int in, int out)
 {
 	Channel *c;
-	struct ssh *ssh = active_state; /* XXX */
 
 	debug("channel_connect_stdio_fwd %s:%d", host_to_connect,
 	    port_to_connect);

@@ -957,7 +957,8 @@ process_mux_stdio_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 	if (!isatty(new_fd[1]))
 		set_nonblock(new_fd[1]);
 
-	nc = channel_connect_stdio_fwd(chost, cport, new_fd[0], new_fd[1]);
+	nc = channel_connect_stdio_fwd(c->ssh, chost, cport, new_fd[0],
+	    new_fd[1]);
 
 	nc->ctl_chan = c->self;		/* link session -> control channel */
 	c->remote_id = nc->self; 	/* link control -> session channel */

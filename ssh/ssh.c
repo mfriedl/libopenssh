@@ -1041,7 +1041,7 @@ client_cleanup_stdio_fwd(int id, void *arg)
 }
 
 static void
-ssh_init_stdio_forwarding(void)
+ssh_init_stdio_forwarding(struct ssh *ssh)
 {
 	Channel *c;
 	int in, out;
@@ -1056,7 +1056,7 @@ ssh_init_stdio_forwarding(void)
 	if ((in = dup(STDIN_FILENO)) < 0 ||
 	    (out = dup(STDOUT_FILENO)) < 0)
 		fatal("channel_connect_stdio_fwd: dup() in/out failed");
-	if ((c = channel_connect_stdio_fwd(stdio_forward_host,
+	if ((c = channel_connect_stdio_fwd(ssh, stdio_forward_host,
 	    stdio_forward_port, in, out)) == NULL)
 		fatal("%s: channel_connect_stdio_fwd failed", __func__);
 	channel_register_cleanup(c->self, client_cleanup_stdio_fwd, 0);
@@ -1271,7 +1271,7 @@ ssh_session(struct ssh *ssh)
 	}
 
 	/* Initiate port forwardings. */
-	ssh_init_stdio_forwarding();
+	ssh_init_stdio_forwarding(ssh);
 	ssh_init_forwarding(ssh);
 
 	/* Execute a local command */
@@ -1417,7 +1417,7 @@ ssh_session2(struct ssh *ssh)
 
 	/* XXX should be pre-session */
 	if (!options.control_persist)
-		ssh_init_stdio_forwarding();
+		ssh_init_stdio_forwarding(ssh);
 	ssh_init_forwarding(ssh);
 
 	/* Start listening for multiplex clients */
@@ -1449,7 +1449,7 @@ ssh_session2(struct ssh *ssh)
 	 * stdio forward setup that we skipped earlier.
 	 */
 	if (options.control_persist && muxserver_sock == -1)
-		ssh_init_stdio_forwarding();
+		ssh_init_stdio_forwarding(ssh);
 
 	if (!no_shell_flag || (ssh->compat & SSH_BUG_DUMMYCHAN))
 		id = ssh_session2_open(ssh);
