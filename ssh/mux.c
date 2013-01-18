@@ -457,7 +457,7 @@ process_mux_new_session(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *
 		packetmax >>= 1;
 	}
 
-	nc = channel_new("session", SSH_CHANNEL_OPENING,
+	nc = channel_new(c->ssh, "session", SSH_CHANNEL_OPENING,
 	    new_fd[0], new_fd[1], new_fd[2], window, packetmax,
 	    CHAN_EXTENDED_WRITE, "client-session", /*nonblock*/0);
 
@@ -1136,6 +1136,7 @@ mux_tty_alloc_failed(Channel *c)
 void
 muxserver_listen(void)
 {
+	struct ssh *ssh = active_state; /* XXX */
 	struct sockaddr_un addr;
 	mode_t old_umask;
 	char *orig_control_path = options.control_path;
@@ -1221,7 +1222,7 @@ muxserver_listen(void)
 
 	set_nonblock(muxserver_sock);
 
-	mux_listener_channel = channel_new("mux listener",
+	mux_listener_channel = channel_new(ssh, "mux listener",
 	    SSH_CHANNEL_MUX_LISTENER, muxserver_sock, muxserver_sock, -1,
 	    CHAN_TCP_WINDOW_DEFAULT, CHAN_TCP_PACKET_DEFAULT,
 	    0, options.control_path, 1);

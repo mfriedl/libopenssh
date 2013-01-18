@@ -92,6 +92,7 @@ struct channel_connect {
 typedef int mux_callback_fn(struct Channel *);
 
 struct Channel {
+	struct ssh *ssh;	/* ssh connection */
 	int     type;		/* channel type/state */
 	int     self;		/* my own channel identifier */
 	int     remote_id;	/* channel identifier for remote peer */
@@ -209,7 +210,8 @@ struct Channel {
 
 Channel	*channel_by_id(int);
 Channel	*channel_lookup(int);
-Channel *channel_new(char *, int, int, int, int, u_int, u_int, int, char *, int);
+Channel *channel_new(struct ssh *, char *, int, int, int, int, u_int, u_int, int,
+    char *, int);
 void	 channel_set_fds(int, int, int, int, int, int, int, u_int);
 void	 channel_free(Channel *);
 void	 channel_free_all(void);

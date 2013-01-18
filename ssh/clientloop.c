@@ -1883,7 +1883,7 @@ client_input_agent_open(int type, u_int32_t seq, struct ssh *ssh)
 	 * agent.
 	 */
 	if (r == 0) {
-		c = channel_new("", SSH_CHANNEL_OPEN, sock, sock,
+		c = channel_new(ssh, "", SSH_CHANNEL_OPEN, sock, sock,
 		    -1, 0, 0, 0, "authentication agent connection", 1);
 		c->remote_id = remote_id;
 		c->force_drain = 1;
@@ -1970,7 +1970,7 @@ client_request_x11(struct ssh *ssh, const char *request_type, int rchan)
 	sock = x11_connect_display();
 	if (sock < 0)
 		return NULL;
-	c = channel_new("x11",
+	c = channel_new(ssh, "x11",
 	    SSH_CHANNEL_X11_OPEN, sock, sock, -1,
 	    CHAN_TCP_WINDOW_DEFAULT, CHAN_X11_PACKET_DEFAULT, 0, "x11", 1);
 	c->force_drain = 1;
@@ -1995,7 +1995,7 @@ client_request_agent(struct ssh *ssh, const char *request_type, int rchan)
 			    __func__, ssh_err(r));
 		return NULL;
 	}
-	c = channel_new("authentication agent connection",
+	c = channel_new(ssh, "authentication agent connection",
 	    SSH_CHANNEL_OPEN, sock, sock, -1,
 	    CHAN_X11_WINDOW_DEFAULT, CHAN_TCP_PACKET_DEFAULT, 0,
 	    "authentication agent connection", 1);
@@ -2026,7 +2026,7 @@ client_request_tun_fwd(struct ssh *ssh, int tun_mode, int local_tun,
 		return -1;
 	}
 
-	c = channel_new("tun", SSH_CHANNEL_OPENING, fd, fd, -1,
+	c = channel_new(ssh, "tun", SSH_CHANNEL_OPENING, fd, fd, -1,
 	    CHAN_TCP_WINDOW_DEFAULT, CHAN_TCP_PACKET_DEFAULT, 0, "tun", 1);
 	c->datagram = 1;
 

@@ -1029,7 +1029,7 @@ server_request_tun(struct ssh *ssh)
 	sock = tun_open(tun, mode);
 	if (sock < 0)
 		goto done;
-	c = channel_new("tun", SSH_CHANNEL_OPEN, sock, sock, -1,
+	c = channel_new(ssh, "tun", SSH_CHANNEL_OPEN, sock, sock, -1,
 	    CHAN_TCP_WINDOW_DEFAULT, CHAN_TCP_PACKET_DEFAULT, 0, "tun", 1);
 	c->datagram = 1;
 
@@ -1061,7 +1061,7 @@ server_request_session(struct ssh *ssh)
 	 * SSH_CHANNEL_LARVAL.  Additionally, a callback for handling all
 	 * CHANNEL_REQUEST messages is registered.
 	 */
-	c = channel_new("session", SSH_CHANNEL_LARVAL,
+	c = channel_new(ssh, "session", SSH_CHANNEL_LARVAL,
 	    -1, -1, -1, /*window size*/0, CHAN_SES_PACKET_DEFAULT,
 	    0, "server-session", 1);
 	if (session_open(ssh, c->self) != 1) {

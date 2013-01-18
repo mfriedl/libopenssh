@@ -220,7 +220,7 @@ auth_input_request_forwarding(Session *s)
 	}
 
 	/* Allocate a channel for the authentication agent socket. */
-	nc = channel_new("auth socket",
+	nc = channel_new(s->ssh, "auth socket",
 	    SSH_CHANNEL_AUTH_SOCKET, sock, sock, -1,
 	    CHAN_X11_WINDOW_DEFAULT, CHAN_X11_PACKET_DEFAULT,
 	    0, "auth socket", 1);
