@@ -1168,7 +1168,7 @@ server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 			    "Server has disabled port forwarding.");
 		} else {
 			/* Start listening on the port */
-			success = channel_setup_remote_fwd_listener(
+			success = channel_setup_remote_fwd_listener(ssh,
 			    listen_address, listen_port,
 			    &allocated_listen_port, options.gateway_ports);
 		}

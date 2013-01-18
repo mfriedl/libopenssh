@@ -744,7 +744,7 @@ process_mux_open_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 	}
 
 	if (ftype == MUX_FWD_LOCAL || ftype == MUX_FWD_DYNAMIC) {
-		if (!channel_setup_local_fwd_listener(fwd.listen_host,
+		if (!channel_setup_local_fwd_listener(c->ssh, fwd.listen_host,
 		    fwd.listen_port, fwd.connect_host, fwd.connect_port,
 		    options.gateway_ports)) {
  fail:
@@ -758,8 +758,9 @@ process_mux_open_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 	} else {
 		struct mux_channel_confirm_ctx *fctx;
 
-		fwd.handle = channel_request_remote_forwarding(fwd.listen_host,
-		    fwd.listen_port, fwd.connect_host, fwd.connect_port);
+		fwd.handle = channel_request_remote_forwarding(c->ssh,
+		    fwd.listen_host, fwd.listen_port, fwd.connect_host,
+		    fwd.connect_port);
 		if (fwd.handle < 0)
 			goto fail;
 		add_remote_forward(&options, &fwd);

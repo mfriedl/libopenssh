@@ -977,15 +977,15 @@ process_cmdline(struct ssh *ssh)
 			goto out;
 		}
 		if (local || dynamic) {
-			if (!channel_setup_local_fwd_listener(fwd.listen_host,
-			    fwd.listen_port, fwd.connect_host,
+			if (!channel_setup_local_fwd_listener(ssh,
+			    fwd.listen_host, fwd.listen_port, fwd.connect_host,
 			    fwd.connect_port, options.gateway_ports)) {
 				logit("Port forwarding failed.");
 				goto out;
 			}
 		} else {
-			if (channel_request_remote_forwarding(fwd.listen_host,
-			    fwd.listen_port, fwd.connect_host,
+			if (channel_request_remote_forwarding(ssh,
+			    fwd.listen_host, fwd.listen_port, fwd.connect_host,
 			    fwd.connect_port) < 0) {
 				logit("Port forwarding failed.");
 				goto out;

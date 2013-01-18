@@ -272,12 +272,13 @@ Channel	*channel_connect_to(const char *, u_short, char *, char *);
 Channel	*channel_connect_stdio_fwd(struct ssh *, const char*, u_short,
     int, int);
 Channel	*channel_connect_by_listen_address(u_short, char *, char *);
-int	 channel_request_remote_forwarding(const char *, u_short,
+int	 channel_request_remote_forwarding(struct ssh *, const char *, u_short,
 	     const char *, u_short);
-int	 channel_setup_local_fwd_listener(const char *, u_short,
+int	 channel_setup_local_fwd_listener(struct ssh *, const char *, u_short,
 	     const char *, u_short, int);
 int	 channel_request_rforward_cancel(const char *host, u_short port);
-int	 channel_setup_remote_fwd_listener(const char *, u_short, int *, int);
+int	 channel_setup_remote_fwd_listener(struct ssh *, const char *, u_short,
+    int *, int);
 int	 channel_cancel_rport_listener(const char *, u_short);
 int	 channel_cancel_lport_listener(struct ssh *, const char *, u_short,
     int, int);

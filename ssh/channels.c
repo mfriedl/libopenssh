@@ -2849,11 +2849,10 @@ channel_fwd_bind_addr(struct ssh *ssh, const char *listen_addr, int *wildcardp,
 }
 
 static int
-channel_setup_fwd_listener(int type, const char *listen_addr,
+channel_setup_fwd_listener(struct ssh *ssh, int type, const char *listen_addr,
     u_short listen_port, int *allocated_listen_port,
     const char *host_to_connect, u_short port_to_connect, int gateway_ports)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	Channel *c;
 	int sock, r, success = 0, wildcard = 0, is_client;
 	struct addrinfo hints, *ai, *aitop;
@@ -3048,20 +3047,21 @@ channel_cancel_lport_listener(struct ssh *ssh, const char *lhost, u_short lport,
 
 /* protocol local port fwd, used by ssh (and sshd in v1) */
 int
-channel_setup_local_fwd_listener(const char *listen_host, u_short listen_port,
-    const char *host_to_connect, u_short port_to_connect, int gateway_ports)
+channel_setup_local_fwd_listener(struct ssh *ssh, const char *listen_host,
+    u_short listen_port, const char *host_to_connect, u_short port_to_connect,
+    int gateway_ports)
 {
-	return channel_setup_fwd_listener(SSH_CHANNEL_PORT_LISTENER,
+	return channel_setup_fwd_listener(ssh, SSH_CHANNEL_PORT_LISTENER,
 	    listen_host, listen_port, NULL, host_to_connect, port_to_connect,
 	    gateway_ports);
 }
 
 /* protocol v2 remote port fwd, used by sshd */
 int
-channel_setup_remote_fwd_listener(const char *listen_address,
+channel_setup_remote_fwd_listener(struct ssh *ssh, const char *listen_address,
     u_short listen_port, int *allocated_listen_port, int gateway_ports)
 {
-	return channel_setup_fwd_listener(SSH_CHANNEL_RPORT_LISTENER,
+	return channel_setup_fwd_listener(ssh, SSH_CHANNEL_RPORT_LISTENER,
 	    listen_address, listen_port, allocated_listen_port,
 	    NULL, 0, gateway_ports);
 }
@@ -3094,10 +3094,9 @@ channel_rfwd_bind_host(const char *listen_host)
  * channel_update_permitted_opens().
  */
 int
-channel_request_remote_forwarding(const char *listen_host, u_short listen_port,
-    const char *host_to_connect, u_short port_to_connect)
+channel_request_remote_forwarding(struct ssh *ssh, const char *listen_host,
+    u_short listen_port, const char *host_to_connect, u_short port_to_connect)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	int r, type, success = 0, idx = -1;
 
 	/* Send the forward request to the remote side. */
@@ -3217,7 +3216,7 @@ channel_input_port_forward_request(int is_root, int gateway_ports)
 		ssh_packet_disconnect(ssh, "Dynamic forwarding denied.");
 
 	/* Initiate forwarding */
-	success = channel_setup_local_fwd_listener(NULL, port, hostname,
+	success = channel_setup_local_fwd_listener(ssh, NULL, port, hostname,
 	    host_port, gateway_ports);
 
 	/* Free the argument string. */

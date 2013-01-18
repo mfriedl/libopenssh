@@ -1078,7 +1078,7 @@ ssh_init_forwarding(struct ssh *ssh)
 		    options.local_forwards[i].listen_port,
 		    options.local_forwards[i].connect_host,
 		    options.local_forwards[i].connect_port);
-		success += channel_setup_local_fwd_listener(
+		success += channel_setup_local_fwd_listener(ssh,
 		    options.local_forwards[i].listen_host,
 		    options.local_forwards[i].listen_port,
 		    options.local_forwards[i].connect_host,
@@ -1100,7 +1100,7 @@ ssh_init_forwarding(struct ssh *ssh)
 		    options.remote_forwards[i].connect_host,
 		    options.remote_forwards[i].connect_port);
 		options.remote_forwards[i].handle =
-		    channel_request_remote_forwarding(
+		    channel_request_remote_forwarding(ssh,
 		    options.remote_forwards[i].listen_host,
 		    options.remote_forwards[i].listen_port,
 		    options.remote_forwards[i].connect_host,
