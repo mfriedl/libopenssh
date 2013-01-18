@@ -868,7 +868,7 @@ client_register_global_confirm(global_confirm_cb *cb, void *ctx)
 }
 
 static void
-process_cmdline(void)
+process_cmdline(struct ssh *ssh)
 {
 	void (*handler)(int);
 	char *s, *cmd, *cancel_host;
@@ -960,10 +960,10 @@ process_cmdline(void)
 			ok = channel_request_rforward_cancel(cancel_host,
 			    cancel_port) == 0;
 		else if (dynamic)
-                	ok = channel_cancel_lport_listener(cancel_host,
+			ok = channel_cancel_lport_listener(ssh, cancel_host,
 			    cancel_port, 0, options.gateway_ports) > 0;
 		else
-                	ok = channel_cancel_lport_listener(cancel_host,
+			ok = channel_cancel_lport_listener(ssh, cancel_host,
 			    cancel_port, CHANNEL_CANCEL_PORT_STATIC,
 			    options.gateway_ports) > 0;
 		if (!ok) {
@@ -1285,7 +1285,7 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf **binp,
 			case 'C':
 				if (c && c->ctl_chan != -1)
 					goto noescape;
-				process_cmdline();
+				process_cmdline(ssh);
 				continue;
 
 			default:

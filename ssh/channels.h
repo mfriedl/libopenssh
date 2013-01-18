@@ -279,7 +279,8 @@ int	 channel_setup_local_fwd_listener(const char *, u_short,
 int	 channel_request_rforward_cancel(const char *host, u_short port);
 int	 channel_setup_remote_fwd_listener(const char *, u_short, int *, int);
 int	 channel_cancel_rport_listener(const char *, u_short);
-int	 channel_cancel_lport_listener(const char *, u_short, int, int);
+int	 channel_cancel_lport_listener(struct ssh *, const char *, u_short,
+    int, int);
 int	 permitopen_port(const char *);
 
 /* x11 forwarding */

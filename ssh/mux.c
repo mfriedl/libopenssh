@@ -859,7 +859,7 @@ process_mux_close_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 			error_reason = "port not in permitted opens";
 	} else {	/* local and dynamic forwards */
 		/* Ditto */
-		if (channel_cancel_lport_listener(fwd.listen_host,
+		if (channel_cancel_lport_listener(c->ssh, fwd.listen_host,
 		    fwd.listen_port, fwd.connect_port,
 		    options.gateway_ports) == -1)
 			error_reason = "port not found";

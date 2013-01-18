@@ -2824,7 +2824,7 @@ channel_set_af(int af)
  * "localhost"             -> loopback v4/v6
  */
 static const char *
-channel_fwd_bind_addr(const char *listen_addr, int *wildcardp,
+channel_fwd_bind_addr(struct ssh *ssh, const char *listen_addr, int *wildcardp,
     int is_client, int gateway_ports)
 {
 	const char *addr = NULL;
@@ -2835,7 +2835,7 @@ channel_fwd_bind_addr(const char *listen_addr, int *wildcardp,
 		if (gateway_ports)
 			wildcard = 1;
 	} else if (gateway_ports || is_client) {
-		if (((active_state->compat & SSH_OLD_FORWARD_ADDR) &&
+		if (((ssh->compat & SSH_OLD_FORWARD_ADDR) &&
 		    strcmp(listen_addr, "0.0.0.0") == 0 && is_client == 0) ||
 		    *listen_addr == '\0' || strcmp(listen_addr, "*") == 0 ||
 		    (!is_client && gateway_ports == 1))
@@ -2875,7 +2875,7 @@ channel_setup_fwd_listener(int type, const char *listen_addr,
 	}
 
 	/* Determine the bind address, cf. channel_fwd_bind_addr() comment */
-	addr = channel_fwd_bind_addr(listen_addr, &wildcard,
+	addr = channel_fwd_bind_addr(ssh, listen_addr, &wildcard,
 	    is_client, gateway_ports);
 	debug3("channel_setup_fwd_listener: type %d wildcard %d addr %s",
 	    type, wildcard, (addr == NULL) ? "NULL" : addr);
@@ -3011,18 +3011,19 @@ channel_cancel_rport_listener(const char *host, u_short port)
 }
 
 int
-channel_cancel_lport_listener(const char *lhost, u_short lport,
+channel_cancel_lport_listener(struct ssh *ssh, const char *lhost, u_short lport,
     int cport, int gateway_ports)
 {
 	u_int i;
 	int found = 0;
-	const char *addr = channel_fwd_bind_addr(lhost, NULL, 1, gateway_ports);
+	const char *addr = channel_fwd_bind_addr(ssh, lhost, NULL, 1,
+	    gateway_ports);
 
 	for (i = 0; i < channels_alloc; i++) {
 		Channel *c = channels[i];
 		if (c == NULL || c->type != SSH_CHANNEL_PORT_LISTENER)
 			continue;
-		if (c->listening_port != lport)
+		if (c->listening_port != lport || c->ssh != ssh)
 			continue;
 		if (cport == CHANNEL_CANCEL_PORT_STATIC) {
 			/* skip dynamic forwardings */
