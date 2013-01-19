@@ -791,7 +791,6 @@ main(int ac, char **av)
 	    options.proxy_command);
 	if (!ssh)
 		exit(255);
-	active_state = ssh; /* XXX */
 
 	if (timeout_ms > 0)
 		debug3("timeout: %d ms remain after connect", timeout_ms);
