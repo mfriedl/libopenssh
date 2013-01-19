@@ -1484,12 +1484,9 @@ client_filter_cleanup(int cid, void *ctx)
 int
 client_simple_escape_filter(Channel *c, char *buf, int len)
 {
-	struct ssh *ssh = active_state;	/* XXX get from channel? */
-
 	if (c->extended_usage != CHAN_EXTENDED_WRITE)
 		return 0;
-
-	return process_escapes(ssh, c, &c->input, &c->output, &c->extended,
+	return process_escapes(c->ssh, c, &c->input, &c->output, &c->extended,
 	    buf, len);
 }
 
