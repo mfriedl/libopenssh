@@ -201,10 +201,6 @@ static int ssh_session2(struct ssh *);
 static void load_public_identity_files(void);
 static void main_sigchld_handler(int);
 
-/* from muxclient.c */
-void muxclient(const char *);
-void muxserver_listen(void);
-
 /* ~/ expand a list of paths. NB. assumes path[n] is heap-allocated. */
 static void
 tilde_expand_paths(char **paths, u_int num_paths)
@@ -1421,7 +1417,7 @@ ssh_session2(struct ssh *ssh)
 	ssh_init_forwarding(ssh);
 
 	/* Start listening for multiplex clients */
-	muxserver_listen();
+	muxserver_listen(ssh);
 
  	/*
 	 * If we are in control persist mode and have a working mux listen

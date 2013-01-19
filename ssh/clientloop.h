@@ -75,7 +75,7 @@ void client_expect_confirm(int, const char *, enum confirm_action);
 #define SSHMUX_COMMAND_STOP		6	/* Disable mux but not conn */
 #define SSHMUX_COMMAND_CANCEL_FWD	7	/* Cancel forwarding(s) */
 
-void	muxserver_listen(void);
+void	muxserver_listen(struct ssh *);
 void	muxclient(const char *);
 void	mux_exit_message(Channel *, int);
 void	mux_tty_alloc_failed(Channel *);

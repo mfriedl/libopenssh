@@ -1136,9 +1136,8 @@ mux_tty_alloc_failed(Channel *c)
 
 /* Prepare a mux master to listen on a Unix domain socket. */
 void
-muxserver_listen(void)
+muxserver_listen(struct ssh *ssh)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	struct sockaddr_un addr;
 	mode_t old_umask;
 	char *orig_control_path = options.control_path;
