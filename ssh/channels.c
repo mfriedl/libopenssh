@@ -3257,7 +3257,7 @@ channel_add_permitted_opens(char *host, int port)
  * passed then they entry will be invalidated.
  */
 void
-channel_update_permitted_opens(int idx, int newport)
+channel_update_permitted_opens(struct ssh *ssh, int idx, int newport)
 {
 	if (idx < 0 || idx >= num_permitted_opens) {
 		debug("channel_update_permitted_opens: index out of range:"
@@ -3271,7 +3271,7 @@ channel_update_permitted_opens(int idx, int newport)
 	    permitted_opens[idx].port_to_connect);
 	if (newport >= 0)  {
 		permitted_opens[idx].listen_port = 
-		    (active_state->compat & SSH_BUG_DYNAMIC_RPORT) ? 0 : newport;
+		    (ssh->compat & SSH_BUG_DYNAMIC_RPORT) ? 0 : newport;
 	} else {
 		permitted_opens[idx].listen_port = 0;
 		permitted_opens[idx].port_to_connect = 0;

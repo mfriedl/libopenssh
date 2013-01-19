@@ -615,7 +615,7 @@ mux_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 			    (r = sshbuf_put_u32(o, rfwd->allocated_port)) != 0)
 				fatal("%s: buffer error: %s",
 				    __func__, ssh_err(r));
-			channel_update_permitted_opens(rfwd->handle,
+			channel_update_permitted_opens(ssh, rfwd->handle,
 			   rfwd->allocated_port);
 		} else {
 			send_mux_ok(o, fctx->rid);
@@ -623,7 +623,7 @@ mux_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 		goto out;
 	} else {
 		if (rfwd->listen_port == 0)
-			channel_update_permitted_opens(rfwd->handle, -1);
+			channel_update_permitted_opens(ssh, rfwd->handle, -1);
 		xasprintf(&failmsg, "remote port forwarding failed for "
 		    "listen port %d", rfwd->listen_port);
 	}
