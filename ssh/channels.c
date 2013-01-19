@@ -3071,15 +3071,15 @@ channel_setup_remote_fwd_listener(struct ssh *ssh, const char *listen_address,
  * this server.
  */
 static const char *
-channel_rfwd_bind_host(const char *listen_host)
+channel_rfwd_bind_host(struct ssh *ssh, const char *listen_host)
 {
 	if (listen_host == NULL) {
-		if (active_state->compat & SSH_BUG_RFWD_ADDR)
+		if (ssh->compat & SSH_BUG_RFWD_ADDR)
 			return "127.0.0.1";
 		else
 			return "localhost";
 	} else if (*listen_host == '\0' || strcmp(listen_host, "*") == 0) {
-		if (active_state->compat & SSH_BUG_RFWD_ADDR)
+		if (ssh->compat & SSH_BUG_RFWD_ADDR)
 			return "0.0.0.0";
 		else
 			return "";
@@ -3105,7 +3105,7 @@ channel_request_remote_forwarding(struct ssh *ssh, const char *listen_host,
 		    (r = sshpkt_put_cstring(ssh, "tcpip-forward")) != 0 ||
 		    (r = sshpkt_put_u8(ssh, 1)) != 0 ||	/* boolean: want reply */
 		    (r = sshpkt_put_cstring(ssh,
-		    channel_rfwd_bind_host(listen_host))) != 0 ||
+		    channel_rfwd_bind_host(ssh, listen_host))) != 0 ||
 		    (r = sshpkt_put_u32(ssh, listen_port)) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
@@ -3173,7 +3173,8 @@ channel_request_rforward_cancel(const char *host, u_short port)
 	if ((r = sshpkt_start(ssh, SSH2_MSG_GLOBAL_REQUEST)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, "cancel-tcpip-forward")) != 0 ||
 	    (r = sshpkt_put_u8(ssh, 0)) != 0 ||
-	    (r = sshpkt_put_cstring(ssh, channel_rfwd_bind_host(host))) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, channel_rfwd_bind_host(ssh, host)))
+	    != 0 ||
 	    (r = sshpkt_put_u32(ssh, port)) != 0 ||
 	    (r = sshpkt_send(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
