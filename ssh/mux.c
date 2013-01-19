@@ -1236,7 +1236,6 @@ muxserver_listen(struct ssh *ssh)
 static void
 mux_session_confirm(int id, int success, void *arg)
 {
-	struct ssh *ssh = active_state; /* XXXX */
 	struct mux_session_confirm_ctx *cctx = arg;
 	const char *display;
 	Channel *c, *cc;
@@ -1272,7 +1271,7 @@ mux_session_confirm(int id, int success, void *arg)
 		/* Request forwarding with authentication spoofing. */
 		debug("Requesting X11 forwarding with authentication "
 		    "spoofing.");
-		x11_request_forwarding_with_spoofing(ssh, id, display, proto,
+		x11_request_forwarding_with_spoofing(c->ssh, id, display, proto,
 		    data, 1);
 		client_expect_confirm(id, "X11 forwarding", CONFIRM_WARN);
 		/* XXX exit_on_forward_failure */
@@ -1281,11 +1280,11 @@ mux_session_confirm(int id, int success, void *arg)
 	if (cctx->want_agent_fwd && options.forward_agent) {
 		debug("Requesting authentication agent forwarding.");
 		channel_request_start(id, "auth-agent-req@openssh.com", 0);
-		if ((r = sshpkt_send(ssh)) != 0)
+		if ((r = sshpkt_send(c->ssh)) != 0)
 			fatal("%s: packet error: %s", __func__, ssh_err(r));
 	}
 
-	client_session2_setup(ssh, id, cctx->want_tty, cctx->want_subsys,
+	client_session2_setup(c->ssh, id, cctx->want_tty, cctx->want_subsys,
 	    cctx->term, &cctx->tio, c->rfd, cctx->cmd, cctx->env);
 
 	debug3("%s: sending success reply", __func__);
