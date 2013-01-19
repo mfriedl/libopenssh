@@ -1236,7 +1236,7 @@ ssh_session(struct ssh *ssh)
 		/* Request forwarding with authentication spoofing. */
 		debug("Requesting X11 forwarding with authentication "
 		    "spoofing.");
-		x11_request_forwarding_with_spoofing(0, display, proto,
+		x11_request_forwarding_with_spoofing(ssh, 0, display, proto,
 		    data, 0);
 		/* Read response from the server. */
 		type = ssh_packet_read(ssh);
@@ -1341,7 +1341,7 @@ ssh_session2_setup(int id, int success, void *arg)
 		/* Request forwarding with authentication spoofing. */
 		debug("Requesting X11 forwarding with authentication "
 		    "spoofing.");
-		x11_request_forwarding_with_spoofing(id, display, proto,
+		x11_request_forwarding_with_spoofing(ssh, id, display, proto,
 		    data, 1);
 		client_expect_confirm(id, "X11 forwarding", CONFIRM_WARN);
 		/* XXX exit_on_forward_failure */

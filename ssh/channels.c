@@ -3851,10 +3851,9 @@ deny_input_open(int type, u_int32_t seq, struct ssh *ssh)
  * This should be called in the client only.
  */
 void
-x11_request_forwarding_with_spoofing(int client_session_id, const char *disp,
-    const char *proto, const char *data, int want_reply)
+x11_request_forwarding_with_spoofing(struct ssh *ssh, int client_session_id,
+    const char *disp, const char *proto, const char *data, int want_reply)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	u_int data_len = (u_int) strlen(data) / 2;
 	u_int i, value;
 	char *new_data;
