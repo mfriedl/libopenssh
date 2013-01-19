@@ -3192,9 +3192,9 @@ channel_request_rforward_cancel(struct ssh *ssh, const char *host, u_short port)
  * message if there was an error).
  */
 int
-channel_input_port_forward_request(int is_root, int gateway_ports)
+channel_input_port_forward_request(struct ssh *ssh, int is_root,
+    int gateway_ports)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	u_int port, host_port;
 	int r, success = 0;
 	char *hostname;

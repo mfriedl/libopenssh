@@ -267,7 +267,7 @@ void	 channel_update_permitted_opens(int, int);
 void	 channel_clear_permitted_opens(void);
 void	 channel_clear_adm_permitted_opens(void);
 void 	 channel_print_adm_permitted_opens(void);
-int      channel_input_port_forward_request(int, int);
+int      channel_input_port_forward_request(struct ssh *ssh, int, int);
 Channel	*channel_connect_to(const char *, u_short, char *, char *);
 Channel	*channel_connect_stdio_fwd(struct ssh *, const char*, u_short,
     int, int);

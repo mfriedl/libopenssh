@@ -385,7 +385,7 @@ do_authenticated1(struct ssh *ssh)
 				break;
 			}
 			debug("Received TCP/IP port forwarding request.");
-			if (channel_input_port_forward_request(s->pw->pw_uid == 0,
+			if (channel_input_port_forward_request(ssh, s->pw->pw_uid == 0,
 			    options.gateway_ports) < 0) {
 				debug("Port forwarding failed.");
 				break;
