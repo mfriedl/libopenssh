@@ -1927,7 +1927,7 @@ client_request_forwarded_tcpip(struct ssh *ssh, const char *request_type, int rc
 	    "originator %s port %d", listen_address, listen_port,
 	    originator_address, originator_port);
 
-	c = channel_connect_by_listen_address(listen_port,
+	c = channel_connect_by_listen_address(ssh, listen_port,
 	    "forwarded-tcpip", originator_address);
 
 	free(originator_address);

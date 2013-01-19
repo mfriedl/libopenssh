@@ -268,10 +268,11 @@ void	 channel_clear_permitted_opens(void);
 void	 channel_clear_adm_permitted_opens(void);
 void 	 channel_print_adm_permitted_opens(void);
 int      channel_input_port_forward_request(struct ssh *, int, int);
-Channel	*channel_connect_to(const char *, u_short, char *, char *);
+Channel	*channel_connect_to(struct ssh *, const char *, u_short, char *, char *);
 Channel	*channel_connect_stdio_fwd(struct ssh *, const char*, u_short,
     int, int);
-Channel	*channel_connect_by_listen_address(u_short, char *, char *);
+Channel	*channel_connect_by_listen_address(struct ssh *, u_short, char *,
+    char *);
 int	 channel_request_remote_forwarding(struct ssh *, const char *, u_short,
 	     const char *, u_short);
 int	 channel_setup_local_fwd_listener(struct ssh *, const char *, u_short,

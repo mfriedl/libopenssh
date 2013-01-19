@@ -2756,7 +2756,7 @@ channel_input_port_open(int type, u_int32_t seq, struct ssh *ssh)
 	}
 	if ((r = sshpkt_get_end(ssh)) != 0)
 		CHANNEL_PACKET_ERROR(NULL, r);
-	c = channel_connect_to(host, host_port, "connected socket",
+	c = channel_connect_to(ssh, host, host_port, "connected socket",
 	    originator_string);
 	xfree(originator_string);
 	xfree(host);
@@ -3432,9 +3432,9 @@ channel_connect_ctx_free(struct channel_connect *cctx)
 
 /* Return CONNECTING channel to remote host, port */
 static Channel *
-connect_to(const char *host, u_short port, char *ctype, char *rname)
+connect_to(struct ssh *ssh, const char *host, u_short port, char *ctype,
+    char *rname)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	struct addrinfo hints;
 	int gaierr;
 	int sock = -1;
@@ -3470,14 +3470,15 @@ connect_to(const char *host, u_short port, char *ctype, char *rname)
 }
 
 Channel *
-channel_connect_by_listen_address(u_short listen_port, char *ctype, char *rname)
+channel_connect_by_listen_address(struct ssh *ssh, u_short listen_port,
+    char *ctype, char *rname)
 {
 	int i;
 
 	for (i = 0; i < num_permitted_opens; i++) {
 		if (permitted_opens[i].host_to_connect != NULL &&
 		    port_match(permitted_opens[i].listen_port, listen_port)) {
-			return connect_to(
+			return connect_to(ssh,
 			    permitted_opens[i].host_to_connect,
 			    permitted_opens[i].port_to_connect, ctype, rname);
 		}
@@ -3489,7 +3490,8 @@ channel_connect_by_listen_address(u_short listen_port, char *ctype, char *rname)
 
 /* Check if connecting to that port is permitted and connect. */
 Channel *
-channel_connect_to(const char *host, u_short port, char *ctype, char *rname)
+channel_connect_to(struct ssh *ssh, const char *host, u_short port, char *ctype,
+    char *rname)
 {
 	int i, permit, permit_adm = 1;
 
@@ -3517,7 +3519,7 @@ channel_connect_to(const char *host, u_short port, char *ctype, char *rname)
 		    "but the request was denied.", host, port);
 		return NULL;
 	}
-	return connect_to(host, port, ctype, rname);
+	return connect_to(ssh, host, port, ctype, rname);
 }
 
 void

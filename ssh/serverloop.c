@@ -985,7 +985,7 @@ server_request_direct_tcpip(struct ssh *ssh)
 	/* XXX fine grained permissions */
 	if ((options.allow_tcp_forwarding & FORWARD_LOCAL) != 0 &&
 	    !no_port_forwarding_flag) {
-		c = channel_connect_to(target, target_port,
+		c = channel_connect_to(ssh, target, target_port,
 		    "direct-tcpip", "direct-tcpip");
 	} else {
 		logit("refused local port forward: "
