@@ -892,7 +892,7 @@ main(int ac, char **av)
 
 	if (ssh_packet_connection_is_on_socket(ssh)) {
 		verbose("Authenticated to %s ([%s]:%d).", host,
-		    ssh_remote_ipaddr(ssh), get_remote_port());
+		    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh));
 	} else {
 		verbose("Authenticated to %s (via proxy).", host);
 	}

@@ -524,7 +524,7 @@ get_connection_info(int populate, int use_dns)
 	ci.host = get_canonical_hostname(use_dns);
 	ci.address = ssh_remote_ipaddr(ssh);
 	ci.laddress = get_local_ipaddr(ssh_packet_get_connection_in(ssh));
-	ci.lport = get_local_port();
+	ci.lport = ssh_get_local_port(ssh);
 	return &ci;
 }
 

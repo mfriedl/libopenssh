@@ -1013,12 +1013,14 @@ do_setup_env(Session *s, const char *shell)
 
 	/* SSH_CLIENT deprecated */
 	snprintf(buf, sizeof buf, "%.50s %d %d",
-	    ssh_remote_ipaddr(ssh), get_remote_port(), get_local_port());
+	    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh),
+	    ssh_get_local_port(ssh));
 	child_set_env(&env, &envsize, "SSH_CLIENT", buf);
 
 	laddr = get_local_ipaddr(ssh_packet_get_connection_in(ssh));
 	snprintf(buf, sizeof buf, "%.50s %d %.50s %d",
-	    ssh_remote_ipaddr(ssh), get_remote_port(), laddr, get_local_port());
+	    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh), laddr,
+	    ssh_get_local_port(ssh));
 	xfree(laddr);
 	child_set_env(&env, &envsize, "SSH_CONNECTION", buf);
 

@@ -211,7 +211,7 @@ auth_log(struct authctxt *authctxt, int authenticated, int partial,
 	    authctxt->valid ? "" : "invalid user ",
 	    authctxt->user,
 	    ssh_remote_ipaddr(active_state),	/* XXX */
-	    get_remote_port(),
+	    ssh_get_remote_port(active_state),
 	    info);
 }
 

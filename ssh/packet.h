@@ -54,8 +54,9 @@ struct ssh {
 	char *host;
 	struct sockaddr *hostaddr;
 
-	/* cached remote ip address */
+	/* cached remote ip address and port*/
 	char *remote_ipaddr;
+	int remote_port;
 
 	/* Dispatcher table */
 	dispatch_fn *dispatch[DISPATCH_MAX];

@@ -1867,7 +1867,7 @@ main(int ac, char **av)
 	    setsockopt(sock_in, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on)) < 0)
 		error("setsockopt SO_KEEPALIVE: %.100s", strerror(errno));
 
-	if ((remote_port = get_remote_port()) < 0) {
+	if ((remote_port = ssh_get_remote_port(ssh)) < 0) {
 		debug("get_remote_port failed");
 		cleanup_exit(255);
 	}
