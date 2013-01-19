@@ -2313,7 +2313,7 @@ session_setup_x11fwd(Session *s)
 		debug("X11 display already set.");
 		return 0;
 	}
-	if (x11_create_display_inet(options.x11_display_offset,
+	if (x11_create_display_inet(ssh, options.x11_display_offset,
 	    options.x11_use_localhost, s->single_connection,
 	    &s->display_number, &s->x11_chanids) == -1) {
 		debug("x11_create_display_inet failed.");

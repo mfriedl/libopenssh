@@ -289,7 +289,7 @@ int	 permitopen_port(const char *);
 /* x11 forwarding */
 
 int	 x11_connect_display(void);
-int	 x11_create_display_inet(int, int, int, u_int *, int **);
+int	 x11_create_display_inet(struct ssh *, int, int, int, u_int *, int **);
 int	 x11_input_open(int, u_int32_t, struct ssh *);
 void	 x11_request_forwarding_with_spoofing(int, const char *, const char *,
 	     const char *, int);

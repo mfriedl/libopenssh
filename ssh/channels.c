@@ -3555,10 +3555,10 @@ channel_send_window_changes(void)
  * stored in display_numberp , or -1 if an error occurs.
  */
 int
-x11_create_display_inet(int x11_display_offset, int x11_use_localhost,
-    int single_connection, u_int *display_numberp, int **chanids)
+x11_create_display_inet(struct ssh *ssh, int x11_display_offset,
+    int x11_use_localhost, int single_connection, u_int *display_numberp,
+    int **chanids)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	Channel *nc = NULL;
 	int display_number, sock;
 	u_short port;
