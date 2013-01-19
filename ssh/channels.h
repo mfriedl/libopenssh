@@ -276,7 +276,8 @@ int	 channel_request_remote_forwarding(struct ssh *, const char *, u_short,
 	     const char *, u_short);
 int	 channel_setup_local_fwd_listener(struct ssh *, const char *, u_short,
 	     const char *, u_short, int);
-int	 channel_request_rforward_cancel(const char *host, u_short port);
+int	 channel_request_rforward_cancel(struct ssh *ssh, const char *host,
+    u_short port);
 int	 channel_setup_remote_fwd_listener(struct ssh *, const char *, u_short,
     int *, int);
 int	 channel_cancel_rport_listener(const char *, u_short);

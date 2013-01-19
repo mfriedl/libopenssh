@@ -3153,9 +3153,8 @@ channel_request_remote_forwarding(struct ssh *ssh, const char *listen_host,
  * local side.
  */
 int
-channel_request_rforward_cancel(const char *host, u_short port)
+channel_request_rforward_cancel(struct ssh *ssh, const char *host, u_short port)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	int r, i;
 
 	if (!compat20)

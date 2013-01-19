@@ -957,7 +957,7 @@ process_cmdline(struct ssh *ssh)
 			goto out;
 		}
 		if (remote)
-			ok = channel_request_rforward_cancel(cancel_host,
+			ok = channel_request_rforward_cancel(ssh, cancel_host,
 			    cancel_port) == 0;
 		else if (dynamic)
 			ok = channel_cancel_lport_listener(ssh, cancel_host,

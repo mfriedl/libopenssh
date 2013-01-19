@@ -855,7 +855,7 @@ process_mux_close_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 		 */
 	        listen_port = (fwd.listen_port == 0) ?
 		    found_fwd->allocated_port : fwd.listen_port;
-		if (channel_request_rforward_cancel(fwd.listen_host,
+		if (channel_request_rforward_cancel(c->ssh, fwd.listen_host,
 		    listen_port) == -1)
 			error_reason = "port not in permitted opens";
 	} else {	/* local and dynamic forwards */
