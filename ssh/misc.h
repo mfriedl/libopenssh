@@ -35,7 +35,7 @@ char	*tohex(const void *, size_t);
 void	 sanitise_stdfd(void);
 void	 ms_subtract_diff(struct timeval *, int *);
 void	 ms_to_timeval(struct timeval *, int);
-void	*reallocn(void *, size_t, size_t);
+int	 reallocn(void **ptr, size_t nmemb, size_t size);
 
 struct passwd *pwcopy(struct passwd *);
 const char *ssh_gai_strerror(int);

@@ -320,7 +320,7 @@ process_mux_new_session(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *
 {
 	Channel *nc;
 	struct mux_session_confirm_ctx *cctx;
-	char *cmd, *cp, **tmp_env;
+	char *cmd, *cp;
 	u_int i, j, env_len, escape_char, window, packetmax;
 	int r, new_fd[3];
 
@@ -359,12 +359,9 @@ process_mux_new_session(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *
 			free(cp);
 			continue;
 		}
-		tmp_env = reallocn(cctx->env, env_len + 2, sizeof(*cctx->env));
-		if (tmp_env == NULL) {
-			r = SSH_ERR_ALLOC_FAIL;
+		if ((r = reallocn(&cctx->env, env_len + 2,
+		    sizeof(*cctx->env))) != 0)
 			goto malf;
-		}
-		cctx->env = tmp_env;
 		cctx->env[env_len++] = cp;
 		cctx->env[env_len] = NULL;
 		if (env_len > MUX_MAX_ENV_VARS) {

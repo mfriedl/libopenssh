@@ -978,18 +978,23 @@ iptos2str(int iptos)
 	return iptos_str;
 }
 
-void *
-reallocn(void *ptr, size_t nmemb, size_t size)
+int
+reallocn(void **ptr, size_t nmemb, size_t size)
 {
 	void *new_ptr;
 	size_t new_size = nmemb * size;
 
 	if (new_size == 0 ||
-	    SIZE_T_MAX / nmemb < size)
-		return NULL;
-	if (ptr == NULL)
+	    SIZE_T_MAX / nmemb < size) {
+		*ptr = NULL;
+		return SSH_ERR_INVALID_ARGUMENT;
+	}
+	if (*ptr == NULL)
 		new_ptr = malloc(new_size);
 	else
-		new_ptr = realloc(ptr, new_size);
-	return new_ptr;
+		new_ptr = realloc(*ptr, new_size);
+	if (new_ptr == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	*ptr = new_ptr;
+	return 0;
 }

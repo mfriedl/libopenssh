@@ -120,13 +120,11 @@ detect_attack(struct deattack_ctx *dctx, const u_char *buf, u_int32_t len)
 		dctx->n = l;
 	} else {
 		if (l > dctx->n) {
-			if ((tmp = reallocn(dctx->h, l,
-			    HASH_ENTRYSIZE)) == NULL) {
+			if (reallocn(&dctx->h, l, HASH_ENTRYSIZE) != 0) {
 				free(dctx->h);
 				dctx->h = NULL;
 				return DEATTACK_ERROR;
 			}
-			dctx->h = tmp;
 			dctx->n = l;
 		}
 	}
