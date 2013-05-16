@@ -1,4 +1,4 @@
-/* $OpenBSD: key.c,v 1.99 2012/05/23 03:28:28 djm Exp $ */
+/* $OpenBSD: key.c,v 1.100 2013/01/17 23:00:01 djm Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Alexander von Gernler.  All rights reserved.
@@ -77,7 +77,7 @@ static const struct keytype key_types[] = {
 };
 
 int
-sshkey_type_from_name(char *name)
+sshkey_type_from_name(const char *name)
 {
 	const struct keytype *kt;
 
@@ -167,7 +167,7 @@ sshkey_ecdsa_nid_from_name(const char *name)
 }
 
 int
-sshkey_cert_is_legacy(struct sshkey *k)
+sshkey_cert_is_legacy(const struct sshkey *k)
 {
 	switch (k->type) {
 	case KEY_DSA_CERT_V00:
@@ -516,8 +516,115 @@ sshkey_equal(const struct sshkey *a, const struct sshkey *b)
 	return sshkey_equal_public(a, b);
 }
 
+static int
+to_blob_buf(const struct sshkey *key, struct sshbuf *b, int force_plain)
+{
+	int type, ret = SSH_ERR_INTERNAL_ERROR;
+	const char *typename;
+
+	if (key == NULL)
+		return SSH_ERR_INVALID_ARGUMENT;
+
+	type = force_plain ? sshkey_type_plain(key->type) : key->type;
+	typename = sshkey_ssh_name_from_type_nid(type, key->ecdsa_nid);
+
+	switch (type) {
+	case KEY_DSA_CERT_V00:
+	case KEY_RSA_CERT_V00:
+	case KEY_DSA_CERT:
+	case KEY_ECDSA_CERT:
+	case KEY_RSA_CERT:
+		/* Use the existing blob */
+		/* XXX modified flag? */
+		if ((ret = sshbuf_putb(b, key->cert->certblob)) != 0)
+			return ret;
+		break;
+	case KEY_DSA:
+		if (key->dsa == NULL)
+			return SSH_ERR_INVALID_ARGUMENT;
+		if ((ret = sshbuf_put_cstring(b, typename)) != 0 ||
+		    (ret = sshbuf_put_bignum2(b, key->dsa->p)) != 0 ||
+		    (ret = sshbuf_put_bignum2(b, key->dsa->q)) != 0 ||
+		    (ret = sshbuf_put_bignum2(b, key->dsa->g)) != 0 ||
+		    (ret = sshbuf_put_bignum2(b, key->dsa->pub_key)) != 0)
+			return ret;
+		break;
+	case KEY_ECDSA:
+		if (key->ecdsa == NULL)
+			return SSH_ERR_INVALID_ARGUMENT;
+		if ((ret = sshbuf_put_cstring(b, typename)) != 0 ||
+		    (ret = sshbuf_put_cstring(b,
+		    sshkey_curve_nid_to_name(key->ecdsa_nid))) != 0 ||
+		    (ret = sshbuf_put_eckey(b, key->ecdsa)) != 0)
+			return ret;
+		break;
+	case KEY_RSA:
+		if (key->rsa == NULL)
+			return SSH_ERR_INVALID_ARGUMENT;
+		if ((ret = sshbuf_put_cstring(b, typename)) != 0 ||
+		    (ret = sshbuf_put_bignum2(b, key->rsa->e)) != 0 ||
+		    (ret = sshbuf_put_bignum2(b, key->rsa->n)) != 0)
+			return ret;
+		break;
+	default:
+		return SSH_ERR_KEY_TYPE_UNKNOWN;
+	}
+	return 0;
+}
+
+int
+sshkey_to_blob_buf(const struct sshkey *key, struct sshbuf *b)
+{
+	return to_blob_buf(key, b, 0);
+}
+
+int
+sshkey_plain_to_blob_buf(const struct sshkey *key, struct sshbuf *b)
+{
+	return to_blob_buf(key, b, 1);
+}
+
+static int
+to_blob(const struct sshkey *key, u_char **blobp, size_t *lenp, int force_plain)
+{
+	int ret = SSH_ERR_INTERNAL_ERROR;
+	size_t len;
+	struct sshbuf *b = NULL;
+
+	if ((b = sshbuf_new()) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if ((ret = to_blob_buf(key, b, force_plain)) != 0)
+		goto out;
+	len = sshbuf_len(b);
+	if (lenp != NULL)
+		*lenp = len;
+	if (blobp != NULL) {
+		if ((*blobp = malloc(len)) == NULL) {
+			ret = SSH_ERR_ALLOC_FAIL;
+			goto out;
+		}
+		memcpy(*blobp, sshbuf_ptr(b), len);
+	}
+	ret = 0;
+ out:
+	sshbuf_free(b);
+	return ret;
+}
+
+int
+sshkey_to_blob(const struct sshkey *key, u_char **blobp, size_t *lenp)
+{
+	return to_blob(key, blobp, lenp, 0);
+}
+
+int
+sshkey_plain_to_blob(const struct sshkey *key, u_char **blobp, size_t *lenp)
+{
+	return to_blob(key, blobp, lenp, 1);
+}
+
 u_char*
-sshkey_fingerprint_raw(struct sshkey *k, enum sshkey_fp_type dgst_type,
+sshkey_fingerprint_raw(const struct sshkey *k, enum sshkey_fp_type dgst_type,
     size_t *dgst_raw_length)
 {
 	const EVP_MD *md = NULL;
@@ -525,7 +632,7 @@ sshkey_fingerprint_raw(struct sshkey *k, enum sshkey_fp_type dgst_type,
 	u_char *blob;
 	u_char *retval = NULL;
 	size_t len = 0;
-	int nlen, elen, otype;
+	int nlen, elen, force_plain = 0;
 	u_int dlen;
 
 	*dgst_raw_length = 0;
@@ -553,25 +660,19 @@ sshkey_fingerprint_raw(struct sshkey *k, enum sshkey_fp_type dgst_type,
 		BN_bn2bin(k->rsa->n, blob);
 		BN_bn2bin(k->rsa->e, blob + nlen);
 		break;
-	case KEY_DSA:
-	case KEY_ECDSA:
-	case KEY_RSA:
-		if (sshkey_to_blob(k, &blob, &len) == -1)
-			return NULL;
-		break;
 	case KEY_DSA_CERT_V00:
 	case KEY_RSA_CERT_V00:
 	case KEY_DSA_CERT:
 	case KEY_ECDSA_CERT:
 	case KEY_RSA_CERT:
 		/* We want a fingerprint of the _key_ not of the cert */
-		otype = k->type;
-		k->type = sshkey_type_plain(k->type);
-		if (sshkey_to_blob(k, &blob, &len) == -1) {
-			k->type = otype;
+		force_plain = 1;
+		/* FALLTHROUGH */
+	case KEY_DSA:
+	case KEY_ECDSA:
+	case KEY_RSA:
+		if (to_blob(k, &blob, &len, force_plain) == -1)
 			return NULL;
-		}
-		k->type = otype;
 		break;
 	case KEY_UNSPEC:
 	default:
@@ -772,7 +873,7 @@ fingerprint_randomart(u_char *dgst_raw, size_t dgst_raw_len,
 }
 
 char *
-sshkey_fingerprint(struct sshkey *k, enum sshkey_fp_type dgst_type,
+sshkey_fingerprint(const struct sshkey *k, enum sshkey_fp_type dgst_type,
     enum sshkey_fp_rep dgst_rep)
 {
 	char *retval = NULL;
@@ -1660,84 +1761,6 @@ sshkey_from_blob(const u_char *blob, size_t blen, struct sshkey **keyp)
 		free(curve);
 	if (q != NULL)
 		EC_POINT_free(q);
-	sshbuf_free(b);
-	return ret;
-}
-
-int
-sshkey_to_blob_buf(const struct sshkey *key, struct sshbuf *b)
-{
-	int ret = SSH_ERR_INTERNAL_ERROR;
-
-	if (key == NULL)
-		return SSH_ERR_INVALID_ARGUMENT;
-	switch (key->type) {
-	case KEY_DSA_CERT_V00:
-	case KEY_RSA_CERT_V00:
-	case KEY_DSA_CERT:
-	case KEY_ECDSA_CERT:
-	case KEY_RSA_CERT:
-		/* Use the existing blob */
-		/* XXX modified flag? */
-		if ((ret = sshbuf_putb(b, key->cert->certblob)) != 0)
-			return ret;
-		break;
-	case KEY_DSA:
-		if (key->dsa == NULL)
-			return SSH_ERR_INVALID_ARGUMENT;
-		if ((ret = sshbuf_put_cstring(b, sshkey_ssh_name(key))) != 0 ||
-		    (ret = sshbuf_put_bignum2(b, key->dsa->p)) != 0 ||
-		    (ret = sshbuf_put_bignum2(b, key->dsa->q)) != 0 ||
-		    (ret = sshbuf_put_bignum2(b, key->dsa->g)) != 0 ||
-		    (ret = sshbuf_put_bignum2(b, key->dsa->pub_key)) != 0)
-			return ret;
-		break;
-	case KEY_ECDSA:
-		if (key->ecdsa == NULL)
-			return SSH_ERR_INVALID_ARGUMENT;
-		if ((ret = sshbuf_put_cstring(b, sshkey_ssh_name(key))) != 0 ||
-		    (ret = sshbuf_put_cstring(b,
-		    sshkey_curve_nid_to_name(key->ecdsa_nid))) != 0 ||
-		    (ret = sshbuf_put_eckey(b, key->ecdsa)) != 0)
-			return ret;
-		break;
-	case KEY_RSA:
-		if (key->rsa == NULL)
-			return SSH_ERR_INVALID_ARGUMENT;
-		if ((ret = sshbuf_put_cstring(b, sshkey_ssh_name(key))) != 0 ||
-		    (ret = sshbuf_put_bignum2(b, key->rsa->e)) != 0 ||
-		    (ret = sshbuf_put_bignum2(b, key->rsa->n)) != 0)
-			return ret;
-		break;
-	default:
-		return SSH_ERR_KEY_TYPE_UNKNOWN;
-	}
-	return 0;
-}
-
-int
-sshkey_to_blob(const struct sshkey *key, u_char **blobp, size_t *lenp)
-{
-	int ret = SSH_ERR_INTERNAL_ERROR;
-	size_t len;
-	struct sshbuf *b = NULL;
-
-	if ((b = sshbuf_new()) == NULL)
-		return SSH_ERR_ALLOC_FAIL;
-	if ((ret = sshkey_to_blob_buf(key, b)) != 0)
-		goto out;
-	len = sshbuf_len(b);
-	if (lenp != NULL)
-		*lenp = len;
-	if (blobp != NULL) {
-		if ((*blobp = malloc(len)) == NULL) {
-			ret = SSH_ERR_ALLOC_FAIL;
-			goto out;
-		}
-		memcpy(*blobp, sshbuf_ptr(b), len);
-	}
-	ret = 0;
- out:
 	sshbuf_free(b);
 	return ret;
 }

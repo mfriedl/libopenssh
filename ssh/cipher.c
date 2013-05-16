@@ -81,8 +81,6 @@ struct sshcipher {
 	{ "aes128-ctr",	SSH_CIPHER_SSH2, 16, 16, 0, 0, 0, 0, EVP_aes_128_ctr },
 	{ "aes192-ctr",	SSH_CIPHER_SSH2, 16, 24, 0, 0, 0, 0, EVP_aes_192_ctr },
 	{ "aes256-ctr",	SSH_CIPHER_SSH2, 16, 32, 0, 0, 0, 0, EVP_aes_256_ctr },
-	{ "acss@openssh.org",
-			SSH_CIPHER_SSH2, 16, 5, 0, 0, 0, 0, EVP_acss },
 	{ "aes128-gcm@openssh.com",
 			SSH_CIPHER_SSH2, 16, 16, 12, 16, 0, 0, EVP_aes_128_gcm },
 	{ "aes256-gcm@openssh.com",
@@ -463,7 +461,7 @@ cipher_get_keycontext(const struct sshcipher_ctx *cc, u_char *dat)
 	struct sshcipher *c = cc->cipher;
 	int plen = 0;
 
-	if (c->evptype == EVP_rc4 || c->evptype == EVP_acss) {
+	if (c->evptype == EVP_rc4) {
 		plen = EVP_X_STATE_LEN(cc->evp);
 		if (dat == NULL)
 			return (plen);
@@ -478,7 +476,7 @@ cipher_set_keycontext(struct sshcipher_ctx *cc, const u_char *dat)
 	struct sshcipher *c = cc->cipher;
 	int plen;
 
-	if (c->evptype == EVP_rc4 || c->evptype == EVP_acss) {
+	if (c->evptype == EVP_rc4) {
 		plen = EVP_X_STATE_LEN(cc->evp);
 		memcpy(EVP_X_STATE(cc->evp), dat, plen);
 	}

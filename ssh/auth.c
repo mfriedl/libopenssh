@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.c,v 1.99 2012/12/14 05:26:43 dtucker Exp $ */
+/* $OpenBSD: auth.c,v 1.100 2013/01/17 23:00:01 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -58,6 +58,7 @@
 #include "authfile.h"
 #include "monitor_wrap.h"
 #include "err.h"
+#include "krl.h"
 
 /* import */
 extern ServerOptions options;
@@ -512,30 +513,47 @@ getpwnamallow(const char *user)
 
 /* Returns 1 if key is revoked by revoked_keys_file, 0 otherwise */
 int
-auth_key_is_revoked(struct sshkey *key)
+auth_key_is_revoked(struct sshkey *k)
 {
 	char *key_fp;
 	int r;
 
 	if (options.revoked_keys_file == NULL)
 		return 0;
+	switch ((r = ssh_krl_file_contains_key(options.revoked_keys_file, k))) {
+	case 0:
+		/* Not revoked */
+		return 0;
+	case SSH_ERR_KRL_BAD_MAGIC:
+		/* Not a KRL */
+		break;
+	case SSH_ERR_KEY_REVOKED:
+		goto revoked;	
+	default:
+		error("KRL error in file %s: %s, refusing key",
+		    options.revoked_keys_file, ssh_err(r));
+		return 1;
+	}
 
-	switch ((r = sshkey_in_file(key, options.revoked_keys_file, 0))) {
+	/* Fall back to treating the file as a list of keys */
+	debug3("%s: treating %s as a key list", __func__,
+	    options.revoked_keys_file);
+
+	switch ((r = sshkey_in_file(k, options.revoked_keys_file, 0))) {
 	case SSH_ERR_KEY_NOT_FOUND:
 		/* key not revoked */
 		return 0;
-	default:
-		/* Error opening revoked_keys_file: refuse all keys */
-		error("Error checking revoked keys file \"%s\": %s, "
-		    "refusing public key authentication",
-		    options.revoked_keys_file, ssh_err(r));
-		return 1;
 	case 0:
 		/* found: key revoked */
-		key_fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
+ revoked:
+		key_fp = sshkey_fingerprint(k, SSH_FP_MD5, SSH_FP_HEX);
 		error("WARNING: authentication attempt with a revoked "
-		    "%s key %s ", sshkey_type(key), key_fp);
+		    "%s key %s ", sshkey_type(k), key_fp);
 		xfree(key_fp);
+		return 1;
+	default:
+		error("Error in revoked keys file %s: %s, refusing key",
+		    options.revoked_keys_file, ssh_err(r));
 		return 1;
 	}
 	/* NOTREACHED */

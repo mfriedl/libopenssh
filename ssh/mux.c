@@ -359,7 +359,7 @@ process_mux_new_session(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *
 			free(cp);
 			continue;
 		}
-		if ((r = reallocn(&cctx->env, env_len + 2,
+		if ((r = reallocn((void **)&cctx->env, env_len + 2,
 		    sizeof(*cctx->env))) != 0)
 			goto malf;
 		cctx->env[env_len++] = cp;
