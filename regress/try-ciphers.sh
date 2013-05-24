@@ -42,14 +42,3 @@ for c in $ciphers; do
 		fail "ssh -1 failed with cipher $c"
 	fi
 done
-
-echo "Ciphers acss@openssh.org" >> $OBJ/sshd_proxy
-c=acss@openssh.org
-for m in $macs; do
-	trace "proto 2 $c mac $m"
-	verbose "test $tid: proto 2 cipher $c mac $m"
-	${SSH} -F $OBJ/ssh_proxy -2 -m $m -c $c somehost true
-	if [ $? -ne 0 ]; then
-		fail "ssh -2 failed with mac $m cipher $c"
-	fi
-done
