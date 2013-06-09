@@ -862,7 +862,7 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
     const struct sshkey **sign_ca_keys, size_t nsign_ca_keys)
 {
 	struct sshbuf *copy = NULL, *sect = NULL;
-	struct ssh_krl *krl;
+	struct ssh_krl *krl = NULL;
 	char timestamp[64];
 	int r = SSH_ERR_INTERNAL_ERROR, sig_seen;
 	struct sshkey *key = NULL, **ca_used = NULL;
@@ -901,7 +901,6 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 	format_timestamp(krl->generated_date, timestamp, sizeof(timestamp));
 	debug("KRL version %llu generated at %s%s%s", krl->krl_version,
 	    timestamp, *krl->comment ? ": " : "", krl->comment);
-
 	/*
 	 * 1st pass: verify signatures, if any. This is done to avoid
 	 * detailed parsing of data whose provenance is unverified.
@@ -957,6 +956,8 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 	 * 2nd pass: parse and load the KRL, skipping the header to the point
 	 * where the section start.
 	 */
+	if ((r = sshbuf_consume(buf, sects_off)) != 0)
+		goto out;
 	while (sshbuf_len(buf) > 0) {
 		if ((r = sshbuf_get_u8(buf, &type)) != 0 ||
 		    (r = sshbuf_froms(buf, &sect)) != 0)
@@ -971,11 +972,11 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 		case KRL_SECTION_EXPLICIT_KEY:
 		case KRL_SECTION_FINGERPRINT_SHA1:
 			while (sshbuf_len(sect) > 0) {
-				if ((r = sshbuf_get_string(buf, &rdata,
+				if ((r = sshbuf_get_string(sect, &rdata,
 				    &rlen)) != 0)
 					goto out;
 				if (type == KRL_SECTION_FINGERPRINT_SHA1 &&
-				    blen != 20) {
+				    rlen != 20) {
 					r = SSH_ERR_INVALID_FORMAT;
 					error("%s: bad SHA1 length", __func__);
 					goto out;
@@ -989,7 +990,7 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 			break;
 		case KRL_SECTION_SIGNATURE:
 			/* Handled above, but still need to stay in synch */
-			if ((r = sshbuf_skip_string(buf)) != 0)
+			if ((r = sshbuf_skip_string(sect)) != 0)
 				goto out;
 			sshbuf_free(sect);
 			sect = NULL;
