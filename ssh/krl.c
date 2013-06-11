@@ -866,7 +866,7 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 	char timestamp[64];
 	int r = SSH_ERR_INTERNAL_ERROR, sig_seen;
 	struct sshkey *key = NULL, **ca_used = NULL;
-	u_char type, *rdata;
+	u_char type, *rdata = NULL;
 	const u_char *blob;
 	size_t i, j, sig_off, sects_off, blen, rlen, nca_used = 0;
 	u_int format_version;
@@ -985,7 +985,8 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 				    type == KRL_SECTION_EXPLICIT_KEY ?
 				    &krl->revoked_keys : &krl->revoked_sha1s,
 				    rdata, rlen)) != 0)
-					goto out; /* revoke_blob frees rdata */
+					goto out;
+				rdata = NULL; /* revoke_blob frees rdata */
 			}
 			break;
 		case KRL_SECTION_SIGNATURE:
@@ -1055,6 +1056,7 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 	for (i = 0; i < nca_used; i++)
 		sshkey_free(ca_used[i]);
 	free(ca_used);
+	free(rdata);
 	sshkey_free(key);
 	sshbuf_free(copy);
 	sshbuf_free(sect);
