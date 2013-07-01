@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.120 2012/12/11 22:16:21 markus Exp $ */
+/* $OpenBSD: monitor.c,v 1.122 2013/03/07 19:27:25 markus Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -286,7 +286,7 @@ monitor_child_preauth(struct authctxt *_authctxt, struct monitor *pmonitor)
 				    "with SSH protocol 1");
 			if (authenticated &&
 			    !auth2_update_methods_lists(authctxt,
-			    auth_method)) {
+			    auth_method, auth_submethod)) {
 				debug3("%s: method %s: partial", __func__,
 				    auth_method);
 				authenticated = 0;
@@ -872,9 +872,10 @@ mm_answer_bsdauthrespond(int sock, struct sshbuf *m)
 	debug3("%s: sending authenticated: %d", __func__, authok);
 	mm_request_send(sock, MONITOR_ANS_BSDAUTHRESPOND, m);
 
-	if (compat20)
-		auth_method = "keyboard-interactive"; /* XXX auth_submethod */
-	else
+	if (compat20) {
+		auth_method = "keyboard-interactive";
+		auth_submethod = "bsdauth";
+	} else
 		auth_method = "bsdauth";
 
 	return (authok != 0);
@@ -980,7 +981,7 @@ monitor_valid_userblob(u_char *data, u_int datalen)
 	const u_char *cp;
 	size_t len;
 	int r, fail = 0;
-	char *username, *methodname;
+	char *username, *methodname, *userstyle;
 
 	if ((b = sshbuf_from(data, datalen)) == NULL)
 		fatal("%s: sshbuf_from failed", __func__);
@@ -1007,14 +1008,18 @@ monitor_valid_userblob(u_char *data, u_int datalen)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (c != SSH2_MSG_USERAUTH_REQUEST)
 		fail++;
+	xasprintf(&userstyle, "%s%s%s", authctxt->user,
+	    authctxt->style ? ":" : "",
+	    authctxt->style ? authctxt->style : "");
 	if ((r = sshbuf_get_cstring(b, &username, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	if (strcmp(authctxt->user, username) != 0) {
+	if (strcmp(userstyle, username) != 0) {
 		logit("wrong user name sent to monitor: expected %s != %.100s",
-		    authctxt->user, username);
+		    userstyle, username);
 		fail++;
 	}
-	xfree(username);
+	free(username);
+	free(userstyle);
 	if ((r = sshbuf_skip_string(b)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (active_state->compat & SSH_BUG_PKAUTH) {
@@ -1048,7 +1053,7 @@ monitor_valid_hostbasedblob(u_char *data, u_int datalen, char *cuser,
     char *chost)
 {
 	struct sshbuf *b;
-	char *username, *methodname, *rawhost, *ruser;
+	char *username, *methodname, *rawhost, *ruser, *userstyle;
 	u_char *sid, c;
 	size_t len;
 	int r, fail = 0;
@@ -1070,12 +1075,16 @@ monitor_valid_hostbasedblob(u_char *data, u_int datalen, char *cuser,
 		fail++;
 	if ((r = sshbuf_get_cstring(b, &username, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	if (strcmp(authctxt->user, username) != 0) {
+	xasprintf(&userstyle, "%s%s%s", authctxt->user,
+	    authctxt->style ? ":" : "",
+	    authctxt->style ? authctxt->style : "");
+	if (strcmp(userstyle, username) != 0) {
 		logit("wrong user name sent to monitor: expected %s != %.100s",
-		    authctxt->user, username);
+		    userstyle, username);
 		fail++;
 	}
-	xfree(username);
+	free(userstyle);
+	free(username);
 	if ((r = sshbuf_skip_string(b)) != 0 || /* service */
 	    (r = sshbuf_get_cstring(b, &methodname, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));

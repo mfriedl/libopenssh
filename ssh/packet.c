@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.180 2013/01/08 18:49:04 markus Exp $ */
+/* $OpenBSD: packet.c,v 1.183 2013/04/19 01:06:50 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -266,7 +266,7 @@ struct ssh *
 ssh_packet_set_connection(struct ssh *ssh, int fd_in, int fd_out)
 {
 	struct session_state *state;
-	struct sshcipher *none = cipher_by_name("none");
+	const struct sshcipher *none = cipher_by_name("none");
 	int r;
 
 	if (none == NULL)
@@ -774,7 +774,7 @@ void
 ssh_packet_set_encryption_key(struct ssh *ssh, const u_char *key, u_int keylen, int number)
 {
 	struct session_state *state = ssh->state;
-	struct sshcipher *cipher = cipher_by_number(number);
+	const struct sshcipher *cipher = cipher_by_number(number);
 	int r;
 	const char *wmsg;
 
@@ -1723,7 +1723,11 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 				if ((r = sshpkt_get_u32(ssh, &reason)) != 0 ||
 				    (r = sshpkt_get_string(ssh, &msg, NULL)) != 0)
 					return r;
-				logit("Received disconnect from %s: %u: %.400s",
+				/* Ignore normal client exit notifications */
+				do_log2(ssh->state->server_side &&
+				    reason == SSH2_DISCONNECT_BY_APPLICATION ?
+				    SYSLOG_LEVEL_INFO : SYSLOG_LEVEL_ERROR,
+				    "Received disconnect from %s: %u: %.400s",
 				    ssh_remote_ipaddr(ssh), reason, msg);
 				free(msg);
 				return SSH_ERR_DISCONNECTED;
@@ -1750,11 +1754,10 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 			case SSH_MSG_DISCONNECT:
 				if ((r = sshpkt_get_string(ssh, &msg, NULL)) != 0)
 					return r;
-				logit("Received disconnect from %s: %.400s",
+				error("Received disconnect from %s: %.400s",
 				    ssh_remote_ipaddr(ssh), msg);
 				free(msg);
 				return SSH_ERR_DISCONNECTED;
-				break;
 			default:
 				if (*typep)
 					DBG(debug("received packet type %d", *typep));

@@ -1,4 +1,4 @@
-/* $OpenBSD: key.c,v 1.100 2013/01/17 23:00:01 djm Exp $ */
+/* $OpenBSD: key.c,v 1.102 2013/05/10 04:08:01 djm Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Alexander von Gernler.  All rights reserved.
@@ -36,82 +36,50 @@
 
 #include "ssh2.h"
 #include "err.h"
+#include "misc.h"
 #include "sshbuf.h"
 #define SSHKEY_INTERNAL
 #include "key.h"
 
 struct keytype {
-	int type;
 	char *name;
-	char *ssh2name;
-	int plain_type;
+	char *shortname;
+	int type;
 	int nid;
+	int cert;
 };
-
-static const struct keytype key_types[] = {
-	{ KEY_RSA1, "RSA1", NULL, KEY_RSA, -1 },
-	{ KEY_RSA, "RSA", "ssh-rsa", KEY_RSA, -1 },
-	{ KEY_DSA, "DSA", "ssh-dss", KEY_DSA, -1 },
-	{ KEY_RSA_CERT_V00, "RSA-CERT-V00", "ssh-rsa-cert-v00@openssh.com",
-	  KEY_RSA, -1 },
-	{ KEY_DSA_CERT_V00, "DSA-CERT-V00", "ssh-dss-cert-v00@openssh.com",
-	  KEY_DSA, -1 },
-	{ KEY_RSA_CERT, "RSA-CERT", "ssh-rsa-cert-v01@openssh.com",
-	  KEY_RSA, -1 },
-	{ KEY_DSA_CERT, "DSA-CERT", "ssh-dss-cert-v01@openssh.com",
-	  KEY_DSA, -1 },
-	{ KEY_ECDSA, "ECDSA", "ecdsa-sha2-nistp256",
-	  KEY_ECDSA, NID_X9_62_prime256v1 },
-	{ KEY_ECDSA, "ECDSA", "ecdsa-sha2-nistp384", KEY_ECDSA, NID_secp384r1 },
-	{ KEY_ECDSA, "ECDSA", "ecdsa-sha2-nistp521", KEY_ECDSA, NID_secp521r1 },
-	{ KEY_ECDSA_CERT, "ECDSA-CERT",
-	  "ecdsa-sha2-nistp256-cert-v01@openssh.com",
-	  KEY_ECDSA, NID_X9_62_prime256v1 },
-	{ KEY_ECDSA_CERT, "ECDSA-CERT",
-	  "ecdsa-sha2-nistp384-cert-v01@openssh.com",
-	  KEY_ECDSA, NID_secp384r1 },
-	{ KEY_ECDSA_CERT, "ECDSA-CERT",
-	  "ecdsa-sha2-nistp521-cert-v01@openssh.com",
-	  KEY_ECDSA, NID_secp521r1 },
-	{ -1, NULL, NULL, -1, -1 }
+static const struct keytype keytypes[] = {
+	{ NULL, "RSA1", KEY_RSA1, 0, 0 },
+	{ "ssh-rsa", "RSA", KEY_RSA, 0, 0 },
+	{ "ssh-dss", "DSA", KEY_DSA, 0, 0 },
+	{ "ecdsa-sha2-nistp256", "ECDSA", KEY_ECDSA, NID_X9_62_prime256v1, 0 },
+	{ "ecdsa-sha2-nistp384", "ECDSA", KEY_ECDSA, NID_secp384r1, 0 },
+	{ "ecdsa-sha2-nistp521", "ECDSA", KEY_ECDSA, NID_secp521r1, 0 },
+	{ "ssh-rsa-cert-v01@openssh.com", "RSA-CERT", KEY_RSA_CERT, 0, 1 },
+	{ "ssh-dss-cert-v01@openssh.com", "DSA-CERT", KEY_DSA_CERT, 0, 1 },
+	{ "ecdsa-sha2-nistp256-cert-v01@openssh.com", "ECDSA-CERT",
+	    KEY_ECDSA_CERT, NID_X9_62_prime256v1, 1 },
+	{ "ecdsa-sha2-nistp384-cert-v01@openssh.com", "ECDSA-CERT",
+	    KEY_ECDSA_CERT, NID_secp384r1, 1 },
+	{ "ecdsa-sha2-nistp521-cert-v01@openssh.com", "ECDSA-CERT",
+	    KEY_ECDSA_CERT, NID_secp521r1, 1 },
+	{ "ssh-rsa-cert-v00@openssh.com", "RSA-CERT-V00",
+	    KEY_RSA_CERT_V00, 0, 1 },
+	{ "ssh-dss-cert-v00@openssh.com", "DSA-CERT-V00",
+	    KEY_DSA_CERT_V00, 0, 1 },
+	{ NULL, NULL, -1, -1, 0 }
 };
-
-int
-sshkey_type_from_name(const char *name)
-{
-	const struct keytype *kt;
-
-	for (kt = key_types; kt->name != NULL; kt++) {
-		if (strcasecmp(name, kt->name) == 0 ||
-		    (kt->ssh2name != NULL && strcmp(name, kt->ssh2name) == 0))
-			return kt->type;
-	}
-	return KEY_UNSPEC;
-}
 
 const char *
 sshkey_type(const struct sshkey *k)
 {
-	u_int i;
+	const struct keytype *kt;
 
-	for (i = 0; key_types[i].type != -1; i++) {
-		if (key_types[i].type == k->type)
-			return key_types[i].name;
+	for (kt = keytypes; kt->type != -1; kt++) {
+		if (kt->type == k->type)
+			return kt->shortname;
 	}
 	return "unknown";
-}
-
-const char *
-sshkey_cert_type(const struct sshkey *k)
-{
-	switch (k->cert->type) {
-	case SSH2_CERT_TYPE_USER:
-		return "user";
-	case SSH2_CERT_TYPE_HOST:
-		return "host";
-	default:
-		return "unknown";
-	}
 }
 
 static const char *
@@ -119,9 +87,9 @@ sshkey_ssh_name_from_type_nid(int type, int nid)
 {
 	const struct keytype *kt;
 
-	for (kt = key_types; kt->name != NULL; kt++) {
-		if (type == kt->type && (kt->nid == -1 || kt->nid == nid))
-			return kt->ssh2name;
+	for (kt = keytypes; kt->type != -1; kt++) {
+		if (kt->type == type && (kt->nid == 0 || kt->nid == nid))
+			return kt->name;
 	}
 	return "ssh-unknown";
 }
@@ -140,18 +108,17 @@ sshkey_ssh_name_plain(const struct sshkey *k)
 }
 
 int
-sshkey_ecdsa_bits_to_nid(int bits)
+sshkey_type_from_name(const char *name)
 {
-	switch (bits) {
-	case 256:
-		return NID_X9_62_prime256v1;
-	case 384:
-		return NID_secp384r1;
-	case 521:
-		return NID_secp521r1;
-	default:
-		return -1;
+	const struct keytype *kt;
+
+	for (kt = keytypes; kt->type != -1; kt++) {
+		/* Only allow shortname matches for plain key types */
+		if ((kt->name != NULL && strcmp(name, kt->name) == 0) ||
+		    (!kt->cert && strcasecmp(kt->shortname, name) == 0))
+			return kt->type;
 	}
+	return KEY_UNSPEC;
 }
 
 int
@@ -159,11 +126,54 @@ sshkey_ecdsa_nid_from_name(const char *name)
 {
 	const struct keytype *kt;
 
-	for (kt = key_types; kt->name != NULL; kt++) {
-		if (kt->ssh2name != NULL && strcmp(kt->ssh2name, name) == 0)
-			return kt->nid;
-	}
+        for (kt = keytypes; kt->type != -1; kt++) {
+                if (kt->type != KEY_ECDSA && kt->type != KEY_ECDSA_CERT)
+                        continue;
+                if (kt->name != NULL && strcmp(name, kt->name) == 0)
+                        return kt->nid;
+        }
 	return -1;
+}
+
+char *
+sshkey_alg_list(void)
+{
+	char *ret = NULL;
+	size_t nlen, rlen = 0;
+	const struct keytype *kt;
+
+	for (kt = keytypes; kt->type != -1; kt++) {
+		if (kt->name == NULL)
+			continue;
+		if (ret != NULL)
+			ret[rlen++] = '\n';
+		nlen = strlen(kt->name);
+		if (reallocn((void **)&ret, 1, rlen + nlen + 2) != 0)
+			return NULL;
+		memcpy(ret + rlen, kt->name, nlen + 1);
+		rlen += nlen;
+	}
+	return ret;
+}
+
+u_int
+sshkey_size(const struct sshkey *k)
+{
+	switch (k->type) {
+	case KEY_RSA1:
+	case KEY_RSA:
+	case KEY_RSA_CERT_V00:
+	case KEY_RSA_CERT:
+		return BN_num_bits(k->rsa->n);
+	case KEY_DSA:
+	case KEY_DSA_CERT_V00:
+	case KEY_DSA_CERT:
+		return BN_num_bits(k->dsa->p);
+	case KEY_ECDSA:
+	case KEY_ECDSA_CERT:
+		return sshkey_curve_nid_to_bits(k->ecdsa_nid);
+	}
+	return 0;
 }
 
 int
@@ -1160,24 +1170,17 @@ sshkey_write(const struct sshkey *key, FILE *f)
 	return ret;
 }
 
-u_int
-sshkey_size(const struct sshkey *k)
+const char *
+sshkey_cert_type(const struct sshkey *k)
 {
-	switch (k->type) {
-	case KEY_RSA1:
-	case KEY_RSA:
-	case KEY_RSA_CERT_V00:
-	case KEY_RSA_CERT:
-		return BN_num_bits(k->rsa->n);
-	case KEY_DSA:
-	case KEY_DSA_CERT_V00:
-	case KEY_DSA_CERT:
-		return BN_num_bits(k->dsa->p);
-	case KEY_ECDSA:
-	case KEY_ECDSA_CERT:
-		return sshkey_curve_nid_to_bits(k->ecdsa_nid);
+	switch (k->cert->type) {
+	case SSH2_CERT_TYPE_USER:
+		return "user";
+	case SSH2_CERT_TYPE_HOST:
+		return "host";
+	default:
+		return "unknown";
 	}
-	return 0;
 }
 
 static int
@@ -1235,6 +1238,21 @@ dsa_generate_private_key(u_int bits, DSA **dsap)
 	if (private != NULL)
 		DSA_free(private);
 	return ret;
+}
+
+int
+sshkey_ecdsa_bits_to_nid(int bits)
+{
+	switch (bits) {
+	case 256:
+		return NID_X9_62_prime256v1;
+	case 384:
+		return NID_secp384r1;
+	case 521:
+		return NID_secp521r1;
+	default:
+		return -1;
+	}
 }
 
 int

@@ -33,8 +33,8 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $OpenBSD: sshd_config.5,v 1.155 2013/01/18 08:00:49 jmc Exp $
-.Dd $Mdocdate: January 18 2013 $
+.\" $OpenBSD: sshd_config.5,v 1.158 2013/04/19 01:00:10 djm Exp $
+.Dd $Mdocdate: April 19 2013 $
 .Dt SSHD_CONFIG 5
 .Os
 .Sh NAME
@@ -180,6 +180,20 @@ Only methods that are next in one or more lists are offered at each stage,
 so for this example, it would not be possible to attempt password or
 keyboard-interactive authentication before public key.
 .Pp
+For keyboard interactive authentication it is also possible to
+restrict authentication to a specific device by appending a
+colon followed by the device identifier
+.Dq bsdauth ,
+.Dq pam ,
+or
+.Dq skey ,
+depending on the server configuration.
+For example,
+.Dq keyboard-interactive:bsdauth
+would restrict keyboard interactive authentication to the
+.Dq bsdauth
+device.
+.Pp
 This option is only available for SSH protocol 2 and will yield a fatal
 error if enabled if protocol 1 is also enabled.
 Note that each authentication method listed should also be explicitly enabled
@@ -188,7 +202,8 @@ The default is not to require multiple authentication; successful completion
 of a single authentication method is sufficient.
 .It Cm AuthorizedKeysCommand
 Specifies a program to be used to look up the user's public keys.
-The program will be invoked with a single argument of the username
+The program must be owned by root and not writable by group or others.
+It will be invoked with a single argument of the username
 being authenticated, and should produce on standard output zero or
 more lines of authorized_keys output (see
 .Sx AUTHORIZED_KEYS
@@ -821,7 +836,7 @@ SSH daemon.
 Additional connections will be dropped until authentication succeeds or the
 .Cm LoginGraceTime
 expires for a connection.
-The default is 10.
+The default is 10:30:100.
 .Pp
 Alternatively, random early drop can be enabled by specifying
 the three colon separated values

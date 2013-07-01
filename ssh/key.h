@@ -1,4 +1,4 @@
-/* $OpenBSD: key.h,v 1.34 2012/05/23 03:28:28 djm Exp $ */
+/* $OpenBSD: key.h,v 1.36 2013/04/19 01:06:50 djm Exp $ */
 
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
@@ -148,6 +148,7 @@ int		 sshkey_ec_validate_private(const EC_KEY *);
 const char	*sshkey_ssh_name(const struct sshkey *);
 const char	*sshkey_ssh_name_plain(const struct sshkey *);
 int		 sshkey_names_valid2(const char *);
+char		*sshkey_alg_list(void);
 
 int	 sshkey_from_blob(const u_char *, size_t, struct sshkey **);
 int	 sshkey_to_blob_buf(const struct sshkey *, struct sshbuf *);
@@ -181,6 +182,5 @@ int ssh_ecdsa_verify(const struct sshkey *key,
     const u_char *signature, size_t signaturelen,
     const u_char *data, size_t datalen, u_int compat);
 #endif
-
 
 #endif

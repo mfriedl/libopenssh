@@ -1,4 +1,4 @@
-/* $OpenBSD: cipher.c,v 1.86 2013/01/12 11:22:04 djm Exp $ */
+/* $OpenBSD: cipher.c,v 1.88 2013/04/19 01:06:50 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -44,6 +44,7 @@
 
 #include "err.h"
 #include "cipher.h"
+#include "misc.h"
 
 extern const EVP_CIPHER *evp_ssh1_bf(void);
 extern const EVP_CIPHER *evp_ssh1_3des(void);
@@ -59,7 +60,9 @@ struct sshcipher {
 	u_int	discard_len;
 	u_int	cbc_mode;
 	const EVP_CIPHER	*(*evptype)(void);
-} ciphers[] = {
+};
+
+static const struct sshcipher ciphers[] = {
 	{ "none",	SSH_CIPHER_NONE, 8, 0, 0, 0, 0, 0, EVP_enc_null },
 	{ "des",	SSH_CIPHER_DES, 8, 8, 0, 0, 0, 1, EVP_des_cbc },
 	{ "3des",	SSH_CIPHER_3DES, 8, 16, 0, 0, 0, 1, evp_ssh1_3des },
@@ -90,6 +93,28 @@ struct sshcipher {
 };
 
 /*--*/
+
+/* Returns a comma-separated list of supported ciphers. */
+char *
+cipher_alg_list(void)
+{
+	char *ret = NULL;
+	size_t nlen, rlen = 0;
+	const struct sshcipher *c;
+
+	for (c = ciphers; c->name != NULL; c++) {
+		if (c->number != SSH_CIPHER_SSH2)
+			continue;
+		if (ret != NULL)
+			ret[rlen++] = '\n';
+		nlen = strlen(c->name);
+		if (reallocn((void **)&ret, 1, rlen + nlen + 2) != 0)
+			return NULL;
+		memcpy(ret + rlen, c->name, nlen + 1);
+		rlen += nlen;
+	}
+	return ret;
+}
 
 u_int
 cipher_blocksize(const struct sshcipher *c)
@@ -139,20 +164,20 @@ cipher_mask_ssh1(int client)
 	return mask;
 }
 
-struct sshcipher *
+const struct sshcipher *
 cipher_by_name(const char *name)
 {
-	struct sshcipher *c;
+	const struct sshcipher *c;
 	for (c = ciphers; c->name != NULL; c++)
 		if (strcmp(c->name, name) == 0)
 			return c;
 	return NULL;
 }
 
-struct sshcipher *
+const struct sshcipher *
 cipher_by_number(int id)
 {
-	struct sshcipher *c;
+	const struct sshcipher *c;
 	for (c = ciphers; c->name != NULL; c++)
 		if (c->number == id)
 			return c;
@@ -163,7 +188,7 @@ cipher_by_number(int id)
 int
 ciphers_valid(const char *names)
 {
-	struct sshcipher *c;
+	const struct sshcipher *c;
 	char *cipher_list, *cp;
 	char *p;
 
@@ -191,7 +216,7 @@ ciphers_valid(const char *names)
 int
 cipher_number(const char *name)
 {
-	struct sshcipher *c;
+	const struct sshcipher *c;
 	if (name == NULL)
 		return -1;
 	for (c = ciphers; c->name != NULL; c++)
@@ -203,12 +228,12 @@ cipher_number(const char *name)
 char *
 cipher_name(int id)
 {
-	struct sshcipher *c = cipher_by_number(id);
+	const struct sshcipher *c = cipher_by_number(id);
 	return (c==NULL) ? "<unknown>" : c->name;
 }
 
 const char *
-cipher_warning_message(struct sshcipher_ctx *cc)
+cipher_warning_message(const struct sshcipher_ctx *cc)
 {
 	if (cc == NULL || cc->cipher == NULL)
 		return NULL;
@@ -219,7 +244,7 @@ cipher_warning_message(struct sshcipher_ctx *cc)
 }
 
 int
-cipher_init(struct sshcipher_ctx *cc, struct sshcipher *cipher,
+cipher_init(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
     const u_char *key, u_int keylen, const u_char *iv, u_int ivlen,
     int do_encrypt)
 {
@@ -353,7 +378,7 @@ cipher_cleanup(struct sshcipher_ctx *cc)
  * passphrase and using the resulting 16 bytes as the key.
  */
 int
-cipher_set_key_string(struct sshcipher_ctx *cc, struct sshcipher *cipher,
+cipher_set_key_string(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
     const char *pphrase, int do_encrypt)
 {
 	MD5_CTX md;
@@ -381,7 +406,7 @@ cipher_set_key_string(struct sshcipher_ctx *cc, struct sshcipher *cipher,
 int
 cipher_get_keyiv_len(const struct sshcipher_ctx *cc)
 {
-	struct sshcipher *c = cc->cipher;
+	const struct sshcipher *c = cc->cipher;
 	int ivlen;
 
 	if (c->number == SSH_CIPHER_3DES)
@@ -394,7 +419,7 @@ cipher_get_keyiv_len(const struct sshcipher_ctx *cc)
 int
 cipher_get_keyiv(struct sshcipher_ctx *cc, u_char *iv, u_int len)
 {
-	struct sshcipher *c = cc->cipher;
+	const struct sshcipher *c = cc->cipher;
 	int evplen;
 
 	switch (c->number) {
@@ -426,7 +451,7 @@ cipher_get_keyiv(struct sshcipher_ctx *cc, u_char *iv, u_int len)
 int
 cipher_set_keyiv(struct sshcipher_ctx *cc, const u_char *iv)
 {
-	struct sshcipher *c = cc->cipher;
+	const struct sshcipher *c = cc->cipher;
 	int evplen = 0;
 
 	switch (c->number) {
@@ -458,7 +483,7 @@ cipher_set_keyiv(struct sshcipher_ctx *cc, const u_char *iv)
 int
 cipher_get_keycontext(const struct sshcipher_ctx *cc, u_char *dat)
 {
-	struct sshcipher *c = cc->cipher;
+	const struct sshcipher *c = cc->cipher;
 	int plen = 0;
 
 	if (c->evptype == EVP_rc4) {
@@ -473,7 +498,7 @@ cipher_get_keycontext(const struct sshcipher_ctx *cc, u_char *dat)
 void
 cipher_set_keycontext(struct sshcipher_ctx *cc, const u_char *dat)
 {
-	struct sshcipher *c = cc->cipher;
+	const struct sshcipher *c = cc->cipher;
 	int plen;
 
 	if (c->evptype == EVP_rc4) {

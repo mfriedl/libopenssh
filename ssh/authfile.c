@@ -1,4 +1,4 @@
-/* $OpenBSD: authfile.c,v 1.95 2013/01/08 18:49:04 markus Exp $ */
+/* $OpenBSD: authfile.c,v 1.96 2013/04/19 01:06:50 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -84,7 +84,7 @@ sshkey_private_rsa1_to_blob(struct sshkey *key, struct sshbuf *blob,
 	u_char buf[8];
 	int r, cipher_num;
 	struct sshcipher_ctx ciphercontext;
-	struct sshcipher *cipher;
+	const struct sshcipher *cipher;
 	u_char *cp;
 
 	/*
@@ -422,7 +422,7 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 	u_char *cp;
 	char *comment = NULL;
 	struct sshcipher_ctx ciphercontext;
-	struct sshcipher *cipher;
+	const struct sshcipher *cipher;
 	struct sshkey *prv = NULL;
 
 	*keyp = NULL;

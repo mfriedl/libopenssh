@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.c,v 1.88 2013/01/08 18:49:04 markus Exp $ */
+/* $OpenBSD: kex.c,v 1.90 2013/04/19 12:07:08 djm Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  *
@@ -41,6 +41,7 @@
 #include "log.h"
 #include "mac.h"
 #include "match.h"
+#include "misc.h"
 #include "dispatch.h"
 #include "monitor.h"
 #include "roaming.h"
@@ -50,6 +51,54 @@
 /* prototype */
 static int kex_choose_conf(struct ssh *);
 static int kex_input_newkeys(int, u_int32_t, struct ssh *);
+
+struct kexalg {
+	char *name;
+	int type;
+	int ec_nid;
+	const EVP_MD *(*mdfunc)(void);
+};
+static const struct kexalg kexalgs[] = {
+	{ KEX_DH1, KEX_DH_GRP1_SHA1, 0, EVP_sha1 },
+	{ KEX_DH14, KEX_DH_GRP14_SHA1, 0, EVP_sha1 },
+	{ KEX_DHGEX_SHA1, KEX_DH_GEX_SHA1, 0, EVP_sha1 },
+	{ KEX_DHGEX_SHA256, KEX_DH_GEX_SHA256, 0, EVP_sha256 },
+	{ KEX_ECDH_SHA2_NISTP256, KEX_ECDH_SHA2, NID_X9_62_prime256v1, EVP_sha256 },
+	{ KEX_ECDH_SHA2_NISTP384, KEX_ECDH_SHA2, NID_secp384r1, EVP_sha384 },
+	{ KEX_ECDH_SHA2_NISTP521, KEX_ECDH_SHA2, NID_secp521r1, EVP_sha512 },
+	{ NULL, -1, -1, NULL},
+};
+
+char *
+kex_alg_list(void)
+{
+	char *ret = NULL;
+	size_t nlen, rlen = 0;
+	const struct kexalg *k;
+
+	for (k = kexalgs; k->name != NULL; k++) {
+		if (ret != NULL)
+			ret[rlen++] = '\n';
+		nlen = strlen(k->name);
+		if (reallocn((void **)&ret, 1, rlen + nlen + 2) != 0)
+			return NULL;
+		memcpy(ret + rlen, k->name, nlen + 1);
+		rlen += nlen;
+	}
+	return ret;
+}
+
+static const struct kexalg *
+kex_alg_by_name(const char *name)
+{
+	const struct kexalg *k;
+
+	for (k = kexalgs; k->name != NULL; k++) {
+		if (strcmp(k->name, name) == 0)
+			return k;
+	}
+	return NULL;
+}
 
 /* Validate KEX method name list */
 int
@@ -63,13 +112,7 @@ kex_names_valid(const char *names)
 		return 0;
 	for ((p = strsep(&cp, ",")); p && *p != '\0';
 	    (p = strsep(&cp, ","))) {
-	    	if (strcmp(p, KEX_DHGEX_SHA256) != 0 &&
-		    strcmp(p, KEX_DHGEX_SHA1) != 0 &&
-		    strcmp(p, KEX_DH14) != 0 &&
-		    strcmp(p, KEX_DH1) != 0 &&
-		    (strncmp(p, KEX_ECDH_SHA2_STEM,
-		    sizeof(KEX_ECDH_SHA2_STEM) - 1) != 0 ||
-		    kex_ecdh_name_to_nid(p) == -1)) {
+		if (kex_alg_by_name(p) == NULL) {
 			error("Unsupported KEX algorithm \"%.100s\"", p);
 			free(s);
 			return 0;
@@ -451,30 +494,17 @@ choose_comp(struct sshcomp *comp, char *client, char *server)
 static int
 choose_kex(struct kex *k, char *client, char *server)
 {
+	const struct kexalg *kexalg;
+
 	k->name = match_list(client, server, NULL);
 
 	if (k->name == NULL)
-		return SSH_ERR_NO_KEX_ALG_MATCH;
-	if (strcmp(k->name, KEX_DH1) == 0) {
-		k->kex_type = KEX_DH_GRP1_SHA1;
-		k->evp_md = EVP_sha1();
-	} else if (strcmp(k->name, KEX_DH14) == 0) {
-		k->kex_type = KEX_DH_GRP14_SHA1;
-		k->evp_md = EVP_sha1();
-	} else if (strcmp(k->name, KEX_DHGEX_SHA1) == 0) {
-		k->kex_type = KEX_DH_GEX_SHA1;
-		k->evp_md = EVP_sha1();
-	} else if (strcmp(k->name, KEX_DHGEX_SHA256) == 0) {
-		k->kex_type = KEX_DH_GEX_SHA256;
-		k->evp_md = EVP_sha256();
-	} else if (strncmp(k->name, KEX_ECDH_SHA2_STEM,
-	    sizeof(KEX_ECDH_SHA2_STEM) - 1) == 0) {
-		k->kex_type = KEX_ECDH_SHA2;
-		k->evp_md = kex_ecdh_name_to_evpmd(k->name);
-		if (k->evp_md == NULL)
-			return SSH_ERR_INTERNAL_ERROR;
-	} else
 		return SSH_ERR_INTERNAL_ERROR;
+	if ((kexalg = kex_alg_by_name(k->name)) == NULL)
+		return SSH_ERR_INTERNAL_ERROR;
+	k->kex_type = kexalg->type;
+	k->evp_md = kexalg->mdfunc();
+	k->ec_nid = kexalg->ec_nid;
 	return 0;
 }
 

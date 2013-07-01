@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.190 2012/12/02 20:26:11 djm Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.195 2013/05/10 03:40:07 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -235,6 +235,7 @@ struct identity {
 	char	*filename;		/* comment for agent-only keys */
 	int	tried;
 	int	isprivate;		/* key points to the private key */
+	int	userprovided;
 };
 TAILQ_HEAD(idlist, identity);
 
@@ -306,7 +307,7 @@ void	userauth(struct ssh *, char *);
 static int sign_and_send_pubkey(struct ssh *, struct identity *);
 static void pubkey_prepare(struct ssh *);
 static void pubkey_cleanup(struct ssh *);
-static struct sshkey *load_identity_file(char *);
+static struct sshkey *load_identity_file(char *, int);
 
 static struct cauthmethod *authmethod_get(char *authlist);
 static struct cauthmethod *authmethod_lookup(const char *name);
@@ -566,8 +567,12 @@ input_userauth_failure(int type, u_int32_t seq, struct ssh *ssh)
 	    (r = sshpkt_get_end(ssh)) != 0)
 		goto out;
 
-	if (partial != 0)
+	if (partial != 0) {
 		logit("Authenticated with partial success.");
+		/* reset state */
+		pubkey_cleanup(ssh);
+		pubkey_prepare(ssh);
+	}
 	debug("Authentications that can continue: %s", authlist);
 
 	userauth(ssh, authlist);
@@ -866,7 +871,7 @@ input_gssapi_errtok(int type, u_int32_t plen, struct ssh *ssh)
 	Gssctxt *gssctxt;
 	gss_buffer_desc send_tok = GSS_C_EMPTY_BUFFER;
 	gss_buffer_desc recv_tok;
-	OM_uint32 status, ms;
+	OM_uint32 ms;
 	u_char *p;
 	size_t len;
 	int r;
@@ -882,7 +887,7 @@ input_gssapi_errtok(int type, u_int32_t plen, struct ssh *ssh)
 	/* Stick it into GSSAPI and see what it says */
 	recv_tok.value = p;
 	recv_tok.length = len;
-	status = ssh_gssapi_init_ctx(gssctxt, options.gss_deleg_creds,
+	(void)ssh_gssapi_init_ctx(gssctxt, options.gss_deleg_creds,
 	    &recv_tok, &send_tok, NULL);
 	r = 0;
  out:
@@ -897,13 +902,12 @@ input_gssapi_errtok(int type, u_int32_t plen, struct ssh *ssh)
 int
 input_gssapi_error(int type, u_int32_t plen, struct ssh *ssh)
 {
-	OM_uint32 maj, min;
 	char *msg = NULL;
 	char *lang = NULL;
 	int r;
 
-	if ((r = sshpkt_get_u32(ssh, &maj)) != 0 ||
-	    (r = sshpkt_get_u32(ssh, &min)) != 0 ||
+	if ((r = sshpkt_get_u32(ssh, NULL)) != 0 ||	/* maj */
+	    (r = sshpkt_get_u32(ssh, NULL)) != 0 ||	/* min */
 	    (r = sshpkt_get_cstring(ssh, &msg, NULL)) != 0 ||
 	    (r = sshpkt_get_cstring(ssh, &lang, NULL)) != 0)
 		goto out;
@@ -1312,7 +1316,7 @@ identity_sign(struct identity *id, u_char **sigp, size_t *lenp,
 		return (sshkey_sign(id->key, sigp, lenp, data, datalen,
 		    compat));
 	/* load the private key from the file */
-	if ((prv = load_identity_file(id->filename)) == NULL)
+	if ((prv = load_identity_file(id->filename, id->userprovided)) == NULL)
 		return (-1); /* XXX return decent error code */
 	ret = sshkey_sign(prv, sigp, lenp, data, datalen, compat);
 	sshkey_free(prv);
@@ -1458,7 +1462,7 @@ send_pubkey_test(struct ssh *ssh, struct identity *id)
 
 /* XXX merge with key loading from sshconnect1.c */
 static struct sshkey *
-load_identity_file(char *filename)
+load_identity_file(char *filename, int userprovided)
 {
 	struct sshkey *private = NULL;
 	char prompt[300], *passphrase;
@@ -1466,7 +1470,8 @@ load_identity_file(char *filename)
 	struct stat st;
 
 	if (stat(filename, &st) < 0) {
-		debug3("no such identity: %s", filename);
+		(userprovided ? logit : debug3)("no such identity: %s: %s",
+		    filename, strerror(errno));
 		return NULL;
 	}
 	snprintf(prompt, sizeof prompt,
@@ -1549,6 +1554,7 @@ pubkey_prepare(struct ssh *ssh)
 		id = xcalloc(1, sizeof(*id));
 		id->key = key;
 		id->filename = xstrdup(options.identity_files[i]);
+		id->userprovided = options.identity_file_userprovided[i];
 		TAILQ_INSERT_TAIL(&files, id, next);
 	}
 	/* Prefer PKCS11 keys that are explicitly listed */
@@ -1570,7 +1576,7 @@ pubkey_prepare(struct ssh *ssh)
 		/* If IdentitiesOnly set and key not found then don't use it */
 		if (!found && options.identities_only) {
 			TAILQ_REMOVE(&files, id, next);
-			bzero(id, sizeof(id));
+			bzero(id, sizeof(*id));
 			free(id);
 		}
 	}
@@ -1624,7 +1630,8 @@ pubkey_prepare(struct ssh *ssh)
 		TAILQ_INSERT_TAIL(preferred, id, next);
 	}
 	TAILQ_FOREACH(id, preferred, next) {
-		debug2("key: %s (%p)", id->filename, id->key);
+		debug2("key: %s (%p),%s", id->filename, id->key,
+		    id->userprovided ? " explicit" : "");
 	}
 }
 
@@ -1671,7 +1678,8 @@ userauth_pubkey(struct ssh *ssh)
 			sent = send_pubkey_test(ssh, id);
 		} else if (id->key == NULL) {
 			debug("Trying private key: %s", id->filename);
-			id->key = load_identity_file(id->filename);
+			id->key = load_identity_file(id->filename,
+			    id->userprovided);
 			if (id->key != NULL) {
 				id->isprivate = 1;
 				sent = sign_and_send_pubkey(ssh, id);

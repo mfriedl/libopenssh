@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $OpenBSD: krl.c,v 1.4 2013/01/19 12:34:55 markus Exp $ */
+/* $OpenBSD: krl.c,v 1.11 2013/04/05 00:14:00 djm Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -29,9 +29,9 @@
 #include <unistd.h>
 
 #include "sshbuf.h"
+#include "err.h"
 #include "key.h"
 #include "authfile.h"
-#include "err.h"
 #include "misc.h"
 #include "log.h"
 #include "xmalloc.h"
@@ -486,8 +486,11 @@ choose_next_state(int current_state, u_int64_t contig, int final,
 	}
 	KRL_DBG(("%s: contig %llu last_gap %llu next_gap %llu final %d, costs:"
 	    "list %llu range %llu bitmap %llu new bitmap %llu, "
-	    "selected 0x%02x%s", __func__, contig, last_gap, next_gap, final,
-	    cost_list, cost_range, cost_bitmap, cost_bitmap_restart, new_state,
+	    "selected 0x%02x%s", __func__, (long long unsigned)contig,
+	    (long long unsigned)last_gap, (long long unsigned)next_gap, final,
+	    (long long unsigned)cost_list, (long long unsigned)cost_range,
+	    (long long unsigned)cost_bitmap,
+	    (long long unsigned)cost_bitmap_restart, new_state,
 	    *force_new_section ? " restart" : ""));
 	return new_state;
 }
@@ -523,7 +526,8 @@ revoked_certs_generate(struct revoked_certs *rc, struct sshbuf *buf)
 	     rs != NULL;
 	     rs = RB_NEXT(revoked_serial_tree, &rc->revoked_serials, rs)) {
 		KRL_DBG(("%s: serial %llu:%llu state 0x%02x", __func__,
-		    rs->lo, rs->hi, state));
+		    (long long unsigned)rs->lo, (long long unsigned)rs->hi,
+		    state));
 
 		/* Check contiguous length and gap to next section (if any) */
 		nrs = RB_NEXT(revoked_serial_tree, &rc->revoked_serials, rs);
@@ -899,8 +903,10 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 		goto out;
 
 	format_timestamp(krl->generated_date, timestamp, sizeof(timestamp));
-	debug("KRL version %llu generated at %s%s%s", krl->krl_version,
-	    timestamp, *krl->comment ? ": " : "", krl->comment);
+	debug("KRL version %llu generated at %s%s%s",
+	    (long long unsigned)krl->krl_version, timestamp,
+	    *krl->comment ? ": " : "", krl->comment);
+
 	/*
 	 * 1st pass: verify signatures, if any. This is done to avoid
 	 * detailed parsing of data whose provenance is unverified.
@@ -991,11 +997,11 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 			break;
 		case KRL_SECTION_SIGNATURE:
 			/* Handled above, but still need to stay in synch */
-			if ((r = sshbuf_skip_string(sect)) != 0)
+			if ((r = sshbuf_skip_string(copy)) != 0)
 				goto out;
 			sshbuf_free(sect);
 			sect = NULL;
-			continue;
+			break;	/* XXX was continue -markus */
 		default:
 			error("Unsupported KRL section %u", type);
 			r = SSH_ERR_INVALID_FORMAT;
@@ -1114,7 +1120,10 @@ is_key_revoked(struct ssh_krl *krl, const struct sshkey *key)
 		return SSH_ERR_KEY_REVOKED;
 	}
 
-	/* Legacy cert formats lack serial numbers */
+	/*
+	 * Legacy cert formats lack serial numbers. Zero serials numbers
+	 * are ignored (it's the default when the CA doesn't specify one).
+	 */
 	if (sshkey_cert_is_legacy(key) || key->cert->serial == 0)
 		return 0;
 

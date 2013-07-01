@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.396 2012/11/04 11:09:15 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.399 2013/04/07 02:10:33 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -896,8 +896,9 @@ usage(void)
 	    SSH_VERSION, SSLeay_version(SSLEAY_VERSION));
 	fprintf(stderr,
 "usage: sshd [-46DdeiqTt] [-b bits] [-C connection_spec] [-c host_cert_file]\n"
-"            [-f config_file] [-g login_grace_time] [-h host_key_file]\n"
-"            [-k key_gen_time] [-o option] [-p port] [-u len]\n"
+"            [-E log_file] [-f config_file] [-g login_grace_time]\n"
+"            [-h host_key_file] [-k key_gen_time] [-o option] [-p port]\n"
+"            [-u len]\n"
 	);
 	exit(1);
 }
@@ -1192,7 +1193,8 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			*newsock = accept(listen_socks[i],
 			    (struct sockaddr *)&from, &fromlen);
 			if (*newsock < 0) {
-				if (errno != EINTR && errno != EWOULDBLOCK)
+				if (errno != EINTR && errno != EWOULDBLOCK &&
+				    errno != ECONNABORTED)
 					error("accept: %.100s",
 					    strerror(errno));
 				if (errno == EMFILE || errno == ENFILE)
@@ -1340,7 +1342,7 @@ main(int ac, char **av)
 	int sock_in = -1, sock_out = -1, newsock = -1;
 	const char *remote_ip;
 	int r, remote_port;
-	char *line;
+	char *line, *logfile = NULL;
 	int config_s[2] = { -1 , -1 };
 	u_int n;
 	u_int64_t ibytes, obytes;
@@ -1360,7 +1362,7 @@ main(int ac, char **av)
 	initialize_server_options(&options);
 
 	/* Parse command-line arguments. */
-	while ((opt = getopt(ac, av, "f:p:b:k:h:g:u:o:C:dDeiqrtQRT46")) != -1) {
+	while ((opt = getopt(ac, av, "f:p:b:k:h:g:u:o:C:dDeE:iqrtQRT46")) != -1) {
 		switch (opt) {
 		case '4':
 			options.address_family = AF_INET;
@@ -1389,6 +1391,9 @@ main(int ac, char **av)
 		case 'D':
 			no_daemon_flag = 1;
 			break;
+		case 'E':
+			logfile = xstrdup(optarg);
+			/* FALLTHROUGH */
 		case 'e':
 			log_stderr = 1;
 			break;
@@ -1486,6 +1491,11 @@ main(int ac, char **av)
 
 	OpenSSL_add_all_algorithms();
 
+	/* If requested, redirect the logs to the specified logfile. */
+	if (logfile != NULL) {
+		log_redirect_stderr_to(logfile);
+		xfree(logfile);
+	}
 	/*
 	 * Force logging to stderr until we have loaded the private host
 	 * key (unless started from inetd)
@@ -1568,7 +1578,8 @@ main(int ac, char **av)
 		exit(1);
 	}
 
-	debug("sshd version %.100s", SSH_VERSION);
+	debug("sshd version %s, %s", SSH_VERSION,
+	    SSLeay_version(SSLEAY_VERSION));
 
 	/* load private host keys */
 	sensitive_data.host_keys = xcalloc(options.num_host_key_files,

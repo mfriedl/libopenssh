@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-pubkey.c,v 1.33 2012/11/14 02:24:27 djm Exp $ */
+/* $OpenBSD: auth2-pubkey.c,v 1.35 2013/03/07 00:19:59 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -74,7 +74,7 @@ userauth_pubkey(struct ssh *ssh)
 	struct authctxt *authctxt = ssh->authctxt;
 	struct sshbuf *b;
 	struct sshkey *key = NULL;
-	char *pkalg;
+	char *pkalg, *userstyle = NULL;
 	u_char *pkblob, *sig, have_sig;
 	size_t blen, slen;
 	int r, pktype;
@@ -141,8 +141,11 @@ userauth_pubkey(struct ssh *ssh)
 				    __func__, ssh_err(r));
 		}
 		/* reconstruct packet */
+		xasprintf(&userstyle, "%s%s%s", authctxt->user,
+		    authctxt->style ? ":" : "",
+		    authctxt->style ? authctxt->style : "");
 		if ((r = sshbuf_put_u8(b, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
-		    (r = sshbuf_put_cstring(b, authctxt->user)) != 0 ||
+		    (r = sshbuf_put_cstring(b, userstyle)) != 0 ||
 		    (r = sshbuf_put_cstring(b, ssh->compat & SSH_BUG_PKSERVICE ?
 		    "ssh-userauth" : authctxt->service)) != 0)
 			fatal("%s: build packet failed: %s",
@@ -202,6 +205,7 @@ done:
 	debug2("%s: authenticated %d pkalg %s", __func__, authenticated, pkalg);
 	if (key != NULL)
 		sshkey_free(key);
+	free(userstyle);
 	free(pkalg);
 	free(pkblob);
 	return authenticated;
@@ -514,8 +518,8 @@ user_key_command_allowed2(struct passwd *user_pw, struct sshkey *key)
 	    "u", user_pw->pw_name, (char *)NULL);
 	pw = getpwnam(username);
 	if (pw == NULL) {
-		error("AuthorizedKeyCommandUser \"%s\" not found: %s",
-		    options.authorized_keys_command, strerror(errno));
+		error("AuthorizedKeysCommandUser \"%s\" not found: %s",
+		    username, strerror(errno));
 		free(username);
 		return 0;
 	}
