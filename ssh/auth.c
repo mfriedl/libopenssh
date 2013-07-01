@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.c,v 1.102 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: auth.c,v 1.103 2013/05/19 02:42:42 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -59,6 +59,7 @@
 #include "monitor_wrap.h"
 #include "err.h"
 #include "krl.h"
+#include "compat.h"
 
 /* import */
 extern ServerOptions options;
@@ -181,8 +182,25 @@ allowed_user(struct passwd * pw)
 }
 
 void
+auth_info(struct authctxt *authctxt, const char *fmt, ...)
+{
+	va_list ap;
+	int i;
+
+	free(authctxt->info);
+	authctxt->info = NULL;
+
+	va_start(ap, fmt);
+	i = vasprintf(&authctxt->info, fmt, ap);
+	va_end(ap);
+
+	if (i < 0 || authctxt->info == NULL)
+		fatal("vasprintf failed");
+}
+
+void
 auth_log(struct authctxt *authctxt, int authenticated, int partial,
-    const char *method, const char *submethod, const char *info)
+    const char *method, const char *submethod)
 {
 	void (*authlog) (const char *fmt,...) = verbose;
 	char *authmsg;
@@ -204,7 +222,7 @@ auth_log(struct authctxt *authctxt, int authenticated, int partial,
 	else
 		authmsg = authenticated ? "Accepted" : "Failed";
 
-	authlog("%s %s%s%s for %s%.100s from %.200s port %d%s",
+	authlog("%s %s%s%s for %s%.100s from %.200s port %d %s%s%s",
 	    authmsg,
 	    method,
 	    submethod != NULL ? "/" : "", submethod == NULL ? "" : submethod,
@@ -212,7 +230,11 @@ auth_log(struct authctxt *authctxt, int authenticated, int partial,
 	    authctxt->user,
 	    ssh_remote_ipaddr(active_state),	/* XXX */
 	    ssh_get_remote_port(active_state),
-	    info);
+	    compat20 ? "ssh2" : "ssh1",
+	    authctxt->info != NULL ? ": " : "",
+	    authctxt->info != NULL ? authctxt->info : "");
+	free(authctxt->info);
+	authctxt->info = NULL;
 }
 
 /*

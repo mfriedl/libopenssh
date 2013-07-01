@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.250 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: clientloop.c,v 1.253 2013/06/07 15:37:52 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -264,7 +264,7 @@ set_control_persist_exit_time(void)
 		control_persist_exit_time = 0;
 	} else if (control_persist_exit_time <= 0) {
 		/* a client connection has recently closed */
-		control_persist_exit_time = time(NULL) +
+		control_persist_exit_time = monotime() +
 			(time_t)options.control_persist_timeout;
 		debug2("%s: schedule exit in %d seconds", __func__,
 		    options.control_persist_timeout);
@@ -347,7 +347,7 @@ client_x11_get_proto(const char *display, const char *xauth_path,
 				if (system(cmd) == 0)
 					generated = 1;
 				if (x11_refuse_time == 0) {
-					now = time(NULL) + 1;
+					now = monotime() + 1;
 					if (UINT_MAX - timeout < now)
 						x11_refuse_time = UINT_MAX;
 					else
@@ -587,7 +587,7 @@ client_wait_until_can_do_something(struct ssh *ssh,
 {
 	struct timeval tv, *tvp;
 	int timeout_secs;
-	time_t minwait_secs = 0, server_alive_time = 0, now = time(NULL);
+	time_t minwait_secs = 0, server_alive_time = 0, now = monotime();
 	int r;
 
 	/* Add any selections by the channel mechanism. */
@@ -683,7 +683,7 @@ client_wait_until_can_do_something(struct ssh *ssh,
 		 * Timeout.  Could have been either keepalive or rekeying.
 		 * Keepalive we check here, rekeying is checked in clientloop.
 		 */
-		if (server_alive_time != 0 && server_alive_time <= time(NULL))
+		if (server_alive_time != 0 && server_alive_time <= monotime())
 			server_alive_check(ssh);
 	}
 }
@@ -1119,8 +1119,11 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf **binp,
 				if (c && c->ctl_chan != -1) {
 					chan_read_failed(c);
 					chan_write_failed(c);
-					mux_master_session_cleanup_cb(c->self,
-					    NULL);
+					if (c->detach_user)
+						c->detach_user(c->self, NULL);
+					c->type = SSH_CHANNEL_ABANDONED;
+					sshbuf_reset(c->input);
+					chan_ibuf_empty(c);
 					return 0;
 				} else
 					quit_pending = 1;
@@ -1694,7 +1697,7 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg, int ssh2_chan_id
 		 * connections, then quit.
 		 */
 		if (control_persist_exit_time > 0) {
-			if (time(NULL) >= control_persist_exit_time) {
+			if (monotime() >= control_persist_exit_time) {
 				debug("ControlPersist timeout expired");
 				break;
 			}
@@ -1951,7 +1954,7 @@ client_request_x11(struct ssh *ssh, const char *request_type, int rchan)
 		    "malicious server.");
 		return NULL;
 	}
-	if (x11_refuse_time != 0 && time(NULL) >= x11_refuse_time) {
+	if (x11_refuse_time != 0 && monotime() >= x11_refuse_time) {
 		verbose("Rejected X11 connection after ForwardX11Timeout "
 		    "expired");
 		return NULL;

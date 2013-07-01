@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-pubkey.c,v 1.36 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: auth2-pubkey.c,v 1.38 2013/06/21 00:34:49 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -167,6 +167,8 @@ userauth_pubkey(struct ssh *ssh)
 #ifdef DEBUG_PK
 		sshbuf_dump(b, stderr);
 #endif
+		pubkey_auth_info(authctxt, key, NULL);
+
 		/* test for correct signature */
 		authenticated = 0;
 		if (PRIVSEP(user_key_allowed(authctxt->pw, key)) &&
@@ -209,6 +211,41 @@ done:
 	free(pkalg);
 	free(pkblob);
 	return authenticated;
+}
+
+void
+pubkey_auth_info(struct authctxt *authctxt, const struct sshkey *key,
+    const char *fmt, ...)
+{
+	char *fp, *extra;
+	va_list ap;
+	int i;
+
+	extra = NULL;
+	if (fmt != NULL) {
+		va_start(ap, fmt);
+		i = vasprintf(&extra, fmt, ap);
+		va_end(ap);
+		if (i < 0 || extra == NULL)
+			fatal("%s: vasprintf failed", __func__);
+	}
+
+	if (sshkey_is_cert(key)) {
+		fp = sshkey_fingerprint(key->cert->signature_key,
+		    SSH_FP_MD5, SSH_FP_HEX);
+		auth_info(authctxt, "%s ID %s (serial %llu) CA %s %s%s%s",
+		    sshkey_type(key), key->cert->key_id,
+		    (unsigned long long)key->cert->serial,
+		    sshkey_type(key->cert->signature_key), fp,
+		    extra == NULL ? "" : ", ", extra == NULL ? "" : extra);
+		free(fp);
+	} else {
+		fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
+		auth_info(authctxt, "%s %s%s%s", sshkey_type(key), fp,
+		    extra == NULL ? "" : ", ", extra == NULL ? "" : extra);
+		free(fp);
+	}
+	free(extra);
 }
 
 static int
@@ -304,13 +341,14 @@ check_authkeys_file(FILE *f, char *file, struct sshkey *key, struct passwd *pw)
 	char *fp;
 
 	found_key = 0;
-	found = sshkey_new(sshkey_is_cert(key) ? KEY_UNSPEC : key->type);
-	if (found == NULL)
-		goto done;
-
+	found = NULL;
 	while (read_keyfile_line(f, file, line, sizeof(line), &linenum) != -1) {
 		char *cp, *key_options = NULL;
-
+		if (found != NULL)
+			sshkey_free(found);
+		found = sshkey_new(sshkey_is_cert(key) ? KEY_UNSPEC : key->type);
+		if (found == NULL)
+			goto done;
 		auth_clear_options();
 
 		/* Skip leading whitespace, empty and comment lines. */
@@ -388,11 +426,9 @@ check_authkeys_file(FILE *f, char *file, struct sshkey *key, struct passwd *pw)
 			if (key_is_cert_authority)
 				continue;
 			found_key = 1;
-			debug("matching key found: file %s, line %lu",
-			    file, linenum);
 			fp = sshkey_fingerprint(found, SSH_FP_MD5, SSH_FP_HEX);
-			verbose("Found matching %s key: %s",
-			    sshkey_type(found), fp);
+			debug("matching key found: file %s, line %lu %s %s",
+			    file, linenum, sshkey_type(found), fp);
 			free(fp);
 			break;
 		}

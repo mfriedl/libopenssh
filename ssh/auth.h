@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.h,v 1.73 2013/03/07 19:27:25 markus Exp $ */
+/* $OpenBSD: auth.h,v 1.75 2013/06/21 00:34:49 djm Exp $ */
 
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
@@ -53,6 +53,7 @@ struct authctxt {
 	struct passwd	*pw;		/* set if 'valid' */
 	char		*style;
 	void		*kbdintctxt;
+	char		*info;		/* Extra info for next auth_log */
 	void		*jpake_ctx;
 	auth_session_t	*as;
 	char		**auth_methods;	/* modified from server config */
@@ -111,6 +112,9 @@ int	 auth_rhosts_rsa_key_allowed(struct passwd *, char *, char *,
 int	 hostbased_key_allowed(struct passwd *, const char *, char *,
     struct sshkey *);
 int	 user_key_allowed(struct passwd *, struct sshkey *);
+void	 pubkey_auth_info(struct authctxt *, const struct sshkey *,
+    const char *, ...)
+	    __attribute__((__format__ (printf, 3, 4)));
 
 struct stat;
 int	 auth_secure_path(const char *, struct stat *, const char *, uid_t,
@@ -127,8 +131,10 @@ void	krb5_cleanup_proc(struct authctxt *authctxt);
 void	do_authentication(struct ssh *);
 void	do_authentication2(struct ssh *);
 
-void	auth_log(struct authctxt *, int, int, const char *, const char *,
-    const char *);
+void	auth_info(struct authctxt *authctxt, const char *, ...)
+	    __attribute__((__format__ (printf, 2, 3)))
+	    __attribute__((__nonnull__ (2)));
+void	auth_log(struct authctxt *, int, int, const char *, const char *);
 void	userauth_finish(struct ssh *, int, const char *, const char *);
 int	auth_root_allowed(const char *);
 

@@ -1,4 +1,4 @@
-/* $OpenBSD: sftp-client.c,v 1.98 2013/05/17 00:13:14 djm Exp $ */
+/* $OpenBSD: sftp-client.c,v 1.100 2013/06/01 22:34:50 dtucker Exp $ */
 /*
  * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
  *
@@ -1161,7 +1161,7 @@ do_download(struct sftp_conn *conn, char *remote_path, char *local_path,
 	}
 
 	local_fd = open(local_path, O_WRONLY | O_CREAT | O_TRUNC,
-	    mode | S_IWRITE);
+	    mode | S_IWUSR);
 	if (local_fd == -1) {
 		error("Couldn't open local file \"%s\" for writing: %s",
 		    local_path, strerror(errno));
@@ -1452,7 +1452,7 @@ do_upload(struct sftp_conn *conn, char *local_path, char *remote_path,
 	int status = SSH2_FX_OK;
 	u_int id;
 	u_char type;
-	off_t offset;
+	off_t offset, progress_counter;
 	char *handle, *data;
 	struct sshbuf *msg;
 	struct stat sb;
@@ -1524,9 +1524,10 @@ do_upload(struct sftp_conn *conn, char *local_path, char *remote_path,
 	data = xmalloc(conn->transfer_buflen);
 
 	/* Read from local and write to remote */
-	offset = 0;
+	offset = progress_counter = 0;
 	if (showprogress)
-		start_progress_meter(local_path, sb.st_size, &offset);
+		start_progress_meter(local_path, sb.st_size,
+		    &progress_counter);
 
 	for (;;) {
 		int len;
@@ -1603,6 +1604,7 @@ do_upload(struct sftp_conn *conn, char *local_path, char *remote_path,
 			debug3("In write loop, ack for %u %u bytes at %lld",
 			    ack->id, ack->len, (long long)ack->offset);
 			++ackid;
+			progress_counter += ack->len;
 			free(ack);
 		}
 		offset += len;

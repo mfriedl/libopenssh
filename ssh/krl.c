@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $OpenBSD: krl.c,v 1.11 2013/04/05 00:14:00 djm Exp $ */
+/* $OpenBSD: krl.c,v 1.12 2013/06/20 19:15:06 markus Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>

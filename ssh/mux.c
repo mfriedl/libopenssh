@@ -1,4 +1,4 @@
-/* $OpenBSD: mux.c,v 1.41 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: mux.c,v 1.43 2013/06/05 02:07:29 dtucker Exp $ */
 /*
  * Copyright (c) 2002-2008 Damien Miller <djm@openbsd.org>
  *
@@ -180,7 +180,7 @@ static const struct {
 
 /* Cleanup callback fired on closure of mux slave _session_ channel */
 /* ARGSUSED */
-void
+static void
 mux_master_session_cleanup_cb(int cid, void *unused)
 {
 	Channel *cc, *c = channel_by_id(cid);
@@ -306,6 +306,7 @@ process_mux_master_hello(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf 
 		if ((r = sshbuf_get_cstring(m, &name, NULL)) != 0 ||
 		    (r = sshbuf_get_cstring(m, &value, NULL)) != 0) {
 			free(name);
+			free(value);
 			goto malf;
 		}
 		debug2("Unrecognised slave extension \"%s\"", name);
@@ -1434,7 +1435,9 @@ mux_client_read_packet(int fd, struct sshbuf *m)
 		fatal("%s: sshbuf_new failed", __func__);
 	if (mux_client_read(fd, queue, 4) != 0) {
 		if ((oerrno = errno) == EPIPE)
-		debug3("%s: read header failed: %s", __func__, strerror(errno));
+			debug3("%s: read header failed: %s", __func__,
+			    strerror(errno));
+		sshbuf_reset(queue);
 		errno = oerrno;
 		return -1;
 	}
@@ -1442,6 +1445,7 @@ mux_client_read_packet(int fd, struct sshbuf *m)
 	if (mux_client_read(fd, queue, need) != 0) {
 		oerrno = errno;
 		debug3("%s: read body failed: %s", __func__, strerror(errno));
+		sshbuf_reset(queue);
 		errno = oerrno;
 		return -1;
 	}

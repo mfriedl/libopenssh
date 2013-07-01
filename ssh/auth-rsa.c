@@ -1,4 +1,4 @@
-/* $OpenBSD: auth-rsa.c,v 1.82 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: auth-rsa.c,v 1.84 2013/06/21 00:34:49 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -166,7 +166,7 @@ static int
 rsa_key_allowed_in_file(struct passwd *pw, char *file,
     const BIGNUM *client_n, struct sshkey **rkey)
 {
-	char line[SSH_MAX_PUBKEY_BYTES];
+	char *fp, line[SSH_MAX_PUBKEY_BYTES];
 	int allowed = 0;
 	u_int bits;
 	FILE *f;
@@ -234,6 +234,11 @@ rsa_key_allowed_in_file(struct passwd *pw, char *file,
 			logit("Warning: %s, line %lu: keysize mismatch: "
 			    "actual %d vs. announced %d.",
 			    file, linenum, BN_num_bits(key->rsa->n), bits);
+
+		fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
+		debug("matching key found: file %s, line %lu %s %s",
+		    file, linenum, sshkey_type(key), fp);
+		free(fp);
 
 		/* Never accept a revoked key */
 		if (auth_key_is_revoked(key))
@@ -303,7 +308,6 @@ auth_rsa(struct authctxt *authctxt, BIGNUM *client_n)
 {
 	struct ssh *ssh = active_state;
 	struct sshkey *key;
-	char *fp;
 	struct passwd *pw = authctxt->pw;
 
 	/* no user given */
@@ -334,11 +338,7 @@ auth_rsa(struct authctxt *authctxt, BIGNUM *client_n)
 	 * options; this will be reset if the options cause the
 	 * authentication to be rejected.
 	 */
-	fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
-	verbose("Found matching %s key: %s",
-	    sshkey_type(key), fp);
-	free(fp);
-	sshkey_free(key);
+	pubkey_auth_info(authctxt, key, NULL);
 
 	ssh_packet_send_debug(ssh, "RSA authentication accepted.");
 	return (1);

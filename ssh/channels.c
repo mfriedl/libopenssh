@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.c,v 1.321 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: channels.c,v 1.323 2013/06/07 15:37:52 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -210,6 +210,7 @@ channel_lookup(int id)
 	case SSH_CHANNEL_OPEN:
 	case SSH_CHANNEL_INPUT_DRAINING:
 	case SSH_CHANNEL_OUTPUT_DRAINING:
+	case SSH_CHANNEL_ABANDONED:
 		return (c);
 	}
 	logit("Non-public channel %d, type %d.", id, c->type);
@@ -536,6 +537,7 @@ channel_still_open(void)
 		case SSH_CHANNEL_DYNAMIC:
 		case SSH_CHANNEL_CONNECTING:
 		case SSH_CHANNEL_ZOMBIE:
+		case SSH_CHANNEL_ABANDONED:
 			continue;
 		case SSH_CHANNEL_LARVAL:
 			if (!compat20)
@@ -581,6 +583,7 @@ channel_find_open(void)
 		case SSH_CHANNEL_OPENING:
 		case SSH_CHANNEL_CONNECTING:
 		case SSH_CHANNEL_ZOMBIE:
+		case SSH_CHANNEL_ABANDONED:
 			continue;
 		case SSH_CHANNEL_LARVAL:
 		case SSH_CHANNEL_AUTH_SOCKET:
@@ -631,6 +634,7 @@ channel_open_message(void)
 		case SSH_CHANNEL_CLOSED:
 		case SSH_CHANNEL_AUTH_SOCKET:
 		case SSH_CHANNEL_ZOMBIE:
+		case SSH_CHANNEL_ABANDONED:
 		case SSH_CHANNEL_MUX_CLIENT:
 		case SSH_CHANNEL_MUX_LISTENER:
 			continue;
@@ -1393,7 +1397,7 @@ channel_post_x11_listener(Channel *c, fd_set *readset, fd_set *writeset)
 			    errno != ECONNABORTED)
 				error("accept: %.100s", strerror(errno));
 			if (errno == EMFILE || errno == ENFILE)
-				c->notbefore = time(NULL) + 1;
+				c->notbefore = monotime() + 1;
 			return;
 		}
 		set_nodelay(newsock);
@@ -1537,7 +1541,7 @@ channel_post_port_listener(Channel *c, fd_set *readset, fd_set *writeset)
 			    errno != ECONNABORTED)
 				error("accept: %.100s", strerror(errno));
 			if (errno == EMFILE || errno == ENFILE)
-				c->notbefore = time(NULL) + 1;
+				c->notbefore = monotime() + 1;
 			return;
 		}
 		set_nodelay(newsock);
@@ -1574,7 +1578,7 @@ channel_post_auth_listener(Channel *c, fd_set *readset, fd_set *writeset)
 			error("accept from auth socket: %.100s",
 			    strerror(errno));
 			if (errno == EMFILE || errno == ENFILE)
-				c->notbefore = time(NULL) + 1;
+				c->notbefore = monotime() + 1;
 			return;
 		}
 		nc = channel_new(c->ssh, "accepted auth socket",
@@ -1995,7 +1999,7 @@ channel_post_mux_listener(Channel *c, fd_set *readset, fd_set *writeset)
 	    &addrlen)) == -1) {
 		error("%s accept: %s", __func__, strerror(errno));
 		if (errno == EMFILE || errno == ENFILE)
-			c->notbefore = time(NULL) + 1;
+			c->notbefore = monotime() + 1;
 		return;
 	}
 
@@ -2158,7 +2162,7 @@ channel_handler(chan_fn *ftab[], fd_set *readset, fd_set *writeset,
 		channel_handler_init();
 		did_init = 1;
 	}
-	now = time(NULL);
+	now = monotime();
 	if (unpause_secs != NULL)
 		*unpause_secs = 0;
 	for (i = 0, oalloc = channels_alloc; i < oalloc; i++) {
@@ -2607,7 +2611,7 @@ channel_input_close_confirmation(int type, u_int32_t seq, struct ssh *ssh)
 	if (c == NULL)
 		ssh_packet_disconnect(ssh, "Received close confirmation for "
 		    "out-of-range channel %d.", id);
-	if (c->type != SSH_CHANNEL_CLOSED)
+	if (c->type != SSH_CHANNEL_CLOSED && c->type != SSH_CHANNEL_ABANDONED)
 		ssh_packet_disconnect(ssh, "Received close confirmation for "
 		    "non-closed channel %d (type %d).", id, c->type);
 	channel_free(c);

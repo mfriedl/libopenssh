@@ -1,4 +1,4 @@
-/* $OpenBSD: mac.c,v 1.23 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: mac.c,v 1.24 2013/06/03 00:03:18 dtucker Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
@@ -169,10 +169,13 @@ int
 mac_compute(struct sshmac *mac, u_int32_t seqno, const u_char *data, int datalen,
     u_char *digest, size_t dlen)
 {
-	static u_char m[MAC_DIGEST_LEN_MAX];
+	static union {
+		u_char m[MAC_DIGEST_LEN_MAX];
+		u_int64_t for_align;
+	} u;
 	u_char b[4], nonce[8];
 
-	if (mac->mac_len > sizeof(m))
+	if (mac->mac_len > sizeof(u))
 		return SSH_ERR_INTERNAL_ERROR;
 
 	switch (mac->type) {
@@ -182,18 +185,18 @@ mac_compute(struct sshmac *mac, u_int32_t seqno, const u_char *data, int datalen
 		if (HMAC_Init(&mac->evp_ctx, NULL, 0, NULL) != 1 ||
 		    HMAC_Update(&mac->evp_ctx, b, sizeof(b)) != 1 ||
 		    HMAC_Update(&mac->evp_ctx, data, datalen) != 1 ||
-		    HMAC_Final(&mac->evp_ctx, m, NULL) != 1)
+		    HMAC_Final(&mac->evp_ctx, u.m, NULL) != 1)
 			return SSH_ERR_LIBCRYPTO_ERROR;
 		break;
 	case SSH_UMAC:
 		POKE_U64(nonce, seqno);
 		umac_update(mac->umac_ctx, data, datalen);
-		umac_final(mac->umac_ctx, m, nonce);
+		umac_final(mac->umac_ctx, u.m, nonce);
 		break;
 	case SSH_UMAC128:
 		put_u64(nonce, seqno);
 		umac128_update(mac->umac_ctx, data, datalen);
-		umac128_final(mac->umac_ctx, m, nonce);
+		umac128_final(mac->umac_ctx, u.m, nonce);
 		break;
 	default:
 		return SSH_ERR_INVALID_ARGUMENT;
@@ -201,7 +204,7 @@ mac_compute(struct sshmac *mac, u_int32_t seqno, const u_char *data, int datalen
 	if (digest != NULL) {
 		if (dlen > mac->mac_len)
 			dlen = mac->mac_len;
-		memcpy(digest, m, dlen);
+		memcpy(digest, u.m, dlen);
 	}
 	return 0;
 }

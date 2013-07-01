@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.124 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: monitor.c,v 1.126 2013/06/21 00:34:49 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -304,8 +304,7 @@ monitor_child_preauth(struct authctxt *_authctxt, struct monitor *pmonitor)
 		}
 		if (ent->flags & (MON_AUTHDECIDE|MON_ALOG)) {
 			auth_log(authctxt, authenticated, partial,
-			    auth_method, auth_submethod,
-			    compat20 ? " ssh2" : "");
+			    auth_method, auth_submethod);
 			if (!authenticated)
 				authctxt->failures++;
 		}
@@ -906,6 +905,7 @@ mm_answer_keyallowed(int sock, struct sshbuf *m)
 		case MM_USERKEY:
 			allowed = options.pubkey_authentication &&
 			    user_key_allowed(authctxt->pw, key);
+			pubkey_auth_info(authctxt, key, NULL);
 			auth_method = "publickey";
 			if (options.pubkey_authentication && allowed != 1)
 				auth_clear_options();
@@ -914,6 +914,9 @@ mm_answer_keyallowed(int sock, struct sshbuf *m)
 			allowed = options.hostbased_authentication &&
 			    hostbased_key_allowed(authctxt->pw,
 			    cuser, chost, key);
+			pubkey_auth_info(authctxt, key,
+			    "client user \"%.100s\", client host \"%.100s\"",
+			    cuser, chost);
 			auth_method = "hostbased";
 			break;
 		case MM_RSAHOSTKEY:
@@ -945,8 +948,7 @@ mm_answer_keyallowed(int sock, struct sshbuf *m)
 		hostbased_chost = chost;
 	} else {
 		/* Log failed attempt */
-		auth_log(authctxt, 0, 0, auth_method, NULL,
-		    compat20 ? " ssh2" : "");
+		auth_log(authctxt, 0, 0, auth_method, NULL);
 		free(blob);
 		free(cuser);
 		free(chost);

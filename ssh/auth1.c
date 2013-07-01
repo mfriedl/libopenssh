@@ -1,4 +1,4 @@
-/* $OpenBSD: auth1.c,v 1.78 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: auth1.c,v 1.79 2013/05/19 02:42:42 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -40,17 +40,17 @@
 /* import */
 extern ServerOptions options;
 
-static int auth1_process_password(struct ssh *, char *, size_t);
-static int auth1_process_rsa(struct ssh *, char *, size_t);
-static int auth1_process_rhosts_rsa(struct ssh *, char *, size_t);
-static int auth1_process_tis_challenge(struct ssh *, char *, size_t);
-static int auth1_process_tis_response(struct ssh *, char *, size_t);
+static int auth1_process_password(struct ssh *);
+static int auth1_process_rsa(struct ssh *);
+static int auth1_process_rhosts_rsa(struct ssh *);
+static int auth1_process_tis_challenge(struct ssh *);
+static int auth1_process_tis_response(struct ssh *);
 
 struct AuthMethod1 {
 	int type;
 	char *name;
 	int *enabled;
-	int (*method)(struct ssh *, char *, size_t);
+	int (*method)(struct ssh *);
 };
 
 const struct AuthMethod1 auth1_methods[] = {
@@ -105,7 +105,7 @@ get_authname(int type)
 
 /*ARGSUSED*/
 static int
-auth1_process_password(struct ssh *ssh, char *info, size_t infolen)
+auth1_process_password(struct ssh *ssh)
 {
 	struct authctxt *authctxt = ssh->authctxt;
 	int r, authenticated = 0;
@@ -132,7 +132,7 @@ auth1_process_password(struct ssh *ssh, char *info, size_t infolen)
 
 /*ARGSUSED*/
 static int
-auth1_process_rsa(struct ssh *ssh, char *info, size_t infolen)
+auth1_process_rsa(struct ssh *ssh)
 {
 	struct authctxt *authctxt = ssh->authctxt;
 	int r, authenticated = 0;
@@ -153,7 +153,7 @@ auth1_process_rsa(struct ssh *ssh, char *info, size_t infolen)
 
 /*ARGSUSED*/
 static int
-auth1_process_rhosts_rsa(struct ssh *ssh, char *info, size_t infolen)
+auth1_process_rhosts_rsa(struct ssh *ssh)
 {
 	struct authctxt *authctxt = ssh->authctxt;
 	int keybits, authenticated = 0;
@@ -189,7 +189,7 @@ auth1_process_rhosts_rsa(struct ssh *ssh, char *info, size_t infolen)
 	    client_host_key);
 	sshkey_free(client_host_key);
 
-	snprintf(info, infolen, " ruser %.100s", client_user);
+	auth_info(authctxt, "ruser %.100s", client_user);
 	free(client_user);
 
 	return (authenticated);
@@ -197,7 +197,7 @@ auth1_process_rhosts_rsa(struct ssh *ssh, char *info, size_t infolen)
 
 /*ARGSUSED*/
 static int
-auth1_process_tis_challenge(struct ssh *ssh, char *info, size_t infolen)
+auth1_process_tis_challenge(struct ssh *ssh)
 {
 	struct authctxt *authctxt = ssh->authctxt;
 	char *challenge;
@@ -219,7 +219,7 @@ auth1_process_tis_challenge(struct ssh *ssh, char *info, size_t infolen)
 
 /*ARGSUSED*/
 static int
-auth1_process_tis_response(struct ssh *ssh, char *info, size_t infolen)
+auth1_process_tis_response(struct ssh *ssh)
 {
 	struct authctxt *authctxt = ssh->authctxt;
 	int authenticated = 0;
@@ -246,7 +246,6 @@ do_authloop(struct ssh *ssh)
 {
 	struct authctxt *authctxt = ssh->authctxt;
 	int authenticated = 0;
-	char info[1024];
 	int r, type = 0;
 	const struct AuthMethod1 *meth;
 
@@ -259,7 +258,7 @@ do_authloop(struct ssh *ssh)
 	    (!options.kerberos_authentication || options.kerberos_or_local_passwd) &&
 #endif
 	    PRIVSEP(auth_password(authctxt, ""))) {
-		auth_log(authctxt, 1, 0, "without authentication", NULL, "");
+		auth_log(authctxt, 1, 0, "without authentication", NULL);
 		return;
 	}
 
@@ -272,8 +271,6 @@ do_authloop(struct ssh *ssh)
 	for (;;) {
 		/* default to fail */
 		authenticated = 0;
-
-		info[0] = '\0';
 
 		/* Get a packet from the client. */
 		type = ssh_packet_read(ssh);
@@ -290,7 +287,7 @@ do_authloop(struct ssh *ssh)
 			goto skip;
 		}
 
-		authenticated = meth->method(ssh, info, sizeof(info));
+		authenticated = meth->method(ssh);
 		if (authenticated == -1)
 			continue; /* "postponed" */
 
@@ -309,8 +306,7 @@ do_authloop(struct ssh *ssh)
 
  skip:
 		/* Log before sending the reply */
-		auth_log(authctxt, authenticated, 0, get_authname(type),
-		    NULL, info);
+		auth_log(authctxt, authenticated, 0, get_authname(type), NULL);
 
 		if (authenticated)
 			return;
