@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.399 2013/04/07 02:10:33 dtucker Exp $ */
+/* $OpenBSD: sshd.c,v 1.401 2013/05/16 09:08:41 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1758,7 +1758,8 @@ main(int ac, char **av)
 
 	/* Chdir to the root directory so that the current disk can be
 	   unmounted if desired. */
-	chdir("/");
+	if (chdir("/") == -1)
+		error("chdir(\"/\"): %s", strerror(errno));
 
 	/* ignore SIGPIPE */
 	signal(SIGPIPE, SIG_IGN);
@@ -2291,6 +2292,11 @@ do_ssh2_kex(struct ssh *ssh)
 	}
 	if (options.kex_algorithms != NULL)
 		myproposal[PROPOSAL_KEX_ALGS] = options.kex_algorithms;
+
+	if (options.rekey_limit || options.rekey_interval)
+		ssh_packet_set_rekey_limits(ssh,
+		    (u_int32_t)options.rekey_limit,
+		    (time_t)options.rekey_interval);
 
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = list_hostkey_types();
 

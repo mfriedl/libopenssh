@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.122 2013/03/07 19:27:25 markus Exp $ */
+/* $OpenBSD: monitor.c,v 1.123 2013/05/16 04:09:13 dtucker Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -1543,6 +1543,10 @@ monitor_apply_keystate(struct monitor *pmonitor)
 		    (ssh_packet_comp_alloc_func *)mm_zalloc,
 		    (ssh_packet_comp_free_func *)mm_zfree);
 	}
+	if (options.rekey_limit || options.rekey_interval)
+		ssh_packet_set_rekey_limits(ssh,
+		    (u_int32_t)options.rekey_limit,
+		    (time_t)options.rekey_interval);
 	debug3("%s: done", __func__);
 }
 

@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.248 2013/01/02 00:32:07 djm Exp $ */
+/* $OpenBSD: clientloop.c,v 1.249 2013/05/16 02:00:34 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -589,7 +589,7 @@ client_wait_until_can_do_something(struct ssh *ssh,
 {
 	struct timeval tv, *tvp;
 	int timeout_secs;
-	time_t minwait_secs = 0;
+	time_t minwait_secs = 0, server_alive_time = 0, now = time(NULL);
 	int r;
 
 	/* Add any selections by the channel mechanism. */
@@ -638,12 +638,17 @@ client_wait_until_can_do_something(struct ssh *ssh,
 	 */
 
 	timeout_secs = INT_MAX; /* we use INT_MAX to mean no timeout */
-	if (options.server_alive_interval > 0 && compat20)
+	if (options.server_alive_interval > 0 && compat20) {
 		timeout_secs = options.server_alive_interval;
+		server_alive_time = now + options.server_alive_interval;
+	}
+	if (options.rekey_interval > 0 && compat20 && !rekeying)
+		timeout_secs = MIN(timeout_secs,
+		    ssh_packet_get_rekey_timeout(ssh));
 	set_control_persist_exit_time();
 	if (control_persist_exit_time > 0) {
 		timeout_secs = MIN(timeout_secs,
-			control_persist_exit_time - time(NULL));
+			control_persist_exit_time - now);
 		if (timeout_secs < 0)
 			timeout_secs = 0;
 	}
@@ -674,8 +679,15 @@ client_wait_until_can_do_something(struct ssh *ssh,
 		    "select: %s\r\n", strerror(errno))) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		quit_pending = 1;
-	} else if (r == 0)
+	} else if (r == 0) {
 		server_alive_check(ssh);
+		/*
+		 * Timeout.  Could have been either keepalive or rekeying.
+		 * Keepalive we check here, rekeying is checked in clientloop.
+		 */
+		if (server_alive_time != 0 && server_alive_time <= time(NULL))
+			server_alive_check(ssh);
+	}
 }
 
 static void

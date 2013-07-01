@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.183 2013/04/19 01:06:50 djm Exp $ */
+/* $OpenBSD: packet.c,v 1.185 2013/05/16 04:09:13 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -54,6 +54,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <time.h>
 
 #include <zlib.h>
 
@@ -169,8 +170,13 @@ struct session_state {
 	struct newkeys *newkeys[MODE_MAX];
 	struct packet_state p_read, p_send;
 
+	/* Volume-based rekeying */
 	u_int64_t max_blocks_in, max_blocks_out;
 	u_int32_t rekey_limit;
+
+	/* Time-based rekeying */
+	time_t rekey_interval;	/* how often in seconds */
+	time_t rekey_time;	/* time of last rekeying */
 
 	/* Session key for protocol v1 */
 	u_char ssh1_key[SSH_SESSION_KEY_LENGTH];
@@ -1216,6 +1222,7 @@ ssh_packet_send2(struct ssh *ssh)
 	/* after a NEWKEYS message we can send the complete queue */
 	if (type == SSH2_MSG_NEWKEYS) {
 		state->rekeying = 0;
+		state->rekey_time = time(NULL);
 		while ((p = TAILQ_FIRST(&state->outgoing))) {
 			type = p->type;
 			debug("dequeue packet: %u", type);
@@ -2122,13 +2129,33 @@ ssh_packet_need_rekeying(struct ssh *ssh)
 	    (state->max_blocks_out &&
 	        (state->p_send.blocks > state->max_blocks_out)) ||
 	    (state->max_blocks_in &&
-	        (state->p_read.blocks > state->max_blocks_in));
+	        (state->p_read.blocks > state->max_blocks_in)) ||
+	    (state->rekey_interval != 0 && state->rekey_time +
+		 state->rekey_interval <= time(NULL));
 }
 
 void
-ssh_packet_set_rekey_limit(struct ssh *ssh, u_int32_t bytes)
+ssh_packet_set_rekey_limits(struct ssh *ssh, u_int32_t bytes, time_t seconds)
 {
+	debug3("rekey after %lld bytes, %d seconds", (long long)bytes,
+	    (int)seconds);
 	ssh->state->rekey_limit = bytes;
+	ssh->state->rekey_interval = seconds;
+	/*
+	 * We set the time here so that in post-auth privsep slave we count
+	 * from the completion of the authentication.
+	 */
+	ssh->state->rekey_time = time(NULL);
+}
+
+time_t
+ssh_packet_get_rekey_timeout(struct ssh *ssh)
+{
+	time_t seconds;
+
+	seconds = ssh->state->rekey_time + ssh->state->rekey_interval -
+	    time(NULL);
+	return (seconds <= 0 ? 1 : seconds);
 }
 
 void
