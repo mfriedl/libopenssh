@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.196 2013/05/16 02:00:34 dtucker Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.197 2013/05/17 00:13:14 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -137,10 +137,10 @@ order_hostkeyalgs(char *host, struct sockaddr *hostaddr, u_short port)
 	if (*first != '\0')
 		debug3("%s: prefer hostkeyalgs: %s", __func__, first);
 
-	xfree(first);
-	xfree(last);
-	xfree(hostname);
-	xfree(oavail);
+	free(first);
+	free(last);
+	free(hostname);
+	free(oavail);
 	free_hostkeys(hostkeys);
 
 	return ret;
@@ -402,7 +402,7 @@ ssh_userauth2(struct ssh *ssh, const char *local_user, const char *server_user,
 	ssh_dispatch_range(ssh, SSH2_MSG_USERAUTH_MIN, SSH2_MSG_USERAUTH_MAX, NULL);
 
 	debug("Authentication succeeded (%s).", authctxt->method->name);
-	xfree(authctxt);
+	free(authctxt);
 	ssh->authctxt = NULL;
 }
 
@@ -446,15 +446,12 @@ userauth(struct ssh *ssh, char *authlist)
 	if (authctxt->method != NULL && authctxt->method->cleanup != NULL)
 		authctxt->method->cleanup(ssh);
 
-	if (authctxt->methoddata) {
-		xfree(authctxt->methoddata);
-		authctxt->methoddata = NULL;
-	}
+	free(authctxt->methoddata);
+	authctxt->methoddata = NULL;
 	if (authlist == NULL) {
 		authlist = authctxt->authlist;
 	} else {
-		if (authctxt->authlist)
-			xfree(authctxt->authlist);
+		free(authctxt->authlist);
 		authctxt->authlist = authlist;
 	}
 	for (;;) {
@@ -526,16 +523,12 @@ input_userauth_success(int type, u_int32_t seq, struct ssh *ssh)
 
 	if (authctxt == NULL)
 		fatal("input_userauth_success: no authentication context");
-	if (authctxt->authlist) {
-		xfree(authctxt->authlist);
-		authctxt->authlist = NULL;
-	}
+	free(authctxt->authlist);
+	authctxt->authlist = NULL;
 	if (authctxt->method != NULL && authctxt->method->cleanup != NULL)
 		authctxt->method->cleanup(ssh);
-	if (authctxt->methoddata) {
-		xfree(authctxt->methoddata);
-		authctxt->methoddata = NULL;
-	}
+	free(authctxt->methoddata);
+	authctxt->methoddata = NULL;
 	authctxt->success = 1;			/* break out */
 	return 0;
 }
@@ -640,7 +633,7 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 	}
 	fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
 	debug2("input_userauth_pk_ok: fp %s", fp);
-	xfree(fp);
+	free(fp);
 
 	/*
 	 * search keys in the reverse order, because last candidate has been
@@ -659,10 +652,8 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 		sshkey_free(key);
 	if (b != NULL);
 		sshbuf_free(b);
-	if (pkalg)
-		free(pkalg);
-	if (pkblob)
-		free(pkblob);
+	free(pkalg);
+	free(pkblob);
 
 	/* try another method if we did not send a packet */
 	if (r == 0 && sent == 0)
@@ -1018,7 +1009,7 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
 		goto out;
 
 	memset(password, 0, strlen(password));
-	xfree(password);
+	free(password);
 	password = NULL;
 
 	while (password == NULL) {
@@ -1037,12 +1028,12 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
 		retype = read_passphrase(prompt, 0);
 		if (strcmp(password, retype) != 0) {
 			memset(password, 0, strlen(password));
-			xfree(password);
+			free(password);
 			logit("Mismatch; try again, EOF to quit.");
 			password = NULL;
 		}
 		memset(retype, 0, strlen(retype));
-		xfree(retype);
+		free(retype);
 	}
 	if ((r = sshpkt_put_cstring(ssh, password)) != 0 ||
 	    (r = sshpkt_add_padding(ssh, 64)) != 0 ||
@@ -1055,7 +1046,7 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
  out:
 	if (password) {
 		memset(password, 0, strlen(password));
-		xfree(password);
+		free(password);
 	}
 	free(info);
 	free(lang);
@@ -1109,13 +1100,13 @@ jpake_password_to_secret(struct cauthctxt *authctxt, const char *crypt_scheme,
 
 	bzero(password, strlen(password));
 	bzero(crypted, strlen(crypted));
-	xfree(password);
-	xfree(crypted);
+	free(password);
+	free(crypted);
 
 	if ((ret = BN_bin2bn(secret, secret_len, NULL)) == NULL)
 		fatal("%s: BN_bin2bn (secret)", __func__);
 	bzero(secret, secret_len);
-	xfree(secret);
+	free(secret);
 
 	return ret;
 }
@@ -1155,6 +1146,11 @@ input_userauth_jpake_server_step1(int type, u_int32_t seq, struct ssh *ssh)
 
 	/* Obtain password and derive secret */
 	pctx->s = jpake_password_to_secret(authctxt, crypt_scheme, salt);
+	bzero(crypt_scheme, strlen(crypt_scheme));
+	bzero(salt, strlen(salt));
+	free(crypt_scheme);
+	free(salt);
+
 	JPAKE_DEBUG_BN((pctx->s, "%s: s = ", __func__));
 
 	/* Calculate step 2 values */
@@ -1183,23 +1179,23 @@ input_userauth_jpake_server_step1(int type, u_int32_t seq, struct ssh *ssh)
  out:
 	if (x2_s_proof) {
 		bzero(x2_s_proof, x2_s_proof_len);
-		xfree(x2_s_proof);
+		free(x2_s_proof);
 	}
 	if (x3_proof) {
 		bzero(x3_proof, x3_proof_len);
-		xfree(x3_proof);
+		free(x3_proof);
 	}
 	if (x4_proof) {
 		bzero(x4_proof, x4_proof_len);
-		xfree(x4_proof);
+		free(x4_proof);
 	}
 	if (crypt_scheme) {
 		bzero(crypt_scheme, strlen(crypt_scheme));
-		xfree(crypt_scheme);
+		free(crypt_scheme);
 	}
 	if (salt) {
 		bzero(salt, strlen(salt));
-		xfree(salt);
+		free(salt);
 	}
 	if (r != 0)
 		userauth_jpake_cleanup(ssh);
@@ -1256,7 +1252,7 @@ input_userauth_jpake_server_step2(int type, u_int32_t seq, struct ssh *ssh)
  out:
 	if (x4_s_proof) {
 		bzero(x4_s_proof, x4_s_proof_len);
-		xfree(x4_s_proof);
+		free(x4_s_proof);
 	}
 	if (r != 0)
 		userauth_jpake_cleanup(ssh);
@@ -1338,7 +1334,7 @@ sign_and_send_pubkey(struct ssh *ssh, struct identity *id)
 
 	fp = sshkey_fingerprint(id->key, SSH_FP_MD5, SSH_FP_HEX);
 	debug3("%s: %s %s", __func__, sshkey_type(id->key), fp);
-	xfree(fp);
+	free(fp);
 
 	if ((r = sshkey_to_blob(id->key, &blob, &bloblen)) != 0) {
 		/* we cannot handle this key */
@@ -1380,7 +1376,7 @@ sign_and_send_pubkey(struct ssh *ssh, struct identity *id)
 	if ((ret = identity_sign(id, &signature, &slen,
 	    sshbuf_ptr(b), sshbuf_len(b), ssh->compat)) != 0) {
 		error("signature failed: %s", ssh_err(ret));
-		xfree(blob);
+		free(blob);
 		sshbuf_free(b);
 		return 0;
 	}
@@ -1405,12 +1401,12 @@ sign_and_send_pubkey(struct ssh *ssh, struct identity *id)
 			    (r = sshbuf_put_string(b, blob, bloblen)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
-	xfree(blob);
+	free(blob);
 
 	/* append signature */
 	if ((r = sshbuf_put_string(b, signature, slen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	xfree(signature);
+	free(signature);
 
 	/* skip session id and packet type */
 	if (sshbuf_len(b) < skip + 1)
@@ -1485,7 +1481,7 @@ load_identity_file(char *filename, int userprovided)
 			passphrase = read_passphrase(prompt, 0);
 			if (*passphrase == '\0') {
 				debug2("no passphrase given, try next key");
-				xfree(passphrase);
+				free(passphrase);
 				break;
 			}
 		}
@@ -1515,7 +1511,7 @@ load_identity_file(char *filename, int userprovided)
 		}
 		if (i > 0) {
 			memset(passphrase, 0, strlen(passphrase));
-			xfree(passphrase);
+			free(passphrase);
 		}
 		if (private != NULL || quit)
 			break;
@@ -1650,9 +1646,8 @@ pubkey_cleanup(struct ssh *ssh)
 		TAILQ_REMOVE(&authctxt->keys, id, next);
 		if (id->key)
 			sshkey_free(id->key);
-		if (id->filename)
-			xfree(id->filename);
-		xfree(id);
+		free(id->filename);
+		free(id);
 	}
 }
 
@@ -1777,7 +1772,7 @@ input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 		if ((r = sshpkt_put_cstring(ssh, response)) != 0)
 			goto out;
 		memset(response, 0, strlen(response));
-		xfree(response);
+		free(response);
 		free(prompt);
 		response = prompt = NULL;
 	}
@@ -1789,7 +1784,7 @@ input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
  out:
 	if (response) {
 		memset(response, 0, strlen(response));
-		xfree(response);
+		free(response);
 	}
 	free(prompt);
 	free(name);
@@ -1923,12 +1918,12 @@ userauth_hostbased(struct ssh *ssh)
 	if (p == NULL) {
 		error("userauth_hostbased: cannot get local ipaddr/name");
 		sshkey_free(private);
-		xfree(blob);
+		free(blob);
 		return 0;
 	}
 	xasprintf(&chost, "%s.", p);
 	debug2("userauth_hostbased: chost %s", chost);
-	xfree(p);
+	free(p);
 
 	service = ssh->compat & SSH_BUG_HBSERVICE ? "ssh-userauth" :
 	    authctxt->service;
@@ -1960,9 +1955,9 @@ userauth_hostbased(struct ssh *ssh)
 	sshbuf_free(b);
 	if (ok != 0) {
 		error("sshkey_sign failed");
-		xfree(chost);
-		xfree(pkalg);
-		xfree(blob);
+		free(chost);
+		free(pkalg);
+		free(blob);
 		return 0;
 	}
 	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
@@ -1977,10 +1972,10 @@ userauth_hostbased(struct ssh *ssh)
 	    (r = sshpkt_send(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
 	memset(signature, 's', slen);
-	xfree(signature);
-	xfree(chost);
-	xfree(pkalg);
-	xfree(blob);
+	free(signature);
+	free(chost);
+	free(pkalg);
+	free(blob);
 
 	return 1;
 }
@@ -2039,8 +2034,8 @@ userauth_jpake(struct ssh *ssh)
 
 	bzero(x1_proof, x1_proof_len);
 	bzero(x2_proof, x2_proof_len);
-	xfree(x1_proof);
-	xfree(x2_proof);
+	free(x1_proof);
+	free(x2_proof);
 
 	/* Expect step 1 packet from peer */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_STEP1,
@@ -2118,8 +2113,7 @@ authmethod_get(char *authlist)
 
 	if (supported == NULL || strcmp(authlist, supported) != 0) {
 		debug3("start over, passed a different list %s", authlist);
-		if (supported != NULL)
-			xfree(supported);
+		free(supported);
 		supported = xstrdup(authlist);
 		preferred = options.preferred_authentications;
 		debug3("preferred %s", preferred);
@@ -2140,7 +2134,7 @@ authmethod_get(char *authlist)
 		    authmethod_is_enabled(current)) {
 			debug3("authmethod_is_enabled %s", name);
 			debug("Next authentication method: %s", name);
-			xfree(name);
+			free(name);
 			return current;
 		}
 	}

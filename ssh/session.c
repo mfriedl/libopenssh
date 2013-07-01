@@ -1,4 +1,4 @@
-/* $OpenBSD: session.c,v 1.264 2013/04/19 01:03:01 djm Exp $ */
+/* $OpenBSD: session.c,v 1.265 2013/05/17 00:13:14 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -183,7 +183,7 @@ auth_input_request_forwarding(Session *s)
 		ssh_packet_send_debug(s->ssh, "Agent forwarding disabled: "
 		    "mkdtemp() failed: %.100s", strerror(errno));
 		restore_uid();
-		xfree(auth_sock_dir);
+		free(auth_sock_dir);
 		auth_sock_dir = NULL;
 		goto authsock_err;
 	}
@@ -228,11 +228,10 @@ auth_input_request_forwarding(Session *s)
 	return 1;
 
  authsock_err:
-	if (auth_sock_name != NULL)
-		xfree(auth_sock_name);
+	free(auth_sock_name);
 	if (auth_sock_dir != NULL) {
 		rmdir(auth_sock_dir);
-		xfree(auth_sock_dir);
+		free(auth_sock_dir);
 	}
 	if (sock != -1)
 		close(sock);
@@ -358,8 +357,8 @@ do_authenticated1(struct ssh *ssh)
 				fatal("%s: %s", __func__, ssh_err(r));
 			success = session_setup_x11fwd(s);
 			if (!success) {
-				xfree(s->auth_proto);
-				xfree(s->auth_data);
+				free(s->auth_proto);
+				free(s->auth_data);
 				s->auth_proto = NULL;
 				s->auth_data = NULL;
 			}
@@ -882,7 +881,7 @@ child_set_env(char ***envp, u_int *envsizep, const char *name,
 			break;
 	if (env[i]) {
 		/* Reuse the slot. */
-		xfree(env[i]);
+		free(env[i]);
 	} else {
 		/* New variable.  Expand if necessary. */
 		envsize = *envsizep;
@@ -1006,8 +1005,8 @@ do_setup_env(Session *s, const char *shell)
 				child_set_env(&env, &envsize, str, str + i + 1);
 			}
 			custom_environment = ce->next;
-			xfree(ce->s);
-			xfree(ce);
+			free(ce->s);
+			free(ce);
 		}
 	}
 
@@ -1021,7 +1020,7 @@ do_setup_env(Session *s, const char *shell)
 	snprintf(buf, sizeof buf, "%.50s %d %.50s %d",
 	    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh), laddr,
 	    ssh_get_local_port(ssh));
-	xfree(laddr);
+	free(laddr);
 	child_set_env(&env, &envsize, "SSH_CONNECTION", buf);
 
 	if (s->ttyfd != -1)
@@ -1142,7 +1141,7 @@ do_nologin(struct passwd *pw)
 
 	if (stat(nl, &sb) == -1) {
 		if (nl != def_nl)
-			xfree(nl);
+			free(nl);
 		return;
 	}
 
@@ -1732,8 +1731,7 @@ session_pty_req(Session *s)
 	debug("Allocating pty.");
 	if (!PRIVSEP(pty_allocate(&s->ptyfd, &s->ttyfd, s->tty,
 	    sizeof(s->tty)))) {
-		if (s->term)
-			xfree(s->term);
+		free(s->term);
 		s->term = NULL;
 		s->ptyfd = -1;
 		s->ttyfd = -1;
@@ -1849,7 +1847,7 @@ session_exec_req(Session *s)
 	    (r = sshpkt_get_end(s->ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
 	success = do_exec(s, command) == 0;
-	xfree(command);
+	free(command);
 	return success;
 }
 
@@ -1899,8 +1897,8 @@ session_env_req(Session *s)
 	debug2("Ignoring env request %s: disallowed name", name);
 
  fail:
-	xfree(name);
-	xfree(val);
+	free(name);
+	free(val);
 	return (0);
 }
 
@@ -2085,24 +2083,16 @@ session_close_single_x11(int id, void *arg)
 		if (s->x11_chanids[i] != id)
 			session_close_x11(s->x11_chanids[i]);
 	}
-	xfree(s->x11_chanids);
+	free(s->x11_chanids);
 	s->x11_chanids = NULL;
-	if (s->display) {
-		xfree(s->display);
-		s->display = NULL;
-	}
-	if (s->auth_proto) {
-		xfree(s->auth_proto);
-		s->auth_proto = NULL;
-	}
-	if (s->auth_data) {
-		xfree(s->auth_data);
-		s->auth_data = NULL;
-	}
-	if (s->auth_display) {
-		xfree(s->auth_display);
-		s->auth_display = NULL;
-	}
+	free(s->display);
+	s->display = NULL;
+	free(s->auth_proto);
+	s->auth_proto = NULL;
+	free(s->auth_data);
+	s->auth_data = NULL;
+	free(s->auth_display);
+	s->auth_display = NULL;
 }
 
 static void
@@ -2166,24 +2156,18 @@ session_close(Session *s)
 	debug("session_close: session %d pid %ld", s->self, (long)s->pid);
 	if (s->ttyfd != -1)
 		session_pty_cleanup(s);
-	if (s->term)
-		xfree(s->term);
-	if (s->display)
-		xfree(s->display);
-	if (s->x11_chanids)
-		xfree(s->x11_chanids);
-	if (s->auth_display)
-		xfree(s->auth_display);
-	if (s->auth_data)
-		xfree(s->auth_data);
-	if (s->auth_proto)
-		xfree(s->auth_proto);
+	free(s->term);
+	free(s->display);
+	free(s->x11_chanids);
+	free(s->auth_display);
+	free(s->auth_data);
+	free(s->auth_proto);
 	if (s->env != NULL) {
 		for (i = 0; i < s->num_env; i++) {
-			xfree(s->env[i].name);
-			xfree(s->env[i].val);
+			free(s->env[i].name);
+			free(s->env[i].val);
 		}
-		xfree(s->env);
+		free(s->env);
 	}
 	session_proctitle(s);
 	session_unused(s->self);

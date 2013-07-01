@@ -1,4 +1,4 @@
-/* $OpenBSD: key.c,v 1.102 2013/05/10 04:08:01 djm Exp $ */
+/* $OpenBSD: key.c,v 1.103 2013/05/17 00:13:13 djm Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Alexander von Gernler.  All rights reserved.
@@ -1773,10 +1773,8 @@ sshkey_from_blob(const u_char *blob, size_t blen, struct sshkey **keyp)
  out:
 	if (ret != 0 && key != NULL)
 		sshkey_free(key);
-	if (ktype != NULL)
-		free(ktype);
-	if (curve != NULL)
-		free(curve);
+	free(ktype);
+	free(curve);
 	if (q != NULL)
 		EC_POINT_free(q);
 	sshbuf_free(b);

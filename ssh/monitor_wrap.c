@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor_wrap.c,v 1.75 2013/01/08 18:49:04 markus Exp $ */
+/* $OpenBSD: monitor_wrap.c,v 1.76 2013/05/17 00:13:13 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -308,7 +308,7 @@ out:
 #undef M_CP_STRARRAYOPT
 
 	copy_set_server_options(&options, newopts, 1);
-	xfree(newopts);
+	free(newopts);
 
 	sshbuf_free(m);
 
@@ -337,7 +337,7 @@ mm_auth2_read_banner(void)
 
 	/* treat empty banner as missing banner */
 	if (strlen(banner) == 0) {
-		xfree(banner);
+		free(banner);
 		banner = NULL;
 	}
 	return (banner);
@@ -441,7 +441,7 @@ mm_key_allowed(enum mm_keytype type, char *user, char *host,
 	    (r = sshbuf_put_cstring(m, host ? host : "")) != 0 ||
 	    (r = sshbuf_put_string(m, blob, len)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	xfree(blob);
+	free(blob);
 
 	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_KEYALLOWED, m);
 
@@ -493,7 +493,7 @@ mm_sshkey_verify(struct sshkey *key, u_char *sig, size_t siglen,
 	    (r = sshbuf_put_string(m, sig, siglen)) != 0 ||
 	    (r = sshbuf_put_string(m, data, datalen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	xfree(blob);
+	free(blob);
 
 	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_KEYVERIFY, m);
 
@@ -565,11 +565,11 @@ mm_pty_allocate(int *ptyfd, int *ttyfd, char *namebuf, size_t namebuflen)
 	sshbuf_free(m);
 
 	strlcpy(namebuf, p, namebuflen); /* Possible truncation */
-	xfree(p);
+	free(p);
 
 	if ((r = sshbuf_put(loginmsg, msg, strlen(msg))) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	xfree(msg);
+	free(msg);
 
 	if ((*ptyfd = mm_receive_fd(pmonitor->m_recvfd)) == -1 ||
 	    (*ttyfd = mm_receive_fd(pmonitor->m_recvfd)) == -1)
@@ -767,7 +767,7 @@ mm_auth_rsa_key_allowed(struct passwd *pw, BIGNUM *client_n,
 			fatal("%s: key_from_blob failed: %s",
 			    __func__, ssh_err(r));
 		*rkey = key;
-		xfree(blob);
+		free(blob);
 	}
 	sshbuf_free(m);
 
@@ -797,7 +797,7 @@ mm_auth_rsa_generate_challenge(struct sshkey *key)
 		fatal("%s: sshbuf_new failed", __func__);
 	if ((r = sshbuf_put_string(m, blob, blen)) != 0)
 		fatal("%s: E buffer error: %s", __func__, ssh_err(r));
-	xfree(blob);
+	free(blob);
 
 	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_RSACHALLENGE, m);
 	mm_request_receive_expect(pmonitor->m_recvfd, MONITOR_ANS_RSACHALLENGE, m);
@@ -830,7 +830,7 @@ mm_auth_rsa_verify_response(struct sshkey *key, BIGNUM *p, u_char response[16])
 	    (r = sshbuf_put_string(m, response, 16)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
-	xfree(blob);
+	free(blob);
 
 	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_RSARESPONSE, m);
 	mm_request_receive_expect(pmonitor->m_recvfd, MONITOR_ANS_RSARESPONSE, m);

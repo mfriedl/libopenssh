@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect1.c,v 1.70 2006/11/06 21:25:28 markus Exp $ */
+/* $OpenBSD: sshconnect1.c,v 1.71 2013/05/17 00:13:14 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -244,7 +244,7 @@ try_rsa_authentication(struct ssh *ssh, int idx)
 	 */
 	if (type == SSH_SMSG_FAILURE) {
 		debug("Server refused our key.");
-		xfree(comment);
+		free(comment);
 		return 0;
 	}
 	/* Otherwise, the server should respond with a challenge. */
@@ -314,14 +314,14 @@ try_rsa_authentication(struct ssh *ssh, int idx)
 				quit = 1;
 			}
 			memset(passphrase, 0, strlen(passphrase));
-			xfree(passphrase);
+			free(passphrase);
 			if (private != NULL || quit)
 				break;
 			debug2("bad passphrase given, try again...");
 		}
 	}
 	/* We no longer need the comment. */
-	xfree(comment);
+	free(comment);
 
 	if (private == NULL) {
 		if (!options.batch_mode && perm_ok)
@@ -464,7 +464,7 @@ try_challenge_response_authentication(struct ssh *ssh)
 			fatal("%s: %s", __func__, ssh_err(r));
 		snprintf(prompt, sizeof prompt, "%s%s", challenge,
 		    strchr(challenge, '\n') ? "" : "\nResponse: ");
-		xfree(challenge);
+		free(challenge);
 		if (i != 0)
 			error("Permission denied, please try again.");
 		if (options.cipher == SSH_CIPHER_NONE)
@@ -472,7 +472,7 @@ try_challenge_response_authentication(struct ssh *ssh)
 			    "Response will be transmitted in clear text.");
 		response = read_passphrase(prompt, 0);
 		if (strcmp(response, "") == 0) {
-			xfree(response);
+			free(response);
 			break;
 		}
 		if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_TIS_RESPONSE)) != 0 ||
@@ -480,7 +480,7 @@ try_challenge_response_authentication(struct ssh *ssh)
 		    (r = sshpkt_send(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
 		memset(response, 0, strlen(response));
-		xfree(response);
+		free(response);
 		ssh_packet_write_wait(ssh);
 		type = ssh_packet_read(ssh);
 		if (type == SSH_SMSG_SUCCESS)
@@ -515,7 +515,7 @@ try_password_authentication(struct ssh *ssh, char *prompt)
 		    (r = sshpkt_send(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
 		memset(password, 0, strlen(password));
-		xfree(password);
+		free(password);
 		ssh_packet_write_wait(ssh);
 
 		type = ssh_packet_read(ssh);

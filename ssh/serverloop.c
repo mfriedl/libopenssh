@@ -1,4 +1,4 @@
-/* $OpenBSD: serverloop.c,v 1.166 2013/05/16 09:08:41 dtucker Exp $ */
+/* $OpenBSD: serverloop.c,v 1.167 2013/05/17 00:13:14 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -690,7 +690,7 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 				    s, strlen(s))) != 0)
 					fatal("%s: buffer error: %s",
 					    __func__, ssh_err(r));
-				xfree(cp);
+				free(cp);
 			}
 		}
 		max_fd = MAX(connection_in, connection_out);
@@ -718,10 +718,8 @@ server_loop(pid_t pid, int fdin_arg, int fdout_arg, int fderr_arg)
 		/* Process output to the client and to program stdin. */
 		process_output(ssh, writeset);
 	}
-	if (readset)
-		xfree(readset);
-	if (writeset)
-		xfree(writeset);
+	free(readset);
+	free(writeset);
 
 	/* Cleanup and termination code. */
 
@@ -886,10 +884,8 @@ server_loop2(struct ssh *ssh)
 	}
 	collect_children();
 
-	if (readset)
-		xfree(readset);
-	if (writeset)
-		xfree(writeset);
+	free(readset);
+	free(writeset);
 
 	/* free all channels, no more reads and writes */
 	channel_free_all();
@@ -999,8 +995,8 @@ server_request_direct_tcpip(struct ssh *ssh)
 		    originator, originator_port, target, target_port);
 	}
 
-	xfree(originator);
-	xfree(target);
+	free(originator);
+	free(target);
 
 	return c;
 }

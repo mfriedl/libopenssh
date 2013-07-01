@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2.c,v 1.127 2013/03/07 19:27:25 markus Exp $ */
+/* $OpenBSD: auth2.c,v 1.128 2013/05/17 00:13:13 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -127,7 +127,7 @@ auth2_read_banner(void)
 	close(fd);
 
 	if (n != len) {
-		xfree(banner);
+		free(banner);
 		return (NULL);
 	}
 	banner[n] = '\0';
@@ -156,8 +156,7 @@ userauth_banner(struct ssh *ssh)
 		fatal("%s: %s", __func__, ssh_err(r));
 	debug("userauth_banner: sent");
 done:
-	if (banner)
-		xfree(banner);
+	free(banner);
 }
 
 /*
@@ -289,9 +288,9 @@ input_userauth_request(int type, u_int32_t seq, struct ssh *ssh)
 	userauth_finish(ssh, authenticated, method, NULL);
 	r = 0;
  out:
-	xfree(service);
-	xfree(user);
-	xfree(method);
+	free(service);
+	free(user);
+	free(method);
 	return r;
 }
 
@@ -354,7 +353,7 @@ userauth_finish(struct ssh *ssh, int authenticated, const char *method,
 		    (r = sshpkt_send(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
 		ssh_packet_write_wait(ssh);
-		xfree(methods);
+		free(methods);
 	}
 }
 

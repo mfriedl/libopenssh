@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-pubkey.c,v 1.35 2013/03/07 00:19:59 djm Exp $ */
+/* $OpenBSD: auth2-pubkey.c,v 1.36 2013/05/17 00:13:13 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -174,7 +174,7 @@ userauth_pubkey(struct ssh *ssh)
 		    sshbuf_len(b), ssh->compat)) == 0)
 			authenticated = 1;
 		sshbuf_free(b);
-		xfree(sig);
+		free(sig);
 	} else {
 		debug("test whether pkalg/pkblob are acceptable");
 		if ((r = sshpkt_get_end(ssh)) != 0)
@@ -224,7 +224,7 @@ match_principals_option(const char *principal_list, struct sshkey_cert *cert)
 		    principal_list, NULL)) != NULL) {
 			debug3("matched principal from key options \"%.100s\"",
 			    result);
-			xfree(result);
+			free(result);
 			return 1;
 		}
 	}
@@ -362,7 +362,7 @@ check_authkeys_file(FILE *f, char *file, struct sshkey *key, struct passwd *pw)
 				reason = "Certificate does not contain an "
 				    "authorized principal";
  fail_reason:
-				xfree(fp);
+				free(fp);
 				error("%s", reason);
 				auth_debug_add("%s", reason);
 				continue;
@@ -372,13 +372,13 @@ check_authkeys_file(FILE *f, char *file, struct sshkey *key, struct passwd *pw)
 			    &reason) != 0)
 				goto fail_reason;
 			if (auth_cert_options(key, pw) != 0) {
-				xfree(fp);
+				free(fp);
 				continue;
 			}
 			verbose("Accepted certificate ID \"%s\" "
 			    "signed by %s CA %s via %s", key->cert->key_id,
 			    sshkey_type(found), fp, file);
-			xfree(fp);
+			free(fp);
 			found_key = 1;
 			break;
 		} else if (sshkey_equal(found, key)) {
@@ -393,7 +393,7 @@ check_authkeys_file(FILE *f, char *file, struct sshkey *key, struct passwd *pw)
 			fp = sshkey_fingerprint(found, SSH_FP_MD5, SSH_FP_HEX);
 			verbose("Found matching %s key: %s",
 			    sshkey_type(found), fp);
-			xfree(fp);
+			free(fp);
 			break;
 		}
 	}
@@ -460,10 +460,8 @@ user_cert_trusted_ca(struct passwd *pw, struct sshkey *key)
 	ret = 1;
 
  out:
-	if (principals_file != NULL)
-		xfree(principals_file);
-	if (ca_fp != NULL)
-		xfree(ca_fp);
+	free(principals_file);
+	free(ca_fp);
 	return ret;
 }
 
@@ -669,7 +667,7 @@ user_key_allowed(struct passwd *pw, struct sshkey *key)
 		    options.authorized_keys_files[i], pw);
 
 		success = user_key_allowed2(pw, key, file);
-		xfree(file);
+		free(file);
 	}
 
 	return success;

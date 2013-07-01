@@ -1,4 +1,4 @@
-/* $OpenBSD: mux.c,v 1.40 2013/04/22 01:17:18 dtucker Exp $ */
+/* $OpenBSD: mux.c,v 1.41 2013/05/17 00:13:13 djm Exp $ */
 /*
  * Copyright (c) 2002-2008 Damien Miller <djm@openbsd.org>
  *
@@ -309,8 +309,8 @@ process_mux_master_hello(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf 
 			goto malf;
 		}
 		debug2("Unrecognised slave extension \"%s\"", name);
-		xfree(name);
-		xfree(value);
+		free(name);
+		free(value);
 	}
 	state->hello_rcvd = 1;
 	return 0;
@@ -392,12 +392,12 @@ process_mux_new_session(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *
 			for (j = 0; j < i; j++)
 				close(new_fd[j]);
 			for (j = 0; j < env_len; j++)
-				xfree(cctx->env[j]);
+				free(cctx->env[j]);
 			if (env_len > 0)
-				xfree(cctx->env);
-			xfree(cctx->term);
+				free(cctx->env);
+			free(cctx->term);
 			sshbuf_free(cctx->cmd);
-			xfree(cctx);
+			free(cctx);
 
 			/* prepare reply */
 			send_mux_error(o, MUX_S_FAILURE, rid,
@@ -418,14 +418,14 @@ process_mux_new_session(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *
 		close(new_fd[0]);
 		close(new_fd[1]);
 		close(new_fd[2]);
-		xfree(cctx->term);
+		free(cctx->term);
 		if (env_len != 0) {
 			for (i = 0; i < env_len; i++)
-				xfree(cctx->env[i]);
-			xfree(cctx->env);
+				free(cctx->env[i]);
+			free(cctx->env);
 		}
 		sshbuf_free(cctx->cmd);
-		xfree(cctx);
+		free(cctx);
 		return 0;
 	}
 
@@ -631,7 +631,7 @@ mux_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
  fail:
 	error("%s: %s", __func__, failmsg);
 	send_mux_error(o, MUX_S_FAILURE, fctx->rid, failmsg);
-	xfree(failmsg);
+	free(failmsg);
  out:
 	if ((r = sshbuf_put_stringb(c->output, o)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
@@ -661,11 +661,11 @@ process_mux_open_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 	}
 
 	if (*fwd.listen_host == '\0') {
-		xfree(fwd.listen_host);
+		free(fwd.listen_host);
 		fwd.listen_host = NULL;
 	}
 	if (*fwd.connect_host == '\0') {
-		xfree(fwd.connect_host);
+		free(fwd.connect_host);
 		fwd.connect_host = NULL;
 	}
 
@@ -778,13 +778,10 @@ process_mux_open_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 	}
 	send_mux_ok(o, rid);
  out:
-	if (fwd_desc != NULL)
-		xfree(fwd_desc);
+	free(fwd_desc);
 	if (freefwd) {
-		if (fwd.listen_host != NULL)
-			xfree(fwd.listen_host);
-		if (fwd.connect_host != NULL)
-			xfree(fwd.connect_host);
+		free(fwd.listen_host);
+		free(fwd.connect_host);
 	}
 	return ret;
 }
@@ -810,11 +807,11 @@ process_mux_close_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 	}
 
 	if (*fwd.listen_host == '\0') {
-		xfree(fwd.listen_host);
+		free(fwd.listen_host);
 		fwd.listen_host = NULL;
 	}
 	if (*fwd.connect_host == '\0') {
-		xfree(fwd.connect_host);
+		free(fwd.connect_host);
 		fwd.connect_host = NULL;
 	}
 
@@ -869,22 +866,17 @@ process_mux_close_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 
 	if (error_reason == NULL) {
 		send_mux_ok(o, rid);
-		if (found_fwd->listen_host != NULL)
-			xfree(found_fwd->listen_host);
-		if (found_fwd->connect_host != NULL)
-			xfree(found_fwd->connect_host);
+		free(found_fwd->listen_host);
+		free(found_fwd->connect_host);
 		found_fwd->listen_host = found_fwd->connect_host = NULL;
 		found_fwd->listen_port = found_fwd->connect_port = 0;
 	} else {
 		send_mux_error(o, MUX_S_FAILURE, rid, error_reason);
 	}
  out:
-	if (fwd_desc != NULL)
-		xfree(fwd_desc);
-	if (fwd.listen_host != NULL)
-		xfree(fwd.listen_host);
-	if (fwd.connect_host != NULL)
-		xfree(fwd.connect_host);
+	free(fwd_desc);
+	free(fwd.listen_host);
+	free(fwd.connect_host);
 
 	return ret;
 }
@@ -916,7 +908,7 @@ process_mux_stdio_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 			    __func__, i);
 			for (j = 0; j < i; j++)
 				close(new_fd[j]);
-			xfree(chost);
+			free(chost);
 
 			/* prepare reply */
 			send_mux_error(o, MUX_S_FAILURE, rid,
@@ -937,7 +929,7 @@ process_mux_stdio_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
  cleanup:
 		close(new_fd[0]);
 		close(new_fd[1]);
-		xfree(chost);
+		free(chost);
 		return 0;
 	}
 
@@ -998,7 +990,7 @@ process_mux_stop_listening(u_int rid, Channel *c, struct sshbuf *m, struct sshbu
 	if (mux_listener_channel != NULL) {
 		channel_free(mux_listener_channel);
 		client_stop_mux();
-		xfree(options.control_path);
+		free(options.control_path);
 		options.control_path = NULL;
 		mux_listener_channel = NULL;
 		muxserver_sock = -1;
@@ -1193,8 +1185,8 @@ muxserver_listen(struct ssh *ssh)
 				close(muxserver_sock);
 				muxserver_sock = -1;
 			}
-			xfree(orig_control_path);
-			xfree(options.control_path);
+			free(orig_control_path);
+			free(options.control_path);
 			options.control_path = NULL;
 			options.control_master = SSHCTL_MASTER_NO;
 			return;
@@ -1219,7 +1211,7 @@ muxserver_listen(struct ssh *ssh)
 		goto disable_mux_master;
 	}
 	unlink(options.control_path);
-	xfree(options.control_path);
+	free(options.control_path);
 	options.control_path = orig_control_path;
 
 	set_nonblock(muxserver_sock);
@@ -1308,13 +1300,13 @@ mux_session_confirm(int id, int success, void *arg)
 	cc->mux_pause = 0; /* start processing messages again */
 	c->open_confirm_ctx = NULL;
 	sshbuf_free(cctx->cmd);
-	xfree(cctx->term);
+	free(cctx->term);
 	if (cctx->env != NULL) {
 		for (i = 0; cctx->env[i] != NULL; i++)
-			xfree(cctx->env[i]);
-		xfree(cctx->env);
+			free(cctx->env[i]);
+		free(cctx->env);
 	}
-	xfree(cctx);
+	free(cctx);
 }
 
 /* ** Multiplexing client support */
@@ -1503,8 +1495,8 @@ mux_client_hello_exchange(int fd)
 		    (r = sshbuf_get_cstring(m, &value, NULL)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		debug2("Unrecognised master extension \"%s\"", name);
-		xfree(name);
-		xfree(value);
+		free(name);
+		free(value);
 	}
 	sshbuf_free(m);
 	return 0;
@@ -1629,7 +1621,7 @@ mux_client_forward(int fd, int cancel_flag, u_int ftype, Forward *fwd)
 	fwd_desc = format_forward(ftype, fwd);
 	debug("Requesting %s %s",
 	    cancel_flag ? "cancellation of" : "forwarding of", fwd_desc);
-	xfree(fwd_desc);
+	free(fwd_desc);
 
 	if ((m = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);

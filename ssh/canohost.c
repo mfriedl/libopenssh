@@ -1,4 +1,4 @@
-/* $OpenBSD: canohost.c,v 1.66 2010/01/13 01:20:20 dtucker Exp $ */
+/* $OpenBSD: canohost.c,v 1.67 2013/05/17 00:13:13 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -36,7 +36,7 @@ static void check_ip_options(int, char *);
 
 /*
  * Return the canonical name of the host at the other end of the socket. The
- * caller should free the returned string with xfree.
+ * caller should free the returned string.
  */
 
 static char *

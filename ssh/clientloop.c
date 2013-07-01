@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.249 2013/05/16 02:00:34 dtucker Exp $ */
+/* $OpenBSD: clientloop.c,v 1.250 2013/05/17 00:13:13 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -384,10 +384,8 @@ client_x11_get_proto(const char *display, const char *xauth_path,
 		unlink(xauthfile);
 		rmdir(xauthdir);
 	}
-	if (xauthdir)
-		xfree(xauthdir);
-	if (xauthfile)
-		xfree(xauthfile);
+	free(xauthdir);
+	free(xauthfile);
 
 	/*
 	 * If we didn't get authentication data, just make up some
@@ -553,7 +551,7 @@ client_global_request_reply(int type, u_int32_t seq, struct ssh *ssh)
 	if (--gc->ref_count <= 0) {
 		TAILQ_REMOVE(&global_confirms, gc, entry);
 		bzero(gc, sizeof(*gc));
-		xfree(gc);
+		free(gc);
 	}
 
 	ssh_packet_set_alive_timeouts(ssh, 0);
@@ -836,13 +834,13 @@ client_status_confirm(int type, Channel *c, void *ctx)
 			chan_write_failed(c);
 		}
 	}
-	xfree(cr);
+	free(cr);
 }
 
 static void
 client_abandon_status_confirm(Channel *c, void *ctx)
 {
-	xfree(ctx);
+	free(ctx);
 }
 
 void
@@ -1009,12 +1007,9 @@ process_cmdline(struct ssh *ssh)
  out:
 	signal(SIGINT, handler);
 	enter_raw_mode(options.request_tty == REQUEST_TTY_FORCE);
-	if (cmd)
-		xfree(cmd);
-	if (fwd.listen_host != NULL)
-		xfree(fwd.listen_host);
-	if (fwd.connect_host != NULL)
-		xfree(fwd.connect_host);
+	free(cmd);
+	free(fwd.listen_host);
+	free(fwd.connect_host);
 }
 
 /* reasons to suppress output of an escape command in help output */
@@ -1291,7 +1286,7 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf **binp,
 				if ((r = sshbuf_put(berr, s, strlen(s))) != 0)
 					fatal("%s: buffer error: %s",
 					    __func__, ssh_err(r));
-				xfree(s);
+				free(s);
 				continue;
 
 			case 'C':
@@ -1490,7 +1485,7 @@ client_new_escape_filter_ctx(int escape_char)
 void
 client_filter_cleanup(int cid, void *ctx)
 {
-	xfree(ctx);
+	free(ctx);
 }
 
 int
@@ -1705,10 +1700,8 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg, int ssh2_chan_id
 			}
 		}
 	}
-	if (readset)
-		xfree(readset);
-	if (writeset)
-		xfree(writeset);
+	free(readset);
+	free(writeset);
 
 	/* Terminate the session. */
 
@@ -2247,7 +2240,7 @@ client_session2_setup(struct ssh *ssh, int id, int want_tty,
 			/* Split */
 			name = xstrdup(env[i]);
 			if ((val = strchr(name, '=')) == NULL) {
-				xfree(name);
+				free(name);
 				continue;
 			}
 			*val++ = '\0';
@@ -2261,7 +2254,7 @@ client_session2_setup(struct ssh *ssh, int id, int want_tty,
 			}
 			if (!matched) {
 				debug3("Ignored env %s", name);
-				xfree(name);
+				free(name);
 				continue;
 			}
 
@@ -2271,7 +2264,7 @@ client_session2_setup(struct ssh *ssh, int id, int want_tty,
 			    (r = sshpkt_put_cstring(ssh, val)) != 0 ||
 			    (r = sshpkt_send(ssh)) != 0)
 				fatal("%s: %s", __func__, ssh_err(r));
-			xfree(name);
+			free(name);
 		}
 	}
 

@@ -1,4 +1,4 @@
-/* $OpenBSD: mac.c,v 1.22 2013/04/19 01:06:50 djm Exp $ */
+/* $OpenBSD: mac.c,v 1.23 2013/05/17 00:13:13 djm Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *

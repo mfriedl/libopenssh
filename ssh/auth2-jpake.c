@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-jpake.c,v 1.5 2012/12/02 20:34:09 djm Exp $ */
+/* $OpenBSD: auth2-jpake.c,v 1.6 2013/05/17 00:13:13 djm Exp $ */
 /*
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
  *
@@ -190,7 +190,7 @@ derive_rawsalt(const char *username, u_char *rawsalt, u_int len)
 		    __func__, len, digest_len);
 	memcpy(rawsalt, digest, len);
 	bzero(digest, digest_len);
-	xfree(digest);
+	free(digest);
 }
 
 /* ASCII an integer [0, 64) for inclusion in a password/salt */
@@ -269,7 +269,7 @@ fake_salt_and_scheme(struct authctxt *authctxt, char **salt, char **scheme)
 		    makesalt(22, authctxt->user));
 		*scheme = xstrdup("bcrypt");
 	}
-	xfree(style);
+	free(style);
 	debug3("%s: fake %s salt for user %s: %s",
 	    __func__, *scheme, authctxt->user, *salt);
 }
@@ -372,7 +372,7 @@ auth2_jpake_get_pwdata(struct authctxt *authctxt, BIGNUM **s,
 	JPAKE_DEBUG_BN((*s, "%s: s = ", __func__));
 #endif
 	bzero(secret, secret_len);
-	xfree(secret);
+	free(secret);
 }
 
 /*
@@ -419,12 +419,12 @@ auth2_jpake_start(struct ssh *ssh)
 
 	bzero(hash_scheme, strlen(hash_scheme));
 	bzero(salt, strlen(salt));
-	xfree(hash_scheme);
-	xfree(salt);
+	free(hash_scheme);
+	free(salt);
 	bzero(x3_proof, x3_proof_len);
 	bzero(x4_proof, x4_proof_len);
-	xfree(x3_proof);
-	xfree(x4_proof);
+	free(x3_proof);
+	free(x4_proof);
 
 	/* Expect step 1 packet from peer */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP1,
@@ -475,8 +475,8 @@ input_userauth_jpake_client_step1(int type, u_int32_t seq, struct ssh *ssh)
 
 	bzero(x1_proof, x1_proof_len);
 	bzero(x2_proof, x2_proof_len);
-	xfree(x1_proof);
-	xfree(x2_proof);
+	free(x1_proof);
+	free(x2_proof);
 
 	if (!use_privsep)
 		JPAKE_DEBUG_CTX((pctx, "step 2 sending in %s", __func__));
@@ -491,7 +491,7 @@ input_userauth_jpake_client_step1(int type, u_int32_t seq, struct ssh *ssh)
 	ssh_packet_write_wait(ssh);
 
 	bzero(x4_s_proof, x4_s_proof_len);
-	xfree(x4_s_proof);
+	free(x4_s_proof);
 
 	/* Expect step 2 packet from peer */
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP2,
@@ -535,7 +535,7 @@ input_userauth_jpake_client_step2(int type, u_int32_t seq, struct ssh *ssh)
 	    &pctx->h_k_sid_sessid, &pctx->h_k_sid_sessid_len));
 
 	bzero(x2_s_proof, x2_s_proof_len);
-	xfree(x2_s_proof);
+	free(x2_s_proof);
 
 	if (!use_privsep)
 		JPAKE_DEBUG_CTX((pctx, "confirm sending in %s", __func__));
