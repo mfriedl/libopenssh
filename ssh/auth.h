@@ -131,7 +131,7 @@ void	krb5_cleanup_proc(struct authctxt *authctxt);
 void	do_authentication(struct ssh *);
 void	do_authentication2(struct ssh *);
 
-void	auth_info(struct authctxt *authctxt, const char *, ...)
+void	auth_info(struct authctxt *, const char *, ...)
 	    __attribute__((__format__ (printf, 2, 3)))
 	    __attribute__((__nonnull__ (2)));
 void	auth_log(struct authctxt *, int, int, const char *, const char *);
