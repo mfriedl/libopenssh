@@ -31,10 +31,6 @@ D/sshd////
 /auth-passwd.c/1.43/Mon Mar 19 16:04:54 2012//
 /auth-rh-rsa.c/1.43/Fri Jan  6 10:00:44 2012//
 /auth-rhosts.c/1.44/Mon Mar 19 16:04:54 2012//
-/auth-rsa.c/1.84/Result of merge+Mon Jul  1 19:26:27 2013//
-/auth.c/1.103/Result of merge+Mon Jul  1 19:26:27 2013//
-/auth.h/1.75/Result of merge+Mon Jul  1 19:26:27 2013//
-/auth1.c/1.79/Result of merge+Mon Jul  1 19:26:27 2013//
 /auth2-chall.c/1.38/Result of merge//
 /auth2-gss.c/1.20/Result of merge//
 /auth2-hostbased.c/1.16/Result of merge//
@@ -42,7 +38,6 @@ D/sshd////
 /auth2-kbdint.c/1.6/Result of merge//
 /auth2-none.c/1.16/Fri Jan  6 10:00:45 2012//
 /auth2-passwd.c/1.10/Result of merge//
-/auth2-pubkey.c/1.38/Result of merge+Mon Jul  1 19:26:27 2013//
 /auth2.c/1.129/Result of merge//
 /authfd.c/1.87/Result of merge//
 /authfd.h/1.37/Fri Jan  6 10:00:45 2012//
@@ -55,14 +50,11 @@ D/sshd////
 /buffer.h/1.21/Mon Jul  1 13:44:53 2013//
 /canohost.c/1.67/Result of merge//
 /canohost.h/1.11/Fri Jan  6 10:00:45 2012//
-/channels.c/1.323/Result of merge+Mon Jul  1 19:26:27 2013//
-/channels.h/1.113/Result of merge+Mon Jul  1 19:26:27 2013//
 /cipher-3des1.c/1.8/Result of merge//
 /cipher-bf1.c/1.6/Fri Jan  6 10:00:45 2012//
 /cipher.c/1.89/Result of merge//
 /cipher.h/1.40/Result of merge//
 /cleanup.c/1.5/Thu Jan  3 19:40:37 2013//
-/clientloop.c/1.253/Result of merge+Mon Jul  1 19:26:27 2013//
 /clientloop.h/1.31/Result of merge//
 /compat.c/1.81/Result of merge//
 /compat.h/1.43/Fri Sep 23 07:45:05 2011//
@@ -72,14 +64,12 @@ D/sshd////
 /crc32.h/1.15/Thu Jan  3 19:40:37 2013//
 /deattack.c/1.30/Fri Jan  6 10:00:46 2012//
 /deattack.h/1.10/Fri Jan  6 10:00:46 2012//
-/dh.c/1.50/Result of merge+Mon Jul  1 19:26:27 2013//
 /dh.h/1.10/Fri Jan  6 10:00:46 2012//
 /dispatch.c/1.22/Fri Oct 31 15:05:34 2008//
 /dispatch.h/1.11/Thu Apr 20 09:27:09 2006//
 /dns.c/1.29/Result of merge//
 /dns.h/1.12/Result of merge//
 /fatal.c/1.7/Thu Jan  3 19:40:37 2013//
-/groupaccess.c/1.14/Mon Jul  1 15:44:37 2013//
 /groupaccess.h/1.8/Thu Jan  3 19:40:37 2013//
 /gss-genr.c/1.21/Result of merge//
 /gss-serv-krb5.c/1.7/Mon Mar 19 16:04:54 2012//
@@ -99,24 +89,16 @@ D/sshd////
 /kexgex.c/1.27/Fri Jan  6 10:00:47 2012//
 /kexgexc.c/1.13/Result of merge//
 /kexgexs.c/1.15/Result of merge//
-/key.c/1.104/Result of merge+Mon Jul  1 19:26:27 2013//
-/key.h/1.37/Result of merge+Mon Jul  1 19:26:27 2013//
-/krl.c/1.12/Result of merge+Mon Jul  1 19:26:27 2013//
 /krl.h/1.2/Fri Jan 18 00:24:58 2013//
 /log.c/1.45/Result of merge//
-/log.h/1.20/Sun Jun 30 15:37:58 2013//
-/mac.c/1.24/Result of merge+Mon Jul  1 19:26:28 2013//
 /mac.h/1.7/Result of merge//
 /match.c/1.28/Result of merge//
 /match.h/1.15/Thu Jan  3 19:40:38 2013//
 /misc.c/1.90/Result of merge//
-/misc.h/1.49/Result of merge+Mon Jul  1 19:26:28 2013//
-/moduli.c/1.27/Mon Jul  1 15:44:37 2013//
 /monitor.c/1.126/Result of merge//
 /monitor.h/1.17/Result of merge//
 /monitor_fdpass.c/1.19/Thu Jan  3 19:40:38 2013//
 /monitor_fdpass.h/1.4/Thu Jan  3 19:40:38 2013//
-/monitor_mm.c/1.17/Mon Jul  1 15:44:37 2013//
 /monitor_mm.h/1.5/Thu Jan  3 19:40:38 2013//
 /monitor_wrap.c/1.76/Result of merge//
 /monitor_wrap.h/1.23/Fri Jan  6 10:00:48 2012//
@@ -127,15 +109,11 @@ D/sshd////
 /nchan.c/1.63/Fri Jan  6 10:00:48 2012//
 /nchan.ms/1.8/Mon Mar 19 16:04:54 2012//
 /nchan2.ms/1.4/Mon Mar 19 16:04:54 2012//
-/packet.c/1.187/Result of merge+Mon Jul  1 19:26:28 2013//
 /packet.h/1.58/Result of merge//
-/pathnames.h/1.23/Sun Jun 30 15:37:58 2013//
 /pkcs11.h/1.2/Thu Jan  3 19:40:38 2013//
-/progressmeter.c/1.39/Mon Jul  1 19:26:28 2013//
 /progressmeter.h/1.2/Thu Jan  3 19:40:38 2013//
 /readconf.c/1.204/Result of merge//
 /readconf.h/1.95/Result of merge//
-/readpass.c/1.49/Mon Jul  1 15:44:38 2013//
 /roaming.h/1.6/Mon Mar 19 16:04:54 2012//
 /roaming_client.c/1.5/Result of merge//
 /roaming_common.c/1.9/Mon Mar 19 16:04:54 2012//
@@ -144,24 +122,20 @@ D/sshd////
 /rsa.c/1.30/Result of merge//
 /rsa.h/1.16/Fri Jan  6 10:00:48 2012//
 /sandbox-rlimit.c/1.3/Thu Jan  3 19:40:38 2013//
-/sandbox-systrace.c/1.7/Mon Jul  1 19:26:28 2013//
 /schnorr.c/1.7/Result of merge//
 /schnorr.h/1.1/Thu Jan  3 19:40:38 2013//
 /scp.1/1.58/Mon Mar 19 16:04:54 2012//
-/scp.c/1.178/Mon Jul  1 19:26:28 2013//
 /servconf.c/1.239/Result of merge//
 /servconf.h/1.108/Result of merge//
 /serverloop.c/1.167/Result of merge//
 /serverloop.h/1.6/Mon Mar 19 16:04:54 2012//
 /session.c/1.265/Result of merge//
 /session.h/1.30/Mon Mar 19 16:04:54 2012//
-/sftp-client.c/1.100/Result of merge+Mon Jul  1 19:26:28 2013//
 /sftp-client.h/1.20/Thu Jan  3 19:40:38 2013//
 /sftp-common.c/1.24/Result of merge//
 /sftp-common.h/1.11/Mon Mar 19 16:04:54 2012//
 /sftp-glob.c/1.24/Result of merge//
 /sftp-server-main.c/1.4/Thu Jan  3 19:40:38 2013//
-/sftp-server.8/1.22/Sun Jun 30 15:37:58 2013//
 /sftp-server.c/1.97/Result of merge//
 /sftp.1/1.91/Mon Mar 19 16:04:54 2012//
 /sftp.c/1.146/Result of merge//
@@ -169,11 +143,9 @@ D/sshd////
 /ssh-add.1/1.58/Wed Jan  2 15:08:00 2013//
 /ssh-add.c/1.106/Result of merge//
 /ssh-agent.1/1.53/Mon Mar 19 16:04:54 2012//
-/ssh-agent.c/1.176/Result of merge+Mon Jul  1 19:26:28 2013//
 /ssh-dss.c/1.28/Result of merge//
 /ssh-ecdsa.c/1.6/Result of merge//
 /ssh-gss.h/1.10/Mon Mar 19 16:04:54 2012//
-/ssh-keygen.1/1.116/Mon Jul  1 19:26:28 2013//
 /ssh-keygen.c/1.227/Result of merge//
 /ssh-keyscan.1/1.30/Thu Aug  9 18:41:57 2012//
 /ssh-keyscan.c/1.87/Result of merge//
@@ -186,21 +158,14 @@ D/sshd////
 /ssh-pkcs11.h/1.2/Fri Jan  6 10:00:49 2012//
 /ssh-rsa.c/1.46/Result of merge//
 /ssh-sandbox.h/1.1/Thu Jan  3 19:40:38 2013//
-/ssh.1/1.333/Mon Jul  1 19:26:28 2013//
 /ssh.c/1.378/Result of merge//
 /ssh.h/1.79/Thu Jan  3 19:40:38 2013//
 /ssh1.h/1.6/Thu Jan  3 19:40:38 2013//
 /ssh2.h/1.14/Thu Jan  3 19:40:38 2013//
-/ssh_config/1.27/Mon Jul  1 13:44:54 2013//
-/ssh_config.5/1.166/Mon Jul  1 19:26:28 2013//
 /sshconnect.c/1.238/Result of merge//
 /sshconnect.h/1.27/Fri Jan  6 10:00:50 2012//
 /sshconnect1.c/1.71/Result of merge//
-/sshconnect2.c/1.198/Result of merge+Mon Jul  1 19:26:28 2013//
-/sshd.8/1.270/Mon Jul  1 19:26:29 2013//
 /sshd.c/1.403/Result of merge//
-/sshd_config/1.90/Mon Jul  1 13:44:55 2013//
-/sshd_config.5/1.161/Mon Jul  1 19:26:29 2013//
 /sshlogin.c/1.27/Mon Mar 19 16:04:54 2012//
 /sshlogin.h/1.8/Thu Jan  3 19:40:39 2013//
 /sshpty.c/1.28/Thu Jan  3 19:40:39 2013//
@@ -212,8 +177,43 @@ D/sshd////
 /uidswap.h/1.13/Thu Jan  3 19:40:39 2013//
 /umac.c/1.5/Result of merge//
 /umac.h/1.2/Thu Oct  4 13:30:40 2012//
-/uuencode.c/1.27/Mon Jul  1 15:44:39 2013//
 /uuencode.h/1.14/Thu Jan  3 19:40:39 2013//
-/version.h/1.66/Sun Jun 30 15:37:59 2013//
-/xmalloc.c/1.28/Mon Jul  1 15:44:39 2013//
-/xmalloc.h/1.14/Mon Jul  1 15:44:39 2013//
+/auth-rsa.c/1.84/Result of merge//
+/auth.c/1.103/Result of merge//
+/auth.h/1.75/Result of merge//
+/auth1.c/1.79/Result of merge//
+/auth2-pubkey.c/1.38/Result of merge//
+/channels.c/1.323/Result of merge//
+/channels.h/1.113/Result of merge//
+/clientloop.c/1.253/Result of merge//
+/dh.c/1.51/Result of merge//
+/groupaccess.c/1.14/Thu Jul  4 20:16:39 2013//
+/key.c/1.104/Result of merge//
+/key.h/1.37/Result of merge//
+/krl.c/1.12/Result of merge//
+/log.h/1.20/Thu Jul  4 20:16:39 2013//
+/mac.c/1.24/Result of merge//
+/misc.h/1.49/Result of merge//
+/moduli.c/1.27/Thu Jul  4 20:16:39 2013//
+/monitor_mm.c/1.17/Thu Jul  4 20:16:39 2013//
+/packet.c/1.187/Result of merge//
+/pathnames.h/1.23/Thu Jul  4 20:16:39 2013//
+/progressmeter.c/1.39/Thu Jul  4 20:16:39 2013//
+/readpass.c/1.49/Thu Jul  4 20:16:39 2013//
+/sandbox-systrace.c/1.7/Thu Jul  4 20:16:39 2013//
+/scp.c/1.178/Thu Jul  4 20:16:39 2013//
+/sftp-client.c/1.100/Result of merge//
+/sftp-server.8/1.22/Thu Jul  4 20:16:39 2013//
+/ssh-agent.c/1.176/Result of merge//
+/ssh-keygen.1/1.116/Thu Jul  4 20:16:39 2013//
+/ssh.1/1.333/Thu Jul  4 20:16:39 2013//
+/ssh_config/1.27/Thu Jul  4 20:16:39 2013//
+/ssh_config.5/1.166/Thu Jul  4 20:16:39 2013//
+/sshconnect2.c/1.198/Result of merge//
+/sshd.8/1.270/Thu Jul  4 20:16:39 2013//
+/sshd_config/1.90/Thu Jul  4 20:16:39 2013//
+/sshd_config.5/1.161/Thu Jul  4 20:16:39 2013//
+/uuencode.c/1.27/Thu Jul  4 20:16:39 2013//
+/version.h/1.66/Thu Jul  4 20:16:39 2013//
+/xmalloc.c/1.28/Thu Jul  4 20:16:39 2013//
+/xmalloc.h/1.14/Thu Jul  4 20:16:39 2013//
