@@ -218,7 +218,7 @@ void	 channel_free(Channel *);
 void	 channel_free_all(void);
 void	 channel_stop_listening(void);
 
-void	 channel_error(Channel *, char *, int, const char *);
+void	 channel_error(Channel *, char *, int, const char *) __attribute__((noreturn));
 void	 channel_send_open(int);
 void	 channel_request_start(int, char *, int);
 void	 channel_register_cleanup(int, channel_callback_fn *, int);

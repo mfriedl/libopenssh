@@ -14,6 +14,7 @@ CDIAGFLAGS+=	-Wunused
 CDIAGFLAGS+=	-Wsign-compare
 CDIAGFLAGS+=	-Wshadow
 CDIAGFLAGS+=	-Wno-deprecated-declarations # XXX until heimdal update deprecations fixes
+CDIAGFLAGS+= -Wno-pointer-sign # XXX for clang, until I fix them all
 #DEBUG=-g
 
 #CFLAGS+=	-DJPAKE

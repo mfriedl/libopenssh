@@ -145,7 +145,7 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 {
 	struct kex *kex = ssh->kex;
 	BIGNUM *dh_server_pub = NULL, *shared_secret = NULL;
-	struct sshkey *server_host_key;
+	struct sshkey *server_host_key = NULL;
 	u_char *kbuf = NULL, *hash, *signature = NULL, *server_host_key_blob = NULL;
 	size_t klen = 0, slen, sbloblen, hashlen;
 	int kout, r;
