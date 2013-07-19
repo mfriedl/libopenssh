@@ -632,17 +632,19 @@ tun_open(u_int tun, int mode)
 {
 	struct ifreq ifr;
 	char name[100];
-	int fd = -1, sock;
+	int i, fd = -1, sock;
 
 	/* Open the tunnel device */
 	if (tun <= SSH_TUNID_MAX) {
 		snprintf(name, sizeof(name), "/dev/tun%u", tun);
 		fd = open(name, O_RDWR);
 	} else if (tun == SSH_TUNID_ANY) {
-		for (tun = 0; tun < 128; tun++) {
-			snprintf(name, sizeof(name), "/dev/tun%u", tun);
-			if ((fd = open(name, O_RDWR)) >= 0)
+		for (i = 100; i >= 0; i++) {
+			snprintf(name, sizeof(name), "/dev/tun%u", i);
+			if ((fd = open(name, O_RDWR)) >= 0) {
+				tun = i;
 				break;
+			}
 		}
 	} else {
 		debug("%s: invalid tunnel %u", __func__, tun);
@@ -650,14 +652,15 @@ tun_open(u_int tun, int mode)
 	}
 
 	if (fd < 0) {
-		debug("%s: %s open failed: %s", __func__, name, strerror(errno));
+		debug("%s: %s open failed: %s", __func__,
+		    name, strerror(errno));
 		return (-1);
 	}
 
 	debug("%s: %s mode %d fd %d", __func__, name, mode, fd);
 
 	/* Set the tunnel device operation mode */
-	snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "tun%d", tun);
+	snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "tun%u", tun);
 	if ((sock = socket(PF_UNIX, SOCK_STREAM, 0)) == -1)
 		goto failed;
 
