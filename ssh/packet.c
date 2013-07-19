@@ -2768,6 +2768,7 @@ sshpkt_disconnect(struct ssh *ssh, const char *fmt,...)
 	va_list args;
 	int r;
 
+	va_start(args, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 
