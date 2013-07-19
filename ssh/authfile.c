@@ -545,9 +545,13 @@ sshkey_parse_private_pem(struct sshbuf *blob, int type, const char *passphrase,
 	if (commentp != NULL)
 		*commentp = NULL;
 
-	if ((bio = BIO_new_mem_buf((u_char *)sshbuf_ptr(blob),
-	    sshbuf_len(blob))) == NULL)
+	if ((bio = BIO_new(BIO_s_mem())) == NULL || sshbuf_len(blob) > INT_MAX)
 		return SSH_ERR_ALLOC_FAIL;
+	if (BIO_write(bio, sshbuf_ptr(blob), sshbuf_len(blob)) !=
+	    (int)sshbuf_len(blob)) {
+		r = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
 	
 	if ((pk = PEM_read_bio_PrivateKey(bio, NULL, NULL,
 	    (char *)passphrase)) == NULL) {

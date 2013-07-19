@@ -551,7 +551,8 @@ int
 input_userauth_failure(int type, u_int32_t seq, struct ssh *ssh)
 {
 	struct cauthctxt *authctxt = ssh->authctxt;
-	char *authlist = NULL, partial;
+	char *authlist = NULL;
+	u_char partial;
 	int r;
 
 	if (authctxt == NULL)
@@ -1731,7 +1732,8 @@ input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 {
 	struct cauthctxt *authctxt = ssh->authctxt;
 	char *name = NULL, *inst = NULL, *lang = NULL, *prompt = NULL;
-	char *response = NULL, echo = 0;
+	char *response = NULL;
+	u_char echo = 0;
 	u_int num_prompts, i;
 	int r;
 
@@ -2161,7 +2163,7 @@ authmethods_get(void)
 	}
 	if ((r = sshbuf_put_u8(b, 0)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	list = xstrdup(sshbuf_ptr(b));
+	list = xstrdup((const char *)sshbuf_ptr(b));
 	sshbuf_free(b);
 	return list;
 }

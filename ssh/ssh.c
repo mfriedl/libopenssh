@@ -1016,6 +1016,7 @@ static void
 ssh_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 {
 	Forward *rfwd = (Forward *)ctxt;
+	u_int port;
 	int r;
 
 	/* XXX verbose() on failure? */
@@ -1024,14 +1025,22 @@ ssh_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 	    rfwd->listen_port, rfwd->connect_host, rfwd->connect_port);
 	if (rfwd->listen_port == 0) {
 		if (type == SSH2_MSG_REQUEST_SUCCESS) {
-			if ((r = sshpkt_get_u32(ssh, &rfwd->allocated_port))
-			    != 0)
+			if ((r = sshpkt_get_u32(ssh, &port)) != 0)
 				fatal("%s: %s", __func__, ssh_err(r));
-			logit("Allocated port %u for remote forward to %s:%d",
-			    rfwd->allocated_port,
-			    rfwd->connect_host, rfwd->connect_port);
-			channel_update_permitted_opens(ssh, rfwd->handle,
-			    rfwd->allocated_port);
+			if (port > 65535) {
+				error("Invalid allocated port %u for remote "
+				    "forward to %s:%d", port,
+				    rfwd->connect_host, rfwd->connect_port);
+				/* Ensure failure processing runs below */
+				type = SSH2_MSG_REQUEST_FAILURE;
+			} else {
+				rfwd->allocated_port = (int)port;
+				logit("Allocated port %u for remote forward "
+				    "to %s:%d", rfwd->allocated_port,
+				    rfwd->connect_host, rfwd->connect_port);
+				channel_update_permitted_opens(ssh,
+				    rfwd->handle, rfwd->allocated_port);
+			}
 		} else {
 			channel_update_permitted_opens(ssh, rfwd->handle, -1);
 		}
@@ -1053,7 +1062,7 @@ ssh_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 }
 
 static void
-client_cleanup_stdio_fwd(int id, void *arg)
+client_cleanup_stdio_fwd(u_int id, void *arg)
 {
 	debug("stdio forwarding: done");
 	cleanup_exit(0);
@@ -1340,7 +1349,7 @@ ssh_session(struct ssh *ssh)
 
 /* request pty/x11/agent/tcpfwd/shell for channel */
 static void
-ssh_session2_setup(int id, int success, void *arg)
+ssh_session2_setup(u_int id, int success, void *arg)
 {
 	struct ssh *ssh = arg;
 	extern char **environ;
@@ -1383,7 +1392,7 @@ ssh_session2_setup(int id, int success, void *arg)
 }
 
 /* open new channel for a session */
-static int
+static u_int
 ssh_session2_open(struct ssh *ssh)
 {
 	Channel *c;
@@ -1432,7 +1441,8 @@ ssh_session2_open(struct ssh *ssh)
 static int
 ssh_session2(struct ssh *ssh)
 {
-	int r, id = -1;
+	int r;
+	u_int id = CHANNEL_ID_NONE;
 
 	/* XXX should be pre-session */
 	if (!options.control_persist)

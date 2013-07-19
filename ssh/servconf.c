@@ -1745,7 +1745,7 @@ parse_server_config(ServerOptions *options, const char *filename,
 
 	debug2("%s: config %s len %zu", __func__, filename, sshbuf_len(conf));
 
-	obuf = cbuf = xstrdup(sshbuf_ptr(conf));
+	obuf = cbuf = xstrdup((const char *)sshbuf_ptr(conf));
 	active = connectinfo ? 0 : 1;
 	linenum = 1;
 	while ((cp = strsep(&cbuf, "\n")) != NULL) {

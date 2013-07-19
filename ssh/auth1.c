@@ -109,7 +109,7 @@ auth1_process_password(struct ssh *ssh)
 {
 	struct authctxt *authctxt = ssh->authctxt;
 	int r, authenticated = 0;
-	u_char *password;
+	char *password;
 	size_t dlen;
 
 	/*
@@ -117,7 +117,7 @@ auth1_process_password(struct ssh *ssh)
 	 * transmitted over the encrypted channel so it is
 	 * not visible to an outside observer.
 	 */
-	if ((r = sshpkt_get_string(ssh, &password, &dlen)) != 0 ||
+	if ((r = sshpkt_get_cstring(ssh, &password, &dlen)) != 0 ||
 	    (r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
 
@@ -223,11 +223,11 @@ auth1_process_tis_response(struct ssh *ssh)
 {
 	struct authctxt *authctxt = ssh->authctxt;
 	int authenticated = 0;
-	u_char *response;
+	char *response;
 	size_t dlen;
 	int r;
 
-	if ((r = sshpkt_get_string(ssh, &response, &dlen)) != 0 ||
+	if ((r = sshpkt_get_cstring(ssh, &response, &dlen)) != 0 ||
 	    (r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
 	authenticated = verify_response(authctxt, response);

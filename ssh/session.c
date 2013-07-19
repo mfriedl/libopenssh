@@ -249,7 +249,7 @@ display_loginmsg(void)
 		return;
 	if ((r = sshbuf_put_u8(loginmsg, 0)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	printf("%s", (char *)sshbuf_ptr(loginmsg));
+	printf("%s", (const char *)sshbuf_ptr(loginmsg));
 	sshbuf_reset(loginmsg);
 }
 
@@ -1520,7 +1520,7 @@ session_unused(int id)
 	bzero(&sessions[id], sizeof(*sessions));
 	sessions[id].self = id;
 	sessions[id].used = 0;
-	sessions[id].chanid = -1;
+	sessions[id].chanid = CHANNEL_ID_NONE;
 	sessions[id].ptyfd = -1;
 	sessions[id].ttyfd = -1;
 	sessions[id].ptymaster = -1;
@@ -1589,7 +1589,7 @@ session_dump(void)
 }
 
 int
-session_open(struct ssh *ssh, int chanid)
+session_open(struct ssh *ssh, u_int chanid)
 {
 	Session *s = session_new();
 	debug("session_open: channel %d", chanid);
@@ -1624,24 +1624,23 @@ session_by_tty(char *tty)
 }
 
 static Session *
-session_by_channel(int id)
+session_by_channel(u_int id)
 {
 	int i;
 	for (i = 0; i < sessions_nalloc; i++) {
 		Session *s = &sessions[i];
 		if (s->used && s->chanid == id) {
-			debug("session_by_channel: session %d channel %d",
-			    i, id);
+			debug("%s: session %d channel %u", __func__, i, id);
 			return s;
 		}
 	}
-	debug("session_by_channel: unknown channel %d", id);
+	debug("%s: unknown channel %u", __func__, id);
 	session_dump();
 	return NULL;
 }
 
 static Session *
-session_by_x11_channel(int id)
+session_by_x11_channel(u_int id)
 {
 	int i, j;
 
@@ -1650,10 +1649,10 @@ session_by_x11_channel(int id)
 
 		if (s->x11_chanids == NULL || !s->used)
 			continue;
-		for (j = 0; s->x11_chanids[j] != -1; j++) {
+		for (j = 0; s->x11_chanids[j] != CHANNEL_ID_NONE; j++) {
 			if (s->x11_chanids[j] == id) {
-				debug("session_by_x11_channel: session %d "
-				    "channel %d", s->self, id);
+				debug("%s: session %d channel %u",
+				    __func__, s->self, id);
 				return s;
 			}
 		}
@@ -1975,7 +1974,7 @@ session_set_fds(Session *s, int fdin, int fdout, int fderr, int ignore_fderr,
 	 * now that have a child and a pipe to the child,
 	 * we can activate our channel and register the fd's
 	 */
-	if (s->chanid == -1)
+	if (s->chanid == CHANNEL_ID_NONE)
 		fatal("no channel for session %d", s->self);
 	channel_set_fds(s->chanid,
 	    fdout, fdin, fderr,
@@ -2048,15 +2047,15 @@ sig2name(int sig)
 }
 
 static void
-session_close_x11(int id)
+session_close_x11(u_int id)
 {
 	Channel *c;
 
 	if ((c = channel_by_id(id)) == NULL) {
-		debug("session_close_x11: x11 channel %d missing", id);
+		debug("%s: x11 channel %u missing", __func__, id);
 	} else {
 		/* Detach X11 listener */
-		debug("session_close_x11: detach x11 channel %d", id);
+		debug("%s: detach x11 channel %u", __func__, id);
 		channel_cancel_cleanup(id);
 		if (c->ostate != CHAN_OUTPUT_CLOSED)
 			chan_mark_dead(c);
@@ -2064,18 +2063,18 @@ session_close_x11(int id)
 }
 
 static void
-session_close_single_x11(int id, void *arg)
+session_close_single_x11(u_int id, void *arg)
 {
 	Session *s;
 	u_int i;
 
-	debug3("session_close_single_x11: channel %d", id);
+	debug3("%s: channel %u", __func__, id);
 	channel_cancel_cleanup(id);
 	if ((s = session_by_x11_channel(id)) == NULL)
-		fatal("session_close_single_x11: no x11 channel %d", id);
-	for (i = 0; s->x11_chanids[i] != -1; i++) {
-		debug("session_close_single_x11: session %d: "
-		    "closing channel %d", s->self, s->x11_chanids[i]);
+		fatal("%s: no x11 channel %u", __func__, id);
+	for (i = 0; s->x11_chanids[i] != CHANNEL_ID_NONE; i++) {
+		debug("%s: session %u: closing channel %d", __func__,
+		    s->self, s->x11_chanids[i]);
 		/*
 		 * The channel "id" is already closing, but make sure we
 		 * close all of its siblings.
@@ -2182,7 +2181,7 @@ session_close_by_pid(pid_t pid, int status)
 		    (long)pid);
 		return;
 	}
-	if (s->chanid != -1)
+	if (s->chanid != CHANNEL_ID_NONE)
 		session_exit_message(s, status);
 	if (s->ttyfd != -1)
 		session_pty_cleanup(s);
@@ -2194,7 +2193,7 @@ session_close_by_pid(pid_t pid, int status)
  * the session 'child' itself dies
  */
 void
-session_close_by_channel(int id, void *arg)
+session_close_by_channel(u_int id, void *arg)
 {
 	Session *s = session_by_channel(id);
 	u_int i;
@@ -2220,13 +2219,13 @@ session_close_by_channel(int id, void *arg)
 
 	/* Close any X11 listeners associated with this session */
 	if (s->x11_chanids != NULL) {
-		for (i = 0; s->x11_chanids[i] != -1; i++) {
+		for (i = 0; s->x11_chanids[i] != CHANNEL_ID_NONE; i++) {
 			session_close_x11(s->x11_chanids[i]);
-			s->x11_chanids[i] = -1;
+			s->x11_chanids[i] = CHANNEL_ID_NONE;
 		}
 	}
 
-	s->chanid = -1;
+	s->chanid = CHANNEL_ID_NONE;
 	session_close(s);
 }
 
@@ -2312,7 +2311,7 @@ session_setup_x11fwd(Session *s)
 		debug("x11_create_display_inet failed.");
 		return 0;
 	}
-	for (i = 0; s->x11_chanids[i] != -1; i++) {
+	for (i = 0; s->x11_chanids[i] != CHANNEL_ID_NONE; i++) {
 		channel_register_cleanup(s->x11_chanids[i],
 		    session_close_single_x11, 0);
 	}

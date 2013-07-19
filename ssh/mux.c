@@ -144,7 +144,7 @@ struct mux_master_state {
 #define MUX_FWD_REMOTE  2
 #define MUX_FWD_DYNAMIC 3
 
-static void mux_session_confirm(int, int, void *);
+static void mux_session_confirm(u_int, int, void *);
 
 static int process_mux_master_hello(u_int, Channel *,
     struct sshbuf *, struct sshbuf *);
@@ -181,19 +181,19 @@ static const struct {
 /* Cleanup callback fired on closure of mux slave _session_ channel */
 /* ARGSUSED */
 static void
-mux_master_session_cleanup_cb(int cid, void *unused)
+mux_master_session_cleanup_cb(u_int cid, void *unused)
 {
 	Channel *cc, *c = channel_by_id(cid);
 
-	debug3("%s: entering for channel %d", __func__, cid);
+	debug3("%s: entering for channel %u", __func__, cid);
 	if (c == NULL)
-		fatal("%s: channel_by_id(%i) == NULL", __func__, cid);
-	if (c->ctl_chan != -1) {
+		fatal("%s: channel_by_id(%u) == NULL", __func__, cid);
+	if (c->ctl_chan != CHANNEL_ID_NONE) {
 		if ((cc = channel_by_id(c->ctl_chan)) == NULL)
-			fatal("%s: channel %d missing control channel %d",
+			fatal("%s: channel %u missing control channel %u",
 			    __func__, c->self, c->ctl_chan);
-		c->ctl_chan = -1;
-		cc->remote_id = -1;
+		c->ctl_chan = CHANNEL_ID_NONE;
+		cc->remote_id = CHANNEL_ID_NONE;
 		chan_rcvd_oclose(cc);
 	}
 	channel_cancel_cleanup(c->self);
@@ -202,19 +202,19 @@ mux_master_session_cleanup_cb(int cid, void *unused)
 /* Cleanup callback fired on closure of mux slave _control_ channel */
 /* ARGSUSED */
 static void
-mux_master_control_cleanup_cb(int cid, void *unused)
+mux_master_control_cleanup_cb(u_int cid, void *unused)
 {
 	Channel *sc, *c = channel_by_id(cid);
 
 	debug3("%s: entering for channel %d", __func__, cid);
 	if (c == NULL)
 		fatal("%s: channel_by_id(%i) == NULL", __func__, cid);
-	if (c->remote_id != -1) {
+	if (c->remote_id != CHANNEL_ID_NONE) {
 		if ((sc = channel_by_id(c->remote_id)) == NULL)
 			fatal("%s: channel %d missing session channel %d",
 			    __func__, c->self, c->remote_id);
-		c->remote_id = -1;
-		sc->ctl_chan = -1;
+		c->remote_id = CHANNEL_ID_NONE;
+		sc->ctl_chan = CHANNEL_ID_NONE;
 		if (sc->type != SSH_CHANNEL_OPEN &&
 		    sc->type != SSH_CHANNEL_OPENING) {
 			debug2("%s: channel %d: not open", __func__, sc->self);
@@ -411,7 +411,7 @@ process_mux_new_session(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *
 	    new_fd[0], new_fd[1], new_fd[2]);
 
 	/* XXX support multiple child sessions in future */
-	if (c->remote_id != -1) {
+	if (c->remote_id != CHANNEL_ID_NONE) {
 		debug2("%s: session already open", __func__);
 		send_mux_error(o, MUX_S_FAILURE, rid,
 		    "Multiple sessions not supported");
@@ -587,6 +587,7 @@ mux_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 	Channel *c;
 	struct sshbuf *o;
 	int r;
+	u_int port;
 
 	if ((c = channel_by_id(fctx->cid)) == NULL) {
 		/* no channel for reply */
@@ -605,10 +606,15 @@ mux_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 	    rfwd->listen_port, rfwd->connect_host, rfwd->connect_port);
 	if (type == SSH2_MSG_REQUEST_SUCCESS) {
 		if (rfwd->listen_port == 0) {
-			if ((r = sshpkt_get_u32(ssh,
-			    &rfwd->allocated_port)) != 0)
+			if ((r = sshpkt_get_u32(ssh, &port)) != 0)
 				fatal("%s: packet error: %s",
 				    __func__, ssh_err(r));
+			if (port > 65535) {
+				fatal("Invalid allocated port %u for "
+				    "mux remote forward to %s:%d", port,
+				    rfwd->connect_host, rfwd->connect_port);
+			}
+			rfwd->allocated_port = (int)port;
 			logit("Allocated port %u for mux remote forward"
 			    " to %s:%d", rfwd->allocated_port,
 			    rfwd->connect_host, rfwd->connect_port);
@@ -929,7 +935,7 @@ process_mux_stdio_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 	    new_fd[0], new_fd[1]);
 
 	/* XXX support multiple child sessions in future */
-	if (c->remote_id != -1) {
+	if (c->remote_id != CHANNEL_ID_NONE) {
 		debug2("%s: session already open", __func__);
 		/* prepare reply */
 		send_mux_error(o, MUX_S_FAILURE, rid,
@@ -1235,7 +1241,7 @@ muxserver_listen(struct ssh *ssh)
 
 /* Callback on open confirmation in mux master for a mux client session. */
 static void
-mux_session_confirm(int id, int success, void *arg)
+mux_session_confirm(u_int id, int success, void *arg)
 {
 	struct mux_session_confirm_ctx *cctx = arg;
 	const char *display;
@@ -1626,7 +1632,7 @@ mux_client_forward(int fd, int cancel_flag, u_int ftype, Forward *fwd)
 {
 	struct sshbuf *m;
 	char *e, *fwd_desc;
-	u_int type, rid;
+	u_int port, type, rid;
 	int r;
 
 	fwd_desc = format_forward(ftype, fwd);
@@ -1671,8 +1677,15 @@ mux_client_forward(int fd, int cancel_flag, u_int ftype, Forward *fwd)
 	case MUX_S_REMOTE_PORT:
 		if (cancel_flag)
 			fatal("%s: got MUX_S_REMOTE_PORT for cancel", __func__);
-		if ((r = sshbuf_get_u32(m, &fwd->allocated_port)) != 0)
+		if ((r = sshbuf_get_u32(m, &port)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
+		if (port > 65535) {
+			fatal("Invalid allocated port %u for remote forward "
+			    "to %s:%d", port,
+			    fwd->connect_host ? fwd->connect_host : "",
+			    fwd->connect_port);
+		}
+		fwd->allocated_port = (int)port;
 		logit("Allocated port %u for remote forward to %s:%d",
 		    fwd->allocated_port,
 		    fwd->connect_host ? fwd->connect_host : "",

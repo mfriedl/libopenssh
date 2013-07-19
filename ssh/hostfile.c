@@ -244,7 +244,7 @@ load_hostkeys(struct hostkeys *hostkeys, const char *host, const char *path)
 	char *cp, *cp2, *hashed_host;
 	HostkeyMarker marker;
 	struct sshkey *key;
-	int kbits;
+	u_int kbits;
 
 	if ((f = fopen(path, "r")) == NULL)
 		return;

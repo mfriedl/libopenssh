@@ -792,7 +792,7 @@ list_hostkey_types(void)
 	}
 	if ((r = sshbuf_put_u8(b, 0)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	ret = xstrdup(sshbuf_ptr(b));
+	ret = xstrdup((const char *)sshbuf_ptr(b));
 	sshbuf_free(b);
 	debug("list_hostkey_types: %s", ret);
 	return ret;
@@ -837,9 +837,10 @@ get_hostkey_private_by_type(int type, struct ssh *ssh)
 }
 
 struct sshkey *
-get_hostkey_by_index(int ind)
+get_hostkey_by_index(u_int ind)
 {
-	if (ind < 0 || ind >= options.num_host_key_files)
+	if (options.num_host_key_files < 0 ||
+	    ind >= (u_int)options.num_host_key_files)
 		return (NULL);
 	return (sensitive_data.host_keys[ind]);
 }
@@ -926,7 +927,7 @@ send_rexec_state(int fd, struct sshbuf *conf)
 	if ((m = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
 	/* servconf.c:load_server_config() ensures a \0 at the end of cfg */
-	if ((r = sshbuf_put_cstring(m, sshbuf_ptr(conf))) != 0)
+	if ((r = sshbuf_put_cstring(m, (const char *)sshbuf_ptr(conf))) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	if (sensitive_data.server_key != NULL &&

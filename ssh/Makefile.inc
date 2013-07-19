@@ -7,14 +7,17 @@ WARNINGS=Yes
 
 CDIAGFLAGS=	-Wall
 CDIAGFLAGS+=	-Werror
+CDIAGFLAGS+=	-Wextra
 CDIAGFLAGS+=	-Wpointer-arith
 CDIAGFLAGS+=	-Wstrict-prototypes
 CDIAGFLAGS+=	-Wmissing-prototypes
 CDIAGFLAGS+=	-Wunused
 CDIAGFLAGS+=	-Wsign-compare
 CDIAGFLAGS+=	-Wshadow
+CDIAGFLAGS+=	-Wpointer-sign
+CDIAGFLAGS+=	-Wno-unused-parameter #-Wno-error=unused-parameter
 CDIAGFLAGS+=	-Wno-deprecated-declarations # XXX until heimdal update deprecations fixes
-CDIAGFLAGS+= -Wno-pointer-sign # XXX for clang, until I fix them all
+
 #DEBUG=-g
 
 #CFLAGS+=	-DJPAKE

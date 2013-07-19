@@ -338,8 +338,8 @@ process_sign_request2(SocketEntry *e)
 {
 	u_char *blob, *data, *signature = NULL;
 	size_t blen, dlen, slen = 0;
-	u_int compat = 0;
-	int r, ok = -1, flags;
+	u_int compat = 0, flags;
+	int r, ok = -1;
 	struct sshbuf *msg;
 	struct sshkey *key;
 
@@ -766,7 +766,8 @@ process_add_identity(SocketEntry *e, int version)
 {
 	Idtab *tab = idtab_lookup(version);
 	Identity *id;
-	int type, success = 0, confirm = 0, seconds;
+	int type, success = 0, confirm = 0;
+	u_int seconds;
 	char *type_name = NULL, *comment = NULL;
 	time_t death = 0;
 	struct sshkey *k = NULL;
@@ -913,7 +914,8 @@ static void
 process_add_smartcard_key(SocketEntry *e)
 {
 	char *provider = NULL, *pin;
-	int r, i, version, count = 0, success = 0, confirm = 0, seconds;
+	int r, i, version, count = 0, success = 0, confirm = 0;
+	u_int seconds;
 	time_t death = 0;
 	u_char type;
 	struct sshkey **keys = NULL, *k;
@@ -1014,7 +1016,7 @@ process_message(SocketEntry *e)
 {
 	u_int msg_len;
 	u_char type;
-	const char *cp;
+	const u_char *cp;
 	int r;
 
 	if (sshbuf_len(e->input) < 5)

@@ -77,7 +77,7 @@ kbdint_alloc(const char *devs)
 		}
 		if ((r = sshbuf_put_u8(b, 0)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
-		kbdintctxt->devices = xstrdup(sshbuf_ptr(b));
+		kbdintctxt->devices = xstrdup((const char *)sshbuf_ptr(b));
 		sshbuf_free(b);
 	} else {
 		kbdintctxt->devices = xstrdup(devs);

@@ -54,7 +54,7 @@ static int kex_input_newkeys(int, u_int32_t, struct ssh *);
 
 struct kexalg {
 	char *name;
-	int type;
+	u_int type;
 	int ec_nid;
 	const EVP_MD *(*mdfunc)(void);
 };
@@ -329,8 +329,7 @@ kex_input_kexinit(int type, u_int32_t seq, struct ssh *ssh)
 	if ((r = kex_choose_conf(ssh)) != 0)
 		return r;
 
-	if (kex->kex_type >= 0 && kex->kex_type < KEX_MAX &&
-	    kex->kex[kex->kex_type] != NULL)
+	if (kex->kex_type < KEX_MAX && kex->kex[kex->kex_type] != NULL)
 		return (kex->kex[kex->kex_type])(ssh);
 
 	return SSH_ERR_INTERNAL_ERROR;

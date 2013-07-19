@@ -2418,7 +2418,7 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 
 	if ((r = sshbuf_get_cstring(b, &enc->name, NULL)) != 0 ||
 	    (r = sshbuf_get(b, &enc->cipher, sizeof(enc->cipher))) != 0 ||
-	    (r = sshbuf_get_u32(b, &enc->enabled)) != 0 ||
+	    (r = sshbuf_get_u32(b, (u_int *)&enc->enabled)) != 0 ||
 	    (r = sshbuf_get_u32(b, &enc->block_size)) != 0 ||
 	    (r = sshbuf_get_string(b, &enc->key, &keylen)) != 0 ||
 	    (r = sshbuf_get_string(b, &enc->iv, &ivlen)) != 0)
@@ -2428,7 +2428,7 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 			goto out;
 		if ((r = mac_setup(mac, mac->name)) != 0)
 			goto out;
-		if ((r = sshbuf_get_u32(b, &mac->enabled)) != 0 ||
+		if ((r = sshbuf_get_u32(b, (u_int *)&mac->enabled)) != 0 ||
 		    (r = sshbuf_get_string(b, &mac->key, &maclen)) != 0)
 			goto out;
 		if (maclen > mac->key_len) {
@@ -2438,7 +2438,7 @@ newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 		mac->key_len = maclen;
 	}
 	if ((r = sshbuf_get_u32(b, &comp->type)) != 0 ||
-	    (r = sshbuf_get_u32(b, &comp->enabled)) != 0 ||
+	    (r = sshbuf_get_u32(b, (u_int *)&comp->enabled)) != 0 ||
 	    (r = sshbuf_get_cstring(b, &comp->name, NULL)) != 0)
 		goto out;
 	if (enc->name == NULL ||
@@ -2478,7 +2478,7 @@ kex_from_blob(struct sshbuf *m, struct kex **kexp)
 	}
 	if ((r = sshbuf_get_string(m, &kex->session_id, &kex->session_id_len)) != 0 ||
 	    (r = sshbuf_get_u32(m, &kex->we_need)) != 0 ||
-	    (r = sshbuf_get_u32(m, &kex->hostkey_type)) != 0 ||
+	    (r = sshbuf_get_u32(m, (u_int *)&kex->hostkey_type)) != 0 ||
 	    (r = sshbuf_get_u32(m, &kex->kex_type)) != 0 ||
 	    (r = sshbuf_get_stringb(m, kex->my)) != 0 ||
 	    (r = sshbuf_get_stringb(m, kex->peer)) != 0 ||
@@ -2516,7 +2516,8 @@ ssh_packet_set_state(struct ssh *ssh, struct sshbuf *m)
 	struct session_state *state = ssh->state;
 	const u_char *ssh1key, *ivin, *ivout, *keyin, *keyout, *input, *output;
 	size_t ssh1keylen, rlen, slen, ilen, olen;
-	int r, ssh1cipher = 0;
+	int r;
+	u_int ssh1cipher = 0;
 	u_int64_t sent_bytes = 0, recv_bytes = 0;
 
 	if (!compat20) {
@@ -2526,8 +2527,10 @@ ssh_packet_set_state(struct ssh *ssh, struct sshbuf *m)
 		    (r = sshbuf_get_string_direct(m, &ivout, &slen)) != 0 ||
 		    (r = sshbuf_get_string_direct(m, &ivin, &rlen)) != 0)
 			return r;
+		if (ssh1cipher > INT_MAX)
+			return SSH_ERR_KEY_UNKNOWN_CIPHER;
 		ssh_packet_set_encryption_key(ssh, ssh1key, ssh1keylen,
-		    ssh1cipher);
+		    (int)ssh1cipher);
 		if (cipher_get_keyiv_len(&state->send_context) != (int)slen ||
 		    cipher_get_keyiv_len(&state->receive_context) != (int)rlen)
 			return SSH_ERR_INVALID_FORMAT;

@@ -167,7 +167,8 @@ rsa_key_allowed_in_file(struct passwd *pw, char *file,
     const BIGNUM *client_n, struct sshkey **rkey)
 {
 	char *fp, line[SSH_MAX_PUBKEY_BYTES];
-	int allowed = 0, bits;
+	int allowed = 0;
+	u_int bits;
 	FILE *f;
 	u_long linenum = 0;
 	struct sshkey *key;
@@ -229,9 +230,9 @@ rsa_key_allowed_in_file(struct passwd *pw, char *file,
 
 		/* check the real bits  */
 		keybits = BN_num_bits(key->rsa->n);
-		if (keybits < 0 || bits != keybits)
+		if (keybits < 0 || bits != (u_int)keybits)
 			logit("Warning: %s, line %lu: keysize mismatch: "
-			    "actual %d vs. announced %d.",
+			    "actual %d vs. announced %u.",
 			    file, linenum, BN_num_bits(key->rsa->n), bits);
 
 		fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);

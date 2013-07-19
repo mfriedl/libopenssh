@@ -436,9 +436,8 @@ static int
 try_challenge_response_authentication(struct ssh *ssh)
 {
 	int type, r, i;
-	size_t clen;
 	char prompt[1024];
-	u_char *challenge, *response;
+	char *challenge, *response;
 
 	debug("Doing challenge response authentication.");
 
@@ -459,7 +458,7 @@ try_challenge_response_authentication(struct ssh *ssh)
 			debug("No challenge.");
 			return 0;
 		}
-		if ((r = sshpkt_get_string(ssh, &challenge, &clen)) != 0 ||
+		if ((r = sshpkt_get_cstring(ssh, &challenge, NULL)) != 0 ||
 		    (r = sshpkt_get_end(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
 		snprintf(prompt, sizeof prompt, "%s%s", challenge,
@@ -538,11 +537,11 @@ ssh_kex(struct ssh *ssh, char *host, struct sockaddr *hostaddr)
 	int i, r;
 	BIGNUM *key;
 	struct sshkey *host_key, *server_key;
-	int bits, rbits;
+	int rbits;
 	int ssh_cipher_default = SSH_CIPHER_3DES;
 	u_char session_key[SSH_SESSION_KEY_LENGTH];
 	u_char cookie[8];
-	u_int supported_ciphers;
+	u_int bits, supported_ciphers;
 	u_int server_flags, client_flags;
 
 	debug("Waiting for server public key.");
@@ -563,9 +562,9 @@ ssh_kex(struct ssh *ssh, char *host, struct sockaddr *hostaddr)
 		fatal("%s: %s", __func__, ssh_err(r));
 
 	rbits = BN_num_bits(server_key->rsa->n);
-	if (bits != rbits) {
+	if (rbits < 0 || bits != (u_int)rbits) {
 		logit("Warning: Server lies about size of server public key: "
-		    "actual size is %d bits vs. announced %d.", rbits, bits);
+		    "actual size is %d bits vs. announced %u.", rbits, bits);
 		logit("Warning: This may be due to an old implementation of ssh.");
 	}
 	/* Get the host key. */
@@ -577,9 +576,9 @@ ssh_kex(struct ssh *ssh, char *host, struct sockaddr *hostaddr)
 		fatal("%s: %s", __func__, ssh_err(r));
 
 	rbits = BN_num_bits(host_key->rsa->n);
-	if (bits != rbits) {
+	if (rbits < 0 || bits != (u_int)rbits) {
 		logit("Warning: Server lies about size of server host key: "
-		    "actual size is %d bits vs. announced %d.", rbits, bits);
+		    "actual size is %d bits vs. announced %u.", rbits, bits);
 		logit("Warning: This may be due to an old implementation of ssh.");
 	}
 

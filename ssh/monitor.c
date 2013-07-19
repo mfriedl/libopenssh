@@ -607,7 +607,8 @@ mm_answer_sign(int sock, struct sshbuf *m)
 	u_char *p;
 	u_char *signature;
 	size_t datlen, siglen;
-	int keyid, r;
+	u_int keyid;
+	int r;
 
 	debug3("%s", __func__);
 

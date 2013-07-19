@@ -233,9 +233,9 @@ main(int argc, char **argv)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (rver != version)
 		fatal("bad version: received %d, expected %d", rver, version);
-	if ((r = sshbuf_get_u32(b, &fd)) != 0)
+	if ((r = sshbuf_get_u32(b, (u_int *)&fd)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	if ((fd == STDIN_FILENO) || (fd == STDOUT_FILENO))
+	if (fd < 0 || fd == STDIN_FILENO || fd == STDOUT_FILENO)
 		fatal("bad fd");
 	if ((host = get_local_name(fd)) == NULL)
 		fatal("cannot get local name for fd");

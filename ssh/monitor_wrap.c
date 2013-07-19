@@ -101,7 +101,8 @@ mm_log_handler(LogLevel level, const char *msg, void *ctx)
 	    (r = sshbuf_put_cstring(log_msg, msg)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	POKE_U32(sshbuf_ptr(log_msg), sshbuf_len(log_msg) - 4);
-	if (atomicio(vwrite, mon->m_log_sendfd, (u_char *)sshbuf_ptr(log_msg),
+	if (atomicio(vwrite, mon->m_log_sendfd,
+	    (u_char *)sshbuf_ptr(log_msg),
 	    sshbuf_len(log_msg)) != sshbuf_len(log_msg))
 		fatal("%s: write: %s", __func__, strerror(errno));
 	sshbuf_free(log_msg);
@@ -369,7 +370,8 @@ int
 mm_auth_password(struct authctxt *authctxt, char *password)
 {
 	struct sshbuf *m;
-	int r, authenticated = 0;
+	int r;
+	u_int authenticated = 0;
 
 	debug3("%s entering", __func__);
 
@@ -424,7 +426,8 @@ mm_key_allowed(enum mm_keytype type, char *user, char *host,
 	struct sshbuf *m;
 	u_char *blob;
 	size_t len;
-	int r, allowed = 0, have_forced = 0;
+	int r;
+	u_int allowed = 0, have_forced = 0;
 
 	debug3("%s entering", __func__);
 
@@ -475,7 +478,8 @@ mm_sshkey_verify(struct sshkey *key, u_char *sig, size_t siglen,
 	struct sshbuf *m;
 	u_char *blob;
 	size_t len;
-	int r, verified = 0;
+	int r;
+	u_int verified = 0;
 
 	debug3("%s entering", __func__);
 
@@ -530,7 +534,8 @@ mm_pty_allocate(int *ptyfd, int *ttyfd, char *namebuf, size_t namebuflen)
 {
 	struct sshbuf *m;
 	char *p, *msg;
-	int r, success = 0, tmp1 = -1, tmp2 = -1;
+	int r, tmp1 = -1, tmp2 = -1;
+	u_int success = 0;
 
 	/* Kludge: ensure there are fds free to receive the pty/tty */
 	if ((tmp1 = dup(pmonitor->m_recvfd)) == -1 ||
@@ -619,7 +624,8 @@ mm_terminate(void)
 int
 mm_ssh1_session_key(BIGNUM *num)
 {
-	int r, rsafail;
+	int r;
+	u_int rsafail;
 	struct sshbuf *m;
 
 	if ((m = sshbuf_new()) == NULL)
@@ -693,7 +699,8 @@ int
 mm_bsdauth_respond(void *ctx, u_int numresponses, char **responses)
 {
 	struct sshbuf *m;
-	int r, authok;
+	int r;
+	u_int authok;
 
 	debug3("%s: entering", __func__);
 	if (numresponses != 1)
@@ -738,7 +745,8 @@ mm_auth_rsa_key_allowed(struct passwd *pw, BIGNUM *client_n,
 	struct sshkey *key;
 	u_char *blob;
 	size_t blen;
-	int r, allowed = 0, have_forced = 0;
+	int r;
+	u_int allowed = 0, have_forced = 0;
 
 	debug3("%s entering", __func__);
 
@@ -815,7 +823,8 @@ mm_auth_rsa_verify_response(struct sshkey *key, BIGNUM *p, u_char response[16])
 	struct sshbuf *m;
 	u_char *blob;
 	size_t blen;
-	int r, success = 0;
+	int r;
+	u_int success = 0;
 
 	debug3("%s entering", __func__);
 
@@ -928,7 +937,8 @@ int
 mm_ssh_gssapi_userok(char *user)
 {
 	struct sshbuf *m;
-	int r, authenticated = 0;
+	int r;
+	u_int authenticated = 0;
 
 	if ((m = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);

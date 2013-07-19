@@ -406,7 +406,7 @@ authmethods_get(struct authctxt *authctxt)
 	}
 	if ((r = sshbuf_put_u8(b, 0)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	list = xstrdup(sshbuf_ptr(b));
+	list = xstrdup((const char *)sshbuf_ptr(b));
 	sshbuf_free(b);
 	return list;
 }

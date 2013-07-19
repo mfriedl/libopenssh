@@ -628,7 +628,7 @@ read_keyfile_line(FILE *f, const char *filename, char *buf, size_t bufsz,
 }
 
 int
-tun_open(int tun, int mode)
+tun_open(u_int tun, int mode)
 {
 	struct ifreq ifr;
 	char name[100];
@@ -636,11 +636,11 @@ tun_open(int tun, int mode)
 
 	/* Open the tunnel device */
 	if (tun <= SSH_TUNID_MAX) {
-		snprintf(name, sizeof(name), "/dev/tun%d", tun);
+		snprintf(name, sizeof(name), "/dev/tun%u", tun);
 		fd = open(name, O_RDWR);
 	} else if (tun == SSH_TUNID_ANY) {
-		for (tun = 100; tun >= 0; tun--) {
-			snprintf(name, sizeof(name), "/dev/tun%d", tun);
+		for (tun = 0; tun < 128; tun++) {
+			snprintf(name, sizeof(name), "/dev/tun%u", tun);
 			if ((fd = open(name, O_RDWR)) >= 0)
 				break;
 		}

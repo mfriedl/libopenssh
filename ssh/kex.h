@@ -91,7 +91,7 @@ struct sshenc {
 	u_char	*iv;
 };
 struct sshcomp {
-	int	type;
+	u_int	type;
 	int	enabled;
 	char	*name;
 };
@@ -111,12 +111,12 @@ struct kex {
 	int	server;
 	char	*name;
 	int	hostkey_type;
-	int	kex_type;
+	u_int	kex_type;
 	int	roaming;
 	struct sshbuf *my;
 	struct sshbuf *peer;
 	sig_atomic_t done;
-	int	flags;
+	u_int	flags;
 	const EVP_MD *evp_md;
 	int	ec_nid;
 	char	*client_version_string;
@@ -128,7 +128,7 @@ struct kex {
 	int	(*kex[KEX_MAX])(struct ssh *);
 	/* kex specific state */
 	DH	*dh;			/* DH */
-	int	min, max, nbits;	/* GEX */
+	u_int	min, max, nbits;	/* GEX */
 	EC_KEY	*ec_client_key;		/* ECÐH */
 	const EC_GROUP *ec_group;	/* ECÐH */
 };
@@ -162,14 +162,14 @@ int	 kex_dh_hash(const char *, const char *,
     const BIGNUM *, const BIGNUM *, const BIGNUM *, u_char **, size_t *);
 
 int	 kexgex_hash(const EVP_MD *, const char *, const char *,
-    const char *, size_t, const char *, size_t, const u_char *, size_t,
+    const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
     int, int, int,
     const BIGNUM *, const BIGNUM *, const BIGNUM *,
     const BIGNUM *, const BIGNUM *,
     u_char **, size_t *);
 
 int kex_ecdh_hash(const EVP_MD *, const EC_GROUP *, const char *, const char *,
-    const char *, size_t, const char *, size_t, const u_char *, size_t,
+    const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
     const EC_POINT *, const EC_POINT *, const BIGNUM *, u_char **, size_t *);
 
 int	kex_ecdh_name_to_nid(const char *);

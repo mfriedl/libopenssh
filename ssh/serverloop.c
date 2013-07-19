@@ -246,7 +246,8 @@ make_packets_from_stdout_data(struct ssh *ssh)
 static void
 client_alive_check(struct ssh *ssh)
 {
-	int channel_id, r;
+	u_int channel_id;
+	int r;
 
 	/* timeout, check to see how many we have had */
 	if (ssh_packet_inc_alive_timeouts(ssh) > options.client_alive_count_max) {
@@ -258,7 +259,7 @@ client_alive_check(struct ssh *ssh)
 	 * send a bogus global/channel request with "wantreply",
 	 * we should get back a failure
 	 */
-	if ((channel_id = channel_find_open()) == -1) {
+	if ((channel_id = channel_find_open()) == CHANNEL_ID_NONE) {
 		if ((r = sshpkt_start(ssh, SSH2_MSG_GLOBAL_REQUEST)) != 0 ||
 		    (r = sshpkt_put_cstring(ssh, "keepalive@openssh.com"))
 		    != 0 ||
@@ -1006,7 +1007,8 @@ static Channel *
 server_request_tun(struct ssh *ssh)
 {
 	Channel *c = NULL;
-	int r, mode, tun, sock;
+	int r, sock;
+	u_int tun, mode;
 
 	if ((r = sshpkt_get_u32(ssh, &mode)) != 0 ||
 	    (r = sshpkt_get_u32(ssh, &tun)) != 0)
@@ -1024,8 +1026,8 @@ server_request_tun(struct ssh *ssh)
 		    "forwarding");
 		return NULL;
 	}
-	if (forced_tun_device != -1) {
-		if (tun != SSH_TUNID_ANY && forced_tun_device != tun)
+	if (forced_tun_device >= 0) {
+		if (tun != SSH_TUNID_ANY && (u_int)forced_tun_device != tun)
 			goto done;
 		tun = forced_tun_device;
 	}
@@ -1081,8 +1083,8 @@ server_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
 	char *ctype = 0;
-	int r, rchan;
-	u_int rmaxpack, rwindow;
+	int r;
+	u_int rchan, rmaxpack, rwindow;
 	size_t len;
 
 	if ((r = sshpkt_get_cstring(ssh, &ctype, &len)) != 0 ||
@@ -1139,7 +1141,7 @@ static int
 server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 {
 	char *rtype = NULL, *listen_address = NULL, *cancel_address = NULL;
-	char want_reply;
+	u_char want_reply;
 	u_int listen_port, cancel_port;
 	int r, success = 0, allocated_listen_port = 0;
 
@@ -1208,20 +1210,22 @@ static int
 server_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c;
-	int r, id, success = 0;
-	char *rtype = NULL, reply;
+	int r, success = 0;
+	u_int id;
+	u_char reply;
+	char *rtype = NULL;
 
 	if ((r = sshpkt_get_u32(ssh, &id)) != 0 ||
 	    (r = sshpkt_get_cstring(ssh, &rtype, NULL)) != 0 ||
 	    (r = sshpkt_get_u8(ssh, &reply)) != 0)
 		goto out;
 
-	debug("server_input_channel_req: channel %d request %s reply %d",
+	debug("server_input_channel_req: channel %u request %s reply %d",
 	    id, rtype, reply);
 
 	if ((c = channel_lookup(id)) == NULL)
 		ssh_packet_disconnect(ssh, "server_input_channel_req: "
-		    "unknown channel %d", id);
+		    "unknown channel %u", id);
 	if (!strcmp(rtype, "eow@openssh.com")) {
 		if ((r = sshpkt_get_end(ssh)) != 0)
 			goto out;

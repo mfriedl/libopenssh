@@ -175,7 +175,7 @@ check_key_in_hostfiles(struct passwd *, struct sshkey *, const char *,
     const char *, const char *);
 
 /* hostkey handling */
-struct sshkey	*get_hostkey_by_index(int);
+struct sshkey	*get_hostkey_by_index(u_int);
 struct sshkey	*get_hostkey_public_by_type(int, struct ssh *);
 struct sshkey	*get_hostkey_private_by_type(int, struct ssh *);
 int	 get_hostkey_index(struct sshkey *);

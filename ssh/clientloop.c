@@ -156,7 +156,7 @@ static int session_closed;	/* In SSH2: login session closed. */
 static int x11_refuse_time;	/* If >0, refuse x11 opens after this time. */
 
 static void client_init_dispatch(struct ssh *);
-int	session_ident = -1;
+u_int	session_ident = CHANNEL_ID_NONE;
 
 int	session_resumed = 0;
 
@@ -793,7 +793,8 @@ client_status_confirm(int type, Channel *c, void *ctx)
 
 	/* XXX supress on mux _client_ quietmode */
 	tochan = options.log_level >= SYSLOG_LEVEL_ERROR &&
-	    c->ctl_chan != -1 && c->extended_usage == CHAN_EXTENDED_WRITE;
+	    c->ctl_chan != CHANNEL_ID_NONE &&
+	    c->extended_usage == CHAN_EXTENDED_WRITE;
 
 	if (type == SSH2_MSG_CHANNEL_SUCCESS) {
 		debug2("%s request accepted on channel %d",
@@ -1116,7 +1117,7 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf **binp,
 				    escape_char)) != 0)
 					fatal("%s: buffer error: %s",
 					    __func__, ssh_err(r));
-				if (c && c->ctl_chan != -1) {
+				if (c && c->ctl_chan != CHANNEL_ID_NONE) {
 					chan_read_failed(c);
 					chan_write_failed(c);
 					if (c->detach_user)
@@ -1131,7 +1132,7 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf **binp,
 
 			case 'Z' - 64:
 				/* XXX support this for mux clients */
-				if (c && c->ctl_chan != -1) {
+				if (c && c->ctl_chan != CHANNEL_ID_NONE) {
 					char b[16];
  noescape:
 					if (ch == 'Z' - 64)
@@ -1188,7 +1189,7 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf **binp,
 			case 'V':
 				/* FALLTHROUGH */
 			case 'v':
-				if (c && c->ctl_chan != -1)
+				if (c && c->ctl_chan != CHANNEL_ID_NONE)
 					goto noescape;
 				if (!log_is_on_stderr()) {
 					if ((r = sshbuf_putf(berr,
@@ -1212,7 +1213,7 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf **binp,
 				continue;
 
 			case '&':
-				if (c && c->ctl_chan != -1)
+				if (c && c->ctl_chan != CHANNEL_ID_NONE)
 					goto noescape;
 				/*
 				 * Detach the program (continue to serve
@@ -1276,7 +1277,7 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf **binp,
 
 			case '?':
 				print_escape_help(berr, escape_char, compat20,
-				    (c && c->ctl_chan != -1),
+				    (c && c->ctl_chan != CHANNEL_ID_NONE),
 				    log_is_on_stderr());
 				continue;
 
@@ -1293,7 +1294,7 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf **binp,
 				continue;
 
 			case 'C':
-				if (c && c->ctl_chan != -1)
+				if (c && c->ctl_chan != CHANNEL_ID_NONE)
 					goto noescape;
 				process_cmdline(ssh);
 				continue;
@@ -1486,7 +1487,7 @@ client_new_escape_filter_ctx(int escape_char)
 
 /* Free the escape filter context on channel free */
 void
-client_filter_cleanup(int cid, void *ctx)
+client_filter_cleanup(u_int cid, void *ctx)
 {
 	free(ctx);
 }
@@ -1501,7 +1502,7 @@ client_simple_escape_filter(Channel *c, char *buf, int len)
 }
 
 static void
-client_channel_closed(int id, void *arg)
+client_channel_closed(u_int id, void *arg)
 {
 	channel_cancel_cleanup(id);
 	session_closed = 1;
@@ -1516,7 +1517,8 @@ client_channel_closed(int id, void *arg)
  */
 
 int
-client_loop(struct ssh *ssh, int have_pty, int escape_char_arg, int ssh2_chan_id)
+client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
+    u_int ssh2_chan_id)
 {
 	fd_set *readset = NULL, *writeset = NULL;
 	double start_time, total_time;
@@ -1581,7 +1583,7 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg, int ssh2_chan_id
 
 	if (compat20) {
 		session_ident = ssh2_chan_id;
-		if (session_ident != -1) {
+		if (session_ident != CHANNEL_ID_NONE) {
 			if (escape_char_arg != SSH_ESCAPECHAR_NONE) {
 				channel_register_filter(session_ident,
 				    client_simple_escape_filter, NULL,
@@ -1843,7 +1845,7 @@ client_input_exit_status(int type, u_int32_t seq, struct ssh *ssh)
 {
 	int r;
 
-	if ((r = sshpkt_get_u32(ssh, &exit_status)) != 0 ||
+	if ((r = sshpkt_get_u32(ssh, (u_int *)&exit_status)) != 0 ||
 	    (r = sshpkt_get_end(ssh)) != 0)
 		goto out;
 	/* Acknowledge the exit. */
@@ -1865,7 +1867,8 @@ static int
 client_input_agent_open(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
-	int remote_id, sock, r;
+	u_int remote_id;
+	int sock, r;
 
 	/* Read the remote channel number from the message. */
 	if ((r = sshpkt_get_u32(ssh, &remote_id)) != 0 ||
@@ -1922,9 +1925,9 @@ client_request_forwarded_tcpip(struct ssh *ssh, const char *request_type, int rc
 
 	/* Get rest of the packet */
 	if ((r = sshpkt_get_cstring(ssh, &listen_address, NULL)) != 0 ||
-	    (r = sshpkt_get_u32(ssh, &listen_port)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, (u_int *)&listen_port)) != 0 ||
 	    (r = sshpkt_get_cstring(ssh, &originator_address, NULL)) != 0 ||
-	    (r = sshpkt_get_u32(ssh, &originator_port)) != 0 ||
+	    (r = sshpkt_get_u32(ssh, (u_int *)&originator_port)) != 0 ||
 	    (r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
 
@@ -1964,7 +1967,7 @@ client_request_x11(struct ssh *ssh, const char *request_type, int rchan)
 	if (ssh->compat & SSH_BUG_X11FWD) {
 		debug2("buggy server: x11 request w/o originator_port");
 		originator_port = 0;
-	} else if ((r = sshpkt_get_u32(ssh, &originator_port)) != 0)
+	} else if ((r = sshpkt_get_u32(ssh, (u_int *)&originator_port)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
 	if ((r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
@@ -2054,7 +2057,8 @@ client_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
 	char *ctype = NULL;
-	int r, rchan;
+	int r;
+	u_int rchan;
 	size_t len;
 	u_int rmaxpack, rwindow;
 
@@ -2116,7 +2120,8 @@ static int
 client_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c = NULL;
-	int r, exitval, id, success = 0;
+	int r, success = 0;
+	u_int exitval, id;
 	u_char reply;
 	char *rtype = NULL;
 
@@ -2125,14 +2130,12 @@ client_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 	    (r = sshpkt_get_u8(ssh, &reply)) != 0)
 		goto out;
 
-	debug("client_input_channel_req: channel %d rtype %s reply %d",
-	    id, rtype, reply);
+	debug("%s: channel %d rtype %s reply %d", __func__, id, rtype, reply);
 
-	if (id == -1) {
-		error("client_input_channel_req: request for channel -1");
+	if (id == CHANNEL_ID_NONE) {
+		error("%s: request for invalid channel", __func__);
 	} else if ((c = channel_lookup(id)) == NULL) {
-		error("client_input_channel_req: channel %d: "
-		    "unknown channel", id);
+		error("%s: channel %d: unknown channel", __func__, id);
 	} else if (strcmp(rtype, "eow@openssh.com") == 0) {
 		if ((r = sshpkt_get_end(ssh)) != 0)
 			goto out;
@@ -2140,13 +2143,14 @@ client_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 	} else if (strcmp(rtype, "exit-status") == 0) {
 		if ((r = sshpkt_get_u32(ssh, &exitval)) != 0)
 			goto out;
-		if (c->ctl_chan != -1) {
+		if (c->ctl_chan != CHANNEL_ID_NONE) {
 			mux_exit_message(c, exitval);
 			success = 1;
 		} else if (id == session_ident) {
 			/* Record exit value of local session */
 			success = 1;
-			exit_status = exitval;
+			exit_status = exitval > INT_MAX ?
+			    INT_MAX : (u_int)exitval;
 		} else {
 			/* Probably for a mux channel that has already closed */
 			debug("%s: no sink for exit-status on channel %d",
@@ -2170,7 +2174,8 @@ client_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 static int
 client_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 {
-	char *rtype = NULL, want_reply;
+	char *rtype = NULL;
+	u_char want_reply;
 	int r, success = 0;
 
 	if ((r = sshpkt_get_cstring(ssh, &rtype, NULL)) != 0 ||
@@ -2277,12 +2282,12 @@ client_session2_setup(struct ssh *ssh, int id, int want_tty,
 			len = 900;
 		if (want_subsystem) {
 			debug("Sending subsystem: %.*s",
-			    (int)len, (u_char*)sshbuf_ptr(cmd));
+			    (int)len, (const u_char*)sshbuf_ptr(cmd));
 			channel_request_start(id, "subsystem", 1);
 			client_expect_confirm(id, "subsystem", CONFIRM_CLOSE);
 		} else {
 			debug("Sending command: %.*s",
-			    (int)len, (u_char*)sshbuf_ptr(cmd));
+			    (int)len, (const u_char*)sshbuf_ptr(cmd));
 			channel_request_start(id, "exec", 1);
 			client_expect_confirm(id, "exec", CONFIRM_CLOSE);
 		}

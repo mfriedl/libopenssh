@@ -346,7 +346,7 @@ dh_new_group14(void)
  * with:  O(exp(1.9223 * (ln q)^(1/3) (ln ln q)^(2/3)))
  */
 
-int
+u_int
 dh_estimate(int bits)
 {
 

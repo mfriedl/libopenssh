@@ -214,7 +214,7 @@ handle_is_ok(int i, int type)
 }
 
 static int
-handle_to_string(int handle, char **stringp, int *hlenp)
+handle_to_string(int handle, u_char **stringp, int *hlenp)
 {
 	if (stringp == NULL || hlenp == NULL)
 		return -1;
@@ -225,7 +225,7 @@ handle_to_string(int handle, char **stringp, int *hlenp)
 }
 
 static int
-handle_from_string(const char *handle, u_int hlen)
+handle_from_string(const u_char *handle, u_int hlen)
 {
 	int val;
 
@@ -410,7 +410,7 @@ send_status(u_int32_t id, u_int32_t status)
 	sshbuf_free(msg);
 }
 static void
-send_data_or_handle(char type, u_int32_t id, const char *data, int dlen)
+send_data_or_handle(char type, u_int32_t id, const u_char *data, int dlen)
 {
 	struct sshbuf *msg;
 	int r;
@@ -426,7 +426,7 @@ send_data_or_handle(char type, u_int32_t id, const char *data, int dlen)
 }
 
 static void
-send_data(u_int32_t id, const char *data, int dlen)
+send_data(u_int32_t id, const u_char *data, int dlen)
 {
 	debug("request %u: sent data len %d", id, dlen);
 	send_data_or_handle(SSH2_FXP_DATA, id, data, dlen);
@@ -435,7 +435,7 @@ send_data(u_int32_t id, const char *data, int dlen)
 static void
 send_handle(u_int32_t id, int handle)
 {
-	char *string;
+	u_char *string;
 	int hlen;
 
 	handle_to_string(handle, &string, &hlen);
@@ -607,7 +607,7 @@ process_close(void)
 static void
 process_read(void)
 {
-	char buf[64*1024];
+	u_char buf[64*1024];
 	u_int32_t id, len;
 	int r, handle, fd, ret, status = SSH2_FX_FAILURE;
 	u_int64_t off;

@@ -63,7 +63,7 @@ static void update_progress_meter(int);
 
 static time_t start;		/* start progress */
 static time_t last_update;	/* last progress update */
-static char *file;		/* name of the file being transferred */
+static const char *file;	/* name of the file being transferred */
 static off_t end_pos;		/* ending position of transfer */
 static off_t cur_pos;		/* transfer position as of last refresh */
 static volatile off_t *counter;	/* progress counter */
@@ -245,7 +245,7 @@ update_progress_meter(int ignore)
 }
 
 void
-start_progress_meter(char *f, off_t filesize, off_t *ctr)
+start_progress_meter(const char *f, off_t filesize, off_t *ctr)
 {
 	start = last_update = monotime();
 	file = f;
