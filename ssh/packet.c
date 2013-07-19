@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.187 2013/06/01 13:15:52 dtucker Exp $ */
+/* $OpenBSD: packet.c,v 1.188 2013/07/12 00:19:58 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1750,6 +1750,8 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		} else {
 			r = ssh_packet_read_poll1(ssh, typep);
 			switch (*typep) {
+			case SSH_MSG_NONE:
+				return SSH_MSG_NONE;
 			case SSH_MSG_IGNORE:
 				break;
 			case SSH_MSG_DEBUG:
@@ -1766,8 +1768,7 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 				free(msg);
 				return SSH_ERR_DISCONNECTED;
 			default:
-				if (*typep)
-					DBG(debug("received packet type %d", *typep));
+				DBG(debug("received packet type %d", *typep));
 				return 0;
 			}
 		}
@@ -1929,7 +1930,7 @@ void
 ssh_packet_write_wait(struct ssh *ssh)
 {
 	fd_set *setp;
-	int ret, ms_remain;
+	int ret, ms_remain = 0;
 	struct timeval start, timeout, *timeoutp = NULL;
 	struct session_state *state = ssh->state;
 

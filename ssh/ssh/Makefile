@@ -17,7 +17,9 @@ SRCS=	ssh.c readconf.c clientloop.c sshtty.c \
 	roaming_common.c roaming_client.c
 
 .include <bsd.own.mk>
-KERBEROS5=no
+
+# XXX leave on while refactoring to ensure we don't break it.
+KERBEROS5=yes
 
 .if (${KERBEROS5:L} == "yes")
 CFLAGS+= -DKRB5 -I${DESTDIR}/usr/include/kerberosV -DGSSAPI
@@ -27,7 +29,7 @@ CFLAGS+= -DKRB5 -I${DESTDIR}/usr/include/kerberosV -DGSSAPI
 
 .if (${KERBEROS5:L} == "yes")
 DPADD+=  ${LIBGSSAPI} ${LIBKRB5}
-LDADD+=  -lgssapi -lkrb5 -lhx509 -lasn1 -lheimntlm
+LDADD+=  -lgssapi -lkrb5 -lasn1
 LDADD+=  -lwind -lroken -lcom_err -lpthread -lheimbase
 .endif # KERBEROS5
 

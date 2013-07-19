@@ -19,7 +19,9 @@ SRCS=	sshd.c auth-rhosts.c auth-passwd.c auth-rsa.c auth-rh-rsa.c \
 	roaming_common.c roaming_serv.c sandbox-systrace.c
 
 .include <bsd.own.mk> # for KERBEROS and AFS
-KERBEROS5=no
+
+# XXX leave on while refactoring to ensure we don't break it.
+KERBEROS5=yes
 
 .if (${KERBEROS5:L} == "yes")
 CFLAGS+=-DKRB5 -I${DESTDIR}/usr/include/kerberosV -DGSSAPI
@@ -29,8 +31,8 @@ SRCS+=  auth-krb5.c auth2-gss.c gss-serv.c gss-serv-krb5.c
 .include <bsd.prog.mk>
 
 .if (${KERBEROS5:L} == "yes")
-LDADD+= -lgssapi -lkrb5 -lhx509 -lasn1 -lheimntlm
-LDADD+= -lwind -lroken -lcom_err -lpthread -lheimbase -lkafs
+LDADD+= -lgssapi -lkrb5 -lasn1
+LDADD+= -lwind -lroken -lcom_err -lpthread -lheimbase -lkafs5
 DPADD+= ${LIBGSSAPI} ${LIBKRB5}
 .endif
 

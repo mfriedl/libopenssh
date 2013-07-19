@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keygen.c,v 1.227 2013/05/17 00:13:14 djm Exp $ */
+/* $OpenBSD: ssh-keygen.c,v 1.229 2013/07/12 05:42:03 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1994 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -534,7 +534,7 @@ do_convert_from_ssh2(struct passwd *pw, struct sshkey **k, int *private)
 		fatal("%s: %s: %s", __progname, identity_file, strerror(errno));
 	encoded[0] = '\0';
 	while ((blen = get_line(fp, line, sizeof(line))) != -1) {
-		if (line[blen - 1] == '\\')
+		if (blen > 0 && line[blen - 1] == '\\')
 			escaped++;
 		if (strncmp(line, "----", 4) == 0 ||
 		    strstr(line, ": ") != NULL) {
@@ -1325,7 +1325,7 @@ do_print_resource_record(struct passwd *pw, char *fname, char *hname)
 	int r;
 
 	if (fname == NULL)
-		ask_filename(pw, "Enter file in which the key is");
+		fatal("%s: no filename", __func__);
 	if (stat(fname, &st) < 0) {
 		if (errno == ENOENT)
 			return 0;

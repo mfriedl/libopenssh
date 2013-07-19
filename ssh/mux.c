@@ -1,4 +1,4 @@
-/* $OpenBSD: mux.c,v 1.43 2013/06/05 02:07:29 dtucker Exp $ */
+/* $OpenBSD: mux.c,v 1.44 2013/07/12 00:19:58 djm Exp $ */
 /*
  * Copyright (c) 2002-2008 Damien Miller <djm@openbsd.org>
  *
@@ -649,18 +649,21 @@ process_mux_open_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 	char *fwd_desc = NULL;
 	u_int ftype;
 	int r, i, ret = 0, freefwd = 1;
+	u_int32_t lport, cport;
 
 	fwd.listen_host = fwd.connect_host = NULL;
 	if ((r = sshbuf_get_u32(m, &ftype)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &fwd.listen_host, NULL)) != 0 ||
-	    (r = sshbuf_get_u32(m, &fwd.listen_port)) != 0 ||
+	    (r = sshbuf_get_u32(m, &lport)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &fwd.connect_host, NULL)) != 0 ||
-	    (r = sshbuf_get_u32(m, &fwd.connect_port)) != 0) {
+	    (r = sshbuf_get_u32(m, &cport)) != 0 ||
+	    lport > 65535 || cport > 65535) {
 		error("%s: malformed message: %s", __func__, ssh_err(r));
 		ret = -1;
 		goto out;
 	}
-
+	fwd.listen_port = lport;
+	fwd.connect_port = cport;
 	if (*fwd.listen_host == '\0') {
 		free(fwd.listen_host);
 		fwd.listen_host = NULL;
@@ -795,17 +798,21 @@ process_mux_close_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 	const char *error_reason = NULL;
 	u_int ftype;
 	int r, i, listen_port, ret = 0;
+	u_int32_t lport, cport;
 
 	fwd.listen_host = fwd.connect_host = NULL;
 	if ((r = sshbuf_get_u32(m, &ftype)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &fwd.listen_host, NULL)) != 0 ||
-	    (r = sshbuf_get_u32(m, &fwd.listen_port)) != 0 ||
+	    (r = sshbuf_get_u32(m, &lport)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &fwd.connect_host, NULL)) != 0 ||
-	    (r = sshbuf_get_u32(m, &fwd.connect_port)) != 0) {
+	    (r = sshbuf_get_u32(m, &cport)) != 0 ||
+	    lport > 65535 || cport > 65535) {
 		error("%s: malformed message: %s", __func__, ssh_err(r));
 		ret = -1;
 		goto out;
 	}
+	fwd.listen_port = lport;
+	fwd.connect_port = cport;
 
 	if (*fwd.listen_host == '\0') {
 		free(fwd.listen_host);

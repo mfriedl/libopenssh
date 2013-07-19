@@ -13,7 +13,7 @@ CDIAGFLAGS+=	-Wmissing-prototypes
 CDIAGFLAGS+=	-Wunused
 CDIAGFLAGS+=	-Wsign-compare
 CDIAGFLAGS+=	-Wshadow
-
+CDIAGFLAGS+=	-Wno-deprecated-declarations # XXX until heimdal update deprecations fixes
 #DEBUG=-g
 
 #CFLAGS+=	-DJPAKE
@@ -28,10 +28,10 @@ CFLAGS+=	-DHAVE_DLOPEN
 
 .if !defined(LIB)
 .if exists(${.CURDIR}/../lib/${__objdir})
-LDADD+=         -L${.CURDIR}/../lib/${__objdir} -lssh -lgssapi -lkrb5
+LDADD+=         -L${.CURDIR}/../lib/${__objdir} -lssh
 DPADD+=         ${.CURDIR}/../lib/${__objdir}/libssh.a
 .else
-LDADD+=         -L${.CURDIR}/../lib -lssh -lgssapi -lkrb5
+LDADD+=         -L${.CURDIR}/../lib -lssh
 DPADD+=         ${.CURDIR}/../lib/libssh.a
 .endif
 DPADD+=         ${.CURDIR}/../lib/shlib_version

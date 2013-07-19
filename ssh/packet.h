@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.h,v 1.58 2013/05/16 02:00:34 dtucker Exp $ */
+/* $OpenBSD: packet.h,v 1.59 2013/07/12 00:19:59 djm Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
@@ -104,7 +104,9 @@ int      ssh_packet_read_seqnr(struct ssh *, u_char *, u_int32_t *seqnr_p);
 int      ssh_packet_read_poll_seqnr(struct ssh *, u_char *, u_int32_t *seqnr_p);
 
 const void *ssh_packet_get_string_ptr(struct ssh *, u_int *length_ptr);
-void     ssh_packet_disconnect(struct ssh *, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+void     ssh_packet_disconnect(struct ssh *, const char *fmt, ...)
+	__attribute__((format(printf, 2, 3)))
+	__attribute__((noreturn));
 void     ssh_packet_send_debug(struct ssh *, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 
 int	 ssh_set_newkeys(struct ssh *, int mode);

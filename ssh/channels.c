@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.c,v 1.323 2013/06/07 15:37:52 dtucker Exp $ */
+/* $OpenBSD: channels.c,v 1.324 2013/07/12 00:19:58 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1191,7 +1191,7 @@ channel_decode_socks5(Channel *c, fd_set *readset, fd_set *writeset)
 	} s5_req, s5_rsp;
 	u_int16_t dest_port;
 	const u_char *p;
-	u_char dest_addr[255+1], ntop[INET6_ADDRSTRLEN];
+	char dest_addr[255+1], ntop[INET6_ADDRSTRLEN];
 	u_int have, need, i, found, nmethods, addrlen, af;
 	int r;
 

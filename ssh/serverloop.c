@@ -1,4 +1,4 @@
-/* $OpenBSD: serverloop.c,v 1.167 2013/05/17 00:13:14 djm Exp $ */
+/* $OpenBSD: serverloop.c,v 1.168 2013/07/12 00:19:59 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -820,7 +820,8 @@ void
 server_loop2(struct ssh *ssh)
 {
 	fd_set *readset = NULL, *writeset = NULL;
-	int r, rekeying = 0, max_fd, nalloc = 0;
+	int r, rekeying = 0, max_fd;
+	u_int nalloc = 0;
 	u_int64_t rekey_timeout_ms = 0;
 
 	debug("Entering interactive session for SSH2.");
