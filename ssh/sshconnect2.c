@@ -651,7 +651,7 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
  done:
 	if (key != NULL)
 		sshkey_free(key);
-	if (b != NULL);
+	if (b != NULL)
 		sshbuf_free(b);
 	free(pkalg);
 	free(pkblob);
