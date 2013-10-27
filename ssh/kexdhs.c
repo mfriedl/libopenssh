@@ -1,4 +1,4 @@
-/* $OpenBSD: kexdhs.c,v 1.13 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: kexdhs.c,v 1.14 2013/07/19 07:37:48 markus Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
@@ -175,8 +175,8 @@ input_kex_dh_init(int type, u_int32_t seq, struct ssh *ssh)
 	}
 
 	/* sign H */
-	if ((r = PRIVSEP(sshkey_sign(server_host_private, &signature, &slen,
-	    hash, hashlen, ssh->compat))) < 0)
+	if ((r = kex->sign(server_host_private, server_host_public,
+	    &signature, &slen, hash, hashlen, ssh->compat)) < 0)
 		goto out;
 
 	/* destroy_sensitive_data(); */

@@ -217,6 +217,7 @@ int
 mm_sshkey_sign(struct sshkey *key, u_char **sigp, size_t *lenp,
     u_char *data, size_t datalen, u_int compat)
 {
+	struct ssh *ssh = active_state;		/* XXX */
 	struct kex *kex = *pmonitor->m_pkex;
 	struct sshbuf *m;
 	int r;
@@ -226,7 +227,7 @@ mm_sshkey_sign(struct sshkey *key, u_char **sigp, size_t *lenp,
 		fatal("%s: datalen too large: %zu", __func__, datalen);
 	if ((m = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
-	if ((r = sshbuf_put_u32(m, kex->host_key_index(key))) != 0 ||
+	if ((r = sshbuf_put_u32(m, kex->host_key_index(key, ssh))) != 0 ||
 	    (r = sshbuf_put_string(m, data, datalen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 

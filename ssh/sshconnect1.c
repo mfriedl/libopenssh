@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect1.c,v 1.71 2013/05/17 00:13:14 djm Exp $ */
+/* $OpenBSD: sshconnect1.c,v 1.72 2013/09/02 22:00:34 deraadt Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -608,7 +608,6 @@ ssh_kex(struct ssh *ssh, char *host, struct sockaddr *hostaddr)
 	 * random number, interpreted as a 32-byte key, with the least
 	 * significant 8 bits being the first byte of the key.
 	 */
-	arc4random_stir();
 	arc4random_buf(session_key, SSH_SESSION_KEY_LENGTH);
 
 	/*

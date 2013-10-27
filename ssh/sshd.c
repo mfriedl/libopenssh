@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.403 2013/06/05 02:27:50 dtucker Exp $ */
+/* $OpenBSD: sshd.c,v 1.409 2013/10/23 23:35:32 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -90,6 +90,7 @@
 #include "canohost.h"
 #include "hostfile.h"
 #include "auth.h"
+#include "authfd.h"
 #include "misc.h"
 #include "msg.h"
 #include "dispatch.h"
@@ -175,6 +176,10 @@ int num_listen_socks = 0;
 char *client_version_string = NULL;
 char *server_version_string = NULL;
 
+/* Daemon's agent connection */
+int auth_sock = -1;
+int have_agent = 0;
+
 /*
  * Any really sensitive data in the application is contained in this
  * structure. The idea is that this structure could be locked into memory so
@@ -187,6 +192,7 @@ struct {
 	struct sshkey *server_key;		/* ephemeral server key */
 	struct sshkey *ssh1_host_key;		/* ssh1 host key */
 	struct sshkey **host_keys;		/* all private host keys */
+	struct sshkey **host_pubkeys;		/* all public host keys */
 	struct sshkey **host_certificates;	/* all public host certs */
 	int	have_ssh1_key;
 	int	have_ssh2_key;
@@ -374,7 +380,6 @@ generate_ephemeral_server_key(void)
 	verbose("RSA key generation complete.");
 
 	arc4random_buf(sensitive_data.ssh1_cookie, SSH_SESSION_KEY_LENGTH);
-	arc4random_stir();
 }
 
 /*ARGSUSED*/
@@ -458,10 +463,11 @@ sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 	    &remote_major, &remote_minor, remote_version) != 3) {
 		s = "Protocol mismatch.\n";
 		(void) atomicio(vwrite, sock_out, s, strlen(s));
+		logit("Bad protocol version identification '%.100s' "
+		    "from %s port %d", client_version_string,
+		    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh));
 		close(sock_in);
 		close(sock_out);
-		logit("Bad protocol version identification '%.100s' from %s",
-		    client_version_string, ssh_remote_ipaddr(ssh));
 		cleanup_exit(255);
 	}
 	debug("Client protocol version %d.%d; client software version %.100s",
@@ -594,9 +600,9 @@ privsep_preauth_child(void)
 	/* Enable challenge-response authentication for privilege separation */
 	privsep_challenge_enable();
 
-	arc4random_stir();
 	arc4random_buf(rnd, sizeof(rnd));
 	RAND_seed(rnd, sizeof(rnd));
+	bzero(rnd, sizeof(rnd));
 
 	/* Demote the private keys to public keys. */
 	demote_sensitive_data();
@@ -631,7 +637,7 @@ privsep_preauth_child(void)
 static int
 privsep_preauth(struct authctxt *authctxt)
 {
-	int status;
+	int r, status;
 	pid_t pid;
 	struct ssh_sandbox *box = NULL;
 
@@ -649,6 +655,15 @@ privsep_preauth(struct authctxt *authctxt)
 		debug2("Network child is on pid %ld", (long)pid);
 
 		pmonitor->m_pid = pid;
+		if (have_agent) {
+			/* XXX do only for parent? */
+			r = ssh_get_authentication_socket(&auth_sock);
+			if (r != 0) {
+				error("Could not get agent socket: %s",
+				    ssh_err(r));
+				have_agent = 0;
+			}
+		}
 		if (box != NULL)
 			ssh_sandbox_parent_preauth(box, pid);
 		monitor_child_preauth(authctxt, pmonitor);
@@ -729,9 +744,9 @@ privsep_postauth(struct ssh *ssh)
 	/* Demote the private keys to public keys. */
 	demote_sensitive_data();
 
-	arc4random_stir();
 	arc4random_buf(rnd, sizeof(rnd));
 	RAND_seed(rnd, sizeof(rnd));
+	bzero(rnd, sizeof(rnd));
 
 	/* Drop privileges */
 	do_setusercontext(authctxt->pw);
@@ -815,6 +830,8 @@ get_hostkey_by_type(int type, int need_private)
 			break;
 		default:
 			key = sensitive_data.host_keys[i];
+			if (key == NULL && !need_private)
+				key = sensitive_data.host_pubkeys[i];
 			break;
 		}
 		if (key != NULL && key->type == type)
@@ -837,7 +854,7 @@ get_hostkey_private_by_type(int type, struct ssh *ssh)
 }
 
 struct sshkey *
-get_hostkey_by_index(u_int ind)
+get_hostkey_by_index(u_int ind, struct ssh *ssh)
 {
 	if (options.num_host_key_files < 0 ||
 	    ind >= (u_int)options.num_host_key_files)
@@ -845,8 +862,16 @@ get_hostkey_by_index(u_int ind)
 	return (sensitive_data.host_keys[ind]);
 }
 
+struct sshkey *
+get_hostkey_public_by_index(int ind, struct ssh *ssh)
+{
+	if (ind < 0 || ind >= options.num_host_key_files)
+		return (NULL);
+	return (sensitive_data.host_pubkeys[ind]);
+}
+
 int
-get_hostkey_index(struct sshkey *key)
+get_hostkey_index(struct sshkey *key, struct ssh *ssh)
 {
 	int i;
 
@@ -856,6 +881,8 @@ get_hostkey_index(struct sshkey *key)
 				return (i);
 		} else {
 			if (key == sensitive_data.host_keys[i])
+				return (i);
+			if (key == sensitive_data.host_pubkeys[i])
 				return (i);
 		}
 	}
@@ -1127,6 +1154,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 	struct sockaddr_storage from;
 	socklen_t fromlen;
 	pid_t pid;
+	u_char rnd[256];
 
 	/* setup fd set for accept */
 	fdset = NULL;
@@ -1322,7 +1350,9 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			 * Ensure that our random state differs
 			 * from that of the child
 			 */
-			arc4random_stir();
+			arc4random_buf(rnd, sizeof(rnd));
+			RAND_seed(rnd, sizeof(rnd));
+			bzero(rnd, sizeof(rnd));
 		}
 
 		/* child process check (or debug mode) */
@@ -1350,8 +1380,9 @@ main(int ac, char **av)
 	u_int n;
 	u_int64_t ibytes, obytes;
 	mode_t new_umask;
-	struct sshkey *key;
+	struct sshkey *key, *pubkey;
 	struct authctxt *authctxt;
+	int keytype;
 	struct connection_info *connection_info = get_connection_info(0, 0);
 
 	/* Save argv. */
@@ -1449,7 +1480,7 @@ main(int ac, char **av)
 				fprintf(stderr, "too many host keys.\n");
 				exit(1);
 			}
-			options.host_key_files[options.num_host_key_files++] = 
+			options.host_key_files[options.num_host_key_files++] =
 			   derelativise_path(optarg);
 			break;
 		case 't':
@@ -1584,22 +1615,50 @@ main(int ac, char **av)
 	debug("sshd version %s, %s", SSH_VERSION,
 	    SSLeay_version(SSLEAY_VERSION));
 
-	/* load private host keys */
+	/* load host keys */
 	sensitive_data.host_keys = xcalloc(options.num_host_key_files,
 	    sizeof(struct sshkey *));
-	for (i = 0; i < options.num_host_key_files; i++)
+	sensitive_data.host_pubkeys = xcalloc(options.num_host_key_files,
+	    sizeof(struct sshkey *));
+	for (i = 0; i < options.num_host_key_files; i++) {
 		sensitive_data.host_keys[i] = NULL;
+		sensitive_data.host_pubkeys[i] = NULL;
+	}
+
+	if (options.host_key_agent) {
+		if (strcmp(options.host_key_agent, SSH_AUTHSOCKET_ENV_NAME))
+			setenv(SSH_AUTHSOCKET_ENV_NAME,
+			    options.host_key_agent, 1);
+		have_agent = ssh_get_authentication_socket(NULL);
+	}
 
 	for (i = 0; i < options.num_host_key_files; i++) {
 		if ((r = sshkey_load_private(options.host_key_files[i], "",
-		    &key, NULL)) != 0) {
-			error("Could not load host key \"%s\": %s",
+		    &key, NULL)) != 0 && r != SSH_ERR_SYSTEM_ERROR)
+			error("Error loading host key \"%s\": %s",
 			    options.host_key_files[i], ssh_err(r));
+		if ((r = sshkey_load_public(options.host_key_files[i],
+		    &pubkey, NULL)) != 0 && r != SSH_ERR_SYSTEM_ERROR)
+			error("Error loading host key \"%s\": %s",
+			    options.host_key_files[i], ssh_err(r));
+
+		if (key == NULL && pubkey != NULL && pubkey->type != KEY_RSA1 &&
+		    have_agent) {
+			debug("will rely on agent for hostkey %s",
+			    options.host_key_files[i]);
+			keytype = pubkey->type;
+		} else if (key != NULL) {
+			keytype = key->type;
+		} else {
+			error("Could not load host key: %s",
+			    options.host_key_files[i]);
 			sensitive_data.host_keys[i] = NULL;
+			sensitive_data.host_pubkeys[i] = NULL;
 			continue;
 		}
 		sensitive_data.host_keys[i] = key;
-		switch (key->type) {
+		sensitive_data.host_pubkeys[i] = pubkey;
+		switch (keytype) {
 		case KEY_RSA1:
 			sensitive_data.ssh1_host_key = key;
 			sensitive_data.have_ssh1_key = 1;
@@ -1610,8 +1669,8 @@ main(int ac, char **av)
 			sensitive_data.have_ssh2_key = 1;
 			break;
 		}
-		debug("private host key: #%d type %d %s", i, key->type,
-		    sshkey_type(key));
+		debug("private host key: #%d type %d %s", i, keytype,
+		    sshkey_type(key ? key : pubkey));
 	}
 	if ((options.protocol & SSH_PROTO_1) && !sensitive_data.have_ssh1_key) {
 		logit("Disabling protocol version 1. Could not load host key");
@@ -1756,9 +1815,6 @@ main(int ac, char **av)
 	/* Reinitialize the log (because of the fork above). */
 	log_init(__progname, options.log_level, options.log_facility, log_stderr);
 
-	/* Initialize the random number generator. */
-	arc4random_stir();
-
 	/* Chdir to the root directory so that the current disk can be
 	   unmounted if desired. */
 	if (chdir("/") == -1)
@@ -1822,13 +1878,14 @@ main(int ac, char **av)
 		dup2(STDIN_FILENO, STDOUT_FILENO);
 		if (startup_pipe == -1)
 			close(REEXEC_STARTUP_PIPE_FD);
-		else
+		else if (startup_pipe != REEXEC_STARTUP_PIPE_FD) {
 			dup2(startup_pipe, REEXEC_STARTUP_PIPE_FD);
+			close(startup_pipe);
+			startup_pipe = REEXEC_STARTUP_PIPE_FD;
+		}
 
 		dup2(config_s[1], REEXEC_CONFIG_PASS_FD);
 		close(config_s[1]);
-		if (startup_pipe != -1)
-			close(startup_pipe);
 
 		execv(rexec_argv[0], rexec_argv);
 
@@ -1839,8 +1896,6 @@ main(int ac, char **av)
 		    options.log_facility, log_stderr);
 
 		/* Clean up fds */
-		startup_pipe = REEXEC_STARTUP_PIPE_FD;
-		close(config_s[1]);
 		close(REEXEC_CONFIG_PASS_FD);
 		newsock = sock_out = sock_in = dup(STDIN_FILENO);
 		if ((fd = open(_PATH_DEVNULL, O_RDWR, 0)) != -1) {
@@ -1917,7 +1972,9 @@ main(int ac, char **av)
 #endif /* LIBWRAP */
 
 	/* Log the connection. */
-	verbose("Connection from %.500s port %d", remote_ip, remote_port);
+	verbose("Connection from %s port %d on %s port %d",
+	    remote_ip, remote_port,
+	    get_local_ipaddr(sock_in), ssh_get_local_port(ssh));
 
 	/*
 	 * We don't want to listen forever unless the other side
@@ -1951,9 +2008,15 @@ main(int ac, char **av)
 		fatal("%s: sshbuf_new failed", __func__);
 	auth_debug_reset();
 
-	if (use_privsep)
+	if (use_privsep) {
 		if (privsep_preauth(authctxt) == 1)
 			goto authenticated;
+	} else if (compat20 && have_agent) {
+		if ((r = ssh_get_authentication_socket(&auth_sock)) != 0) {
+			error("Unable to get agent socket: %s", ssh_err(r));
+			have_agent = -1;
+		}
+	}
 
 	/* perform the key exchange */
 	/* authenticate user and start session */
@@ -2259,6 +2322,22 @@ do_ssh1_kex(struct ssh *ssh)
 	ssh_packet_write_wait(ssh);
 }
 
+int
+sshd_hostkey_sign(struct sshkey *privkey, struct sshkey *pubkey,
+    u_char **signature, size_t *slen, u_char *data, size_t dlen, u_int compat)
+{
+	if (privkey) {
+		return PRIVSEP(sshkey_sign(privkey, signature, slen,
+		    data, dlen, compat));
+	} else if (use_privsep) {
+		return mm_sshkey_sign(pubkey, signature, slen, data, dlen,
+		    compat);
+	} else {
+		return ssh_agent_sign(auth_sock, pubkey, signature, slen, data,
+		    dlen, compat);
+	}
+}
+
 /*
  * SSH2 key exchange: diffie-hellman-group1-sha1
  */
@@ -2318,6 +2397,7 @@ do_ssh2_kex(struct ssh *ssh)
 	kex->load_host_public_key=&get_hostkey_public_by_type;
 	kex->load_host_private_key=&get_hostkey_private_by_type;
 	kex->host_key_index=&get_hostkey_index;
+	kex->sign = sshd_hostkey_sign;
 
 	if ((r = ssh_dispatch_run(ssh, DISPATCH_BLOCK,
 	    &kex->done)) != 0)

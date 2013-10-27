@@ -1,5 +1,5 @@
 
-/* $OpenBSD: servconf.c,v 1.239 2013/05/17 00:13:14 djm Exp $ */
+/* $OpenBSD: servconf.c,v 1.243 2013/10/24 00:51:48 dtucker Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -71,6 +71,7 @@ initialize_server_options(ServerOptions *options)
 	options->address_family = -1;
 	options->num_host_key_files = 0;
 	options->num_host_cert_files = 0;
+	options->host_key_agent = NULL;
 	options->pid_file = NULL;
 	options->server_key_bits = -1;
 	options->login_grace_time = -1;
@@ -316,7 +317,7 @@ typedef enum {
 	sRevokedKeys, sTrustedUserCAKeys, sAuthorizedPrincipalsFile,
 	sKexAlgorithms, sIPQoS, sVersionAddendum,
 	sAuthorizedKeysCommand, sAuthorizedKeysCommandUser,
-	sAuthenticationMethods,
+	sAuthenticationMethods, sHostKeyAgent,
 	sDeprecated, sUnsupported
 } ServerOpCodes;
 
@@ -333,6 +334,7 @@ static struct {
 	{ "port", sPort, SSHCFG_GLOBAL },
 	{ "hostkey", sHostKeyFile, SSHCFG_GLOBAL },
 	{ "hostdsakey", sHostKeyFile, SSHCFG_GLOBAL },		/* alias */
+	{ "hostkeyagent", sHostKeyAgent, SSHCFG_GLOBAL },
 	{ "pidfile", sPidFile, SSHCFG_GLOBAL },
 	{ "serverkeybits", sServerKeyBits, SSHCFG_GLOBAL },
 	{ "logingracetime", sLoginGraceTime, SSHCFG_GLOBAL },
@@ -600,13 +602,13 @@ out:
 
 /*
  * All of the attributes on a single Match line are ANDed together, so we need
- * to check every * attribute and set the result to zero if any attribute does
+ * to check every attribute and set the result to zero if any attribute does
  * not match.
  */
 static int
 match_cfg_line(char **condition, int line, struct connection_info *ci)
 {
-	int result = 1, port;
+	int result = 1, attributes = 0, port;
 	char *arg, *attrib, *cp = *condition;
 	size_t len;
 
@@ -620,6 +622,17 @@ match_cfg_line(char **condition, int line, struct connection_info *ci)
 		    ci->laddress ? ci->laddress : "(null)", ci->lport);
 
 	while ((attrib = strdelim(&cp)) && *attrib != '\0') {
+		attributes++;
+		if (strcasecmp(attrib, "all") == 0) {
+			if (attributes != 1 ||
+			    ((arg = strdelim(&cp)) != NULL && *arg != '\0')) {
+				error("'all' cannot be combined with other "
+				    "Match attributes");
+				return -1;
+			}
+			*condition = cp;
+			return 1;
+		}
 		if ((arg = strdelim(&cp)) == NULL || *arg == '\0') {
 			error("Missing Match criteria for %s", attrib);
 			return -1;
@@ -712,6 +725,10 @@ match_cfg_line(char **condition, int line, struct connection_info *ci)
 			error("Unsupported Match attribute %s", attrib);
 			return -1;
 		}
+	}
+	if (attributes == 0) {
+		error("One or more attributes required for Match");
+		return -1;
 	}
 	if (ci != NULL)
 		debug3("match %sfound", result ? "" : "not ");
@@ -931,6 +948,17 @@ process_server_config_line(ServerOptions *options, char *line,
 			if (intptr != NULL)
 				*intptr = *intptr + 1;
 		}
+		break;
+
+	case sHostKeyAgent:
+		charptr = &options->host_key_agent;
+		arg = strdelim(&cp);
+		if (!arg || *arg == '\0')
+			fatal("%s line %d: missing socket name.",
+			    filename, linenum);
+		if (*activep && *charptr == NULL)
+			*charptr = !strcmp(arg, SSH_AUTHSOCKET_ENV_NAME) ?
+			    xstrdup(arg) : derelativise_path(arg);
 		break;
 
 	case sHostCertificate:
@@ -1962,6 +1990,7 @@ dump_config(ServerOptions *o)
 	dump_cfg_string(sVersionAddendum, o->version_addendum);
 	dump_cfg_string(sAuthorizedKeysCommand, o->authorized_keys_command);
 	dump_cfg_string(sAuthorizedKeysCommandUser, o->authorized_keys_command_user);
+	dump_cfg_string(sHostKeyAgent, o->host_key_agent);
 
 	/* string arguments requiring a lookup */
 	dump_cfg_string(sLogLevel, log_level_name(o->log_level));
@@ -2000,7 +2029,8 @@ dump_config(ServerOptions *o)
 	printf("ipqos %s ", iptos2str(o->ip_qos_interactive));
 	printf("%s\n", iptos2str(o->ip_qos_bulk));
 
-	printf("rekeylimit %lld %d\n", o->rekey_limit, o->rekey_interval);
+	printf("rekeylimit %lld %d\n", (long long)o->rekey_limit,
+	    o->rekey_interval);
 
 	channel_print_adm_permitted_opens();
 }

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keygen.c,v 1.229 2013/07/12 05:42:03 djm Exp $ */
+/* $OpenBSD: ssh-keygen.c,v 1.235 2013/10/23 04:16:22 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1994 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -920,7 +920,6 @@ do_gen_all_hostkeys(struct passwd *pw)
 		}
 		printf("%s ", key_types[i].key_type_display);
 		fflush(stdout);
-		arc4random_stir();
 		type = sshkey_type_from_name(key_types[i].key_type);
 		strlcpy(identity_file, key_types[i].path, sizeof(identity_file));
 		bits = 0;
@@ -945,7 +944,6 @@ do_gen_all_hostkeys(struct passwd *pw)
 			continue;
 		}
 		sshkey_free(private);
-		arc4random_stir();
 		strlcat(identity_file, ".pub", sizeof(identity_file));
 		fd = open(identity_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 		if (fd == -1) {
@@ -1016,6 +1014,7 @@ do_known_hosts(struct passwd *pw, const char *name)
 	char line[16*1024], tmp[MAXPATHLEN], old[MAXPATHLEN];
 	int c, skip = 0, inplace = 0, num = 0, invalid = 0, has_unhashed = 0;
 	int ca, r;
+	int found_key = 0;
 
 	if (!have_identity) {
 		cp = tilde_expand_filename(_PATH_SSH_USER_HOSTFILE, pw->pw_uid);
@@ -1120,11 +1119,13 @@ do_known_hosts(struct passwd *pw, const char *name)
 				}
 				c = (strcmp(cp2, cp) == 0);
 				if (find_host && c) {
-					printf("# Host %s found: "
-					    "line %d type %s%s\n", name,
-					    num, sshkey_type(pub),
-					    ca ? " (CA key)" : "");
+					if (!quiet)
+						printf("# Host %s found: "
+						    "line %d type %s%s\n", name,
+						    num, sshkey_type(pub),
+						    ca ? " (CA key)" : "");
 					printhost(out, cp, pub, ca, 0);
+					found_key = 1;
 				}
 				if (delete_host) {
 					if (!c && !ca)
@@ -1141,12 +1142,14 @@ do_known_hosts(struct passwd *pw, const char *name)
 				c = (match_hostname(name, cp,
 				    strlen(cp)) == 1);
 				if (find_host && c) {
-					printf("# Host %s found: "
-					    "line %d type %s%s\n", name,
-					    num, sshkey_type(pub),
-					    ca ? " (CA key)" : "");
+					if (!quiet)
+						printf("# Host %s found: "
+						    "line %d type %s%s\n", name,
+						    num, sshkey_type(pub),
+						    ca ? " (CA key)" : "");
 					printhost(out, name, pub,
 					    ca, hash_hosts && !ca);
+					found_key = 1;
 				}
 				if (delete_host) {
 					if (!c && !ca)
@@ -1222,7 +1225,7 @@ do_known_hosts(struct passwd *pw, const char *name)
 		}
 	}
 
-	exit(0);
+	exit (find_host && !found_key);
 }
 
 /*
@@ -1778,7 +1781,7 @@ parse_cert_times(char *timespec)
 		cert_valid_from = parse_absolute_time(from);
 
 	if (*to == '-' || *to == '+')
-		cert_valid_to = parse_relative_time(to, cert_valid_from);
+		cert_valid_to = parse_relative_time(to, now);
 	else
 		cert_valid_to = parse_absolute_time(to);
 
@@ -2007,7 +2010,7 @@ update_krl_from_file(struct passwd *pw, const char *file,
 			continue;
 		if (strncasecmp(cp, "serial:", 7) == 0) {
 			if (ca == NULL) {
-				fatal("revoking certificated by serial number "
+				fatal("revoking certificates by serial number "
 				    "requires specification of a CA key");
 			}
 			cp += 7;
@@ -2044,7 +2047,7 @@ update_krl_from_file(struct passwd *pw, const char *file,
 			}
 		} else if (strncasecmp(cp, "id:", 3) == 0) {
 			if (ca == NULL) {
-				fatal("revoking certificated by key ID "
+				fatal("revoking certificates by key ID "
 				    "requires specification of a CA key");
 			}
 			cp += 3;
@@ -2259,7 +2262,7 @@ main(int argc, char **argv)
 	/* we need this for the home * directory.  */
 	pw = getpwuid(getuid());
 	if (!pw) {
-		printf("You don't exist, go away!\n");
+		printf("No user exists for uid %lu\n", (u_long)getuid());
 		exit(1);
 	}
 	if (gethostname(hostname, sizeof(hostname)) < 0) {
@@ -2583,8 +2586,6 @@ main(int argc, char **argv)
 		return (0);
 	}
 
-	arc4random_stir();
-
 	if (key_type_name == NULL)
 		key_type_name = "rsa";
 
@@ -2683,7 +2684,6 @@ passphrase_again:
 
 	/* Clear the private key and the random number generator. */
 	sshkey_free(private);
-	arc4random_stir();
 
 	if (!quiet)
 		printf("Your identification has been saved in %s.\n", identity_file);

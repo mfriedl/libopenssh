@@ -1,4 +1,4 @@
-/* $OpenBSD: misc.c,v 1.91 2013/07/12 00:43:50 djm Exp $ */
+/* $OpenBSD: misc.c,v 1.92 2013/10/14 23:28:23 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2005,2006 Damien Miller.  All rights reserved.
@@ -35,6 +35,7 @@
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
@@ -1011,4 +1012,11 @@ reallocn(void **ptr, size_t nmemb, size_t size)
 		return SSH_ERR_ALLOC_FAIL;
 	*ptr = new_ptr;
 	return 0;
+}
+
+void
+lowercase(char *s)
+{
+	for (; *s; s++)
+		*s = tolower((u_char)*s);
 }

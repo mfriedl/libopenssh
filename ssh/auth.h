@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.h,v 1.75 2013/06/21 00:34:49 djm Exp $ */
+/* $OpenBSD: auth.h,v 1.76 2013/07/19 07:37:48 markus Exp $ */
 
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
@@ -175,11 +175,14 @@ check_key_in_hostfiles(struct passwd *, struct sshkey *, const char *,
     const char *, const char *);
 
 /* hostkey handling */
-struct sshkey	*get_hostkey_by_index(u_int);
+struct sshkey	*get_hostkey_by_index(u_int, struct ssh *);
+struct sshkey	*get_hostkey_public_by_index(int, struct ssh *);
 struct sshkey	*get_hostkey_public_by_type(int, struct ssh *);
 struct sshkey	*get_hostkey_private_by_type(int, struct ssh *);
-int	 get_hostkey_index(struct sshkey *);
+int		 get_hostkey_index(struct sshkey *, struct ssh *);
 int	 ssh1_session_key(BIGNUM *);
+int	 sshd_hostkey_sign(struct sshkey *, struct sshkey *,
+    u_char **, size_t *, u_char *, size_t, u_int);
 
 /* debug messages during authentication */
 void	 auth_debug_add(const char *fmt,...) __attribute__((format(printf, 1, 2)));

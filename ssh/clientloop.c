@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.253 2013/06/07 15:37:52 dtucker Exp $ */
+/* $OpenBSD: clientloop.c,v 1.254 2013/09/12 01:41:12 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1166,7 +1166,7 @@ process_escapes(struct ssh *ssh, Channel *c, struct sshbuf **binp,
 					    "%cB\r\n", escape_char)) != 0)
 						fatal("%s: buffer error: %s",
 						    __func__, ssh_err(r));
-					channel_request_start(session_ident,
+					channel_request_start(c->self,
 					    "break", 0);
 					if ((r = sshpkt_put_u32(ssh, 1000))
 					    != 0 ||

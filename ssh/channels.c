@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.c,v 1.324 2013/07/12 00:19:58 djm Exp $ */
+/* $OpenBSD: channels.c,v 1.326 2013/09/19 01:24:46 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1289,12 +1289,10 @@ channel_decode_socks5(Channel *c, fd_set *readset, fd_set *writeset)
 	s5_rsp.command = SSH_SOCKS5_SUCCESS;
 	s5_rsp.reserved = 0;			/* ignored */
 	s5_rsp.atyp = SSH_SOCKS5_IPV4;
-	((struct in_addr *)&dest_addr)->s_addr = INADDR_ANY;
 	dest_port = 0;				/* ignored */
 
 	if ((r = sshbuf_put(c->output, &s5_rsp, sizeof(s5_rsp))) != 0 ||
-	    (r = sshbuf_put(c->output, &dest_addr,
-	    sizeof(struct in_addr))) != 0 ||
+	    (r = sshbuf_put_u32(c->output, ntohl(INADDR_ANY))) != 0 ||
 	    (r = sshbuf_put(c->output, &dest_port, sizeof(dest_port))) != 0)
 		CHANNEL_BUFFER_ERROR(c, r);
 	return 1;
@@ -2851,8 +2849,21 @@ channel_fwd_bind_addr(struct ssh *ssh, const char *listen_addr, int *wildcardp,
 		if (((ssh->compat & SSH_OLD_FORWARD_ADDR) &&
 		    strcmp(listen_addr, "0.0.0.0") == 0 && is_client == 0) ||
 		    *listen_addr == '\0' || strcmp(listen_addr, "*") == 0 ||
-		    (!is_client && gateway_ports == 1))
+		    (!is_client && gateway_ports == 1)) {
 			wildcard = 1;
+			/*
+			 * Notify client if they requested a specific listen
+			 * address and it was overridden.
+			 */
+			if (*listen_addr != '\0' &&
+			    strcmp(listen_addr, "0.0.0.0") != 0 &&
+			    strcmp(listen_addr, "*") != 0) {
+				ssh_packet_send_debug(ssh,
+				    "Forwarding listen address "
+				    "\"%s\" overridden by server "
+				    "GatewayPorts", listen_addr);
+			}
+		}
 		else if (strcmp(listen_addr, "localhost") != 0)
 			addr = listen_addr;
 	}

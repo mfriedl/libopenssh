@@ -1,4 +1,4 @@
-/* $OpenBSD: misc.h,v 1.49 2013/06/01 13:15:52 dtucker Exp $ */
+/* $OpenBSD: misc.h,v 1.50 2013/10/14 23:28:23 djm Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
@@ -37,6 +37,7 @@ void	 ms_subtract_diff(struct timeval *, int *);
 void	 ms_to_timeval(struct timeval *, int);
 int	 reallocn(void **ptr, size_t nmemb, size_t size);
 time_t	 monotime(void);
+void	 lowercase(char *s);
 
 struct passwd *pwcopy(struct passwd *);
 const char *ssh_gai_strerror(int);

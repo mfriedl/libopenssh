@@ -6,17 +6,32 @@ CFLAGS+=	-I${.CURDIR}/..
 WARNINGS=Yes
 
 CDIAGFLAGS=	-Wall
+CDIAGFLAGS+=	-Wchar-subscripts
+CDIAGFLAGS+=	-Wcomment
 CDIAGFLAGS+=	-Werror
 CDIAGFLAGS+=	-Wextra
-CDIAGFLAGS+=	-Wpointer-arith
-CDIAGFLAGS+=	-Wstrict-prototypes
+CDIAGFLAGS+=	-Wformat
+CDIAGFLAGS+=	-Wformat-security
+CDIAGFLAGS+=	-Wimplicit
+CDIAGFLAGS+=	-Winline
+CDIAGFLAGS+=	-Wmissing-declarations
 CDIAGFLAGS+=	-Wmissing-prototypes
-CDIAGFLAGS+=	-Wunused
-CDIAGFLAGS+=	-Wsign-compare
+CDIAGFLAGS+=	-Wparentheses
+CDIAGFLAGS+=	-Wpointer-arith
+CDIAGFLAGS+=	-Wreturn-type
 CDIAGFLAGS+=	-Wshadow
-CDIAGFLAGS+=	-Wpointer-sign
-CDIAGFLAGS+=	-Wno-unused-parameter #-Wno-error=unused-parameter
-CDIAGFLAGS+=	-Wno-deprecated-declarations # XXX until heimdal update deprecations fixes
+CDIAGFLAGS+=	-Wsign-compare
+CDIAGFLAGS+=	-Wstrict-aliasing
+CDIAGFLAGS+=	-Wstrict-prototypes
+CDIAGFLAGS+=	-Wswitch
+CDIAGFLAGS+=	-Wtrigraphs
+CDIAGFLAGS+=	-Wuninitialized
+CDIAGFLAGS+=	-Wunused
+CDIAGFLAGS+=	-Wno-unused-parameter # Not clean for this yet
+#-Wno-error=address
+#CDIAGFLAGS+=	-Wcast-qual # XXX not clean
+#CDIAGFLAGS+=	-Wcast-align # XXX can't be clean with sockaddr casts?
+
 
 #DEBUG=-g
 

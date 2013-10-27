@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.126 2013/06/21 00:34:49 djm Exp $ */
+/* $OpenBSD: monitor.c,v 1.127 2013/07/19 07:37:48 markus Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -76,6 +76,7 @@
 #include "jpake.h"
 #include "roaming.h"
 #include "err.h"
+#include "authfd.h"
 
 #ifdef GSSAPI
 static Gssctxt *gsscontext = NULL;
@@ -603,6 +604,8 @@ mm_answer_moduli(int sock, struct sshbuf *m)
 int
 mm_answer_sign(int sock, struct sshbuf *m)
 {
+	struct ssh *ssh = active_state;		/* XXX */
+	extern int auth_sock;			/* XXX move to state struct? */
 	struct sshkey *key;
 	u_char *p;
 	u_char *signature;
@@ -630,11 +633,18 @@ mm_answer_sign(int sock, struct sshbuf *m)
 		memcpy(session_id2, p, session_id2_len);
 	}
 
-	if ((key = get_hostkey_by_index(keyid)) == NULL)
+	if ((key = get_hostkey_by_index(keyid, ssh)) != NULL) {
+		if ((r = sshkey_sign(key, &signature, &siglen, p, datlen,
+		    ssh->compat)) != 0)
+			fatal("%s: sshkey_sign failed: %s",
+			    __func__, ssh_err(r));
+	} else if ((key = get_hostkey_public_by_index(keyid, ssh)) != NULL &&
+	    auth_sock > 0) {
+		if (ssh_agent_sign(auth_sock, key, &signature, &siglen, p,
+		    datlen, ssh->compat) < 0)
+			fatal("%s: ssh_agent_sign failed", __func__);
+	} else
 		fatal("%s: no hostkey from index %d", __func__, keyid);
-	if ((r = sshkey_sign(key, &signature, &siglen, p, datlen,
-	    active_state->compat)) != 0)
-		fatal("%s: sshkey_sign failed: %s", __func__, ssh_err(r));
 
 	debug3("%s: signature %p(%zu)", __func__, signature, siglen);
 
@@ -1533,6 +1543,7 @@ monitor_apply_keystate(struct monitor *pmonitor)
 		kex->load_host_public_key=&get_hostkey_public_by_type;
 		kex->load_host_private_key=&get_hostkey_private_by_type;
 		kex->host_key_index=&get_hostkey_index;
+		kex->sign = sshd_hostkey_sign;
 	}
 
 	/* Update with new address */

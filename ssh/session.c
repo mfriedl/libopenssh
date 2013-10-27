@@ -1,4 +1,4 @@
-/* $OpenBSD: session.c,v 1.265 2013/05/17 00:13:14 djm Exp $ */
+/* $OpenBSD: session.c,v 1.267 2013/10/14 21:20:52 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -69,6 +69,7 @@
 #include "hostfile.h"
 #include "auth.h"
 #include "auth-options.h"
+#include "authfd.h"
 #include "pathnames.h"
 #include "log.h"
 #include "servconf.h"
@@ -732,26 +733,50 @@ int
 do_exec(Session *s, const char *command)
 {
 	int ret;
+	const char *forced = NULL;
+	char session_type[1024], *tty = NULL;
+	struct ssh *ssh = s->ssh;
 
 	if (options.adm_forced_command) {
 		original_command = command;
 		command = options.adm_forced_command;
-		if (IS_INTERNAL_SFTP(command)) {
-			s->is_subsystem = s->is_subsystem ?
-			    SUBSYSTEM_INT_SFTP : SUBSYSTEM_INT_SFTP_ERROR;
-		} else if (s->is_subsystem)
-			s->is_subsystem = SUBSYSTEM_EXT;
-		debug("Forced command (config) '%.900s'", command);
+		forced = "(config)";
 	} else if (forced_command) {
 		original_command = command;
 		command = forced_command;
+		forced = "(key-option)";
+	}
+	if (forced != NULL) {
 		if (IS_INTERNAL_SFTP(command)) {
 			s->is_subsystem = s->is_subsystem ?
 			    SUBSYSTEM_INT_SFTP : SUBSYSTEM_INT_SFTP_ERROR;
 		} else if (s->is_subsystem)
 			s->is_subsystem = SUBSYSTEM_EXT;
-		debug("Forced command (key option) '%.900s'", command);
+		snprintf(session_type, sizeof(session_type),
+		    "forced-command %s '%.900s'", forced, command);
+	} else if (s->is_subsystem) {
+		snprintf(session_type, sizeof(session_type),
+		    "subsystem '%.900s'", s->subsys);
+	} else if (command == NULL) {
+		snprintf(session_type, sizeof(session_type), "shell");
+	} else {
+		/* NB. we don't log unforced commands to preserve privacy */
+		snprintf(session_type, sizeof(session_type), "command");
 	}
+
+	if (s->ttyfd != -1) {
+		tty = s->tty;
+		if (strncmp(tty, "/dev/", 5) == 0)
+			tty += 5;
+	}
+
+	verbose("Starting session: %s%s%s for %s from %.200s port %d",
+	    session_type,
+	    tty == NULL ? "" : " on ",
+	    tty == NULL ? "" : tty,
+	    s->pw->pw_name,
+	    get_peer_ipaddr(ssh_packet_get_connection_in(ssh)),
+	    ssh_get_remote_port(ssh));
 
 #ifdef GSSAPI
 	if (options.gss_authentication) {
@@ -1762,17 +1787,18 @@ session_subsystem_req(Session *s)
 {
 	struct ssh *ssh = s->ssh;
 	struct stat st;
-	char *prog, *cmd, *subsys;
+	char *prog, *cmd;
 	u_int i;
 	int r, success = 0;
 
-	if ((r = sshpkt_get_cstring(ssh, &subsys, NULL)) != 0 ||
+	if ((r = sshpkt_get_cstring(ssh, &s->subsys, NULL)) != 0 ||
 	    (r = sshpkt_get_end(ssh)) != 0)
-	logit("subsystem request for %.100s by user %s", subsys,
+		fatal("%s: %s", __func__, ssh_err(r));
+	debug2("subsystem request for %.100s by user %s", s->subsys,
 	    s->pw->pw_name);
 
 	for (i = 0; i < options.num_subsystems; i++) {
-		if (strcmp(subsys, options.subsystem_name[i]) == 0) {
+		if (strcmp(s->subsys, options.subsystem_name[i]) == 0) {
 			prog = options.subsystem_command[i];
 			cmd = options.subsystem_args[i];
 			if (strcmp(INTERNAL_SFTP_NAME, prog) == 0) {
@@ -1791,10 +1817,9 @@ session_subsystem_req(Session *s)
 	}
 
 	if (!success)
-		logit("subsystem request for %.100s failed, subsystem not found",
-		    subsys);
+		logit("subsystem request for %.100s by user %s failed, "
+		    "subsystem not found", s->subsys, s->pw->pw_name);
 
-	free(subsys);
 	return success;
 }
 
@@ -2161,6 +2186,7 @@ session_close(Session *s)
 	free(s->auth_display);
 	free(s->auth_data);
 	free(s->auth_proto);
+	free(s->subsys);
 	if (s->env != NULL) {
 		for (i = 0; i < s->num_env; i++) {
 			free(s->env[i].name);
