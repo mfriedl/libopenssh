@@ -656,7 +656,6 @@ privsep_preauth(struct authctxt *authctxt)
 
 		pmonitor->m_pid = pid;
 		if (have_agent) {
-			/* XXX do only for parent? */
 			r = ssh_get_authentication_socket(&auth_sock);
 			if (r != 0) {
 				error("Could not get agent socket: %s",
