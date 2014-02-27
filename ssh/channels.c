@@ -1116,7 +1116,7 @@ channel_decode_socks4(Channel *c, fd_set *readset, fd_set *writeset)
 	    &s4_req.dest_addr, sizeof(s4_req.dest_addr)) != 0))
 		CHANNEL_BUFFER_ERROR(c, r);
 	have = sshbuf_len(c->input);
-	if (memchr(p, '\0', have) == NULL) \
+	if (memchr(p, '\0', have) == NULL)
 		fatal("channel %d: decode socks4: user not nul terminated",
 		    c->self);
 	p = (const char *)sshbuf_ptr(c->input);
