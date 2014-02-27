@@ -153,6 +153,7 @@ ssh_rsa_verify(const struct sshkey *key,
 		diff = modlen - len;
 		osigblob = sigblob;
 		if ((sigblob = realloc(sigblob, modlen)) == NULL) {
+			memset(osigblob, 's', len);
 			free(osigblob);
 			ret = SSH_ERR_ALLOC_FAIL;
 			goto out;
