@@ -1337,7 +1337,7 @@ int
 sshkey_generate(int type, u_int bits, struct sshkey **keyp)
 {
 	struct sshkey *k;
-	int ret;
+	int ret = SSH_ERR_INTERNAL_ERROR;
 
 	if (keyp == NULL)
 		return SSH_ERR_INVALID_ARGUMENT;
@@ -1431,7 +1431,7 @@ int
 sshkey_from_private(const struct sshkey *k, struct sshkey **pkp)
 {
 	struct sshkey *n = NULL;
-	int ret;
+	int ret = SSH_ERR_INTERNAL_ERROR;
 
 	switch (k->type) {
 	case KEY_DSA:
@@ -1519,7 +1519,7 @@ cert_parse(struct sshbuf *b, struct sshkey *key, const u_char *blob,
 	size_t signed_len, plen, clen, sklen, slen, kidlen, elen;
 	struct sshbuf *tmp;
 	char *principal;
-	int ret;
+	int ret = SSH_ERR_INTERNAL_ERROR;
 	int v00 = key->type == KEY_DSA_CERT_V00 ||
 	    key->type == KEY_RSA_CERT_V00;
 	char **oprincipals;
@@ -2006,7 +2006,7 @@ sshkey_certify(struct sshkey *k, struct sshkey *ca)
 	struct sshbuf *principals = NULL;
 	u_char *ca_blob = NULL, *sig_blob = NULL, nonce[32];
 	size_t i, ca_len, sig_len;
-	int ret;
+	int ret = SSH_ERR_INTERNAL_ERROR;
 	struct sshbuf *cert;
 
 	if (k == NULL || k->cert == NULL || k->cert->certblob == NULL)

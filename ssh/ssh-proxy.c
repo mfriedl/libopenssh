@@ -297,7 +297,7 @@ ssh_packet_fwd(struct side *from, struct side *to)
 	const u_char *data;
 	u_char type;
 	size_t len;
-	int ret;
+	int ret = SSH_ERR_INTERNAL_ERROR;
 
 	if (!from->ssh || !to->ssh)
 		return 0;
