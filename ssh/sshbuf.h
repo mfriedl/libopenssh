@@ -28,7 +28,7 @@
 #include "leakmalloc.h"
 #endif
 
-#define SSHBUF_SIZE_MAX		0x20000000	/* Hard maximum size */
+#define SSHBUF_SIZE_MAX		0x8000000	/* Hard maximum size */
 #define SSHBUF_REFS_MAX		0x100000	/* Max child buffers */
 #define SSHBUF_MAX_BIGNUM	(8192 / 8)	/* Max bignum *bytes* */
 #define SSHBUF_MAX_ECPOINT	((528 * 2 / 8) + 1) /* Max EC point *bytes* */
