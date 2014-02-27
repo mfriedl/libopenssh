@@ -249,6 +249,31 @@ sshkey_ec_nid_to_evpmd(int nid)
 		return EVP_sha512();
 }
 
+static void
+cert_free(struct sshkey_cert *cert)
+{
+	u_int i;
+
+	if (cert == NULL)
+		return;
+	if (cert->certblob != NULL)
+		sshbuf_free(cert->certblob);
+	if (cert->critical != NULL)
+		sshbuf_free(cert->critical);
+	if (cert->extensions != NULL)
+		sshbuf_free(cert->extensions);
+	if (cert->key_id != NULL)
+		free(cert->key_id);
+	for (i = 0; i < cert->nprincipals; i++)
+		free(cert->principals[i]);
+	if (cert->principals != NULL)
+		free(cert->principals);
+	if (cert->signature_key != NULL)
+		sshkey_free(cert->signature_key);
+	bzero(cert, sizeof(*cert));
+	free(cert);
+}
+
 static struct sshkey_cert *
 cert_new(void)
 {
@@ -383,31 +408,6 @@ sshkey_new_private(int type)
 		return NULL;
 	}
 	return k;
-}
-
-static void
-cert_free(struct sshkey_cert *cert)
-{
-	u_int i;
-
-	if (cert == NULL)
-		return;
-	if (cert->certblob != NULL)
-		sshbuf_free(cert->certblob);
-	if (cert->critical != NULL)
-		sshbuf_free(cert->critical);
-	if (cert->extensions != NULL)
-		sshbuf_free(cert->extensions);
-	if (cert->key_id != NULL)
-		free(cert->key_id);
-	for (i = 0; i < cert->nprincipals; i++)
-		free(cert->principals[i]);
-	if (cert->principals != NULL)
-		free(cert->principals);
-	if (cert->signature_key != NULL)
-		sshkey_free(cert->signature_key);
-	bzero(cert, sizeof(*cert));
-	free(cert);
 }
 
 void
