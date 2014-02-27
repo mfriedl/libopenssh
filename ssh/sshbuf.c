@@ -175,7 +175,7 @@ sshbuf_free(struct sshbuf *buf)
 		bzero(buf->d, buf->alloc);
 		free(buf->d);
 	}
-	bzero(buf, sizeof(buf));
+	bzero(buf, sizeof(*buf));
 	free(buf);
 }
 
