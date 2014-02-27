@@ -243,10 +243,12 @@ sshbuf_set_max_size(struct sshbuf *buf, size_t max_size)
 	/* pack and realloc if necessary */
 	sshbuf_maybe_pack(buf, max_size < buf->size);
 	if (max_size < buf->alloc && max_size > buf->size) {
-		rlen = roundup(buf->size, SSHBUF_SIZE_INC);
+		if (buf->size < SSHBUF_SIZE_INIT)
+			rlen = SSHBUF_SIZE_INIT;
+		else
+			rlen = roundup(buf->size, SSHBUF_SIZE_INC);
 		if (rlen > max_size)
 			rlen = max_size;
-		rlen = buf->size;
 		bzero(buf->d + buf->size, buf->alloc - buf->size);
 		SSHBUF_DBG(("new alloc = %zu", rlen));
 		if ((dp = realloc(buf->d, rlen)) == NULL)
