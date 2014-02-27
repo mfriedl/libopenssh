@@ -35,6 +35,8 @@ ssh_err(int n)
 		return "invalid format";
 	case SSH_ERR_BIGNUM_IS_NEGATIVE:
 		return "bignum is negative";
+	case SSH_ERR_STRING_TOO_LARGE:
+		return "string is too large";
 	case SSH_ERR_BIGNUM_TOO_LARGE:
 		return "bignum is too large";
 	case SSH_ERR_ECPOINT_TOO_LARGE:

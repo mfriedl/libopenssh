@@ -145,6 +145,10 @@ sshbuf_peek_string_direct(const struct sshbuf *buf, const u_char **valp,
 		return SSH_ERR_MESSAGE_INCOMPLETE;
 	}
 	len = PEEK_U32(p);
+	if (len > SSHBUF_SIZE_MAX - 4) {
+		SSHBUF_DBG(("SSH_ERR_STRING_TOO_LARGE"));
+		return SSH_ERR_STRING_TOO_LARGE;
+	}
 	if (sshbuf_len(buf) - 4 < len) {
 		SSHBUF_DBG(("SSH_ERR_MESSAGE_INCOMPLETE"));
 		return SSH_ERR_MESSAGE_INCOMPLETE;
@@ -168,7 +172,11 @@ sshbuf_get_cstring(struct sshbuf *buf, char **valp, size_t *lenp)
 		return SSH_ERR_MESSAGE_INCOMPLETE;
 	}
 	len = PEEK_U32(p);
-	if (sshbuf_len(buf) < (size_t)len + 4) {
+	if (len > SSHBUF_SIZE_MAX - 4) {
+		SSHBUF_DBG(("SSH_ERR_STRING_TOO_LARGE"));
+		return SSH_ERR_STRING_TOO_LARGE;
+	}
+	if (sshbuf_len(buf) - 4 < (size_t)len) {
 		SSHBUF_DBG(("SSH_ERR_MESSAGE_INCOMPLETE"));
 		return SSH_ERR_MESSAGE_INCOMPLETE;
 	}

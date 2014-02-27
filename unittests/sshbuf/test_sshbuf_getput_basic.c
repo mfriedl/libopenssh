@@ -325,7 +325,19 @@ sshbuf_getput_basic_tests(void)
 	ASSERT_INT_EQ(sshbuf_put(p1, x, sizeof(x)), 0);
 	ASSERT_SIZE_T_EQ(sshbuf_len(p1), sizeof(x) + 4);
 	r = sshbuf_get_string(p1, &d, &s);
-	ASSERT_INT_EQ(r, SSH_ERR_MESSAGE_INCOMPLETE);
+	ASSERT_INT_EQ(r, SSH_ERR_STRING_TOO_LARGE);
+	ASSERT_SIZE_T_EQ(sshbuf_len(p1), sizeof(x) + 4);
+	sshbuf_free(p1);
+	TEST_DONE();
+
+	TEST_START("sshbuf_get_cstring giant");
+	p1 = sshbuf_new();
+	ASSERT_PTR_NE(p1, NULL);
+	ASSERT_INT_EQ(sshbuf_put_u32(p1, 0xffffffff), 0);
+	ASSERT_INT_EQ(sshbuf_put(p1, x, sizeof(x)), 0);
+	ASSERT_SIZE_T_EQ(sshbuf_len(p1), sizeof(x) + 4);
+	r = sshbuf_get_cstring(p1, &s2, &s);
+	ASSERT_INT_EQ(r, SSH_ERR_STRING_TOO_LARGE);
 	ASSERT_SIZE_T_EQ(sshbuf_len(p1), sizeof(x) + 4);
 	sshbuf_free(p1);
 	TEST_DONE();
