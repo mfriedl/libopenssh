@@ -47,15 +47,15 @@ attempt_parse_blob(u_char *blob, size_t len)
 		free(s);
 	}
 	bn = BN_new();
-	if (sshbuf_get_bignum1(p1, bn) == 0)
-		BN_clear_free(bn);
+	sshbuf_get_bignum1(p1, bn);
+	BN_clear_free(bn);
 	bn = BN_new();
-	if (sshbuf_get_bignum2(p1, bn) == 0)
-		BN_clear_free(bn);
+	sshbuf_get_bignum2(p1, bn);
+	BN_clear_free(bn);
 	eck = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
 	ASSERT_PTR_NE(eck, NULL);
-	if (sshbuf_get_eckey(p1, eck) == 0)
-		EC_KEY_free(eck);
+	sshbuf_get_eckey(p1, eck);
+	EC_KEY_free(eck);
 	sshbuf_free(p1);
 }
 

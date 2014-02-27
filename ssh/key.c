@@ -343,20 +343,22 @@ sshkey_add_private(struct sshkey *k)
 	case KEY_RSA:
 	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
-		if ((k->rsa->d = BN_new()) == NULL ||
-		    (k->rsa->iqmp = BN_new()) == NULL ||
-		    (k->rsa->q = BN_new()) == NULL ||
-		    (k->rsa->p = BN_new()) == NULL ||
-		    (k->rsa->dmq1 = BN_new()) == NULL ||
-		    (k->rsa->dmp1 = BN_new()) == NULL)
+#define bn_maybe_alloc_failed(p) (p == NULL && (p = BN_new()) == NULL)
+		if (bn_maybe_alloc_failed(k->rsa->d) ||
+		    bn_maybe_alloc_failed(k->rsa->iqmp) ||
+		    bn_maybe_alloc_failed(k->rsa->q) ||
+		    bn_maybe_alloc_failed(k->rsa->p) ||
+		    bn_maybe_alloc_failed(k->rsa->dmq1) ||
+		    bn_maybe_alloc_failed(k->rsa->dmp1))
 			return SSH_ERR_ALLOC_FAIL;
 		break;
 	case KEY_DSA:
 	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
-		if ((k->dsa->priv_key = BN_new()) == NULL)
+		if (bn_maybe_alloc_failed(k->dsa->priv_key))
 			return SSH_ERR_ALLOC_FAIL;
 		break;
+#undef bn_maybe_alloc_failed
 	case KEY_ECDSA:
 	case KEY_ECDSA_CERT:
 		/* Cannot do anything until we know the group */
@@ -1217,7 +1219,7 @@ rsa_generate_private_key(u_int bits, RSA **rsap)
 static int
 dsa_generate_private_key(u_int bits, DSA **dsap)
 {
-	DSA *private = DSA_new();
+	DSA *private;
 	int ret = SSH_ERR_INTERNAL_ERROR;
 
 	if (dsap == NULL || bits != 1024)
@@ -1228,6 +1230,7 @@ dsa_generate_private_key(u_int bits, DSA **dsap)
 	}
 	if (!DSA_generate_parameters_ex(private, bits, NULL, 0, NULL,
 	    NULL, NULL) || !DSA_generate_key(private)) {
+		DSA_free(private);
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
 	}

@@ -126,10 +126,14 @@ sshbuf_get_eckey(struct sshbuf *buf, EC_KEY *v)
 		SSHBUF_DBG(("SSH_ERR_ALLOC_FAIL"));
 		return SSH_ERR_ALLOC_FAIL;
 	}
-	if ((r = sshbuf_peek_string_direct(buf, &d, &len)) < 0)
+	if ((r = sshbuf_peek_string_direct(buf, &d, &len)) < 0) {
+		EC_POINT_free(pt);
 		return r;
-	if ((r = get_ec(d, len, pt, EC_KEY_get0_group(v))) != 0)
+	}
+	if ((r = get_ec(d, len, pt, EC_KEY_get0_group(v))) != 0) {
+		EC_POINT_free(pt);
 		return r;
+	}
 	if (EC_KEY_set_public_key(v, pt) != 1) {
 		EC_POINT_free(pt);
 		return SSH_ERR_ALLOC_FAIL; /* XXX assumption */

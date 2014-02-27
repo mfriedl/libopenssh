@@ -353,6 +353,8 @@ sshbuf_getput_crypto_tests(void)
 	ASSERT_INT_EQ(EC_POINT_set_affine_coordinates_GFp(
 	    EC_KEY_get0_group(eck), ecp, bn_x, bn_y, NULL), 1);
 	ASSERT_INT_EQ(EC_KEY_set_public_key(eck, ecp), 1);
+	BN_free(bn_x);
+	BN_free(bn_y);
 	EC_POINT_free(ecp);
 	p1 = sshbuf_new();
 	ASSERT_PTR_NE(p1, NULL);
