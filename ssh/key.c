@@ -2052,7 +2052,7 @@ sshkey_certify(struct sshkey *k, struct sshkey *ca)
 	case KEY_RSA_CERT_V00:
 	case KEY_RSA_CERT:
 		if ((ret = sshbuf_put_bignum2(cert, k->rsa->e)) != 0 ||
-		    (sshbuf_put_bignum2(cert, k->rsa->n)) != 0)
+		    (ret = sshbuf_put_bignum2(cert, k->rsa->n)) != 0)
 			goto out;
 		break;
 	default:
