@@ -305,7 +305,7 @@ sshbuf_check_reserve(const struct sshbuf *buf, size_t len)
 	if (buf->readonly || buf->refcount > 1)
 		return SSH_ERR_BUFFER_READ_ONLY;
 	SSHBUF_TELL("check");
-	/* Slightly odd test construction is to prevent unsigned overflows */
+	/* Check that len is reasonable and that max_size + available < len */
 	if (len > buf->max_size || buf->max_size - len < buf->size - buf->off)
 		return SSH_ERR_NO_BUFFER_SPACE;
 	return 0;
@@ -324,7 +324,10 @@ sshbuf_reserve(struct sshbuf *buf, size_t len, u_char **dpp)
 			*dpp = NULL;
 		return r;
 	}
-	/* If we are running against max_size, we must pack */
+	/*
+	 * If the requested allocation appended would push us past max_size
+	 * then pack the buffer, zeroing buf->off.
+	 */
 	sshbuf_maybe_pack(buf, buf->size + len > buf->max_size);
 	SSHBUF_TELL("reserve");
 	if (len + buf->size > buf->alloc) {
