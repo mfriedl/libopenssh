@@ -115,7 +115,7 @@ ssh_rsa_verify(const struct sshkey *key,
 	struct sshbuf *b = NULL;
 	const EVP_MD *evp_md;
 	EVP_MD_CTX md;
-	char *ktype;
+	char *ktype = NULL;
 	u_char digest[EVP_MAX_MD_SIZE], *osigblob, *sigblob = NULL;
 	size_t len, diff, modlen;
 	u_int dlen;
