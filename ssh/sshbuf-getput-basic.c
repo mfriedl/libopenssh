@@ -175,40 +175,30 @@ sshbuf_peek_string_direct(const struct sshbuf *buf, const u_char **valp,
 int
 sshbuf_get_cstring(struct sshbuf *buf, char **valp, size_t *lenp)
 {
-	u_int32_t len;
-	const u_char *p = sshbuf_ptr(buf), *z;
+	size_t len;
+	const u_char *p, *z;
 	int r;
 
 	if (valp != NULL)
 		*valp = NULL;
 	if (lenp != NULL)
 		*lenp = 0;
-	if (sshbuf_len(buf) < 4) {
-		SSHBUF_DBG(("SSH_ERR_MESSAGE_INCOMPLETE"));
-		return SSH_ERR_MESSAGE_INCOMPLETE;
-	}
-	len = PEEK_U32(p);
-	if (len > SSHBUF_SIZE_MAX - 4) {
-		SSHBUF_DBG(("SSH_ERR_STRING_TOO_LARGE"));
-		return SSH_ERR_STRING_TOO_LARGE;
-	}
-	if (sshbuf_len(buf) - 4 < (size_t)len) {
-		SSHBUF_DBG(("SSH_ERR_MESSAGE_INCOMPLETE"));
-		return SSH_ERR_MESSAGE_INCOMPLETE;
-	}
+	if ((r = sshbuf_peek_string_direct(buf, &p, &len)) != 0)
+		return r;
 	/* Allow a \0 only at the end of the string */
-	if ((z = memchr(p + 4, '\0', len)) != NULL && z < p + 4 + len - 1) {
+	if (len > 0 &&
+	    (z = memchr(p , '\0', len)) != NULL && z < p + len - 1) {
 		SSHBUF_DBG(("SSH_ERR_INVALID_FORMAT"));
 		return SSH_ERR_INVALID_FORMAT;
 	}
-	if ((r = sshbuf_consume(buf, 4 + (size_t)len)) < 0)
+	if ((r = sshbuf_skip_string(buf)) != 0)
 		return -1;
 	if (valp != NULL) {
 		if ((*valp = malloc(len + 1)) == NULL) {
 			SSHBUF_DBG(("SSH_ERR_ALLOC_FAIL"));
 			return SSH_ERR_ALLOC_FAIL;
 		}
-		memcpy(*valp, p + 4, len);
+		memcpy(*valp, p, len);
 		(*valp)[len] = '\0';
 	}
 	if (lenp != NULL)
