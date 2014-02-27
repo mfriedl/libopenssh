@@ -96,6 +96,8 @@ sshbuf_get_string(struct sshbuf *buf, u_char **valp, size_t *lenp)
 	size_t len;
 	int r;
 
+	if (valp != NULL)
+		*valp = NULL;
 	if ((r = sshbuf_get_string_direct(buf, &val, &len)) < 0)
 		return r;
 	if (valp != NULL) {
@@ -118,6 +120,8 @@ sshbuf_get_string_direct(struct sshbuf *buf, const u_char **valp, size_t *lenp)
 	const u_char *p;
 	int r;
 
+	if (valp != NULL)
+		*valp = NULL;
 	if ((r = sshbuf_peek_string_direct(buf, &p, &len)) < 0)
 		return r;
 	if (valp != 0)
@@ -140,6 +144,8 @@ sshbuf_peek_string_direct(const struct sshbuf *buf, const u_char **valp,
 	u_int32_t len;
 	const u_char *p = sshbuf_ptr(buf);
 
+	if (valp != NULL)
+		*valp = NULL;
 	if (sshbuf_len(buf) < 4) {
 		SSHBUF_DBG(("SSH_ERR_MESSAGE_INCOMPLETE"));
 		return SSH_ERR_MESSAGE_INCOMPLETE;
@@ -167,6 +173,8 @@ sshbuf_get_cstring(struct sshbuf *buf, char **valp, size_t *lenp)
 	const u_char *p = sshbuf_ptr(buf), *z;
 	int r;
 
+	if (valp != NULL)
+		*valp = NULL;
 	if (sshbuf_len(buf) < 4) {
 		SSHBUF_DBG(("SSH_ERR_MESSAGE_INCOMPLETE"));
 		return SSH_ERR_MESSAGE_INCOMPLETE;
@@ -368,7 +376,6 @@ sshbuf_froms(struct sshbuf *buf, struct sshbuf **bufp)
 	struct sshbuf *ret;
 	int r;
 
-	/* XXX see comment in sshbuf_fromb() */
 	if (buf == NULL || bufp == NULL)
 		return SSH_ERR_INVALID_ARGUMENT;
 	*bufp = NULL;

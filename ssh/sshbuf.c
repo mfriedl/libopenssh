@@ -319,12 +319,12 @@ sshbuf_reserve(struct sshbuf *buf, size_t len, u_char **dpp)
 	u_char *dp;
 	int r;
 
+	if (dpp != NULL)
+		*dpp = NULL;
+
 	SSHBUF_DBG(("reserve buf = %p len = %zu", buf, len));
-	if ((r = sshbuf_check_reserve(buf, len)) != 0) {
-		if (dpp != NULL)
-			*dpp = NULL;
+	if ((r = sshbuf_check_reserve(buf, len)) != 0)
 		return r;
-	}
 	/*
 	 * If the requested allocation appended would push us past max_size
 	 * then pack the buffer, zeroing buf->off.
