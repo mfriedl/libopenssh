@@ -345,7 +345,7 @@ sshbuf_put_string(struct sshbuf *buf, const void *v, size_t len)
 	u_char *d;
 	int r;
 
-	if (len > 0xFFFFFFFF - 4) {
+	if (len > SSHBUF_SIZE_MAX - 4) {
 		SSHBUF_DBG(("SSH_ERR_NO_BUFFER_SPACE"));
 		return SSH_ERR_NO_BUFFER_SPACE;
 	}
