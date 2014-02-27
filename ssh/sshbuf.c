@@ -134,7 +134,8 @@ sshbuf_fromb(struct sshbuf *buf)
 
 	if (sshbuf_check_sanity(buf) != 0)
 		return NULL;
-	ret = sshbuf_from(sshbuf_ptr(buf), sshbuf_len(buf));
+	if ((ret = sshbuf_from(sshbuf_ptr(buf), sshbuf_len(buf))) == NULL)
+		return NULL;
 	if (sshbuf_set_parent(ret, buf) != 0) {
 		sshbuf_free(ret);
 		return NULL;
