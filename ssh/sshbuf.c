@@ -17,6 +17,7 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -53,8 +54,9 @@ sshbuf_check_sanity(const struct sshbuf *buf)
 	    buf->alloc > buf->max_size ||
 	    buf->size > buf->alloc ||
 	    buf->off > buf->size)) {
+		/* Do not try to recover from corrupted buffer internals */
 		SSHBUF_DBG(("SSH_ERR_INTERNAL_ERROR"));
-		SSHBUF_ABORT();
+		raise(SIGSEGV);
 		return SSH_ERR_INTERNAL_ERROR;
 	}
 	return 0;
