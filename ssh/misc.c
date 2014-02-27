@@ -640,7 +640,7 @@ tun_open(u_int tun, int mode)
 		snprintf(name, sizeof(name), "/dev/tun%u", tun);
 		fd = open(name, O_RDWR);
 	} else if (tun == SSH_TUNID_ANY) {
-		for (i = 100; i >= 0; i++) {
+		for (i = 100; i >= 0; i--) {
 			snprintf(name, sizeof(name), "/dev/tun%u", i);
 			if ((fd = open(name, O_RDWR)) >= 0) {
 				tun = i;
