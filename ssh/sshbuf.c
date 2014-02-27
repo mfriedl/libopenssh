@@ -67,7 +67,7 @@ sshbuf_maybe_pack(struct sshbuf *buf, int force)
 {
 	SSHBUF_DBG(("force %d", force));
 	SSHBUF_TELL("pre-pack");
-	if (buf->readonly || buf->refcount > 1)
+	if (buf->off == 0 || buf->readonly || buf->refcount > 1)
 		return;
 	if (force ||
 	    (buf->off >= SSHBUF_PACK_MIN && buf->off >= buf->size / 2)) {
