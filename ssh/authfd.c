@@ -427,10 +427,15 @@ ssh_agent_sign(int sock, struct sshkey *key,
     const u_char *data, size_t datalen, u_int compat)
 {
 	struct sshbuf *msg;
-	u_char *blob, type;
-	size_t blen, len;
+	u_char *blob = NULL, type;
+	size_t blen = 0, len = 0;
 	u_int flags = 0;
 	int r;
+
+	if (sigp != NULL)
+		*sigp = NULL;
+	if (lenp != NULL)
+		*lenp = 0;
 
 	if (datalen > SSH_KEY_MAX_SIGN_DATA_SIZE)
 		return SSH_ERR_INVALID_ARGUMENT;
