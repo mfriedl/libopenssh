@@ -259,7 +259,7 @@ cert_new(void)
 	if ((cert->certblob = sshbuf_new()) == NULL ||
 	    (cert->critical = sshbuf_new()) == NULL ||
 	    (cert->extensions = sshbuf_new()) == NULL) {
-		free(cert);
+		cert_free(cert);
 		return NULL;
 	}
 	cert->key_id = NULL;
