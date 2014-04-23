@@ -33,6 +33,12 @@ sshbuf_getput_basic_tests(void)
 	size_t s;
 	char *s2;
 	int r;
+	u_char bn1[] = { 0x00, 0x00, 0x00 };
+	u_char bn2[] = { 0x00, 0x00, 0x01, 0x02 };
+	u_char bn3[] = { 0x00, 0x80, 0x09 };
+	u_char bn_exp1[] = { 0x00, 0x00, 0x00, 0x00 };
+	u_char bn_exp2[] = { 0x00, 0x00, 0x00, 0x02, 0x01, 0x02 };
+	u_char bn_exp3[] = { 0x00, 0x00, 0x00, 0x03, 0x00, 0x80, 0x09 };
 
 	TEST_START("PEEK_U64");
 	ASSERT_U64_EQ(PEEK_U64(x), 0x1122334455667788ULL);
@@ -416,5 +422,59 @@ sshbuf_getput_basic_tests(void)
 	ASSERT_SIZE_T_EQ(sshbuf_len(p2), 12);
 	ASSERT_MEM_EQ(sshbuf_ptr(p2), "blahblahblah", 12);
 	sshbuf_free(p2);
+	TEST_DONE();
+
+	TEST_START("sshbuf_put_bignum2_bytes empty buf");
+	p1 = sshbuf_new();
+	ASSERT_PTR_NE(p1, NULL);
+	ASSERT_INT_EQ(sshbuf_put_bignum2_bytes(p1, NULL, 0), 0);
+	ASSERT_SIZE_T_EQ(sshbuf_len(p1), sizeof(bn_exp1));
+	ASSERT_MEM_EQ(sshbuf_ptr(p1), bn_exp1, sizeof(bn_exp1));
+	sshbuf_free(p1);
+	TEST_DONE();
+
+	TEST_START("sshbuf_put_bignum2_bytes all zeroes");
+	p1 = sshbuf_new();
+	ASSERT_PTR_NE(p1, NULL);
+	ASSERT_INT_EQ(sshbuf_put_bignum2_bytes(p1, bn1, sizeof(bn1)), 0);
+	ASSERT_SIZE_T_EQ(sshbuf_len(p1), sizeof(bn_exp1));
+	ASSERT_MEM_EQ(sshbuf_ptr(p1), bn_exp1, sizeof(bn_exp1));
+	sshbuf_free(p1);
+	TEST_DONE();
+
+	TEST_START("sshbuf_put_bignum2_bytes simple");
+	p1 = sshbuf_new();
+	ASSERT_PTR_NE(p1, NULL);
+	ASSERT_INT_EQ(sshbuf_put_bignum2_bytes(p1, bn2+2, sizeof(bn2)-2), 0);
+	ASSERT_SIZE_T_EQ(sshbuf_len(p1), sizeof(bn_exp2));
+	ASSERT_MEM_EQ(sshbuf_ptr(p1), bn_exp2, sizeof(bn_exp2));
+	sshbuf_free(p1);
+	TEST_DONE();
+
+	TEST_START("sshbuf_put_bignum2_bytes leading zero");
+	p1 = sshbuf_new();
+	ASSERT_PTR_NE(p1, NULL);
+	ASSERT_INT_EQ(sshbuf_put_bignum2_bytes(p1, bn2, sizeof(bn2)), 0);
+	ASSERT_SIZE_T_EQ(sshbuf_len(p1), sizeof(bn_exp2));
+	ASSERT_MEM_EQ(sshbuf_ptr(p1), bn_exp2, sizeof(bn_exp2));
+	sshbuf_free(p1);
+	TEST_DONE();
+
+	TEST_START("sshbuf_put_bignum2_bytes neg");
+	p1 = sshbuf_new();
+	ASSERT_PTR_NE(p1, NULL);
+	ASSERT_INT_EQ(sshbuf_put_bignum2_bytes(p1, bn3+1, sizeof(bn3)-1), 0);
+	ASSERT_SIZE_T_EQ(sshbuf_len(p1), sizeof(bn_exp3));
+	ASSERT_MEM_EQ(sshbuf_ptr(p1), bn_exp3, sizeof(bn_exp3));
+	sshbuf_free(p1);
+	TEST_DONE();
+
+	TEST_START("sshbuf_put_bignum2_bytes neg and leading zero");
+	p1 = sshbuf_new();
+	ASSERT_PTR_NE(p1, NULL);
+	ASSERT_INT_EQ(sshbuf_put_bignum2_bytes(p1, bn3, sizeof(bn3)), 0);
+	ASSERT_SIZE_T_EQ(sshbuf_len(p1), sizeof(bn_exp3));
+	ASSERT_MEM_EQ(sshbuf_ptr(p1), bn_exp3, sizeof(bn_exp3));
+	sshbuf_free(p1);
 	TEST_DONE();
 }

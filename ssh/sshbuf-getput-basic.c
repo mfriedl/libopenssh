@@ -390,3 +390,30 @@ sshbuf_froms(struct sshbuf *buf, struct sshbuf **bufp)
 	return 0;
 }
 
+int
+sshbuf_put_bignum2_bytes(struct sshbuf *buf, const void *v, size_t len)
+{
+	u_char *d;
+	const u_char *s = (const u_char *)v;
+	int r, prepend;
+
+	if (len > SSHBUF_SIZE_MAX - 5) {
+		SSHBUF_DBG(("SSH_ERR_NO_BUFFER_SPACE"));
+		return SSH_ERR_NO_BUFFER_SPACE;
+	}
+	/* Skip leading zero bytes */
+	for (; len > 0 && *s == 0; len--, s++)
+		;
+	/*
+	 * If most significant bit is set then prepend a zero byte to
+	 * avoid interpretation as a negative number.
+	 */
+	prepend = len > 0 && (s[0] & 0x80) != 0;
+	if ((r = sshbuf_reserve(buf, len + 4 + prepend, &d)) < 0)
+		return r;
+	POKE_U32(d, len + prepend);
+	if (prepend)
+		d[4] = 0;
+	memcpy(d + 4 + prepend, s, len);
+	return 0;
+}
