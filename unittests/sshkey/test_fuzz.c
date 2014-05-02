@@ -48,7 +48,9 @@ public_fuzz(struct sshkey *k)
 
 	ASSERT_PTR_NE(buf = sshbuf_new(), NULL);
 	ASSERT_INT_EQ(sshkey_to_blob_buf(k, buf), 0);
-	fuzz = fuzz_begin(FUZZ_1_BIT_FLIP | FUZZ_1_BYTE_FLIP |
+	/* XXX need a way to run the tests in "slow, but complete" mode */
+	fuzz = fuzz_begin(FUZZ_1_BIT_FLIP | /* XXX too slow FUZZ_2_BIT_FLIP | */
+	    FUZZ_1_BYTE_FLIP | /* XXX too slow FUZZ_2_BYTE_FLIP | */
 	    FUZZ_TRUNCATE_START | FUZZ_TRUNCATE_END,
 	    sshbuf_mutable_ptr(buf), sshbuf_len(buf));
 	ASSERT_INT_EQ(sshkey_from_blob(sshbuf_ptr(buf), sshbuf_len(buf),
@@ -59,6 +61,28 @@ public_fuzz(struct sshkey *k)
 	for(; !fuzz_done(fuzz); fuzz_next(fuzz)) {
 		if (sshkey_from_blob(fuzz_ptr(fuzz), fuzz_len(fuzz), &k1) == 0)
 			sshkey_free(k1);
+	}
+	fuzz_cleanup(fuzz);
+}
+
+static void
+sig_fuzz(struct sshkey *k)
+{
+	struct fuzz *fuzz;
+	u_char *sig, c[] = "some junk to be signed";
+	size_t l;
+
+	ASSERT_INT_EQ(sshkey_sign(k, &sig, &l, c, sizeof(c), 0), 0);
+	ASSERT_SIZE_T_GT(l, 0);
+	fuzz = fuzz_begin(FUZZ_1_BIT_FLIP | FUZZ_2_BIT_FLIP |
+	    FUZZ_1_BYTE_FLIP | FUZZ_2_BYTE_FLIP |
+	    FUZZ_TRUNCATE_START | FUZZ_TRUNCATE_END, sig, l);
+	ASSERT_INT_EQ(sshkey_verify(k, sig, l, c, sizeof(c), 0), 0);
+	free(sig);
+	TEST_ONERROR(onerror, fuzz);
+	for(; !fuzz_done(fuzz); fuzz_next(fuzz)) {
+		sshkey_verify(k, fuzz_ptr(fuzz), fuzz_len(fuzz),
+		    c, sizeof(c), 0);
 	}
 	fuzz_cleanup(fuzz);
 }
@@ -212,6 +236,30 @@ sshkey_fuzz_tests(void)
 	TEST_START("fuzz ECDSA cert");
 	ASSERT_INT_EQ(sshkey_load_cert(test_data_file("ecdsa_1"), &k1), 0);
 	public_fuzz(k1);
+	sshkey_free(k1);
+	TEST_DONE();
+
+	TEST_START("fuzz RSA sig");
+	buf = load_file("rsa_1");
+	ASSERT_INT_EQ(sshkey_parse_private(buf, "", "key", &k1, NULL), 0);
+	sshbuf_free(buf);
+	sig_fuzz(k1);
+	sshkey_free(k1);
+	TEST_DONE();
+
+	TEST_START("fuzz DSA sig");
+	buf = load_file("dsa_1");
+	ASSERT_INT_EQ(sshkey_parse_private(buf, "", "key", &k1, NULL), 0);
+	sshbuf_free(buf);
+	sig_fuzz(k1);
+	sshkey_free(k1);
+	TEST_DONE();
+
+	TEST_START("fuzz ECDSA sig");
+	buf = load_file("ecdsa_1");
+	ASSERT_INT_EQ(sshkey_parse_private(buf, "", "key", &k1, NULL), 0);
+	sshbuf_free(buf);
+	sig_fuzz(k1);
 	sshkey_free(k1);
 	TEST_DONE();
 }
