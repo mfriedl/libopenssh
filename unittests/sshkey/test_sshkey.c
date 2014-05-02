@@ -20,16 +20,75 @@
 #include "test_helper.h"
 
 #include "ssherr.h"
+#include "sshbuf.h"
 #define SSHBUF_INTERNAL 1	/* access internals for testing */
 #include "sshkey.h"
 
+#include "authfile.h"
+#include "common.h"
+#include "ssh2.h"
 
 void sshkey_tests(void);
+
+static void
+build_cert(struct sshbuf *b, const struct sshkey *k, const char *type,
+    const struct sshkey *sign_key, const struct sshkey *ca_key)
+{
+	struct sshbuf *ca_buf, *pk, *principals, *critopts, *exts;
+	u_char *sigblob;
+	size_t siglen;
+
+	ca_buf = sshbuf_new();
+	ASSERT_INT_EQ(sshkey_to_blob_buf(ca_key, ca_buf), 0);
+
+	/*
+	 * Get the public key serialisation by rendering the key and skipping
+	 * the type string. This is a bit of a hack :/
+	 */
+	pk = sshbuf_new();
+	ASSERT_INT_EQ(sshkey_plain_to_blob_buf(k, pk), 0);
+	ASSERT_INT_EQ(sshbuf_skip_string(pk), 0);
+
+	principals = sshbuf_new();
+	ASSERT_INT_EQ(sshbuf_put_cstring(principals, "gsamsa"), 0);
+	ASSERT_INT_EQ(sshbuf_put_cstring(principals, "gregor"), 0);
+
+	critopts = sshbuf_new();
+	/* XXX fill this in */
+
+	exts = sshbuf_new();
+	/* XXX fill this in */
+
+	ASSERT_INT_EQ(sshbuf_put_cstring(b, type), 0);
+	ASSERT_INT_EQ(sshbuf_put_cstring(b, "noncenoncenonce!"), 0); /* nonce */
+	ASSERT_INT_EQ(sshbuf_putb(b, pk), 0); /* public key serialisation */
+	ASSERT_INT_EQ(sshbuf_put_u64(b, 1234), 0); /* serial */
+	ASSERT_INT_EQ(sshbuf_put_u32(b, SSH2_CERT_TYPE_USER), 0); /* type */
+	ASSERT_INT_EQ(sshbuf_put_cstring(b, "gregor"), 0); /* key ID */
+	ASSERT_INT_EQ(sshbuf_put_stringb(b, principals), 0); /* principals */
+	ASSERT_INT_EQ(sshbuf_put_u64(b, 0), 0); /* start */
+	ASSERT_INT_EQ(sshbuf_put_u64(b, 0xffffffffffffffffULL), 0); /* end */
+	ASSERT_INT_EQ(sshbuf_put_stringb(b, critopts), 0); /* options */
+	ASSERT_INT_EQ(sshbuf_put_stringb(b, exts), 0); /* extensions */
+	ASSERT_INT_EQ(sshbuf_put_string(b, NULL, 0), 0); /* reserved */
+	ASSERT_INT_EQ(sshbuf_put_stringb(b, ca_buf), 0); /* signature key */
+	ASSERT_INT_EQ(sshkey_sign(sign_key, &sigblob, &siglen,
+	    sshbuf_ptr(b), sshbuf_len(b), 0), 0);
+	ASSERT_INT_EQ(sshbuf_put_string(b, sigblob, siglen), 0); /* signature */
+
+	free(sigblob);
+	sshbuf_free(ca_buf);
+	sshbuf_free(exts);
+	sshbuf_free(critopts);
+	sshbuf_free(principals);
+	sshbuf_free(pk);
+}
 
 void
 sshkey_tests(void)
 {
-	struct sshkey *k1, *kr, *kd, *ke;
+	struct sshkey *k1, *k2, *k3, *k4, *kr, *kd, *ke;
+	struct sshbuf *b;
 
 	TEST_START("new invalid");
 	k1 = sshkey_new(-42);
@@ -47,6 +106,7 @@ sshkey_tests(void)
 	ASSERT_PTR_NE(k1, NULL);
 	ASSERT_PTR_NE(k1->rsa, NULL);
 	ASSERT_PTR_NE(k1->rsa->n, NULL);
+	ASSERT_PTR_NE(k1->rsa->e, NULL);
 	ASSERT_PTR_EQ(k1->rsa->p, NULL);
 	sshkey_free(k1);
 	TEST_DONE();
@@ -56,6 +116,7 @@ sshkey_tests(void)
 	ASSERT_PTR_NE(k1, NULL);
 	ASSERT_PTR_NE(k1->rsa, NULL);
 	ASSERT_PTR_NE(k1->rsa->n, NULL);
+	ASSERT_PTR_NE(k1->rsa->e, NULL);
 	ASSERT_PTR_EQ(k1->rsa->p, NULL);
 	sshkey_free(k1);
 	TEST_DONE();
@@ -81,6 +142,7 @@ sshkey_tests(void)
 	ASSERT_PTR_NE(k1, NULL);
 	ASSERT_PTR_NE(k1->rsa, NULL);
 	ASSERT_PTR_NE(k1->rsa->n, NULL);
+	ASSERT_PTR_NE(k1->rsa->e, NULL);
 	ASSERT_PTR_NE(k1->rsa->p, NULL);
 	ASSERT_INT_EQ(sshkey_add_private(k1), 0);
 	sshkey_free(k1);
@@ -127,6 +189,7 @@ sshkey_tests(void)
 	ASSERT_PTR_NE(kr, NULL);
 	ASSERT_PTR_NE(kr->rsa, NULL);
 	ASSERT_PTR_NE(kr->rsa->n, NULL);
+	ASSERT_PTR_NE(kr->rsa->e, NULL);
 	ASSERT_PTR_NE(kr->rsa->p, NULL);
 	ASSERT_INT_EQ(BN_num_bits(kr->rsa->n), 768);
 	TEST_DONE();
@@ -154,6 +217,7 @@ sshkey_tests(void)
 	ASSERT_INT_EQ(k1->type, KEY_RSA);
 	ASSERT_PTR_NE(k1->rsa, NULL);
 	ASSERT_PTR_NE(k1->rsa->n, NULL);
+	ASSERT_PTR_NE(k1->rsa->e, NULL);
 	ASSERT_PTR_EQ(k1->rsa->p, NULL);
 	TEST_DONE();
 
@@ -214,5 +278,26 @@ sshkey_tests(void)
 	sshkey_free(kr);
 	sshkey_free(kd);
 	sshkey_free(ke);
+
+/* XXX certify test */
+/* XXX sign test */
+/* XXX verify test */
+
+	TEST_START("nested certificate");
+	ASSERT_INT_EQ(sshkey_load_cert(test_data_file("rsa_1"), &k1), 0);
+	ASSERT_INT_EQ(sshkey_load_public(test_data_file("rsa_1.pub"), &k2,
+	    NULL), 0);
+	b = load_file("rsa_2");
+	ASSERT_INT_EQ(sshkey_parse_private(b, "", "rsa_1", &k3, NULL), 0);
+	sshbuf_reset(b);
+	build_cert(b, k2, "ssh-rsa-cert-v01@openssh.com", k3, k1);
+	ASSERT_INT_EQ(sshkey_from_blob(sshbuf_ptr(b), sshbuf_len(b), &k4),
+	    SSH_ERR_KEY_CERT_INVALID_SIGN_KEY);
+	ASSERT_PTR_EQ(k4, NULL);
+	sshbuf_free(b);
+	sshkey_free(k1);
+	sshkey_free(k2);
+	sshkey_free(k3);
+	TEST_DONE();
 
 }
