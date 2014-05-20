@@ -1,27 +1,45 @@
-#	$OpenBSD$
+#	$OpenBSD: Makefile.inc,v 1.1 2014/04/30 05:32:00 djm Exp $
 
 .include <bsd.own.mk>
 .include <bsd.obj.mk>
 
+# XXX detect from ssh binary? 
+OPENSSL?=	yes
+.if (${OPENSSL:L} == "yes")
+CFLAGS+=	-DWITH_OPENSSL -DWITH_SSH1
+.endif
+
 # enable warnings
 WARNINGS=Yes
 
-CDIAGFLAGS=	-Wall
-CDIAGFLAGS+=	-Werror
-CDIAGFLAGS+=	-Wextra
-CDIAGFLAGS+=	-Wpointer-arith
-CDIAGFLAGS+=	-Wstrict-prototypes
-CDIAGFLAGS+=	-Wmissing-prototypes
-CDIAGFLAGS+=	-Wunused
-CDIAGFLAGS+=	-Wsign-compare
-CDIAGFLAGS+=	-Wshadow
-CDIAGFLAGS+=	-Wpointer-sign
-#CDIAGFLAGS+=	-Wno-unused-parameter #-Wno-error=unused-parameter
-.if (${CC:L} == "gcc" || ${CC:L} == "cc")
-CDIAGFLAGS+=	-Wbounded
-.endif
-
 DEBUG=-g
+CFLAGS+=	-fstack-protector-all
+CDIAGFLAGS=	-Wall
+CDIAGFLAGS+=	-Wextra
+CDIAGFLAGS+=	-Werror
+CDIAGFLAGS+=	-Wchar-subscripts
+CDIAGFLAGS+=	-Wcomment
+CDIAGFLAGS+=	-Wformat
+CDIAGFLAGS+=	-Wformat-security
+CDIAGFLAGS+=	-Wimplicit
+CDIAGFLAGS+=	-Winline
+CDIAGFLAGS+=	-Wmissing-declarations
+CDIAGFLAGS+=	-Wmissing-prototypes
+CDIAGFLAGS+=	-Wparentheses
+CDIAGFLAGS+=	-Wpointer-arith
+CDIAGFLAGS+=	-Wpointer-sign
+CDIAGFLAGS+=	-Wreturn-type
+CDIAGFLAGS+=	-Wshadow
+CDIAGFLAGS+=	-Wsign-compare
+CDIAGFLAGS+=	-Wstrict-aliasing
+CDIAGFLAGS+=	-Wstrict-prototypes
+CDIAGFLAGS+=	-Wswitch
+CDIAGFLAGS+=	-Wtrigraphs
+CDIAGFLAGS+=	-Wuninitialized
+CDIAGFLAGS+=	-Wunused
+.if ${COMPILER_VERSION} == "gcc4"
+CDIAGFLAGS+=	-Wold-style-definition
+.endif
 
 CFLAGS+=-I${.CURDIR}/../test_helper -I${.CURDIR}/../../ssh
 
@@ -41,10 +59,6 @@ LDADD+=-L${.CURDIR}/../../ssh/lib -lssh
 DPADD+=${.CURDIR}/../../ssh/lib/libssh.a
 .endif
 
-CFLAGS+=-DWITH_OPENSSL
-LDADD+= -lcrypto -lutil
-DPADD+= ${LIBCRYPTO} ${LIBUTIL}
-
 .if defined(LEAKMALLOC)
 DEBUG=		-g
 COPTS=		-O0
@@ -63,3 +77,10 @@ DPADD+=         ${LEAKMALLOC_DIR}/libleakmalloc.a
 CDIAGFLAGS+=	-Wuninitialized
 .endif
 
+LDADD+= -lutil
+DPADD+= ${LIBUTIL}
+
+.if (${OPENSSL:L} == "yes")
+LDADD+= -lcrypto
+DPADD+= ${LIBCRYPTO}
+.endif

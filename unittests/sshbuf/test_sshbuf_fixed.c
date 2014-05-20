@@ -1,4 +1,4 @@
-/* 	$OpenBSD$ */
+/* 	$OpenBSD: test_sshbuf_fixed.c,v 1.1 2014/04/30 05:32:00 djm Exp $ */
 /*
  * Regress test for sshbuf.h buffer API
  *

@@ -1,4 +1,4 @@
-/* 	$OpenBSD$ */
+/* 	$OpenBSD: test_sshbuf_getput_fuzz.c,v 1.2 2014/05/02 02:54:00 djm Exp $ */
 /*
  * Regress test for sshbuf.h buffer API
  *
