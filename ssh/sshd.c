@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.409 2013/10/23 23:35:32 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.411 2013/11/20 02:19:01 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -463,11 +463,19 @@ sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 	    &remote_major, &remote_minor, remote_version) != 3) {
 		s = "Protocol mismatch.\n";
 		(void) atomicio(vwrite, sock_out, s, strlen(s));
+<<<<<<< sshd.c
 		logit("Bad protocol version identification '%.100s' "
 		    "from %s port %d", client_version_string,
 		    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh));
 		close(sock_in);
 		close(sock_out);
+=======
+		logit("Bad protocol version identification '%.100s' "
+		    "from %s port %d", client_version_string,
+		    get_remote_ipaddr(), get_remote_port());
+		close(sock_in);
+		close(sock_out);
+>>>>>>> 1.411
 		cleanup_exit(255);
 	}
 	debug("Client protocol version %d.%d; client software version %.100s",
@@ -2390,6 +2398,7 @@ do_ssh2_kex(struct ssh *ssh)
 	kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
 	kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
 	kex->kex[KEX_ECDH_SHA2] = kexecdh_server;
+	kex->kex[KEX_C25519_SHA256] = kexc25519_server;
 	kex->server = 1;
 	kex->client_version_string=client_version_string;
 	kex->server_version_string=server_version_string;

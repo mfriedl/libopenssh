@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-pkcs11-helper.c,v 1.6 2013/05/17 00:13:14 djm Exp $ */
+/* $OpenBSD: ssh-pkcs11-helper.c,v 1.7 2013/12/02 02:56:17 djm Exp $ */
 /*
  * Copyright (c) 2010 Markus Friedl.  All rights reserved.
  *
@@ -120,6 +120,7 @@ process_add(void)
 		    (r = sshbuf_put_u32(msg, nkeys)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		for (i = 0; i < nkeys; i++) {
+<<<<<<< ssh-pkcs11-helper.c
 			if ((r = sshkey_to_blob(keys[i], &blob, &blen)) != 0)
 				fatal("%s: sshkey_to_blob: %s",
 				    __func__, ssh_err(r));
@@ -127,6 +128,12 @@ process_add(void)
 			    (r = sshbuf_put_cstring(msg, name)) != 0)
 				fatal("%s: buffer error: %s",
 				    __func__, ssh_err(r));
+=======
+			if (key_to_blob(keys[i], &blob, &blen) == 0)
+				continue;
+			buffer_put_string(&msg, blob, blen);
+			buffer_put_cstring(&msg, name);
+>>>>>>> 1.7
 			free(blob);
 			add_key(keys[i], name);
 		}

@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor_wrap.c,v 1.76 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: monitor_wrap.c,v 1.77 2013/11/06 16:52:11 markus Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -513,6 +513,138 @@ mm_sshkey_verify(struct sshkey *key, u_char *sig, size_t siglen,
 	return (verified);
 }
 
+<<<<<<< monitor_wrap.c
+=======
+/* Export key state after authentication */
+Newkeys *
+mm_newkeys_from_blob(u_char *blob, int blen)
+{
+	Buffer b;
+	u_int len;
+	Newkeys *newkey = NULL;
+	Enc *enc;
+	Mac *mac;
+	Comp *comp;
+
+	debug3("%s: %p(%d)", __func__, blob, blen);
+#ifdef DEBUG_PK
+	dump_base64(stderr, blob, blen);
+#endif
+	buffer_init(&b);
+	buffer_append(&b, blob, blen);
+
+	newkey = xcalloc(1, sizeof(*newkey));
+	enc = &newkey->enc;
+	mac = &newkey->mac;
+	comp = &newkey->comp;
+
+	/* Enc structure */
+	enc->name = buffer_get_string(&b, NULL);
+	buffer_get(&b, &enc->cipher, sizeof(enc->cipher));
+	enc->enabled = buffer_get_int(&b);
+	enc->block_size = buffer_get_int(&b);
+	enc->key = buffer_get_string(&b, &enc->key_len);
+	enc->iv = buffer_get_string(&b, &enc->iv_len);
+
+	if (enc->name == NULL || cipher_by_name(enc->name) != enc->cipher)
+		fatal("%s: bad cipher name %s or pointer %p", __func__,
+		    enc->name, enc->cipher);
+
+	/* Mac structure */
+	if (cipher_authlen(enc->cipher) == 0) {
+		mac->name = buffer_get_string(&b, NULL);
+		if (mac->name == NULL || mac_setup(mac, mac->name) == -1)
+			fatal("%s: can not setup mac %s", __func__, mac->name);
+		mac->enabled = buffer_get_int(&b);
+		mac->key = buffer_get_string(&b, &len);
+		if (len > mac->key_len)
+			fatal("%s: bad mac key length: %u > %d", __func__, len,
+			    mac->key_len);
+		mac->key_len = len;
+	}
+
+	/* Comp structure */
+	comp->type = buffer_get_int(&b);
+	comp->enabled = buffer_get_int(&b);
+	comp->name = buffer_get_string(&b, NULL);
+
+	len = buffer_len(&b);
+	if (len != 0)
+		error("newkeys_from_blob: remaining bytes in blob %u", len);
+	buffer_free(&b);
+	return (newkey);
+}
+
+int
+mm_newkeys_to_blob(int mode, u_char **blobp, u_int *lenp)
+{
+	Buffer b;
+	int len;
+	Enc *enc;
+	Mac *mac;
+	Comp *comp;
+	Newkeys *newkey = (Newkeys *)packet_get_newkeys(mode);
+
+	debug3("%s: converting %p", __func__, newkey);
+
+	if (newkey == NULL) {
+		error("%s: newkey == NULL", __func__);
+		return 0;
+	}
+	enc = &newkey->enc;
+	mac = &newkey->mac;
+	comp = &newkey->comp;
+
+	buffer_init(&b);
+	/* Enc structure */
+	buffer_put_cstring(&b, enc->name);
+	/* The cipher struct is constant and shared, you export pointer */
+	buffer_append(&b, &enc->cipher, sizeof(enc->cipher));
+	buffer_put_int(&b, enc->enabled);
+	buffer_put_int(&b, enc->block_size);
+	buffer_put_string(&b, enc->key, enc->key_len);
+	packet_get_keyiv(mode, enc->iv, enc->iv_len);
+	buffer_put_string(&b, enc->iv, enc->iv_len);
+
+	/* Mac structure */
+	if (cipher_authlen(enc->cipher) == 0) {
+		buffer_put_cstring(&b, mac->name);
+		buffer_put_int(&b, mac->enabled);
+		buffer_put_string(&b, mac->key, mac->key_len);
+	}
+
+	/* Comp structure */
+	buffer_put_int(&b, comp->type);
+	buffer_put_int(&b, comp->enabled);
+	buffer_put_cstring(&b, comp->name);
+
+	len = buffer_len(&b);
+	if (lenp != NULL)
+		*lenp = len;
+	if (blobp != NULL) {
+		*blobp = xmalloc(len);
+		memcpy(*blobp, buffer_ptr(&b), len);
+	}
+	memset(buffer_ptr(&b), 0, len);
+	buffer_free(&b);
+	return len;
+}
+
+static void
+mm_send_kex(Buffer *m, Kex *kex)
+{
+	buffer_put_string(m, kex->session_id, kex->session_id_len);
+	buffer_put_int(m, kex->we_need);
+	buffer_put_int(m, kex->hostkey_type);
+	buffer_put_int(m, kex->kex_type);
+	buffer_put_string(m, buffer_ptr(&kex->my), buffer_len(&kex->my));
+	buffer_put_string(m, buffer_ptr(&kex->peer), buffer_len(&kex->peer));
+	buffer_put_int(m, kex->flags);
+	buffer_put_cstring(m, kex->client_version_string);
+	buffer_put_cstring(m, kex->server_version_string);
+}
+
+>>>>>>> 1.77
 void
 mm_send_keystate(struct monitor *monitor)
 {

@@ -1,4 +1,4 @@
-/* $OpenBSD: authfd.c,v 1.87 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: authfd.c,v 1.88 2013/11/08 00:39:14 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -181,6 +181,7 @@ ssh_close_authentication_socket(int sock)
 int
 ssh_lock_agent(int sock, int lock, const char *password)
 {
+<<<<<<< authfd.c
 	int r;
 	u_char type = lock ? SSH_AGENTC_LOCK : SSH_AGENTC_UNLOCK;
 	struct sshbuf *msg;
@@ -198,6 +199,26 @@ ssh_lock_agent(int sock, int lock, const char *password)
  out:
 	sshbuf_free(msg);
 	return r;
+=======
+	AuthenticationConnection *auth;
+	int sock;
+
+	sock = ssh_get_authentication_socket();
+
+	/*
+	 * Fail if we couldn't obtain a connection.  This happens if we
+	 * exited due to a timeout.
+	 */
+	if (sock < 0)
+		return NULL;
+
+	auth = xcalloc(1, sizeof(*auth));
+	auth->fd = sock;
+	buffer_init(&auth->identities);
+	auth->howmany = 0;
+
+	return auth;
+>>>>>>> 1.88
 }
 
 static int

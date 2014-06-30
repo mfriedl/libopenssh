@@ -1,4 +1,4 @@
-/* $OpenBSD: key.c,v 1.104 2013/05/19 02:42:42 djm Exp $ */
+/* $OpenBSD: key.c,v 1.106 2013/12/02 03:09:22 djm Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Alexander von Gernler.  All rights reserved.
@@ -41,6 +41,7 @@
 #define SSHKEY_INTERNAL
 #include "key.h"
 
+<<<<<<< key.c
 struct keytype {
 	char *name;
 	char *shortname;
@@ -273,6 +274,10 @@ cert_free(struct sshkey_cert *cert)
 	bzero(cert, sizeof(*cert));
 	free(cert);
 }
+=======
+static int to_blob(const Key *, u_char **, u_int *, int);
+static Key *key_from_blob2(const u_char *, u_int, int);
+>>>>>>> 1.106
 
 static struct sshkey_cert *
 cert_new(void)
@@ -1243,6 +1248,74 @@ dsa_generate_private_key(u_int bits, DSA **dsap)
 	return ret;
 }
 
+<<<<<<< key.c
+=======
+int
+key_type_is_cert(int type)
+{
+	const struct keytype *kt;
+
+	for (kt = keytypes; kt->type != -1; kt++) {
+		if (kt->type == type)
+			return kt->cert;
+	}
+	return 0;
+}
+
+u_int
+key_size(const Key *k)
+{
+	switch (k->type) {
+	case KEY_RSA1:
+	case KEY_RSA:
+	case KEY_RSA_CERT_V00:
+	case KEY_RSA_CERT:
+		return BN_num_bits(k->rsa->n);
+	case KEY_DSA:
+	case KEY_DSA_CERT_V00:
+	case KEY_DSA_CERT:
+		return BN_num_bits(k->dsa->p);
+	case KEY_ECDSA:
+	case KEY_ECDSA_CERT:
+		return key_curve_nid_to_bits(k->ecdsa_nid);
+	}
+	return 0;
+}
+
+static RSA *
+rsa_generate_private_key(u_int bits)
+{
+	RSA *private = RSA_new();
+	BIGNUM *f4 = BN_new();
+
+	if (private == NULL)
+		fatal("%s: RSA_new failed", __func__);
+	if (f4 == NULL)
+		fatal("%s: BN_new failed", __func__);
+	if (!BN_set_word(f4, RSA_F4))
+		fatal("%s: BN_new failed", __func__);
+	if (!RSA_generate_key_ex(private, bits, f4, NULL))
+		fatal("%s: key generation failed.", __func__);
+	BN_free(f4);
+	return private;
+}
+
+static DSA*
+dsa_generate_private_key(u_int bits)
+{
+	DSA *private = DSA_new();
+
+	if (private == NULL)
+		fatal("%s: DSA_new failed", __func__);
+	if (!DSA_generate_parameters_ex(private, bits, NULL, 0, NULL,
+	    NULL, NULL))
+		fatal("%s: DSA_generate_parameters failed", __func__);
+	if (!DSA_generate_key(private))
+		fatal("%s: DSA_generate_key failed.", __func__);
+	return private;
+}
+
+>>>>>>> 1.106
 int
 sshkey_ecdsa_bits_to_nid(int bits)
 {
@@ -1617,8 +1690,14 @@ cert_parse(struct sshbuf *b, struct sshkey *key, const u_char *blob,
 	}
 	sshbuf_reset(tmp);
 
+<<<<<<< key.c
 	if (sshkey_from_blob(sig_key, sklen, &key->cert->signature_key) != 0) {
 		ret = SSH_ERR_KEY_CERT_INVALID_SIGN_KEY;
+=======
+	if ((key->cert->signature_key = key_from_blob2(sig_key, sklen, 0))
+	    == NULL) {
+		error("%s: Signature key invalid", __func__);
+>>>>>>> 1.106
 		goto out;
 	}
 	if (key->cert->signature_key->type != KEY_RSA &&
@@ -1643,8 +1722,13 @@ cert_parse(struct sshbuf *b, struct sshkey *key, const u_char *blob,
 	return ret;
 }
 
+<<<<<<< key.c
 int
 sshkey_from_blob(const u_char *blob, size_t blen, struct sshkey **keyp)
+=======
+static Key *
+key_from_blob2(const u_char *blob, u_int blen, int allow_cert)
+>>>>>>> 1.106
 {
 	struct sshbuf *b;
 	int type, nid = -1, ret = SSH_ERR_INTERNAL_ERROR;
@@ -1665,10 +1749,20 @@ sshkey_from_blob(const u_char *blob, size_t blen, struct sshkey **keyp)
 		goto out;
 	}
 
+<<<<<<< key.c
 	type = sshkey_type_from_name(ktype);
 	if (sshkey_type_plain(type) == KEY_ECDSA)
 		nid = sshkey_ecdsa_nid_from_name(ktype);
 
+=======
+	type = key_type_from_name(ktype);
+	if (key_type_plain(type) == KEY_ECDSA)
+		nid = key_ecdsa_nid_from_name(ktype);
+	if (!allow_cert && key_type_is_cert(type)) {
+		error("key_from_blob: certificate not allowed in this context");
+		goto out;
+	}
+>>>>>>> 1.106
 	switch (type) {
 	case KEY_RSA_CERT:
 		if (sshbuf_get_string_direct(b, NULL, NULL) != 0) {
@@ -1780,8 +1874,89 @@ sshkey_from_blob(const u_char *blob, size_t blen, struct sshkey **keyp)
 	free(curve);
 	if (q != NULL)
 		EC_POINT_free(q);
+<<<<<<< key.c
 	sshbuf_free(b);
 	return ret;
+=======
+	buffer_free(&b);
+	return key;
+}
+
+Key *
+key_from_blob(const u_char *blob, u_int blen)
+{
+	return key_from_blob2(blob, blen, 1);
+}
+
+static int
+to_blob(const Key *key, u_char **blobp, u_int *lenp, int force_plain)
+{
+	Buffer b;
+	int len, type;
+
+	if (blobp != NULL)
+		*blobp = NULL;
+	if (lenp != NULL)
+		*lenp = 0;
+	if (key == NULL) {
+		error("key_to_blob: key == NULL");
+		return 0;
+	}
+	buffer_init(&b);
+	type = force_plain ? key_type_plain(key->type) : key->type;
+	switch (type) {
+	case KEY_DSA_CERT_V00:
+	case KEY_RSA_CERT_V00:
+	case KEY_DSA_CERT:
+	case KEY_ECDSA_CERT:
+	case KEY_RSA_CERT:
+		/* Use the existing blob */
+		buffer_append(&b, buffer_ptr(&key->cert->certblob),
+		    buffer_len(&key->cert->certblob));
+		break;
+	case KEY_DSA:
+		buffer_put_cstring(&b,
+		    key_ssh_name_from_type_nid(type, key->ecdsa_nid));
+		buffer_put_bignum2(&b, key->dsa->p);
+		buffer_put_bignum2(&b, key->dsa->q);
+		buffer_put_bignum2(&b, key->dsa->g);
+		buffer_put_bignum2(&b, key->dsa->pub_key);
+		break;
+	case KEY_ECDSA:
+		buffer_put_cstring(&b,
+		    key_ssh_name_from_type_nid(type, key->ecdsa_nid));
+		buffer_put_cstring(&b, key_curve_nid_to_name(key->ecdsa_nid));
+		buffer_put_ecpoint(&b, EC_KEY_get0_group(key->ecdsa),
+		    EC_KEY_get0_public_key(key->ecdsa));
+		break;
+	case KEY_RSA:
+		buffer_put_cstring(&b,
+		    key_ssh_name_from_type_nid(type, key->ecdsa_nid));
+		buffer_put_bignum2(&b, key->rsa->e);
+		buffer_put_bignum2(&b, key->rsa->n);
+		break;
+	default:
+		error("key_to_blob: unsupported key type %d", key->type);
+		buffer_free(&b);
+		return 0;
+	}
+	len = buffer_len(&b);
+	if (lenp != NULL)
+		*lenp = len;
+	if (blobp != NULL) {
+		*blobp = xmalloc(len);
+		memcpy(*blobp, buffer_ptr(&b), len);
+	}
+	memset(buffer_ptr(&b), 0, len);
+	buffer_free(&b);
+	return len;
+}
+
+int
+key_to_blob(const Key *key, u_char **blobp, u_int *lenp)
+{
+	return to_blob(key, blobp, lenp, 0);
+>>>>>>> 1.106
 }
 
 int
@@ -1915,16 +2090,7 @@ sshkey_is_cert(const struct sshkey *k)
 {
 	if (k == NULL)
 		return 0;
-	switch (k->type) {
-	case KEY_RSA_CERT_V00:
-	case KEY_DSA_CERT_V00:
-	case KEY_RSA_CERT:
-	case KEY_DSA_CERT:
-	case KEY_ECDSA_CERT:
-		return 1;
-	default:
-		return 0;
-	}
+	return key_type_is_cert(k->type);
 }
 
 /* Return the cert-less equivalent to a certified key type */

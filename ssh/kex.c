@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.c,v 1.91 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: kex.c,v 1.93 2013/11/07 11:58:27 dtucker Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  *
@@ -66,11 +66,12 @@ static const struct kexalg kexalgs[] = {
 	{ KEX_ECDH_SHA2_NISTP256, KEX_ECDH_SHA2, NID_X9_62_prime256v1, EVP_sha256 },
 	{ KEX_ECDH_SHA2_NISTP384, KEX_ECDH_SHA2, NID_secp384r1, EVP_sha384 },
 	{ KEX_ECDH_SHA2_NISTP521, KEX_ECDH_SHA2, NID_secp521r1, EVP_sha512 },
+	{ KEX_CURVE25519_SHA256, KEX_C25519_SHA256, 0, EVP_sha256 },
 	{ NULL, -1, -1, NULL},
 };
 
 char *
-kex_alg_list(void)
+kex_alg_list(char sep)
 {
 	char *ret = NULL;
 	size_t nlen, rlen = 0;
@@ -78,7 +79,7 @@ kex_alg_list(void)
 
 	for (k = kexalgs; k->name != NULL; k++) {
 		if (ret != NULL)
-			ret[rlen++] = '\n';
+			ret[rlen++] = sep;
 		nlen = strlen(k->name);
 		if (reallocn((void **)&ret, 1, rlen + nlen + 2) != 0)
 			return NULL;

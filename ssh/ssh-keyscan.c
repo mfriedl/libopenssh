@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keyscan.c,v 1.87 2013/05/17 00:13:14 djm Exp $ */
+/* $OpenBSD: ssh-keyscan.c,v 1.88 2013/11/02 21:59:15 markus Exp $ */
 /*
  * Copyright 1995, 1996 by David Mazieres <dm@lcs.mit.edu>.
  *
@@ -248,9 +248,25 @@ keygrab_ssh2(con *c)
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = c->c_keytype == KT_DSA?
 	    "ssh-dss" : (c->c_keytype == KT_RSA ? "ssh-rsa" :
 	    "ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521");
+<<<<<<< ssh-keyscan.c
 	if ((r = kex_setup(c->c_ssh, myproposal)) != 0) {
 		free(c->c_ssh);
 		fprintf(stderr, "kex_setup: %s\n", ssh_err(r));
+=======
+	c->c_kex = kex_setup(myproposal);
+	c->c_kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
+	c->c_kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
+	c->c_kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
+	c->c_kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
+	c->c_kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
+	c->c_kex->kex[KEX_C25519_SHA256] = kexc25519_client;
+	c->c_kex->verify_host_key = hostjump;
+
+	if (!(j = setjmp(kexjmp))) {
+		nonfatal_fatal = 1;
+		dispatch_run(DISPATCH_BLOCK, &c->c_kex->done, c->c_kex);
+		fprintf(stderr, "Impossible! dispatch_run() returned!\n");
+>>>>>>> 1.88
 		exit(1);
 	}
 	c->c_ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;

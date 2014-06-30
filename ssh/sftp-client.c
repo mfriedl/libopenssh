@@ -1,4 +1,4 @@
-/* $OpenBSD: sftp-client.c,v 1.107 2013/10/17 00:30:13 djm Exp $ */
+/* $OpenBSD: sftp-client.c,v 1.110 2013/12/04 04:20:01 djm Exp $ */
 /*
  * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
  *
@@ -35,6 +35,7 @@
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -529,7 +530,7 @@ do_lsreaddir(struct sftp_conn *conn, const char *path, int print_flag,
 
 	if (dir) {
 		ents = 0;
-		*dir = xmalloc(sizeof(**dir));
+		*dir = xcalloc(1, sizeof(**dir));
 		(*dir)[0] = NULL;
 	}
 
@@ -620,7 +621,7 @@ do_lsreaddir(struct sftp_conn *conn, const char *path, int print_flag,
 
 			if (dir) {
 				*dir = xrealloc(*dir, ents + 2, sizeof(**dir));
-				(*dir)[ents] = xmalloc(sizeof(***dir));
+				(*dir)[ents] = xcalloc(1, sizeof(***dir));
 				(*dir)[ents]->filename = xstrdup(filename);
 				(*dir)[ents]->longname = xstrdup(longname);
 				memcpy(&(*dir)[ents]->a, &a, sizeof(a));
@@ -639,7 +640,7 @@ do_lsreaddir(struct sftp_conn *conn, const char *path, int print_flag,
 	/* Don't return partial matches on interrupt */
 	if (interrupted && dir != NULL && *dir != NULL) {
 		free_sftp_dirents(*dir);
-		*dir = xmalloc(sizeof(**dir));
+		*dir = xcalloc(1, sizeof(**dir));
 		**dir = NULL;
 	}
 
@@ -1222,6 +1223,8 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 			do_close(conn, handle, handle_len);
 			sshbuf_free(msg);
 			free(handle);
+			if (local_fd != -1)
+				close(local_fd);
 			return -1;
 		}
 		offset = highwater = st.st_size;
@@ -1255,7 +1258,7 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 			    (unsigned long long)offset,
 			    (unsigned long long)offset + buflen - 1,
 			    num_req, max_req);
-			req = xmalloc(sizeof(*req));
+			req = xcalloc(1, sizeof(*req));
 			req->id = conn->msg_id++;
 			req->len = buflen;
 			req->offset = offset;
@@ -1630,7 +1633,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 			    strerror(errno));
 
 		if (len != 0) {
-			ack = xmalloc(sizeof(*ack));
+			ack = xcalloc(1, sizeof(*ack));
 			ack->id = ++id;
 			ack->offset = offset;
 			ack->len = len;

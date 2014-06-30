@@ -1,4 +1,4 @@
-/* $OpenBSD: key.h,v 1.37 2013/05/19 02:42:42 djm Exp $ */
+/* $OpenBSD: key.h,v 1.38 2013/10/29 09:42:11 djm Exp $ */
 
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
@@ -104,6 +104,7 @@ struct sshkey {
 	struct sshkey_cert *cert;
 };
 
+<<<<<<< key.h
 struct sshkey	*sshkey_new(int);
 int		 sshkey_add_private(struct sshkey *);
 struct sshkey	*sshkey_new_private(int);
@@ -133,6 +134,34 @@ int	 sshkey_certify(struct sshkey *, struct sshkey *);
 int	 sshkey_cert_copy(const struct sshkey *, struct sshkey *);
 int	 sshkey_cert_check_authority(const struct sshkey *, int, int,
     const char *,
+=======
+Key		*key_new(int);
+void		 key_add_private(Key *);
+Key		*key_new_private(int);
+void		 key_free(Key *);
+Key		*key_demote(const Key *);
+int		 key_equal_public(const Key *, const Key *);
+int		 key_equal(const Key *, const Key *);
+char		*key_fingerprint(const Key *, enum fp_type, enum fp_rep);
+u_char		*key_fingerprint_raw(const Key *, enum fp_type, u_int *);
+const char	*key_type(const Key *);
+const char	*key_cert_type(const Key *);
+int		 key_write(const Key *, FILE *);
+int		 key_read(Key *, char **);
+u_int		 key_size(const Key *);
+
+Key	*key_generate(int, u_int);
+Key	*key_from_private(const Key *);
+int	 key_type_from_name(char *);
+int	 key_is_cert(const Key *);
+int	 key_type_is_cert(int);
+int	 key_type_plain(int);
+int	 key_to_certified(Key *, int);
+int	 key_drop_cert(Key *);
+int	 key_certify(Key *, Key *);
+void	 key_cert_copy(const Key *, struct Key *);
+int	 key_cert_check_authority(const Key *, int, int, const char *,
+>>>>>>> 1.38
 	    const char **);
 int	 sshkey_cert_is_legacy(const struct sshkey *);
 

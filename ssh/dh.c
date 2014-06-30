@@ -1,4 +1,4 @@
-/* $OpenBSD: dh.c,v 1.52 2013/10/08 11:42:13 dtucker Exp $ */
+/* $OpenBSD: dh.c,v 1.53 2013/11/21 00:45:44 djm Exp $ */
 /*
  * Copyright (c) 2000 Niels Provos.  All rights reserved.
  *
@@ -253,8 +253,13 @@ dh_pub_is_valid(DH *dh, BIGNUM *dh_pub)
 int
 dh_gen_key(DH *dh, int need)
 {
+<<<<<<< dh.c
 	int tries = 0;
+=======
+	int pbits;
+>>>>>>> 1.53
 
+<<<<<<< dh.c
 	if (need < 0 || dh->p == NULL ||
 	    need > INT_MAX / 2 || 2 * need >= BN_num_bits(dh->p))
 		return SSH_ERR_INVALID_ARGUMENT;
@@ -272,6 +277,19 @@ dh_gen_key(DH *dh, int need)
 		}
 	} while (!dh_pub_is_valid(dh, dh->pub_key));
 	return 0;
+=======
+	if (need <= 0)
+		fatal("%s: need <= 0", __func__);
+	if (dh->p == NULL)
+		fatal("%s: dh->p == NULL", __func__);
+	if ((pbits = BN_num_bits(dh->p)) <= 0)
+		fatal("%s: bits(p) <= 0", __func__);
+	dh->length = MIN(need * 2, pbits - 1);
+	if (DH_generate_key(dh) == 0)
+		fatal("%s: key generation failed", __func__);
+	if (!dh_pub_is_valid(dh, dh->pub_key))
+		fatal("%s: generated invalid key", __func__);
+>>>>>>> 1.53
 }
 
 DH *

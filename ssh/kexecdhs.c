@@ -1,4 +1,4 @@
-/* $OpenBSD: kexecdhs.c,v 1.5 2013/07/19 07:37:48 markus Exp $ */
+/* $OpenBSD: kexecdhs.c,v 1.7 2013/11/02 22:24:24 markus Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2010 Damien Miller.  All rights reserved.
@@ -35,8 +35,8 @@
 #include "kex.h"
 #include "log.h"
 #include "packet.h"
-#include "dh.h"
 #include "ssh2.h"
+<<<<<<< kexecdhs.c
 #ifdef GSSAPI
 #include "ssh-gss.h"
 #endif
@@ -45,6 +45,8 @@
 #include "compat.h"
 #include "err.h"
 #include "sshbuf.h"
+=======
+>>>>>>> 1.7
 
 static int input_kex_ecdh_init(int, u_int32_t, struct ssh *);
 
