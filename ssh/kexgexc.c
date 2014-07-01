@@ -211,13 +211,8 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 		kex->min = kex->max = -1;
 
 	/* calc and verify H */
-<<<<<<< kexgexc.c
 	if ((r = kexgex_hash(
 	    kex->hash_alg,
-=======
-	kexgex_hash(
-	    kex->hash_alg,
->>>>>>> 1.15
 	    kex->client_version_string,
 	    kex->server_version_string,
 	    sshbuf_ptr(kex->my), sshbuf_len(kex->my),
@@ -245,13 +240,8 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 		}
 		memcpy(kex->session_id, hash, kex->session_id_len);
 	}
-<<<<<<< kexgexc.c
-=======
-	kex_derive_keys_bn(kex, hash, hashlen, shared_secret);
-	BN_clear_free(shared_secret);
->>>>>>> 1.15
 
-	if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) == 0)
+	if ((r = kex_derive_keys_bn(ssh, hash, hashlen, shared_secret)) == 0)
 		r = kex_send_newkeys(ssh);
  out:
 	DH_free(kex->dh);

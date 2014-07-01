@@ -646,15 +646,9 @@ kex_choose_conf(struct ssh *ssh)
 	return r;
 }
 
-<<<<<<< kex.c
 static int
 derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
-    BIGNUM *shared_secret, u_char **keyp)
-=======
-static u_char *
-derive_key(Kex *kex, int id, u_int need, u_char *hash, u_int hashlen,
-    const u_char *shared_secret, u_int slen)
->>>>>>> 1.95
+    const u_char *shared_secret, u_int slen, u_char **keyp)
 {
 	struct kex *kex = ssh->kex;
 	struct sshbuf *b = NULL;
@@ -666,20 +660,14 @@ derive_key(Kex *kex, int id, u_int need, u_char *hash, u_int hashlen,
 	int r;
 
 	if ((mdsz = ssh_digest_bytes(kex->hash_alg)) == 0)
-<<<<<<< kex.c
 		return SSH_ERR_INVALID_ARGUMENT;
 	if ((digest = calloc(1, roundup(need, mdsz))) == NULL ||
 	    (b = sshbuf_new()) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-=======
-		fatal("bad kex md size %zu", mdsz);
-	digest = xmalloc(roundup(need, mdsz));
-
-	buffer_init(&b);
-	buffer_append(&b, shared_secret, slen);
->>>>>>> 1.95
+	if ((r = sshbuf_put(b, shared_secret, slen)) < 0)
+		goto out;
 
 	/* K1 = HASH(K || H || "A" || session_id) */
 	if ((hashctx = ssh_digest_start(kex->hash_alg)) == NULL ||
@@ -729,15 +717,9 @@ derive_key(Kex *kex, int id, u_int need, u_char *hash, u_int hashlen,
 }
 
 #define NKEYS	6
-<<<<<<< kex.c
 int
 kex_derive_keys(struct ssh *ssh, u_char *hash, u_int hashlen,
-    BIGNUM *shared_secret)
-=======
-void
-kex_derive_keys(Kex *kex, u_char *hash, u_int hashlen,
     const u_char *shared_secret, u_int slen)
->>>>>>> 1.95
 {
 	struct kex *kex = ssh->kex;
 	u_char *keys[NKEYS];
@@ -745,17 +727,12 @@ kex_derive_keys(Kex *kex, u_char *hash, u_int hashlen,
 	int r;
 
 	for (i = 0; i < NKEYS; i++) {
-<<<<<<< kex.c
 		if ((r = derive_key(ssh, 'A'+i, kex->we_need, hash, hashlen,
-		    shared_secret, &keys[i])) != 0) {
+		    shared_secret, slen, &keys[i])) != 0) {
 			for (j = 0; j < i; j++)
 				free(keys[j]);
 			return r;
 		}
-=======
-		keys[i] = derive_key(kex, 'A'+i, kex->we_need, hash, hashlen,
-		    shared_secret, slen);
->>>>>>> 1.95
 	}
 	for (mode = 0; mode < MODE_MAX; mode++) {
 		ctos = (!kex->server && mode == MODE_OUT) ||
@@ -767,33 +744,24 @@ kex_derive_keys(Kex *kex, u_char *hash, u_int hashlen,
 	return 0;
 }
 
-<<<<<<< kex.c
 int
-=======
-void
-kex_derive_keys_bn(Kex *kex, u_char *hash, u_int hashlen, const BIGNUM *secret)
+kex_derive_keys_bn(struct ssh *ssh, u_char *hash, u_int hashlen,
+    const BIGNUM *secret)
 {
-	Buffer shared_secret;
+	struct sshbuf *shared_secret;
+	int r;
 
-	buffer_init(&shared_secret);
-	buffer_put_bignum2(&shared_secret, secret);
-	kex_derive_keys(kex, hash, hashlen,
-	    buffer_ptr(&shared_secret), buffer_len(&shared_secret));
-	buffer_free(&shared_secret);
+	if ((shared_secret = sshbuf_new()) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if ((r = sshbuf_put_bignum2(shared_secret, secret)) != 0) {
+		r = kex_derive_keys(ssh, hash, hashlen,
+		    sshbuf_ptr(shared_secret), sshbuf_len(shared_secret));
+	}
+	sshbuf_free(shared_secret);
+	return r;
 }
 
-Newkeys *
-kex_get_newkeys(int mode)
-{
-	Newkeys *ret;
-
-	ret = current_keys[mode];
-	current_keys[mode] = NULL;
-	return ret;
-}
-
-void
->>>>>>> 1.95
+int
 derive_ssh1_session_id(BIGNUM *host_modulus, BIGNUM *server_modulus,
     u_int8_t cookie[8], u_int8_t id[16])
 {

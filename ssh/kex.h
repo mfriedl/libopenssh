@@ -137,8 +137,8 @@ struct kex {
 	u_int	min, max, nbits;	/* GEX */
 	EC_KEY	*ec_client_key;		/* ECDH */
 	const EC_GROUP *ec_group;	/* ECDH */
-        u_char c25519_client_key[CURVE25519_SIZE]; /* 25519 */
-        u_char c25519_client_pubkey[CURVE25519_SIZE]; /* 25519 */
+	u_char c25519_client_key[CURVE25519_SIZE]; /* 25519 */
+	u_char c25519_client_pubkey[CURVE25519_SIZE]; /* 25519 */
 };
 
 int	 kex_names_valid(const char *);
@@ -155,7 +155,8 @@ void	 kex_prop_free(char **);
 
 int	 kex_send_kexinit(struct ssh *);
 int	 kex_input_kexinit(int, u_int32_t, struct ssh *);
-int	 kex_derive_keys(struct ssh *, u_char *, u_int, BIGNUM *);
+int	 kex_derive_keys(struct ssh *, u_char *, u_int, const u_char *, u_int);
+int	 kex_derive_keys_bn(struct ssh *, u_char *, u_int, const BIGNUM *);
 int	 kex_send_newkeys(struct ssh *);
 
 int	 kexdh_client(struct ssh *);
@@ -186,53 +187,11 @@ int	 kex_c25519_hash(int, const char *, const char *, const char *, size_t,
     const char *, size_t, const u_char *, size_t, const u_char *, const u_char *,
     const u_char *, size_t, u_char **, size_t *);
 
-<<<<<<< kex.h
-int	kex_ecdh_name_to_nid(const char *);
-const EVP_MD *kex_ecdh_name_to_evpmd(const char *);
-=======
-void	 kex_send_kexinit(Kex *);
-void	 kex_input_kexinit(int, u_int32_t, void *);
-void	 kex_derive_keys(Kex *, u_char *, u_int, const u_char *, u_int);
-void	 kex_derive_keys_bn(Kex *, u_char *, u_int, const BIGNUM *);
-
-Newkeys *kex_get_newkeys(int);
-
-void	 kexdh_client(Kex *);
-void	 kexdh_server(Kex *);
-void	 kexgex_client(Kex *);
-void	 kexgex_server(Kex *);
-void	 kexecdh_client(Kex *);
-void	 kexecdh_server(Kex *);
-void	 kexc25519_client(Kex *);
-void	 kexc25519_server(Kex *);
-
-void
-kex_dh_hash(char *, char *, char *, int, char *, int, u_char *, int,
-    BIGNUM *, BIGNUM *, BIGNUM *, u_char **, u_int *);
-void
-kexgex_hash(int, char *, char *, char *, int, char *,
-    int, u_char *, int, int, int, int, BIGNUM *, BIGNUM *, BIGNUM *,
-    BIGNUM *, BIGNUM *, u_char **, u_int *);
-void
-kex_ecdh_hash(int, const EC_GROUP *, char *, char *, char *, int,
-    char *, int, u_char *, int, const EC_POINT *, const EC_POINT *,
-    const BIGNUM *, u_char **, u_int *);
-void
-kex_c25519_hash(int, char *, char *, char *, int,
-    char *, int, u_char *, int, const u_char *, const u_char *,
-    const u_char *, u_int, u_char **, u_int *);
->>>>>>> 1.60
-
-void	kexc25519_keygen(u_char[CURVE25519_SIZE], u_char[CURVE25519_SIZE])
+void	kexc25519_keygen(u_char key[CURVE25519_SIZE], u_char pub[CURVE25519_SIZE])
 	__attribute__((__bounded__(__minbytes__, 1, CURVE25519_SIZE)))
 	__attribute__((__bounded__(__minbytes__, 2, CURVE25519_SIZE)));
-<<<<<<< kex.h
-int	kexc25519_shared_key(const u_char[CURVE25519_SIZE],
-    const u_char[CURVE25519_SIZE], struct sshbuf *out)
-=======
-void kexc25519_shared_key(const u_char key[CURVE25519_SIZE],
-    const u_char pub[CURVE25519_SIZE], Buffer *out)
->>>>>>> 1.60
+int	kexc25519_shared_key(const u_char key[CURVE25519_SIZE],
+    const u_char pub[CURVE25519_SIZE], struct sshbuf *out)
 	__attribute__((__bounded__(__minbytes__, 1, CURVE25519_SIZE)))
 	__attribute__((__bounded__(__minbytes__, 2, CURVE25519_SIZE)));
 

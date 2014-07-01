@@ -18,6 +18,7 @@ SRCS=	authfd.c authfile.c canohost.c \
 	sshbuf-getput-crypto.c \
 	sshbuf-misc.c \
 	sshbuf.c \
+	digest-openssl.c \
 	err.c
 
 SRCS+=	kexdhs.c kexgexs.c kexecdhs.c kexc25519s.c
@@ -45,7 +46,7 @@ install:
 .include <bsd.own.mk>
 
 # XXX leave on while refactoring to ensure we don't break it.
-KERBEROS5=yes
+KERBEROS5=no
 
 .if (${KERBEROS5:L} == "yes")
 CFLAGS+= -DKRB5 -I${DESTDIR}/usr/include/kerberosV

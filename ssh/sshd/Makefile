@@ -21,7 +21,7 @@ SRCS=	sshd.c auth-rhosts.c auth-passwd.c auth-rsa.c auth-rh-rsa.c \
 .include <bsd.own.mk> # for KERBEROS and AFS
 
 # XXX leave on while refactoring to ensure we don't break it.
-KERBEROS5=yes
+KERBEROS5=no
 
 .if (${KERBEROS5:L} == "yes")
 CFLAGS+=-DKRB5 -I${DESTDIR}/usr/include/kerberosV -DGSSAPI
@@ -31,16 +31,17 @@ SRCS+=  auth-krb5.c auth2-gss.c gss-serv.c gss-serv-krb5.c
 .include <bsd.prog.mk>
 
 .if (${KERBEROS5:L} == "yes")
+#LDADD+= -lgssapi -lkrb5
 LDADD+= -lgssapi -lkrb5 -lasn1
-LDADD+= -lwind -lroken -lcom_err -lpthread -lheimbase -lkafs
+#LDADD+= -lwind -lroken -lcom_err -lpthread -lheimbase -lkafs
 DPADD+= ${LIBGSSAPI} ${LIBKRB5}
 .endif
 
 LDADD+=	-lcrypto -lutil -lz
 DPADD+=	${LIBCRYPTO} ${LIBUTIL} ${LIBZ}
 
-.if (${TCP_WRAPPERS:L} == "yes")
-CFLAGS+= -DLIBWRAP
-DPADD+= ${LIBWRAP}
-LDADD+= -lwrap
-.endif
+#.if (${TCP_WRAPPERS:L} == "yes")
+#CFLAGS+= -DLIBWRAP
+#DPADD+= ${LIBWRAP}
+#LDADD+= -lwrap
+#.endif

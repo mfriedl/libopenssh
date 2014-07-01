@@ -42,7 +42,7 @@
 #include "err.h"
 
 static int
-input_kex_ehdh_25519(int type, u_int32_t seq, struct ssh *ssh);
+input_kex_c25519_reply(int type, u_int32_t seq, struct ssh *ssh);
 
 int
 kexc25519_client(struct ssh *ssh)
@@ -62,12 +62,12 @@ kexc25519_client(struct ssh *ssh)
 		return r;
 
 	debug("expecting SSH2_MSG_KEX_ECDH_REPLY");
-	ssh_dispatch_set(ssh, SSH2_MSG_KEX_ECDH_REPLY, &input_kex_ehdh_25519);
+	ssh_dispatch_set(ssh, SSH2_MSG_KEX_ECDH_REPLY, &input_kex_c25519_reply);
 	return 0;
 }
 
 static int
-input_kex_ehdh_25519(int type, u_int32_t seq, struct ssh *ssh)
+input_kex_c25519_reply(int type, u_int32_t seq, struct ssh *ssh)
 {
 	struct kex *kex = ssh->kex;
 	struct sshkey *server_host_key = NULL;
@@ -123,7 +123,7 @@ input_kex_ehdh_25519(int type, u_int32_t seq, struct ssh *ssh)
 
 	/* calc and verify H */
 	if ((r = kex_c25519_hash(
-	    SSH_DIGEST_SHA256,
+	    kex->hash_alg,
 	    kex->client_version_string,
 	    kex->server_version_string,
 	    sshbuf_ptr(kex->my), sshbuf_len(kex->my),
@@ -154,6 +154,7 @@ input_kex_ehdh_25519(int type, u_int32_t seq, struct ssh *ssh)
 	    sshbuf_len(shared_secret))) == 0)
 		r = kex_send_newkeys(ssh);
 
+	r = 0;
 out:
 	bzero(kex->c25519_client_key, sizeof(kex->c25519_client_key));
 	free(server_host_key_blob);
@@ -161,4 +162,5 @@ out:
 	free(signature);
 	sshkey_free(server_host_key);
 	sshbuf_free(shared_secret);
+	return r;
 }
