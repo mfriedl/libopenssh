@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.h,v 1.58 2013/11/07 11:58:27 dtucker Exp $ */
+/* $OpenBSD: kex.h,v 1.59 2014/01/09 23:20:00 djm Exp $ */
 
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
@@ -120,8 +120,13 @@ struct kex {
 	struct sshbuf *my;
 	struct sshbuf *peer;
 	sig_atomic_t done;
+<<<<<<< kex.h
 	u_int	flags;
 	const EVP_MD *evp_md;
+=======
+	int	flags;
+	int	hash_alg;
+>>>>>>> 1.59
 	int	ec_nid;
 	char	*client_version_string;
 	char	*server_version_string;
@@ -186,8 +191,41 @@ int	 kex_c25519_hash(int, const char *, const char *, const char *, size_t,
     const char *, size_t, const u_char *, size_t, const u_char *, const u_char *,
     const u_char *, size_t, u_char **, size_t *);
 
+<<<<<<< kex.h
 int	kex_ecdh_name_to_nid(const char *);
 const EVP_MD *kex_ecdh_name_to_evpmd(const char *);
+=======
+void	 kex_send_kexinit(Kex *);
+void	 kex_input_kexinit(int, u_int32_t, void *);
+void	 kex_derive_keys(Kex *, u_char *, u_int, BIGNUM *);
+
+Newkeys *kex_get_newkeys(int);
+
+void	 kexdh_client(Kex *);
+void	 kexdh_server(Kex *);
+void	 kexgex_client(Kex *);
+void	 kexgex_server(Kex *);
+void	 kexecdh_client(Kex *);
+void	 kexecdh_server(Kex *);
+void	 kexc25519_client(Kex *);
+void	 kexc25519_server(Kex *);
+
+void
+kex_dh_hash(char *, char *, char *, int, char *, int, u_char *, int,
+    BIGNUM *, BIGNUM *, BIGNUM *, u_char **, u_int *);
+void
+kexgex_hash(int, char *, char *, char *, int, char *,
+    int, u_char *, int, int, int, int, BIGNUM *, BIGNUM *, BIGNUM *,
+    BIGNUM *, BIGNUM *, u_char **, u_int *);
+void
+kex_ecdh_hash(int, const EC_GROUP *, char *, char *, char *, int,
+    char *, int, u_char *, int, const EC_POINT *, const EC_POINT *,
+    const BIGNUM *, u_char **, u_int *);
+void
+kex_c25519_hash(int, char *, char *, char *, int,
+    char *, int, u_char *, int, const u_char *, const u_char *,
+    const BIGNUM *, u_char **, u_int *);
+>>>>>>> 1.59
 
 void	kexc25519_keygen(u_char[CURVE25519_SIZE], u_char[CURVE25519_SIZE])
 	__attribute__((__bounded__(__minbytes__, 1, CURVE25519_SIZE)))

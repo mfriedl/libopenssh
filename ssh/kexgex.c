@@ -1,4 +1,4 @@
-/* $OpenBSD: kexgex.c,v 1.27 2006/08/03 03:34:42 deraadt Exp $ */
+/* $OpenBSD: kexgex.c,v 1.28 2014/01/09 23:20:00 djm Exp $ */
 /*
  * Copyright (c) 2000 Niels Provos.  All rights reserved.
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
@@ -33,12 +33,18 @@
 #include "cipher.h"
 #include "kex.h"
 #include "ssh2.h"
+<<<<<<< kexgex.c
 #include "err.h"
 #include "sshbuf.h"
+=======
+#include "digest.h"
+#include "log.h"
+>>>>>>> 1.28
 
 int
 kexgex_hash(
-    const EVP_MD *evp_md,
+<<<<<<< kexgex.c
+    int hash_alg,
     const char *client_version_string,
     const char *server_version_string,
     const u_char *ckexinit, size_t ckexinitlen,
@@ -51,11 +57,29 @@ kexgex_hash(
     const BIGNUM *server_dh_pub,
     const BIGNUM *shared_secret,
     u_char **hash, size_t *hashlen)
+=======
+    int hash_alg,
+    char *client_version_string,
+    char *server_version_string,
+    char *ckexinit, int ckexinitlen,
+    char *skexinit, int skexinitlen,
+    u_char *serverhostkeyblob, int sbloblen,
+    int min, int wantbits, int max, BIGNUM *prime, BIGNUM *gen,
+    BIGNUM *client_dh_pub,
+    BIGNUM *server_dh_pub,
+    BIGNUM *shared_secret,
+    u_char **hash, u_int *hashlen)
+>>>>>>> 1.28
 {
+<<<<<<< kexgex.c
 	struct sshbuf *b;
 	static u_char digest[EVP_MAX_MD_SIZE];
 	EVP_MD_CTX md;
 	int r;
+=======
+	Buffer b;
+	static u_char digest[SSH_DIGEST_MAX_LENGTH];
+>>>>>>> 1.28
 
 	if ((b = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
@@ -83,6 +107,7 @@ kexgex_hash(
 #ifdef DEBUG_KEXDH
 	sshbuf_dump(b, stderr);
 #endif
+<<<<<<< kexgex.c
 	if (EVP_DigestInit(&md, evp_md) != 1 ||
 	    EVP_DigestUpdate(&md, sshbuf_ptr(b), sshbuf_len(b)) != 1 ||
 	    EVP_DigestFinal(&md, digest, NULL) != 1) {
@@ -90,10 +115,24 @@ kexgex_hash(
 		return SSH_ERR_LIBCRYPTO_ERROR;
 	}
 	sshbuf_free(b);
+=======
+	if (ssh_digest_buffer(hash_alg, &b, digest, sizeof(digest)) != 0)
+		fatal("%s: ssh_digest_buffer failed", __func__);
+
+	buffer_free(&b);
+
+#ifdef DEBUG_KEX
+	dump_digest("hash", digest, ssh_digest_bytes(hash_alg));
+#endif
+>>>>>>> 1.28
 	*hash = digest;
+<<<<<<< kexgex.c
 	*hashlen = EVP_MD_size(evp_md);
 #ifdef DEBUG_KEXDH
 	dump_digest("hash", digest, *hashlen);
 #endif
 	return 0;
+=======
+	*hashlen = ssh_digest_bytes(hash_alg);
+>>>>>>> 1.28
 }

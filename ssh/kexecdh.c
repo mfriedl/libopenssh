@@ -1,4 +1,4 @@
-/* $OpenBSD: kexecdh.c,v 1.4 2013/04/19 01:06:50 djm Exp $ */
+/* $OpenBSD: kexecdh.c,v 1.5 2014/01/09 23:20:00 djm Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2010 Damien Miller.  All rights reserved.
@@ -39,12 +39,16 @@
 #include "cipher.h"
 #include "kex.h"
 #include "log.h"
+<<<<<<< kexecdh.c
 #include "err.h"
 #include "sshbuf.h"
+=======
+#include "digest.h"
+>>>>>>> 1.5
 
 int
 kex_ecdh_hash(
-    const EVP_MD *evp_md,
+    int hash_alg,
     const EC_GROUP *ec_group,
     const char *client_version_string,
     const char *server_version_string,
@@ -56,10 +60,15 @@ kex_ecdh_hash(
     const BIGNUM *shared_secret,
     u_char **hash, size_t *hashlen)
 {
+<<<<<<< kexecdh.c
 	struct sshbuf *b;
 	EVP_MD_CTX md;
 	static u_char digest[EVP_MAX_MD_SIZE];
 	int r;
+=======
+	Buffer b;
+	static u_char digest[SSH_DIGEST_MAX_LENGTH];
+>>>>>>> 1.5
 
 	if ((b = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
@@ -82,6 +91,7 @@ kex_ecdh_hash(
 #ifdef DEBUG_KEX
 	sshbuf_dump(b, stderr);
 #endif
+<<<<<<< kexecdh.c
 	if (EVP_DigestInit(&md, evp_md) != 1 ||
 	    EVP_DigestUpdate(&md, sshbuf_ptr(b), sshbuf_len(b)) != 1 ||
 	    EVP_DigestFinal(&md, digest, NULL) != 1) {
@@ -89,10 +99,21 @@ kex_ecdh_hash(
 		return SSH_ERR_LIBCRYPTO_ERROR;
 	}
 	sshbuf_free(b);
+=======
+	if (ssh_digest_buffer(hash_alg, &b, digest, sizeof(digest)) != 0)
+		fatal("%s: ssh_digest_buffer failed", __func__);
+
+	buffer_free(&b);
+
+>>>>>>> 1.5
 #ifdef DEBUG_KEX
-	dump_digest("hash", digest, EVP_MD_size(evp_md));
+	dump_digest("hash", digest, ssh_digest_bytes(hash_alg));
 #endif
 	*hash = digest;
+<<<<<<< kexecdh.c
 	*hashlen = EVP_MD_size(evp_md);
 	return 0;
+=======
+	*hashlen = ssh_digest_bytes(hash_alg);
+>>>>>>> 1.5
 }

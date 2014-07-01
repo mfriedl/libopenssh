@@ -91,8 +91,6 @@ D/moduli-gen////
 /hostfile.h/1.20/Result of merge//D2013.12.04.23.00.00
 /jpake.c/1.8/Result of merge//D2013.12.04.23.00.00
 /jpake.h/1.2/Mon Jun 30 15:58:16 2014//D2013.12.04.23.00.00
-/kex.c/1.93/Result of merge//D2013.12.04.23.00.00
-/kex.h/1.58/Result of merge+Mon Jun 30 16:19:52 2014//D2013.12.04.23.00.00
 /kexdh.c/1.23/Fri Jan  6 10:00:47 2012//D2013.12.04.23.00.00
 /kexdhc.c/1.13/Result of merge//D2013.12.04.23.00.00
 /kexdhs.c/1.16/Result of merge+Mon Jun 30 16:19:52 2014//D2013.12.04.23.00.00
@@ -224,3 +222,5 @@ D/moduli-gen////
 /chacha.h/1.1/Thu Nov 21 00:45:44 2013//D2013.12.04.23.00.00
 /kexc25519.c/1.2/Fri Jan 31 16:39:19 2014//D2013.12.04.23.00.00
 /poly1305.h/1.1/Thu Dec 19 22:57:13 2013//D2013.12.04.23.00.00
+/kex.h/1.59/Result of merge+Tue Jul  1 12:30:29 2014//D2014.01.11.23.00.00
+/kex.c/1.94/Result of merge+Tue Jul  1 12:30:30 2014//D2014.01.11.23.00.00
