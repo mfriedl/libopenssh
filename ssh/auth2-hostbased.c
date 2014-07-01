@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-hostbased.c,v 1.16 2013/06/21 00:34:49 djm Exp $ */
+/* $OpenBSD: auth2-hostbased.c,v 1.17 2013/12/30 23:52:27 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -104,7 +104,17 @@ userauth_hostbased(struct ssh *ssh)
 		    "(received %d, expected %d)", __func__, key->type, pktype);
 		goto done;
 	}
+<<<<<<< auth2-hostbased.c
 	service = ssh->compat & SSH_BUG_HBSERVICE ? "ssh-userauth" :
+=======
+	if (key_type_plain(key->type) == KEY_RSA &&
+	    (datafellows & SSH_BUG_RSASIGMD5) != 0) {
+		error("Refusing RSA key because peer uses unsafe "
+		    "signature format");
+		goto done;
+	}
+	service = datafellows & SSH_BUG_HBSERVICE ? "ssh-userauth" :
+>>>>>>> 1.17
 	    authctxt->service;
 	if ((b = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);

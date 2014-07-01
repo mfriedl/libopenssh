@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.190 2013/11/21 00:45:44 djm Exp $ */
+/* $OpenBSD: packet.c,v 1.191 2013/12/06 13:34:54 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -868,6 +868,7 @@ ssh_packet_send1(struct ssh *ssh)
 #endif
 
 	/* Append to output. */
+<<<<<<< packet.c
 	POKE_U32(buf, len);
 	if ((r = sshbuf_put(state->output, buf, 4)) != 0)
 		goto out;
@@ -878,6 +879,16 @@ ssh_packet_send1(struct ssh *ssh)
 	    sshbuf_ptr(state->outgoing_packet),
 	    sshbuf_len(state->outgoing_packet), 0, 0)) != 0)
 		goto out;
+=======
+	put_u32(buf, len);
+	buffer_append(&active_state->output, buf, 4);
+	cp = buffer_append_space(&active_state->output,
+	    buffer_len(&active_state->outgoing_packet));
+	if (cipher_crypt(&active_state->send_context, 0, cp,
+	    buffer_ptr(&active_state->outgoing_packet),
+	    buffer_len(&active_state->outgoing_packet), 0, 0) != 0)
+		fatal("%s: cipher_crypt failed", __func__);
+>>>>>>> 1.191
 
 #ifdef PACKET_DEBUG
 	fprintf(stderr, "encrypted: ");
@@ -1139,6 +1150,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 		DBG(debug("done calc MAC out #%d", state->p_send.seqnr));
 	}
 	/* encrypt packet and append to output buffer. */
+<<<<<<< packet.c
 	if ((r = sshbuf_reserve(state->output,
 	    sshbuf_len(state->outgoing_packet) + authlen, &cp)) != 0)
 		goto out;
@@ -1146,6 +1158,13 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	    sshbuf_ptr(state->outgoing_packet),
 	    len - aadlen, aadlen, authlen)) != 0)
 		goto out;
+=======
+	cp = buffer_append_space(&active_state->output, len + authlen);
+	if (cipher_crypt(&active_state->send_context, active_state->p_send.seqnr,
+	    cp, buffer_ptr(&active_state->outgoing_packet),
+	    len - aadlen, aadlen, authlen) != 0)
+		fatal("%s: cipher_crypt failed", __func__);
+>>>>>>> 1.191
 	/* append unencrypted MAC */
 	if (mac && mac->enabled) {
 		if (mac->etm) {
@@ -1426,12 +1445,20 @@ ssh_packet_read_poll1(struct ssh *ssh, u_char *typep)
 	}
 
 	/* Decrypt data to incoming_packet. */
+<<<<<<< packet.c
 	sshbuf_reset(state->incoming_packet);
 	if ((r = sshbuf_reserve(state->incoming_packet, padded_len, &p)) != 0)
 		goto out;
 	if ((r = cipher_crypt(&state->receive_context, 0, p,
 	    sshbuf_ptr(state->input), padded_len, 0, 0)) != 0)
 		goto out;
+=======
+	buffer_clear(&active_state->incoming_packet);
+	cp = buffer_append_space(&active_state->incoming_packet, padded_len);
+	if (cipher_crypt(&active_state->receive_context, 0, cp,
+	    buffer_ptr(&active_state->input), padded_len, 0, 0) != 0)
+		fatal("%s: cipher_crypt failed", __func__);
+>>>>>>> 1.191
 
 	if ((r = sshbuf_consume(state->input, padded_len)) != 0)
 		goto out;
@@ -1534,6 +1561,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		 * check if input size is less than the cipher block size,
 		 * decrypt first block and extract length of incoming packet
 		 */
+<<<<<<< packet.c
 		if (sshbuf_len(state->input) < block_size)
 			return 0;
 		sshbuf_reset(state->incoming_packet);
@@ -1547,6 +1575,21 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		state->packlen = PEEK_U32(sshbuf_ptr(state->incoming_packet));
 		if (state->packlen < 1 + 4 ||
 		    state->packlen > PACKET_MAX_SIZE) {
+=======
+		if (buffer_len(&active_state->input) < block_size)
+			return SSH_MSG_NONE;
+		buffer_clear(&active_state->incoming_packet);
+		cp = buffer_append_space(&active_state->incoming_packet,
+		    block_size);
+		if (cipher_crypt(&active_state->receive_context,
+		    active_state->p_read.seqnr, cp,
+		    buffer_ptr(&active_state->input), block_size, 0, 0) != 0)
+			fatal("Decryption integrity check failed");
+		cp = buffer_ptr(&active_state->incoming_packet);
+		active_state->packlen = get_u32(cp);
+		if (active_state->packlen < 1 + 4 ||
+		    active_state->packlen > PACKET_MAX_SIZE) {
+>>>>>>> 1.191
 #ifdef PACKET_DEBUG
 			fprintf(stderr, "input: \n");
 			sshbuf_dump(state->input, stderr);
@@ -1595,6 +1638,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	sshbuf_dump(state->input, stderr);
 #endif
 	/* EtM: compute mac over encrypted input */
+<<<<<<< packet.c
 	if (mac && mac->enabled && mac->etm) {
 		if ((r = mac_compute(mac, state->p_read.seqnr,
 		    sshbuf_ptr(state->input), aadlen + need,
@@ -1609,6 +1653,17 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		goto out;
 	if ((r = sshbuf_consume(state->input, aadlen + need + authlen)) != 0)
 		goto out;
+=======
+	if (mac && mac->enabled && mac->etm)
+		macbuf = mac_compute(mac, active_state->p_read.seqnr,
+		    buffer_ptr(&active_state->input), aadlen + need);
+	cp = buffer_append_space(&active_state->incoming_packet, aadlen + need);
+	if (cipher_crypt(&active_state->receive_context,
+	    active_state->p_read.seqnr, cp,
+	    buffer_ptr(&active_state->input), need, aadlen, authlen) != 0)
+		fatal("Decryption integrity check failed");
+	buffer_consume(&active_state->input, aadlen + need + authlen);
+>>>>>>> 1.191
 	/*
 	 * compute MAC over seqnr and packet,
 	 * increment sequence number for incoming packet

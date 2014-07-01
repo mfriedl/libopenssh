@@ -1,5 +1,5 @@
 
-/* $OpenBSD: servconf.c,v 1.246 2013/11/21 00:45:44 djm Exp $ */
+/* $OpenBSD: servconf.c,v 1.248 2013/12/06 13:39:49 markus Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -165,6 +165,8 @@ fill_default_server_options(ServerOptions *options)
 			    _PATH_HOST_DSA_KEY_FILE;
 			options->host_key_files[options->num_host_key_files++] =
 			    _PATH_HOST_ECDSA_KEY_FILE;
+			options->host_key_files[options->num_host_key_files++] =
+			    _PATH_HOST_ED25519_KEY_FILE;
 		}
 	}
 	/* No certificates by default */
@@ -1698,24 +1700,6 @@ int server_match_spec_complete(struct connection_info *ci)
 	return 0;	/* partial */
 }
 
-/* Helper macros */
-#define M_CP_INTOPT(n) do {\
-	if (src->n != -1) \
-		dst->n = src->n; \
-} while (0)
-#define M_CP_STROPT(n) do {\
-	if (src->n != NULL) { \
-		free(dst->n); \
-		dst->n = src->n; \
-	} \
-} while(0)
-#define M_CP_STRARRAYOPT(n, num_n) do {\
-	if (src->num_n != 0) { \
-		for (dst->num_n = 0; dst->num_n < src->num_n; dst->num_n++) \
-			dst->n[dst->num_n] = xstrdup(src->n[dst->num_n]); \
-	} \
-} while(0)
-
 /*
  * Copy any supported values that are set.
  *
@@ -1726,6 +1710,11 @@ int server_match_spec_complete(struct connection_info *ci)
 void
 copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 {
+#define M_CP_INTOPT(n) do {\
+	if (src->n != -1) \
+		dst->n = src->n; \
+} while (0)
+
 	M_CP_INTOPT(password_authentication);
 	M_CP_INTOPT(gss_authentication);
 	M_CP_INTOPT(rsa_authentication);
@@ -1735,8 +1724,6 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 	M_CP_INTOPT(hostbased_uses_name_from_packet_only);
 	M_CP_INTOPT(kbd_interactive_authentication);
 	M_CP_INTOPT(zero_knowledge_password_authentication);
-	M_CP_STROPT(authorized_keys_command);
-	M_CP_STROPT(authorized_keys_command_user);
 	M_CP_INTOPT(permit_root_login);
 	M_CP_INTOPT(permit_empty_passwd);
 
@@ -1754,6 +1741,20 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 	M_CP_INTOPT(ip_qos_bulk);
 	M_CP_INTOPT(rekey_limit);
 	M_CP_INTOPT(rekey_interval);
+
+	/* M_CP_STROPT and M_CP_STRARRAYOPT should not appear before here */
+#define M_CP_STROPT(n) do {\
+	if (src->n != NULL && dst->n != src->n) { \
+		free(dst->n); \
+		dst->n = src->n; \
+	} \
+} while(0)
+#define M_CP_STRARRAYOPT(n, num_n) do {\
+	if (src->num_n != 0) { \
+		for (dst->num_n = 0; dst->num_n < src->num_n; dst->num_n++) \
+			dst->n[dst->num_n] = xstrdup(src->n[dst->num_n]); \
+	} \
+} while(0)
 
 	/* See comment in servconf.h */
 	COPY_MATCH_STRING_OPTS();

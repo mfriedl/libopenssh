@@ -1,4 +1,4 @@
-/* $OpenBSD: sftp-client.c,v 1.110 2013/12/04 04:20:01 djm Exp $ */
+/* $OpenBSD: sftp-client.c,v 1.111 2013/12/05 22:59:45 djm Exp $ */
 /*
  * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
  *
@@ -504,12 +504,22 @@ static int
 do_lsreaddir(struct sftp_conn *conn, const char *path, int print_flag,
     SFTP_DIRENT ***dir)
 {
+<<<<<<< sftp-client.c
 	struct sshbuf *msg;
 	u_int count, id, i, expected_id, ents = 0;
 	size_t handle_len;
 	u_char *handle;
 	int r;
 	u_char type;
+=======
+	Buffer msg;
+	u_int count, type, id, handle_len, i, expected_id, ents = 0;
+	char *handle;
+	int status = SSH2_FX_FAILURE;
+
+	if (dir)
+		*dir = NULL;
+>>>>>>> 1.111
 
 	id = conn->msg_id++;
 
@@ -560,15 +570,19 @@ do_lsreaddir(struct sftp_conn *conn, const char *path, int print_flag,
 			fatal("ID mismatch (%u != %u)", id, expected_id);
 
 		if (type == SSH2_FXP_STATUS) {
+<<<<<<< sftp-client.c
 			u_int status;
 
 			if ((r = sshbuf_get_u32(msg, &status)) != 0)
 				fatal("%s: buffer error: %s",
 				    __func__, ssh_err(r));
+=======
+			status = buffer_get_int(&msg);
+>>>>>>> 1.111
 			debug3("Received SSH2_FXP_STATUS %d", status);
-
-			if (status == SSH2_FX_EOF) {
+			if (status == SSH2_FX_EOF)
 				break;
+<<<<<<< sftp-client.c
 			} else {
 				error("Couldn't read directory: %s",
 				    fx2txt(status));
@@ -577,6 +591,10 @@ do_lsreaddir(struct sftp_conn *conn, const char *path, int print_flag,
 				sshbuf_free(msg);
 				return(status);
 			}
+=======
+			error("Couldn't read directory: %s", fx2txt(status));
+			goto out;
+>>>>>>> 1.111
 		} else if (type != SSH2_FXP_NAME)
 			fatal("Expected SSH2_FXP_NAME(%u) packet, got %u",
 			    SSH2_FXP_NAME, type);
@@ -616,10 +634,7 @@ do_lsreaddir(struct sftp_conn *conn, const char *path, int print_flag,
 			if (strchr(filename, '/') != NULL) {
 				error("Server sent suspect path \"%s\" "
 				    "during readdir of \"%s\"", filename, path);
-				goto next;
-			}
-
-			if (dir) {
+			} else if (dir) {
 				*dir = xrealloc(*dir, ents + 2, sizeof(**dir));
 				(*dir)[ents] = xcalloc(1, sizeof(***dir));
 				(*dir)[ents]->filename = xstrdup(filename);
@@ -627,24 +642,33 @@ do_lsreaddir(struct sftp_conn *conn, const char *path, int print_flag,
 				memcpy(&(*dir)[ents]->a, &a, sizeof(a));
 				(*dir)[++ents] = NULL;
 			}
- next:
 			free(filename);
 			free(longname);
 		}
 	}
+	status = 0;
 
+<<<<<<< sftp-client.c
 	sshbuf_free(msg);
+=======
+ out:
+	buffer_free(&msg);
+>>>>>>> 1.111
 	do_close(conn, handle, handle_len);
 	free(handle);
 
-	/* Don't return partial matches on interrupt */
-	if (interrupted && dir != NULL && *dir != NULL) {
+	if (status != 0 && dir != NULL) {
+		/* Don't return results on error */
+		free_sftp_dirents(*dir);
+		*dir = NULL;
+	} else if (interrupted && dir != NULL && *dir != NULL) {
+		/* Don't return partial matches on interrupt */
 		free_sftp_dirents(*dir);
 		*dir = xcalloc(1, sizeof(**dir));
 		**dir = NULL;
 	}
 
-	return 0;
+	return status;
 }
 
 int
@@ -657,6 +681,8 @@ void free_sftp_dirents(SFTP_DIRENT **s)
 {
 	int i;
 
+	if (s == NULL)
+		return;
 	for (i = 0; s[i]; i++) {
 		free(s[i]->filename);
 		free(s[i]->longname);

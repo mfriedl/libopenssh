@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-agent.c,v 1.177 2013/07/20 01:50:20 djm Exp $ */
+/* $OpenBSD: ssh-agent.c,v 1.181 2013/12/19 01:19:41 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -767,15 +767,24 @@ process_add_identity(SocketEntry *e, int version)
 	Idtab *tab = idtab_lookup(version);
 	Identity *id;
 	int type, success = 0, confirm = 0;
+<<<<<<< ssh-agent.c
 	u_int seconds;
 	char *type_name = NULL, *comment = NULL;
+=======
+	char *comment;
+>>>>>>> 1.181
 	time_t death = 0;
+<<<<<<< ssh-agent.c
 	struct sshkey *k = NULL;
 	u_char ctype;
 	int r = SSH_ERR_INTERNAL_ERROR;
+=======
+	Key *k = NULL;
+>>>>>>> 1.181
 
 	switch (version) {
 	case 1:
+<<<<<<< ssh-agent.c
 		r = agent_decode_rsa1(e->request, &k);
 		break;
 	case 2:
@@ -809,8 +818,30 @@ process_add_identity(SocketEntry *e, int version)
 		default:
 			r = SSH_ERR_KEY_TYPE_UNKNOWN;
 			break;
+=======
+		k = key_new_private(KEY_RSA1);
+		(void) buffer_get_int(&e->request);		/* ignored */
+		buffer_get_bignum(&e->request, k->rsa->n);
+		buffer_get_bignum(&e->request, k->rsa->e);
+		buffer_get_bignum(&e->request, k->rsa->d);
+		buffer_get_bignum(&e->request, k->rsa->iqmp);
+
+		/* SSH and SSL have p and q swapped */
+		buffer_get_bignum(&e->request, k->rsa->q);	/* p */
+		buffer_get_bignum(&e->request, k->rsa->p);	/* q */
+
+		/* Generate additional parameters */
+		rsa_generate_additional_parameters(k->rsa);
+
+		/* enable blinding */
+		if (RSA_blinding_on(k->rsa, NULL) != 1) {
+			error("process_add_identity: RSA_blinding_on failed");
+			key_free(k);
+			goto send;
+>>>>>>> 1.181
 		}
 		break;
+<<<<<<< ssh-agent.c
 	}
 	free(type_name);
 	if (r != 0 || k == NULL ||
@@ -823,6 +854,13 @@ process_add_identity(SocketEntry *e, int version)
 		if ((r = sshbuf_get_u8(e->request, &ctype)) != 0) {
 			error("%s: buffer error: %s", __func__, ssh_err(r));
 			goto err;
+=======
+	case 2:
+		k = key_private_deserialize(&e->request);
+		if (k == NULL) {
+			buffer_clear(&e->request);
+			goto send;
+>>>>>>> 1.181
 		}
 		switch (ctype) {
 		case SSH_AGENT_CONSTRAIN_LIFETIME:
@@ -992,6 +1030,9 @@ process_remove_smartcard_key(SocketEntry *e)
 		tab = idtab_lookup(version);
 		for (id = TAILQ_FIRST(&tab->idlist); id; id = nxt) {
 			nxt = TAILQ_NEXT(id, next);
+			/* Skip file--based keys */
+			if (id->provider == NULL)
+				continue;
 			if (!strcmp(provider, id->provider)) {
 				TAILQ_REMOVE(&tab->idlist, id, next);
 				free_identity(id);

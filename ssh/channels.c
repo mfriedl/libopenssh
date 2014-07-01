@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.c,v 1.327 2013/11/08 00:39:15 djm Exp $ */
+/* $OpenBSD: channels.c,v 1.328 2013/12/19 01:04:36 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1441,6 +1441,8 @@ port_open_helper(Channel *c, char *rtype)
 	struct ssh *ssh = c->ssh;
 	int r, direct;
 	char buf[1024];
+	char *local_ipaddr = get_local_ipaddr(c->sock);
+	int local_port = get_sock_port(c->sock, 1);
 	char *remote_ipaddr = get_peer_ipaddr(c->sock);
 	int remote_port = get_peer_port(c->sock);
 
@@ -1455,14 +1457,15 @@ port_open_helper(Channel *c, char *rtype)
 
 	snprintf(buf, sizeof buf,
 	    "%s: listening port %d for %.100s port %d, "
-	    "connect from %.200s port %d",
+	    "connect from %.200s port %d to %.100s port %d",
 	    rtype, c->listening_port, c->path, c->host_port,
-	    remote_ipaddr, remote_port);
+	    remote_ipaddr, remote_port, local_ipaddr, local_port);
 
 	free(c->remote_name);
 	c->remote_name = xstrdup(buf);
 
 	if (compat20) {
+<<<<<<< channels.c
 		if ((r = sshpkt_start(ssh, SSH2_MSG_CHANNEL_OPEN)) != 0 ||
 		    (r = sshpkt_put_cstring(ssh, rtype)) != 0 ||
 		    (r = sshpkt_put_u32(ssh, c->self)) != 0 ||
@@ -1475,6 +1478,26 @@ port_open_helper(Channel *c, char *rtype)
 		    (r = sshpkt_put_u32(ssh, (u_int)remote_port)) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)
 			CHANNEL_PACKET_ERROR(c, r);
+=======
+		packet_start(SSH2_MSG_CHANNEL_OPEN);
+		packet_put_cstring(rtype);
+		packet_put_int(c->self);
+		packet_put_int(c->local_window_max);
+		packet_put_int(c->local_maxpacket);
+		if (direct) {
+			/* target host, port */
+			packet_put_cstring(c->path);
+			packet_put_int(c->host_port);
+		} else {
+			/* listen address, port */
+			packet_put_cstring(c->path);
+			packet_put_int(local_port);
+		}
+		/* originator host and port */
+		packet_put_cstring(remote_ipaddr);
+		packet_put_int((u_int)remote_port);
+		packet_send();
+>>>>>>> 1.328
 	} else {
 		u_int flags = ssh_packet_get_protocol_flags(ssh);
 
@@ -1488,6 +1511,7 @@ port_open_helper(Channel *c, char *rtype)
 			CHANNEL_PACKET_ERROR(c, r);
 	}
 	free(remote_ipaddr);
+	free(local_ipaddr);
 }
 
 static void

@@ -1,4 +1,4 @@
-/* $OpenBSD: authfd.c,v 1.88 2013/11/08 00:39:14 djm Exp $ */
+/* $OpenBSD: authfd.c,v 1.91 2013/12/29 04:29:25 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -41,9 +41,13 @@
 #include <sys/socket.h>
 
 #include <openssl/evp.h>
+#include <openssl/crypto.h>
 
+<<<<<<< authfd.c
 #include <openssl/crypto.h>
 #include <errno.h>
+=======
+>>>>>>> 1.91
 #include <fcntl.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -498,6 +502,7 @@ static int
 ssh_encode_identity_ssh2(struct sshbuf *b, struct sshkey *key,
     const char *comment)
 {
+<<<<<<< authfd.c
 	int r;
 
 	if ((r = sshbuf_put_cstring(b, sshkey_ssh_name(key))) != 0)
@@ -578,6 +583,10 @@ encode_constraints(struct sshbuf *m, u_int life, u_int confirm)
 	r = 0;
  out:
 	return r;
+=======
+	key_private_serialize(key, b);
+	buffer_put_cstring(b, comment);
+>>>>>>> 1.91
 }
 
 /*
@@ -612,6 +621,8 @@ ssh_add_identity_constrained(int sock, struct sshkey *key, const char *comment,
 	case KEY_DSA_CERT_V00:
 	case KEY_ECDSA:
 	case KEY_ECDSA_CERT:
+	case KEY_ED25519:
+	case KEY_ED25519_CERT:
 		type = constrained ?
 		    SSH2_AGENTC_ADD_ID_CONSTRAINED :
 		    SSH2_AGENTC_ADD_IDENTITY;
@@ -652,6 +663,7 @@ ssh_remove_identity(int sock, struct sshkey *key)
 		return SSH_ERR_ALLOC_FAIL;
 
 	if (key->type == KEY_RSA1) {
+<<<<<<< authfd.c
 		if ((r = sshbuf_put_u8(msg,
 		    SSH_AGENTC_REMOVE_RSA_IDENTITY)) != 0 ||
 		    (r = sshbuf_put_u32(msg, BN_num_bits(key->rsa->n))) != 0 ||
@@ -667,6 +679,17 @@ ssh_remove_identity(int sock, struct sshkey *key)
 		    SSH2_AGENTC_REMOVE_IDENTITY)) != 0 ||
 		    (r = sshbuf_put_string(msg, blob, blen)) != 0)
 			goto out;
+=======
+		buffer_put_char(&msg, SSH_AGENTC_REMOVE_RSA_IDENTITY);
+		buffer_put_int(&msg, BN_num_bits(key->rsa->n));
+		buffer_put_bignum(&msg, key->rsa->e);
+		buffer_put_bignum(&msg, key->rsa->n);
+	} else if (key->type != KEY_UNSPEC) {
+		key_to_blob(key, &blob, &blen);
+		buffer_put_char(&msg, SSH2_AGENTC_REMOVE_IDENTITY);
+		buffer_put_string(&msg, blob, blen);
+		free(blob);
+>>>>>>> 1.91
 	} else {
 		r = SSH_ERR_INVALID_ARGUMENT;
 		goto out;

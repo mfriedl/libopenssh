@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect.c,v 1.241 2013/10/16 02:31:46 djm Exp $ */
+/* $OpenBSD: sshconnect.c,v 1.244 2014/01/09 23:26:48 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -655,6 +655,12 @@ ssh_exchange_identification(struct ssh *ssh, int timeout_ms)
 		fatal("Protocol major versions differ: %d vs. %d",
 		    (options.protocol & SSH_PROTO_2) ? PROTOCOL_MAJOR_2 : PROTOCOL_MAJOR_1,
 		    remote_major);
+	if ((datafellows & SSH_BUG_DERIVEKEY) != 0)
+		fatal("Server version \"%.100s\" uses unsafe key agreement; "
+		    "refusing connection", remote_version);
+	if ((datafellows & SSH_BUG_RSASIGMD5) != 0)
+		logit("Server version \"%.100s\" uses unsafe RSA signature "
+		    "scheme; disabling use of RSA keys", remote_version);
 	if (!client_banner_sent)
 		send_client_banner(connection_out, minor1);
 	chop(server_version_string);
@@ -1286,7 +1292,14 @@ ssh_put_password(struct ssh *ssh, char *password)
 static int
 show_other_keys(struct hostkeys *hostkeys, struct sshkey *key)
 {
-	int type[] = { KEY_RSA1, KEY_RSA, KEY_DSA, KEY_ECDSA, -1};
+	int type[] = {
+		KEY_RSA1,
+		KEY_RSA,
+		KEY_DSA,
+		KEY_ECDSA,
+		KEY_ED25519,
+		-1
+	};
 	int i, ret = 0;
 	char *fp, *ra;
 	const struct hostkey_entry *found;

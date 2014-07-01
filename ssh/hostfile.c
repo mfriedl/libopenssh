@@ -1,4 +1,4 @@
-/* $OpenBSD: hostfile.c,v 1.52 2013/07/12 00:19:58 djm Exp $ */
+/* $OpenBSD: hostfile.c,v 1.53 2014/01/09 23:20:00 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -54,7 +54,11 @@
 #include "hostfile.h"
 #include "log.h"
 #include "misc.h"
+<<<<<<< hostfile.c
 #include "err.h"
+=======
+#include "digest.h"
+>>>>>>> 1.53
 
 struct hostkeys {
 	struct hostkey_entry *entries;

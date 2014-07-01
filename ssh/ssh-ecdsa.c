@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-ecdsa.c,v 1.6 2013/05/17 00:13:14 djm Exp $ */
+/* $OpenBSD: ssh-ecdsa.c,v 1.8 2014/01/09 23:20:00 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2010 Damien Miller.  All rights reserved.
@@ -37,12 +37,14 @@
 #include "err.h"
 #define SSHKEY_INTERNAL
 #include "key.h"
+#include "digest.h"
 
 /* ARGSUSED */
 int
 ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
     const u_char *data, size_t datalen, u_int compat)
 {
+<<<<<<< ssh-ecdsa.c
 	ECDSA_SIG *sig = NULL;
 	const EVP_MD *evp_md;
 	EVP_MD_CTX md;
@@ -51,10 +53,36 @@ ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	u_int dlen;
 	struct sshbuf *b = NULL, *bb = NULL;
 	int ret = SSH_ERR_INTERNAL_ERROR;
+=======
+	ECDSA_SIG *sig;
+	int hash_alg;
+	u_char digest[SSH_DIGEST_MAX_LENGTH];
+	u_int len, dlen;
+	Buffer b, bb;
+>>>>>>> 1.8
 
+<<<<<<< ssh-ecdsa.c
 	if (key == NULL || key->ecdsa == NULL ||
 	    (key->type != KEY_ECDSA && key->type != KEY_ECDSA_CERT))
 		return SSH_ERR_INVALID_ARGUMENT;
+=======
+	if (key == NULL || key_type_plain(key->type) != KEY_ECDSA ||
+	    key->ecdsa == NULL) {
+		error("%s: no ECDSA key", __func__);
+		return -1;
+	}
+
+	hash_alg = key_ec_nid_to_hash_alg(key->ecdsa_nid);
+	if ((dlen = ssh_digest_bytes(hash_alg)) == 0) {
+		error("%s: bad hash algorithm %d", __func__, hash_alg);
+		return -1;
+	}
+	if (ssh_digest_memory(hash_alg, data, datalen,
+	    digest, sizeof(digest)) != 0) {
+		error("%s: digest_memory failed", __func__);
+		return -1;
+	}
+>>>>>>> 1.8
 
 	if ((evp_md = sshkey_ec_nid_to_evpmd(key->ecdsa_nid)) == NULL)
 		return SSH_ERR_INVALID_ARGUMENT;
@@ -109,6 +137,7 @@ ssh_ecdsa_verify(const struct sshkey *key,
     const u_char *signature, size_t signaturelen,
     const u_char *data, size_t datalen, u_int compat)
 {
+<<<<<<< ssh-ecdsa.c
 	ECDSA_SIG *sig = NULL;
 	const EVP_MD *evp_md;
 	EVP_MD_CTX md;
@@ -117,12 +146,29 @@ ssh_ecdsa_verify(const struct sshkey *key,
 	int ret = SSH_ERR_INTERNAL_ERROR;
 	struct sshbuf *b = NULL, *sigbuf = NULL;
 	char *ktype = NULL;
+=======
+	ECDSA_SIG *sig;
+	int hash_alg;
+	u_char digest[SSH_DIGEST_MAX_LENGTH], *sigblob;
+	u_int len, dlen;
+	int rlen, ret;
+	Buffer b, bb;
+	char *ktype;
+>>>>>>> 1.8
 
+<<<<<<< ssh-ecdsa.c
 	if (key == NULL || key->ecdsa == NULL ||
 	    (key->type != KEY_ECDSA && key->type != KEY_ECDSA_CERT))
 		return SSH_ERR_INTERNAL_ERROR;
 	if ((evp_md = sshkey_ec_nid_to_evpmd(key->ecdsa_nid)) == NULL)
 		return SSH_ERR_INTERNAL_ERROR;
+=======
+	if (key == NULL || key_type_plain(key->type) != KEY_ECDSA ||
+	    key->ecdsa == NULL) {
+		error("%s: no ECDSA key", __func__);
+		return -1;
+	}
+>>>>>>> 1.8
 
 	/* fetch signature */
 	if ((b = sshbuf_from(signature, signaturelen)) == NULL)
@@ -158,6 +204,7 @@ ssh_ecdsa_verify(const struct sshkey *key,
 		goto out;
 	}
 	/* hash the data */
+<<<<<<< ssh-ecdsa.c
 	if (EVP_DigestInit(&md, evp_md) != 1 ||
 	    EVP_DigestUpdate(&md, data, datalen) != 1 ||
 	    EVP_DigestFinal(&md, digest, &dlen) != 1) {
@@ -176,6 +223,18 @@ ssh_ecdsa_verify(const struct sshkey *key,
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
 	}
+=======
+	hash_alg = key_ec_nid_to_hash_alg(key->ecdsa_nid);
+	if ((dlen = ssh_digest_bytes(hash_alg)) == 0) {
+		error("%s: bad hash algorithm %d", __func__, hash_alg);
+		return -1;
+	}
+	if (ssh_digest_memory(hash_alg, data, datalen,
+	    digest, sizeof(digest)) != 0) {
+		error("%s: digest_memory failed", __func__);
+		return -1;
+	}
+>>>>>>> 1.8
 
  out:
 	memset(digest, 'd', sizeof(digest));

@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile.inc,v 1.39 2010/10/01 23:10:48 djm Exp $
+#	$OpenBSD: Makefile.inc,v 1.40 2013/12/06 13:34:54 markus Exp $
 
 CFLAGS+=	-I${.CURDIR}/..
 
@@ -53,6 +53,7 @@ DPADD+=         ${.CURDIR}/../lib/${__objdir}/libssh.a
 LDADD+=         -L${.CURDIR}/../lib -lssh
 DPADD+=         ${.CURDIR}/../lib/libssh.a
 .endif
+<<<<<<< Makefile.inc
 DPADD+=         ${.CURDIR}/../lib/shlib_version
 LDADD+=         -lcrypto -lz
 DPADD+=         ${LIBCRYPTO} ${LIBZ}
@@ -79,3 +80,7 @@ DPADD+=         ${LEAKMALLOC_DIR}/libleakmalloc.a
 CDIAGFLAGS+=	-Wuninitialized
 .endif
 
+=======
+
+LDADD+=		-lutil
+>>>>>>> 1.40

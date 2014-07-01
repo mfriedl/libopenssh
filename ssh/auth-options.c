@@ -1,4 +1,4 @@
-/* $OpenBSD: auth-options.c,v 1.61 2013/11/08 00:39:14 djm Exp $ */
+/* $OpenBSD: auth-options.c,v 1.62 2013/12/19 00:27:57 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -431,6 +431,7 @@ parse_option_list(struct sshbuf *oblob, struct passwd *pw,
 	char *command, *allowed;
 	const char *remote_ip;
 	char *name = NULL;
+<<<<<<< auth-options.c
 	struct sshbuf *c = NULL, *data = NULL;
 	int r, ret = -1, found;
 
@@ -446,6 +447,23 @@ parse_option_list(struct sshbuf *oblob, struct passwd *pw,
 		    (r = sshbuf_froms(c, &data)) != 0) {
 			error("Unable to parse certificate options: %s",
 			    ssh_err(r));
+=======
+	u_char *data_blob = NULL;
+	u_int nlen, dlen, clen;
+	Buffer c, data;
+	int ret = -1, result, found;
+
+	buffer_init(&data);
+
+	/* Make copy to avoid altering original */
+	buffer_init(&c);
+	buffer_append(&c, optblob, optblob_len);
+
+	while (buffer_len(&c) > 0) {
+		if ((name = buffer_get_cstring_ret(&c, &nlen)) == NULL ||
+		    (data_blob = buffer_get_string_ret(&c, &dlen)) == NULL) {
+			error("Certificate options corrupt");
+>>>>>>> 1.62
 			goto out;
 		}
 		debug3("found certificate option \"%.100s\" len %zu",
@@ -501,12 +519,19 @@ parse_option_list(struct sshbuf *oblob, struct passwd *pw,
 					free(allowed);
 					goto out;
 				}
+<<<<<<< auth-options.c
 				remote_ip = ssh_remote_ipaddr(ssh);
 				switch (addr_match_cidr_list(remote_ip,
 				    allowed)) {
+=======
+				remote_ip = get_remote_ipaddr();
+				result = addr_match_cidr_list(remote_ip,
+				    allowed);
+				free(allowed);
+				switch (result) {
+>>>>>>> 1.62
 				case 1:
 					/* accepted */
-					free(allowed);
 					break;
 				case 0:
 					/* no match */
@@ -519,12 +544,11 @@ parse_option_list(struct sshbuf *oblob, struct passwd *pw,
 					    "is not permitted to use this "
 					    "certificate for login.",
 					    remote_ip);
-					free(allowed);
 					goto out;
 				case -1:
+				default:
 					error("Certificate source-address "
 					    "contents invalid");
-					free(allowed);
 					goto out;
 				}
 				found = 1;

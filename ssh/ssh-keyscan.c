@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keyscan.c,v 1.88 2013/11/02 21:59:15 markus Exp $ */
+/* $OpenBSD: ssh-keyscan.c,v 1.89 2013/12/06 13:39:49 markus Exp $ */
 /*
  * Copyright 1995, 1996 by David Mazieres <dm@lcs.mit.edu>.
  *
@@ -52,6 +52,7 @@ int ssh_port = SSH_DEFAULT_PORT;
 #define KT_DSA		2
 #define KT_RSA		4
 #define KT_ECDSA	8
+#define KT_ED25519	16
 
 int get_keytypes = KT_RSA|KT_ECDSA;/* Get RSA and ECDSA keys by default */
 
@@ -245,12 +246,33 @@ keygrab_ssh2(con *c)
 	int r;
 
 	enable_compat20();
+<<<<<<< ssh-keyscan.c
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = c->c_keytype == KT_DSA?
 	    "ssh-dss" : (c->c_keytype == KT_RSA ? "ssh-rsa" :
 	    "ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521");
 	if ((r = kex_setup(c->c_ssh, myproposal)) != 0) {
 		free(c->c_ssh);
 		fprintf(stderr, "kex_setup: %s\n", ssh_err(r));
+=======
+	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] =
+	    c->c_keytype == KT_DSA ?  "ssh-dss" :
+	    (c->c_keytype == KT_RSA ? "ssh-rsa" :
+	    (c->c_keytype == KT_ED25519 ? "ssh-ed25519" :
+	    "ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521"));
+	c->c_kex = kex_setup(myproposal);
+	c->c_kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
+	c->c_kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
+	c->c_kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
+	c->c_kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
+	c->c_kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
+	c->c_kex->kex[KEX_C25519_SHA256] = kexc25519_client;
+	c->c_kex->verify_host_key = hostjump;
+
+	if (!(j = setjmp(kexjmp))) {
+		nonfatal_fatal = 1;
+		dispatch_run(DISPATCH_BLOCK, &c->c_kex->done, c->c_kex);
+		fprintf(stderr, "Impossible! dispatch_run() returned!\n");
+>>>>>>> 1.89
 		exit(1);
 	}
 	c->c_ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
@@ -578,7 +600,7 @@ do_host(char *host)
 
 	if (name == NULL)
 		return;
-	for (j = KT_RSA1; j <= KT_ECDSA; j *= 2) {
+	for (j = KT_RSA1; j <= KT_ED25519; j *= 2) {
 		if (get_keytypes & j) {
 			while (ncon >= MAXCON)
 				conloop();
@@ -679,6 +701,9 @@ main(int argc, char **argv)
 					break;
 				case KEY_RSA:
 					get_keytypes |= KT_RSA;
+					break;
+				case KEY_ED25519:
+					get_keytypes |= KT_ED25519;
 					break;
 				case KEY_UNSPEC:
 					fatal("unknown key type %s", tname);
