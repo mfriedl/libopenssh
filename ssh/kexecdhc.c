@@ -1,4 +1,4 @@
-/* $OpenBSD: kexecdhc.c,v 1.4 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: kexecdhc.c,v 1.6 2014/01/12 08:13:13 djm Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2010 Damien Miller.  All rights reserved.
@@ -164,8 +164,13 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 	dump_digest("shared secret", kbuf, klen);
 #endif
 	/* calc and verify H */
+<<<<<<< kexecdhc.c
 	if ((r = kex_ecdh_hash(
 	    kex->hash_alg,
+=======
+	kex_ecdh_hash(
+	    kex->hash_alg,
+>>>>>>> 1.6
 	    group,
 	    kex->client_version_string,
 	    kex->server_version_string,
@@ -193,6 +198,7 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 		memcpy(kex->session_id, hash, kex->session_id_len);
 	}
 
+<<<<<<< kexecdhc.c
 	if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) == 0)
 		r = kex_send_newkeys(ssh);
  out:
@@ -215,4 +221,9 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 	if (signature)
 		free(signature);
 	return r;
+=======
+	kex_derive_keys_bn(kex, hash, hashlen, shared_secret);
+	BN_clear_free(shared_secret);
+	kex_finish(kex);
+>>>>>>> 1.6
 }

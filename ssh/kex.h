@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.h,v 1.59 2014/01/09 23:20:00 djm Exp $ */
+/* $OpenBSD: kex.h,v 1.60 2014/01/12 08:13:13 djm Exp $ */
 
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
@@ -186,14 +186,53 @@ int	 kex_c25519_hash(int, const char *, const char *, const char *, size_t,
     const char *, size_t, const u_char *, size_t, const u_char *, const u_char *,
     const u_char *, size_t, u_char **, size_t *);
 
+<<<<<<< kex.h
 int	kex_ecdh_name_to_nid(const char *);
 const EVP_MD *kex_ecdh_name_to_evpmd(const char *);
+=======
+void	 kex_send_kexinit(Kex *);
+void	 kex_input_kexinit(int, u_int32_t, void *);
+void	 kex_derive_keys(Kex *, u_char *, u_int, const u_char *, u_int);
+void	 kex_derive_keys_bn(Kex *, u_char *, u_int, const BIGNUM *);
+
+Newkeys *kex_get_newkeys(int);
+
+void	 kexdh_client(Kex *);
+void	 kexdh_server(Kex *);
+void	 kexgex_client(Kex *);
+void	 kexgex_server(Kex *);
+void	 kexecdh_client(Kex *);
+void	 kexecdh_server(Kex *);
+void	 kexc25519_client(Kex *);
+void	 kexc25519_server(Kex *);
+
+void
+kex_dh_hash(char *, char *, char *, int, char *, int, u_char *, int,
+    BIGNUM *, BIGNUM *, BIGNUM *, u_char **, u_int *);
+void
+kexgex_hash(int, char *, char *, char *, int, char *,
+    int, u_char *, int, int, int, int, BIGNUM *, BIGNUM *, BIGNUM *,
+    BIGNUM *, BIGNUM *, u_char **, u_int *);
+void
+kex_ecdh_hash(int, const EC_GROUP *, char *, char *, char *, int,
+    char *, int, u_char *, int, const EC_POINT *, const EC_POINT *,
+    const BIGNUM *, u_char **, u_int *);
+void
+kex_c25519_hash(int, char *, char *, char *, int,
+    char *, int, u_char *, int, const u_char *, const u_char *,
+    const u_char *, u_int, u_char **, u_int *);
+>>>>>>> 1.60
 
 void	kexc25519_keygen(u_char[CURVE25519_SIZE], u_char[CURVE25519_SIZE])
 	__attribute__((__bounded__(__minbytes__, 1, CURVE25519_SIZE)))
 	__attribute__((__bounded__(__minbytes__, 2, CURVE25519_SIZE)));
+<<<<<<< kex.h
 int	kexc25519_shared_key(const u_char[CURVE25519_SIZE],
     const u_char[CURVE25519_SIZE], struct sshbuf *out)
+=======
+void kexc25519_shared_key(const u_char key[CURVE25519_SIZE],
+    const u_char pub[CURVE25519_SIZE], Buffer *out)
+>>>>>>> 1.60
 	__attribute__((__bounded__(__minbytes__, 1, CURVE25519_SIZE)))
 	__attribute__((__bounded__(__minbytes__, 2, CURVE25519_SIZE)));
 

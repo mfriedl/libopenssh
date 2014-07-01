@@ -1,4 +1,4 @@
-/* $OpenBSD: kexgexs.c,v 1.16 2013/07/19 07:37:48 markus Exp $ */
+/* $OpenBSD: kexgexs.c,v 1.18 2014/01/12 08:13:13 djm Exp $ */
 /*
  * Copyright (c) 2000 Niels Provos.  All rights reserved.
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
@@ -206,8 +206,13 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	    &sbloblen)) != 0)
 		goto out;
 	/* calc H */
+<<<<<<< kexgexs.c
 	if ((r = kexgex_hash(
 	    kex->hash_alg,
+=======
+	kexgex_hash(
+	    kex->hash_alg,
+>>>>>>> 1.18
 	    kex->client_version_string,
 	    kex->server_version_string,
 	    sshbuf_ptr(kex->peer), sshbuf_len(kex->peer),
@@ -240,6 +245,7 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	/* destroy_sensitive_data(); */
 
 	/* send server hostkey, DH pubkey 'f' and singed H */
+<<<<<<< kexgexs.c
 	if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_DH_GEX_REPLY)) != 0 ||
 	    (r = sshpkt_put_string(ssh, server_host_key_blob, sbloblen)) != 0 ||
 	    (r = sshpkt_put_bignum2(ssh, kex->dh->pub_key)) != 0 ||     /* f */
@@ -265,4 +271,22 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	if (signature)
 		free(signature);
 	return r;
+=======
+	debug("SSH2_MSG_KEX_DH_GEX_REPLY sent");
+	packet_start(SSH2_MSG_KEX_DH_GEX_REPLY);
+	packet_put_string(server_host_key_blob, sbloblen);
+	packet_put_bignum2(dh->pub_key);	/* f */
+	packet_put_string(signature, slen);
+	packet_send();
+
+	free(signature);
+	free(server_host_key_blob);
+	/* have keys, free DH */
+	DH_free(dh);
+
+	kex_derive_keys_bn(kex, hash, hashlen, shared_secret);
+	BN_clear_free(shared_secret);
+
+	kex_finish(kex);
+>>>>>>> 1.18
 }

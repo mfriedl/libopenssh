@@ -1,4 +1,8 @@
+<<<<<<< kexc25519.c
 /* $OpenBSD: kexc25519.c,v 1.5 2014/01/31 16:39:19 tedu Exp $ */
+=======
+/* $OpenBSD: kexc25519.c,v 1.4 2014/01/12 08:13:13 djm Exp $ */
+>>>>>>> 1.4
 /*
  * Copyright (c) 2001, 2013 Markus Friedl.  All rights reserved.
  * Copyright (c) 2010 Damien Miller.  All rights reserved.
@@ -39,8 +43,12 @@
 #include "cipher.h"
 #include "kex.h"
 #include "log.h"
+<<<<<<< kexc25519.c
 #include "digest.h"
 #include "err.h"
+=======
+#include "digest.h"
+>>>>>>> 1.4
 
 extern int crypto_scalarmult_curve25519(u_char a[CURVE25519_SIZE],
     const u_char b[CURVE25519_SIZE], const u_char c[CURVE25519_SIZE])
@@ -57,36 +65,68 @@ kexc25519_keygen(u_char key[CURVE25519_SIZE], u_char pub[CURVE25519_SIZE])
 	crypto_scalarmult_curve25519(pub, key, basepoint);
 }
 
+<<<<<<< kexc25519.c
 int
+=======
+void
+>>>>>>> 1.4
 kexc25519_shared_key(const u_char key[CURVE25519_SIZE],
+<<<<<<< kexc25519.c
     const u_char pub[CURVE25519_SIZE], struct sshbuf *out)
+=======
+    const u_char pub[CURVE25519_SIZE], Buffer *out)
+>>>>>>> 1.4
 {
 	u_char shared_key[CURVE25519_SIZE];
+<<<<<<< kexc25519.c
 	int r;
+=======
+>>>>>>> 1.4
 
 	crypto_scalarmult_curve25519(shared_key, key, pub);
 #ifdef DEBUG_KEXECDH
 	dump_digest("shared secret", shared_key, CURVE25519_SIZE);
 #endif
+<<<<<<< kexc25519.c
 	sshbuf_reset(out);
 	r = sshbuf_put_bignum2_bytes(out, shared_key, CURVE25519_SIZE);
 	explicit_bzero(shared_key, CURVE25519_SIZE);
 	return r;
+=======
+	buffer_clear(out);
+	buffer_put_bignum2_from_string(out, shared_key, CURVE25519_SIZE);
+	memset(shared_key, 0, CURVE25519_SIZE);	/* XXX explicit_bzero() */
+>>>>>>> 1.4
 }
 
 int
 kex_c25519_hash(
+<<<<<<< kexc25519.c
     int hash_alg,
     const char *client_version_string,
     const char *server_version_string,
     const char *ckexinit, size_t ckexinitlen,
     const char *skexinit, size_t skexinitlen,
     const u_char *serverhostkeyblob, size_t sbloblen,
+=======
+    int hash_alg,
+    char *client_version_string,
+    char *server_version_string,
+    char *ckexinit, int ckexinitlen,
+    char *skexinit, int skexinitlen,
+    u_char *serverhostkeyblob, int sbloblen,
+>>>>>>> 1.4
     const u_char client_dh_pub[CURVE25519_SIZE],
     const u_char server_dh_pub[CURVE25519_SIZE],
+<<<<<<< kexc25519.c
     const u_char *shared_secret, size_t secretlen,
     u_char **hash, size_t *hashlen)
+=======
+    const u_char *shared_secret, u_int secretlen,
+    u_char **hash, u_int *hashlen)
+>>>>>>> 1.4
 {
+<<<<<<< kexc25519.c
 	struct sshbuf *b;
 	static u_char digest[SSH_DIGEST_MAX_LENGTH];
 	int r;
@@ -110,21 +150,56 @@ kex_c25519_hash(
 		sshbuf_free(b);
 		return r;
 	}
+=======
+	Buffer b;
+	static u_char digest[SSH_DIGEST_MAX_LENGTH];
+
+	buffer_init(&b);
+	buffer_put_cstring(&b, client_version_string);
+	buffer_put_cstring(&b, server_version_string);
+
+	/* kexinit messages: fake header: len+SSH2_MSG_KEXINIT */
+	buffer_put_int(&b, ckexinitlen+1);
+	buffer_put_char(&b, SSH2_MSG_KEXINIT);
+	buffer_append(&b, ckexinit, ckexinitlen);
+	buffer_put_int(&b, skexinitlen+1);
+	buffer_put_char(&b, SSH2_MSG_KEXINIT);
+	buffer_append(&b, skexinit, skexinitlen);
+
+	buffer_put_string(&b, serverhostkeyblob, sbloblen);
+	buffer_put_string(&b, client_dh_pub, CURVE25519_SIZE);
+	buffer_put_string(&b, server_dh_pub, CURVE25519_SIZE);
+	buffer_append(&b, shared_secret, secretlen);
+>>>>>>> 1.4
 
 #ifdef DEBUG_KEX
 	sshbuf_dump(b, stderr);
 #endif
+<<<<<<< kexc25519.c
 	if (ssh_digest_buffer(hash_alg, b, digest, sizeof(digest)) != 0) {
 		sshbuf_free(b);
 		return SSH_ERR_LIBCRYPTO_ERROR;
 	}
+=======
+	if (ssh_digest_buffer(hash_alg, &b, digest, sizeof(digest)) != 0)
+		fatal("%s: digest_buffer failed", __func__);
+>>>>>>> 1.4
 
 	sshbuf_free(b);
 
 	*hash = digest;
 	*hashlen = ssh_digest_bytes(hash_alg);
 #ifdef DEBUG_KEX
+<<<<<<< kexc25519.c
 	dump_digest("hash", digest, *hashlen);
+=======
+	dump_digest("hash", digest, ssh_digest_bytes(hash_alg));
+>>>>>>> 1.4
 #endif
+<<<<<<< kexc25519.c
 	return 0;
+=======
+	*hash = digest;
+	*hashlen = ssh_digest_bytes(hash_alg);
+>>>>>>> 1.4
 }

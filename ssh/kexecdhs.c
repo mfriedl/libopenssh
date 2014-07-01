@@ -1,4 +1,4 @@
-/* $OpenBSD: kexecdhs.c,v 1.7 2013/11/02 22:24:24 markus Exp $ */
+/* $OpenBSD: kexecdhs.c,v 1.9 2014/01/12 08:13:13 djm Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2010 Damien Miller.  All rights reserved.
@@ -132,11 +132,17 @@ input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 	dump_digest("shared secret", kbuf, klen);
 #endif
 	/* calc H */
+<<<<<<< kexecdhs.c
 	if ((r = sshkey_to_blob(server_host_public, &server_host_key_blob,
 	    &sbloblen)) != 0)
 		goto out;
 	if ((r = kex_ecdh_hash(
 	    kex->hash_alg,
+=======
+	key_to_blob(server_host_public, &server_host_key_blob, &sbloblen);
+	kex_ecdh_hash(
+	    kex->hash_alg,
+>>>>>>> 1.9
 	    group,
 	    kex->client_version_string,
 	    kex->server_version_string,
@@ -169,6 +175,7 @@ input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 
 	public_key = EC_KEY_get0_public_key(server_key);
 	/* send server hostkey, ECDH pubkey 'Q_S' and signed H */
+<<<<<<< kexecdhs.c
 	if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ECDH_REPLY)) != 0 ||
 	    (r = sshpkt_put_string(ssh, server_host_key_blob, sbloblen)) != 0 ||
 	    (r = sshpkt_put_ec(ssh, public_key, group)) != 0 ||
@@ -196,4 +203,20 @@ input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 	if (signature)
 		free(signature);
 	return r;
+=======
+	packet_start(SSH2_MSG_KEX_ECDH_REPLY);
+	packet_put_string(server_host_key_blob, sbloblen);
+	packet_put_ecpoint(group, EC_KEY_get0_public_key(server_key));
+	packet_put_string(signature, slen);
+	packet_send();
+
+	free(signature);
+	free(server_host_key_blob);
+	/* have keys, free server key */
+	EC_KEY_free(server_key);
+
+	kex_derive_keys_bn(kex, hash, hashlen, shared_secret);
+	BN_clear_free(shared_secret);
+	kex_finish(kex);
+>>>>>>> 1.9
 }

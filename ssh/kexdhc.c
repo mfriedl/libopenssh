@@ -1,4 +1,4 @@
-/* $OpenBSD: kexdhc.c,v 1.13 2013/05/17 00:13:13 djm Exp $ */
+/* $OpenBSD: kexdhc.c,v 1.14 2014/01/12 08:13:13 djm Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
@@ -180,6 +180,7 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 		memcpy(kex->session_id, hash, kex->session_id_len);
 	}
 
+<<<<<<< kexdhc.c
 	if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) == 0)
 		r = kex_send_newkeys(ssh);
  out:
@@ -200,4 +201,9 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 	if (signature)
 		free(signature);
 	return r;
+=======
+	kex_derive_keys_bn(kex, hash, hashlen, shared_secret);
+	BN_clear_free(shared_secret);
+	kex_finish(kex);
+>>>>>>> 1.14
 }

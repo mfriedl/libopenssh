@@ -91,12 +91,6 @@ D/moduli-gen////
 /hostfile.h/1.20/Result of merge//D2013.12.04.23.00.00
 /jpake.c/1.8/Result of merge//D2013.12.04.23.00.00
 /jpake.h/1.2/Mon Jun 30 15:58:16 2014//D2013.12.04.23.00.00
-/kexdhc.c/1.13/Result of merge//D2013.12.04.23.00.00
-/kexdhs.c/1.16/Result of merge+Mon Jun 30 16:19:52 2014//D2013.12.04.23.00.00
-/kexecdhc.c/1.4/Result of merge//D2013.12.04.23.00.00
-/kexecdhs.c/1.7/Result of merge+Mon Jun 30 16:19:52 2014//D2013.12.04.23.00.00
-/kexgexc.c/1.13/Result of merge//D2013.12.04.23.00.00
-/kexgexs.c/1.16/Result of merge//D2013.12.04.23.00.00
 /key.c/1.106/Result of merge+Mon Jun 30 16:19:52 2014//D2013.12.04.23.00.00
 /key.h/1.38/Result of merge+Mon Jun 30 16:19:52 2014//D2013.12.04.23.00.00
 /krl.c/1.13/Result of merge//D2013.12.04.23.00.00
@@ -217,10 +211,16 @@ D/moduli-gen////
 /xmalloc.c/1.28/Mon Jun 30 15:58:16 2014//D2013.12.04.23.00.00
 /xmalloc.h/1.14/Fri Jan 10 14:07:49 2014//D2013.12.04.23.00.00
 /chacha.h/1.1/Thu Nov 21 00:45:44 2013//D2013.12.04.23.00.00
-/kexc25519.c/1.2/Fri Jan 31 16:39:19 2014//D2013.12.04.23.00.00
 /poly1305.h/1.1/Thu Dec 19 22:57:13 2013//D2013.12.04.23.00.00
-/kex.h/1.59/Result of merge+Tue Jul  1 12:30:29 2014//D2014.01.11.23.00.00
-/kex.c/1.94/Result of merge+Tue Jul  1 12:30:30 2014//D2014.01.11.23.00.00
-/kexdh.c/1.24/Result of merge+Tue Jul  1 12:49:55 2014//D2014.01.11.23.00.00
-/kexecdh.c/1.5/Result of merge+Tue Jul  1 12:50:39 2014//D2014.01.11.23.00.00
-/kexgex.c/1.28/Result of merge//D2014.01.11.23.00.00
+/kex.c/1.95/Result of merge+Tue Jul  1 13:11:11 2014//D2014.01.12.23.00.00
+/kex.h/1.60/Result of merge+Tue Jul  1 13:11:14 2014//D2014.01.12.23.00.00
+/kexc25519.c/1.4/Result of merge+Tue Jul  1 13:11:18 2014//D2014.01.12.23.00.00
+/kexdh.c/1.24/Result of merge//D2014.01.12.23.00.00
+/kexdhc.c/1.14/Result of merge+Tue Jul  1 13:11:18 2014//D2014.01.12.23.00.00
+/kexdhs.c/1.17/Result of merge+Tue Jul  1 13:11:18 2014//D2014.01.12.23.00.00
+/kexecdh.c/1.5/Result of merge//D2014.01.12.23.00.00
+/kexecdhc.c/1.6/Result of merge+Tue Jul  1 13:11:19 2014//D2014.01.12.23.00.00
+/kexecdhs.c/1.9/Result of merge+Tue Jul  1 13:11:19 2014//D2014.01.12.23.00.00
+/kexgex.c/1.28/Result of merge//D2014.01.12.23.00.00
+/kexgexc.c/1.15/Result of merge+Tue Jul  1 13:11:19 2014//D2014.01.12.23.00.00
+/kexgexs.c/1.18/Result of merge+Tue Jul  1 13:11:19 2014//D2014.01.12.23.00.00
