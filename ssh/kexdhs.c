@@ -37,17 +37,12 @@
 #include "packet.h"
 #include "dh.h"
 #include "ssh2.h"
-<<<<<<< kexdhs.c
-#ifdef GSSAPI
-#include "ssh-gss.h"
-#endif
+
 #include "monitor_wrap.h"
 #include "dispatch.h"
 #include "compat.h"
 #include "err.h"
 #include "sshbuf.h"
-=======
->>>>>>> 1.16
 
 static int input_kex_dh_init(int, u_int32_t, struct ssh *);
 

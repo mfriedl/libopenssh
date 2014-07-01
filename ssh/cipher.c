@@ -43,13 +43,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-<<<<<<< cipher.c
 #include "err.h"
-=======
-#include "xmalloc.h"
-#include "log.h"
-#include "misc.h"
->>>>>>> 1.92
 #include "cipher.h"
 #include "misc.h"
 
@@ -283,14 +277,10 @@ cipher_init(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
 		return SSH_ERR_INVALID_ARGUMENT;
 
 	cc->cipher = cipher;
-<<<<<<< cipher.c
-=======
 
-	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0) {
-		chachapoly_init(&cc->cp_ctx, key, keylen);
-		return;
-	}
->>>>>>> 1.92
+	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0)
+		return chachapoly_init(&cc->cp_ctx, key, keylen);
+
 	type = (*cipher->evptype)();
 	EVP_CIPHER_CTX_init(&cc->evp);
 	if (EVP_CipherInit(&cc->evp, type, NULL, (u_char *)iv,
@@ -348,21 +338,14 @@ cipher_init(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
  * This tag is written on encryption and verified on decryption.
  * Both 'aadlen' and 'authlen' can be set to 0.
  */
-<<<<<<< cipher.c
 int
-cipher_crypt(struct sshcipher_ctx *cc, u_char *dest, const u_char *src,
-=======
-void
-cipher_crypt(CipherContext *cc, u_int seqnr, u_char *dest, const u_char *src,
->>>>>>> 1.92
-    u_int len, u_int aadlen, u_int authlen)
+cipher_crypt(struct sshcipher_ctx *cc, u_int seqnr,
+    u_char *dest, const u_char *src, u_int len, u_int aadlen, u_int authlen)
 {
 	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0) {
-		if (chachapoly_crypt(&cc->cp_ctx, seqnr, dest, src, len, aadlen,
-		    authlen, cc->encrypt) != 0)
-			fatal("Decryption integrity check failed");
-		return;
-	}
+		return chachapoly_crypt(&cc->cp_ctx, seqnr, dest, src, len,
+		    aadlen, authlen, cc->encrypt);
+	}	
 	if (authlen) {
 		u_char lastiv[1];
 
@@ -402,13 +385,9 @@ cipher_crypt(CipherContext *cc, u_int seqnr, u_char *dest, const u_char *src,
 	return 0;
 }
 
-<<<<<<< cipher.c
-int
-cipher_cleanup(struct sshcipher_ctx *cc)
-=======
 /* Extract the packet length, including any decryption necessary beforehand */
 int
-cipher_get_length(CipherContext *cc, u_int *plenp, u_int seqnr,
+cipher_get_length(struct sshcipher_ctx *cc, u_int *plenp, u_int seqnr,
     const u_char *cp, u_int len)
 {
 	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0)
@@ -420,20 +399,14 @@ cipher_get_length(CipherContext *cc, u_int *plenp, u_int seqnr,
 	return 0;
 }
 
-void
-cipher_cleanup(CipherContext *cc)
->>>>>>> 1.92
+int
+cipher_cleanup(struct sshcipher_ctx *cc)
 {
-<<<<<<< cipher.c
-	if (EVP_CIPHER_CTX_cleanup(&cc->evp) == 0)
-		return SSH_ERR_LIBCRYPTO_ERROR;
-	return 0;
-=======
 	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0)
 		memset(&cc->cp_ctx, 0, sizeof(cc->cp_ctx));
 	else if (EVP_CIPHER_CTX_cleanup(&cc->evp) == 0)
-		error("cipher_cleanup: EVP_CIPHER_CTX_cleanup failed");
->>>>>>> 1.92
+		return SSH_ERR_LIBCRYPTO_ERROR;
+	return 0;
 }
 
 /*
@@ -489,8 +462,8 @@ cipher_get_keyiv(struct sshcipher_ctx *cc, u_char *iv, u_int len)
 
 	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0) {
 		if (len != 0)
-			fatal("%s: wrong iv length %d != %d", __func__, len, 0);
-		return;
+			return SSH_ERR_INVALID_ARGUMENT;
+		return 0;
 	}
 
 	switch (c->number) {
@@ -526,7 +499,7 @@ cipher_set_keyiv(struct sshcipher_ctx *cc, const u_char *iv)
 	int evplen = 0;
 
 	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0)
-		return;
+		return 0;
 
 	switch (c->number) {
 	case SSH_CIPHER_SSH2:

@@ -46,11 +46,7 @@ int roaming_enabled = 0;
 int resume_in_progress = 0;
 
 int
-<<<<<<< roaming_common.c
 get_snd_buf_size(struct ssh *ssh)
-=======
-get_snd_buf_size(void)
->>>>>>> 1.11
 {
 	int fd = ssh_packet_get_connection_out(ssh);
 	int optval;
@@ -62,11 +58,7 @@ get_snd_buf_size(void)
 }
 
 int
-<<<<<<< roaming_common.c
 get_recv_buf_size(struct ssh *ssh)
-=======
-get_recv_buf_size(void)
->>>>>>> 1.11
 {
 	int fd = ssh_packet_get_connection_in(ssh);
 	int optval;

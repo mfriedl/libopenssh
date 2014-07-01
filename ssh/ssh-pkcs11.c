@@ -376,12 +376,12 @@ pkcs11_open_session(struct pkcs11_provider *p, CK_ULONG slotidx, char *pin)
  * keysp points to an (possibly empty) array with *nkeys keys.
  */
 static int pkcs11_fetch_keys_filter(struct pkcs11_provider *, CK_ULONG,
-    CK_ATTRIBUTE [], CK_ATTRIBUTE [3], Key ***, int *)
+    CK_ATTRIBUTE [], CK_ATTRIBUTE [3], struct sshkey ***, int *)
 	__attribute__((__bounded__(__minbytes__,4, 3 * sizeof(CK_ATTRIBUTE))));
 
 static int
 pkcs11_fetch_keys(struct pkcs11_provider *p, CK_ULONG slotidx,
-    Key ***keysp, int *nkeys)
+    struct sshkey ***keysp, int *nkeys)
 {
 	CK_OBJECT_CLASS		pubkey_class = CKO_PUBLIC_KEY;
 	CK_OBJECT_CLASS		cert_class = CKO_CERTIFICATE;
@@ -411,16 +411,12 @@ pkcs11_fetch_keys(struct pkcs11_provider *p, CK_ULONG slotidx,
 }
 
 static int
-<<<<<<< ssh-pkcs11.c
-pkcs11_fetch_keys(struct pkcs11_provider *p, CK_ULONG slotidx,
-   struct sshkey ***keysp, int *nkeys)
-=======
-pkcs11_key_included(Key ***keysp, int *nkeys, Key *key)
+pkcs11_key_included(struct sshkey ***keysp, int *nkeys, struct sshkey *key)
 {
 	int i;
 
 	for (i = 0; i < *nkeys; i++)
-		if (key_equal(key, (*keysp)[i]))
+		if (sshkey_equal(key, (*keysp)[i]))
 			return (1);
 	return (0);
 }
@@ -428,8 +424,7 @@ pkcs11_key_included(Key ***keysp, int *nkeys, Key *key)
 static int
 pkcs11_fetch_keys_filter(struct pkcs11_provider *p, CK_ULONG slotidx,
     CK_ATTRIBUTE filter[], CK_ATTRIBUTE attribs[3],
-    Key ***keysp, int *nkeys)
->>>>>>> 1.11
+    struct sshkey ***keysp, int *nkeys)
 {
 	struct sshkey		*key;
 	RSA			*rsa;
@@ -492,19 +487,6 @@ pkcs11_fetch_keys_filter(struct pkcs11_provider *p, CK_ULONG slotidx,
 				    attribs[2].ulValueLen, NULL);
 			}
 		} else {
-<<<<<<< ssh-pkcs11.c
-			rsa->n = BN_bin2bn(attribs[1].pValue,
-			    attribs[1].ulValueLen, NULL);
-			rsa->e = BN_bin2bn(attribs[2].pValue,
-			    attribs[2].ulValueLen, NULL);
-			if (rsa->n && rsa->e &&
-			    pkcs11_rsa_wrap(p, slotidx, &attribs[0],
-			    rsa) == 0 &&
-			    (key = sshkey_new(KEY_UNSPEC)) != NULL) {
-				key->rsa = rsa;
-				key->type = KEY_RSA;
-				key->flags |= SSHKEY_FLAG_EXT;
-=======
 			cp = attribs[2].pValue;
 			if ((x509 = X509_new()) == NULL) {
 				error("X509_new failed");
@@ -524,14 +506,13 @@ pkcs11_fetch_keys_filter(struct pkcs11_provider *p, CK_ULONG slotidx,
 		}
 		if (rsa && rsa->n && rsa->e &&
 		    pkcs11_rsa_wrap(p, slotidx, &attribs[0], rsa) == 0) {
-			key = key_new(KEY_UNSPEC);
+			key = sshkey_new(KEY_UNSPEC);
 			key->rsa = rsa;
 			key->type = KEY_RSA;
-			key->flags |= KEY_FLAG_EXT;
+			key->flags |= SSHKEY_FLAG_EXT;
 			if (pkcs11_key_included(keysp, nkeys, key)) {
-				key_free(key);
+				sshkey_free(key);
 			} else {
->>>>>>> 1.11
 				/* expand key array and add key */
 				*keysp = xrealloc(*keysp, *nkeys + 1,
 				    sizeof(struct sshkey *));

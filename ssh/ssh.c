@@ -513,16 +513,6 @@ main(int ac, char **av)
 			break;
 		case 'Q':
 			cp = NULL;
-<<<<<<< ssh.c
-			if (strcasecmp(optarg, "cipher") == 0)
-				cp = cipher_alg_list();
-			else if (strcasecmp(optarg, "mac") == 0)
-				cp = mac_alg_list();
-			else if (strcasecmp(optarg, "kex") == 0)
-				cp = kex_alg_list();
-			else if (strcasecmp(optarg, "key") == 0)
-				cp = sshkey_alg_list();
-=======
 			if (strcmp(optarg, "cipher") == 0)
 				cp = cipher_alg_list('\n', 0);
 			else if (strcmp(optarg, "cipher-auth") == 0)
@@ -532,8 +522,7 @@ main(int ac, char **av)
 			else if (strcmp(optarg, "kex") == 0)
 				cp = kex_alg_list('\n');
 			else if (strcmp(optarg, "key") == 0)
-				cp = key_alg_list();
->>>>>>> 1.395
+				cp = sshkey_alg_list();
 			if (cp == NULL)
 				fatal("Unsupported query \"%s\"", optarg);
 			printf("%s\n", cp);

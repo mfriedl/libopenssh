@@ -181,7 +181,6 @@ ssh_close_authentication_socket(int sock)
 int
 ssh_lock_agent(int sock, int lock, const char *password)
 {
-<<<<<<< authfd.c
 	int r;
 	u_char type = lock ? SSH_AGENTC_LOCK : SSH_AGENTC_UNLOCK;
 	struct sshbuf *msg;
@@ -199,26 +198,6 @@ ssh_lock_agent(int sock, int lock, const char *password)
  out:
 	sshbuf_free(msg);
 	return r;
-=======
-	AuthenticationConnection *auth;
-	int sock;
-
-	sock = ssh_get_authentication_socket();
-
-	/*
-	 * Fail if we couldn't obtain a connection.  This happens if we
-	 * exited due to a timeout.
-	 */
-	if (sock < 0)
-		return NULL;
-
-	auth = xcalloc(1, sizeof(*auth));
-	auth->fd = sock;
-	buffer_init(&auth->identities);
-	auth->howmany = 0;
-
-	return auth;
->>>>>>> 1.88
 }
 
 static int

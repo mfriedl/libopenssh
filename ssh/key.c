@@ -98,7 +98,7 @@ sshkey_ssh_name_from_type_nid(int type, int nid)
 	return "ssh-unknown";
 }
 
-int
+static int
 sshkey_type_is_cert(int type)
 {
 	const struct keytype *kt;

@@ -253,43 +253,19 @@ dh_pub_is_valid(DH *dh, BIGNUM *dh_pub)
 int
 dh_gen_key(DH *dh, int need)
 {
-<<<<<<< dh.c
-	int tries = 0;
-=======
 	int pbits;
->>>>>>> 1.53
 
-<<<<<<< dh.c
 	if (need < 0 || dh->p == NULL ||
-	    need > INT_MAX / 2 || 2 * need >= BN_num_bits(dh->p))
+	    (pbits = BN_num_bits(dh->p)) <= 0 ||
+	    need > INT_MAX / 2 || 2 * need >= pbits)
 		return SSH_ERR_INVALID_ARGUMENT;
-	do {
-		if (dh->priv_key != NULL)
-			BN_clear_free(dh->priv_key);
-		if ((dh->priv_key = BN_new()) == NULL)
-			return SSH_ERR_ALLOC_FAIL;
-		/* generate a 2*need bits random private exponent */
-		if (!BN_rand(dh->priv_key, 2*need, 0, 0) ||
-		    DH_generate_key(dh) == 0 || 
-		    tries++ > 10) {
-			BN_clear_free(dh->priv_key);
-			return SSH_ERR_LIBCRYPTO_ERROR;
-		}
-	} while (!dh_pub_is_valid(dh, dh->pub_key));
-	return 0;
-=======
-	if (need <= 0)
-		fatal("%s: need <= 0", __func__);
-	if (dh->p == NULL)
-		fatal("%s: dh->p == NULL", __func__);
-	if ((pbits = BN_num_bits(dh->p)) <= 0)
-		fatal("%s: bits(p) <= 0", __func__);
 	dh->length = MIN(need * 2, pbits - 1);
-	if (DH_generate_key(dh) == 0)
-		fatal("%s: key generation failed", __func__);
-	if (!dh_pub_is_valid(dh, dh->pub_key))
-		fatal("%s: generated invalid key", __func__);
->>>>>>> 1.53
+	if (DH_generate_key(dh) == 0 ||
+	    !dh_pub_is_valid(dh, dh->pub_key)) {
+		BN_clear_free(dh->priv_key);
+		return SSH_ERR_LIBCRYPTO_ERROR;
+	}
+	return 0;
 }
 
 DH *

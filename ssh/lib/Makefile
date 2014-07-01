@@ -12,21 +12,17 @@ SRCS=	authfd.c authfile.c canohost.c \
 	ssh-dss.c ssh-rsa.c ssh-ecdsa.c dh.c kexdh.c kexgex.c kexecdh.c \
 	kexdhc.c kexgexc.c kexecdhc.c msg.c progressmeter.c dns.c \
 	monitor_fdpass.c umac.c addrmatch.c schnorr.c jpake.c ssh-pkcs11.c \
-<<<<<<< Makefile
-	krl.c \
+	krl.c smult_curve25519_ref.c kexc25519.c kexc25519c.c \
+	chacha.c poly1305.c cipher-chachapoly.c \
 	sshbuf-getput-basic.c \
 	sshbuf-getput-crypto.c \
 	sshbuf-misc.c \
 	sshbuf.c \
 	err.c
 
-SRCS+=	kexdhs.c kexgexs.c kexecdhs.c
+SRCS+=	kexdhs.c kexgexs.c kexecdhs.c kexc25519s.c
 SRCS+=	ssh_api.c
 SRCS+=	roaming_dummy.c
-=======
-	krl.c smult_curve25519_ref.c kexc25519.c kexc25519c.c \
-	chacha.c poly1305.c cipher-chachapoly.c
->>>>>>> 1.69
 
 SRCS+=	umac128.c
 CLEANFILES+=   umac128.c

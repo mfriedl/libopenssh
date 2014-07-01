@@ -463,19 +463,11 @@ sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 	    &remote_major, &remote_minor, remote_version) != 3) {
 		s = "Protocol mismatch.\n";
 		(void) atomicio(vwrite, sock_out, s, strlen(s));
-<<<<<<< sshd.c
 		logit("Bad protocol version identification '%.100s' "
 		    "from %s port %d", client_version_string,
 		    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh));
 		close(sock_in);
 		close(sock_out);
-=======
-		logit("Bad protocol version identification '%.100s' "
-		    "from %s port %d", client_version_string,
-		    get_remote_ipaddr(), get_remote_port());
-		close(sock_in);
-		close(sock_out);
->>>>>>> 1.411
 		cleanup_exit(255);
 	}
 	debug("Client protocol version %d.%d; client software version %.100s",

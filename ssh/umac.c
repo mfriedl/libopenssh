@@ -1214,11 +1214,7 @@ struct umac_ctx *umac_new(const u_char key[])
     size_t bytes_to_add;
     aes_int_key prf_key;
     
-<<<<<<< umac.c
-    octx = ctx = malloc(sizeof(*ctx) + ALLOC_BOUNDARY);
-=======
-    octx = ctx = xcalloc(1, sizeof(*ctx) + ALLOC_BOUNDARY);
->>>>>>> 1.8
+    octx = ctx = calloc(1, sizeof(*ctx) + ALLOC_BOUNDARY);
     if (ctx) {
         if (ALLOC_BOUNDARY) {
             bytes_to_add = ALLOC_BOUNDARY -

@@ -65,11 +65,7 @@ kbdint_alloc(const char *devs)
 	struct sshbuf *b;
 	int i, r;
 
-<<<<<<< auth2-chall.c
-	kbdintctxt = xmalloc(sizeof(struct kbdintctxt));
-=======
-	kbdintctxt = xcalloc(1, sizeof(KbdintAuthctxt));
->>>>>>> 1.39
+	kbdintctxt = xcalloc(1, sizeof(struct kbdintctxt));
 	if (strcmp(devs, "") == 0) {
 		if ((b = sshbuf_new()) == NULL)
 			fatal("%s: sshbuf_new failed", __func__);

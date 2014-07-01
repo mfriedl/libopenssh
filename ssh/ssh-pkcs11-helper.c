@@ -120,20 +120,15 @@ process_add(void)
 		    (r = sshbuf_put_u32(msg, nkeys)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		for (i = 0; i < nkeys; i++) {
-<<<<<<< ssh-pkcs11-helper.c
-			if ((r = sshkey_to_blob(keys[i], &blob, &blen)) != 0)
-				fatal("%s: sshkey_to_blob: %s",
+			if ((r = sshkey_to_blob(keys[i], &blob, &blen)) != 0) {
+				debug("%s: sshkey_to_blob: %s",
 				    __func__, ssh_err(r));
+				continue;
+			}
 			if ((r = sshbuf_put_string(msg, blob, blen)) != 0 ||
 			    (r = sshbuf_put_cstring(msg, name)) != 0)
 				fatal("%s: buffer error: %s",
 				    __func__, ssh_err(r));
-=======
-			if (key_to_blob(keys[i], &blob, &blen) == 0)
-				continue;
-			buffer_put_string(&msg, blob, blen);
-			buffer_put_cstring(&msg, name);
->>>>>>> 1.7
 			free(blob);
 			add_key(keys[i], name);
 		}

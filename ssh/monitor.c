@@ -1540,6 +1540,7 @@ monitor_apply_keystate(struct monitor *pmonitor)
 		kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
 		kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
 		kex->kex[KEX_ECDH_SHA2] = kexecdh_server;
+		kex->kex[KEX_C25519_SHA256] = kexc25519_server;
 		kex->load_host_public_key=&get_hostkey_public_by_type;
 		kex->load_host_private_key=&get_hostkey_private_by_type;
 		kex->host_key_index=&get_hostkey_index;
@@ -1556,70 +1557,7 @@ monitor_apply_keystate(struct monitor *pmonitor)
 		ssh_packet_set_rekey_limits(ssh,
 		    (u_int32_t)options.rekey_limit,
 		    (time_t)options.rekey_interval);
-<<<<<<< monitor.c
 	debug3("%s: done", __func__);
-=======
-
-	/* Network I/O buffers */
-	/* XXX inefficient for large buffers, need: buffer_init_from_string */
-	buffer_clear(packet_get_input());
-	buffer_append(packet_get_input(), child_state.input, child_state.ilen);
-	memset(child_state.input, 0, child_state.ilen);
-	free(child_state.input);
-
-	buffer_clear(packet_get_output());
-	buffer_append(packet_get_output(), child_state.output,
-		      child_state.olen);
-	memset(child_state.output, 0, child_state.olen);
-	free(child_state.output);
-
-	/* Roaming */
-	if (compat20)
-		roam_set_bytes(child_state.sent_bytes, child_state.recv_bytes);
-}
-
-static Kex *
-mm_get_kex(Buffer *m)
-{
-	Kex *kex;
-	void *blob;
-	u_int bloblen;
-
-	kex = xcalloc(1, sizeof(*kex));
-	kex->session_id = buffer_get_string(m, &kex->session_id_len);
-	if (session_id2 == NULL ||
-	    kex->session_id_len != session_id2_len ||
-	    timingsafe_bcmp(kex->session_id, session_id2, session_id2_len) != 0)
-		fatal("mm_get_get: internal error: bad session id");
-	kex->we_need = buffer_get_int(m);
-	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
-	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
-	kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
-	kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
-	kex->kex[KEX_ECDH_SHA2] = kexecdh_server;
-	kex->kex[KEX_C25519_SHA256] = kexc25519_server;
-	kex->server = 1;
-	kex->hostkey_type = buffer_get_int(m);
-	kex->kex_type = buffer_get_int(m);
-	blob = buffer_get_string(m, &bloblen);
-	buffer_init(&kex->my);
-	buffer_append(&kex->my, blob, bloblen);
-	free(blob);
-	blob = buffer_get_string(m, &bloblen);
-	buffer_init(&kex->peer);
-	buffer_append(&kex->peer, blob, bloblen);
-	free(blob);
-	kex->done = 1;
-	kex->flags = buffer_get_int(m);
-	kex->client_version_string = buffer_get_string(m, NULL);
-	kex->server_version_string = buffer_get_string(m, NULL);
-	kex->load_host_public_key=&get_hostkey_public_by_type;
-	kex->load_host_private_key=&get_hostkey_private_by_type;
-	kex->host_key_index=&get_hostkey_index;
-	kex->sign = sshd_hostkey_sign;
-
-	return (kex);
->>>>>>> 1.128
 }
 
 /* This function requries careful sanity checking */

@@ -153,26 +153,13 @@ sshkey_private_rsa1_to_blob(struct sshkey *key, struct sshbuf *blob,
 	if ((r = cipher_set_key_string(&ciphercontext, cipher, passphrase,
 	    CIPHER_ENCRYPT)) != 0)
 		goto out;
-	if ((r = cipher_crypt(&ciphercontext, cp,
+	if ((r = cipher_crypt(&ciphercontext, 0, cp,
 	    sshbuf_ptr(buffer), sshbuf_len(buffer), 0, 0)) != 0)
 		goto out;
 	if ((r = cipher_cleanup(&ciphercontext)) != 0)
 		goto out;
 
-<<<<<<< authfile.c
 	r = sshbuf_putb(blob, encrypted);
-=======
-	cipher_set_key_string(&ciphercontext, cipher, passphrase,
-	    CIPHER_ENCRYPT);
-	cipher_crypt(&ciphercontext, 0, cp,
-	    buffer_ptr(&buffer), buffer_len(&buffer), 0, 0);
-	cipher_cleanup(&ciphercontext);
-	memset(&ciphercontext, 0, sizeof(ciphercontext));
-
-	/* Destroy temporary data. */
-	memset(buf, 0, sizeof(buf));
-	buffer_free(&buffer);
->>>>>>> 1.98
 
  out:
 	bzero(&ciphercontext, sizeof(ciphercontext));
@@ -489,33 +476,13 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 		goto out;
 
 	/* Rest of the buffer is encrypted.  Decrypt it using the passphrase. */
-<<<<<<< authfile.c
 	if ((r = cipher_set_key_string(&ciphercontext, cipher, passphrase,
 	    CIPHER_DECRYPT)) != 0)
 		goto out;
-	if ((r = cipher_crypt(&ciphercontext, cp,
+	if ((r = cipher_crypt(&ciphercontext, 0, cp,
 	    sshbuf_ptr(copy), sshbuf_len(copy), 0, 0)) != 0) {
 		cipher_cleanup(&ciphercontext);
 		goto out;
-=======
-	cipher_set_key_string(&ciphercontext, cipher, passphrase,
-	    CIPHER_DECRYPT);
-	cipher_crypt(&ciphercontext, 0, cp,
-	    buffer_ptr(&copy), buffer_len(&copy), 0, 0);
-	cipher_cleanup(&ciphercontext);
-	memset(&ciphercontext, 0, sizeof(ciphercontext));
-	buffer_free(&copy);
-
-	check1 = buffer_get_char(&decrypted);
-	check2 = buffer_get_char(&decrypted);
-	if (check1 != buffer_get_char(&decrypted) ||
-	    check2 != buffer_get_char(&decrypted)) {
-		if (strcmp(passphrase, "") != 0)
-			debug("Bad passphrase supplied for RSA1 key");
-		/* Bad passphrase. */
-		buffer_free(&decrypted);
-		goto fail;
->>>>>>> 1.98
 	}
 	if ((r = cipher_cleanup(&ciphercontext)) != 0)
 		goto out;
