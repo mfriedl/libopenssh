@@ -45,12 +45,10 @@
 #include "dispatch.h"
 #include "monitor.h"
 #include "roaming.h"
-<<<<<<< kex.c
+
 #include "err.h"
 #include "sshbuf.h"
-=======
 #include "digest.h"
->>>>>>> 1.94
 
 /* prototype */
 static int kex_choose_conf(struct ssh *);
@@ -652,68 +650,36 @@ static int
 derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
     BIGNUM *shared_secret, u_char **keyp)
 {
-<<<<<<< kex.c
 	struct kex *kex = ssh->kex;
 	struct sshbuf *b = NULL;
-	EVP_MD_CTX md;
-=======
-	Buffer b;
-	struct ssh_digest_ctx *hashctx;
->>>>>>> 1.94
+	struct ssh_digest_ctx *hashctx = NULL;
 	char c = id;
 	u_int have;
-<<<<<<< kex.c
-	u_char *digest = NULL;
-	int r, mdsz;
-=======
 	size_t mdsz;
 	u_char *digest;
->>>>>>> 1.94
+	int r;
 
-<<<<<<< kex.c
-	if ((mdsz = EVP_MD_size(kex->evp_md)) <= 0)
+	if ((mdsz = ssh_digest_bytes(kex->hash_alg)) == 0)
 		return SSH_ERR_INVALID_ARGUMENT;
 	if ((digest = calloc(1, roundup(need, mdsz))) == NULL ||
 	    (b = sshbuf_new()) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-	if ((r = sshbuf_put_bignum2(b, shared_secret)) != 0)
-		goto out;
-=======
-	if ((mdsz = ssh_digest_bytes(kex->hash_alg)) == 0)
-		fatal("bad kex md size %zu", mdsz);
-	digest = xmalloc(roundup(need, mdsz));
-
-	buffer_init(&b);
-	buffer_put_bignum2(&b, shared_secret);
->>>>>>> 1.94
 
 	/* K1 = HASH(K || H || "A" || session_id) */
-<<<<<<< kex.c
-	if (EVP_DigestInit(&md, kex->evp_md) != 1 ||
-	    (!(ssh->compat & SSH_BUG_DERIVEKEY) &&
-	    EVP_DigestUpdate(&md, sshbuf_ptr(b), sshbuf_len(b)) != 1) ||
-	    EVP_DigestUpdate(&md, hash, hashlen) != 1 ||
-	    EVP_DigestUpdate(&md, &c, 1) != 1 ||
-	    EVP_DigestUpdate(&md, kex->session_id, kex->session_id_len) != 1 ||
-	    EVP_DigestFinal(&md, digest, NULL) != 1) {
-		r = SSH_ERR_LIBCRYPTO_ERROR;
-		goto out;
-	}
-=======
-	if ((hashctx = ssh_digest_start(kex->hash_alg)) == NULL)
-		fatal("%s: ssh_digest_start failed", __func__);
-	if (ssh_digest_update_buffer(hashctx, &b) != 0 ||
+	if ((hashctx = ssh_digest_start(kex->hash_alg)) == NULL ||
+	    ssh_digest_update_buffer(hashctx, b) != 0 ||
 	    ssh_digest_update(hashctx, hash, hashlen) != 0 ||
 	    ssh_digest_update(hashctx, &c, 1) != 0 ||
 	    ssh_digest_update(hashctx, kex->session_id,
-	    kex->session_id_len) != 0)
-		fatal("%s: ssh_digest_update failed", __func__);
-	if (ssh_digest_final(hashctx, digest, mdsz) != 0)
-		fatal("%s: ssh_digest_final failed", __func__);
+	    kex->session_id_len) != 0 ||
+	    ssh_digest_final(hashctx, digest, mdsz) != 0) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
 	ssh_digest_free(hashctx);
->>>>>>> 1.94
+	hashctx = NULL;
 
 	/*
 	 * expand key:
@@ -721,27 +687,16 @@ derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
 	 * Key = K1 || K2 || ... || Kn
 	 */
 	for (have = mdsz; need > have; have += mdsz) {
-<<<<<<< kex.c
-		if (EVP_DigestInit(&md, kex->evp_md) != 1 ||
-		    (!(ssh->compat & SSH_BUG_DERIVEKEY) &&
-		    EVP_DigestUpdate(&md, sshbuf_ptr(b), sshbuf_len(b)) != 1) ||
-		    EVP_DigestUpdate(&md, hash, hashlen) != 1 ||
-		    EVP_DigestUpdate(&md, digest, have) != 1 ||
-		    EVP_DigestFinal(&md, digest + have, NULL) != 1) {
+		if ((hashctx = ssh_digest_start(kex->hash_alg)) == NULL ||
+		    ssh_digest_update_buffer(hashctx, b) != 0 ||
+		    ssh_digest_update(hashctx, hash, hashlen) != 0 ||
+		    ssh_digest_update(hashctx, digest, have) != 0 ||
+		    ssh_digest_final(hashctx, digest + have, mdsz) != 0) {
 			r = SSH_ERR_LIBCRYPTO_ERROR;
 			goto out;
 		}
-=======
-		if ((hashctx = ssh_digest_start(kex->hash_alg)) == NULL)
-			fatal("%s: ssh_digest_start failed", __func__);
-		if (ssh_digest_update_buffer(hashctx, &b) != 0 ||
-		    ssh_digest_update(hashctx, hash, hashlen) != 0 ||
-		    ssh_digest_update(hashctx, digest, have) != 0)
-			fatal("%s: ssh_digest_update failed", __func__);
-		if (ssh_digest_final(hashctx, digest + have, mdsz) != 0)
-			fatal("%s: ssh_digest_final failed", __func__);
 		ssh_digest_free(hashctx);
->>>>>>> 1.94
+		hashctx = NULL;
 	}
 #ifdef DEBUG_KEX
 	fprintf(stderr, "key '%c'== ", c);
@@ -755,6 +710,7 @@ derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
 		free(digest);
 	if (b)
 		sshbuf_free(b);
+	ssh_digest_free(hashctx);
 	return r;
 }
 
@@ -791,60 +747,28 @@ derive_ssh1_session_id(BIGNUM *host_modulus, BIGNUM *server_modulus,
     u_int8_t cookie[8], u_int8_t id[16])
 {
 	u_int8_t nbuf[2048], obuf[SSH_DIGEST_MAX_LENGTH];
-	int len;
-	struct ssh_digest_ctx *hashctx;
+	struct ssh_digest_ctx *hashctx = NULL;
+	size_t len;
+	int r;
 
-<<<<<<< kex.c
-	if (EVP_DigestInit(&md, evp_md) != 1)
-		return SSH_ERR_LIBCRYPTO_ERROR;
-=======
-	if ((hashctx = ssh_digest_start(SSH_DIGEST_MD5)) == NULL)
-		fatal("%s: ssh_digest_start", __func__);
-
->>>>>>> 1.94
 	len = BN_num_bytes(host_modulus);
 	if (len < (512 / 8) || (u_int)len > sizeof(nbuf))
-<<<<<<< kex.c
 		return SSH_ERR_KEY_BITS_MISMATCH;
 	if (BN_bn2bin(host_modulus, nbuf) <= 0 ||
-	    EVP_DigestUpdate(&md, nbuf, len) != 1)
-		return SSH_ERR_LIBCRYPTO_ERROR;
-=======
-		fatal("%s: bad host modulus (len %d)", __func__, len);
-	BN_bn2bin(host_modulus, nbuf);
-	if (ssh_digest_update(hashctx, nbuf, len) != 0)
-		fatal("%s: ssh_digest_update failed", __func__);
->>>>>>> 1.94
-
-	len = BN_num_bytes(server_modulus);
-	if (len < (512 / 8) || (u_int)len > sizeof(nbuf))
-<<<<<<< kex.c
-		return SSH_ERR_KEY_BITS_MISMATCH;
-	if (BN_bn2bin(server_modulus, nbuf) <= 0 ||
-	    EVP_DigestUpdate(&md, nbuf, len) != 1 ||
-	    EVP_DigestUpdate(&md, cookie, 8) != 1 ||
-	    EVP_DigestFinal(&md, obuf, NULL) != 1)
-		return SSH_ERR_LIBCRYPTO_ERROR;
-
-	memcpy(id, obuf, 16);
-=======
-		fatal("%s: bad server modulus (len %d)", __func__, len);
-	BN_bn2bin(server_modulus, nbuf);
-	if (ssh_digest_update(hashctx, nbuf, len) != 0 ||
-	    ssh_digest_update(hashctx, cookie, 8) != 0)
-		fatal("%s: ssh_digest_update failed", __func__);
-	if (ssh_digest_final(hashctx, obuf, sizeof(obuf)) != 0)
-		fatal("%s: ssh_digest_final failed", __func__);
+	    (hashctx = ssh_digest_start(SSH_DIGEST_MD5)) == NULL ||
+	    ssh_digest_update(hashctx, nbuf, len) != 0 ||
+	    ssh_digest_update(hashctx, cookie, 8) != 0 ||
+	    ssh_digest_final(hashctx, obuf, sizeof(obuf)) != 0) {
+		r = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+	}
 	memcpy(id, obuf, ssh_digest_bytes(SSH_DIGEST_MD5));
->>>>>>> 1.94
-
-	memset(nbuf, 0, sizeof(nbuf));
-	memset(obuf, 0, sizeof(obuf));
-<<<<<<< kex.c
-	memset(&md, 0, sizeof(md));
-	return 0;
-=======
->>>>>>> 1.94
+	r = 0;
+ out:
+	ssh_digest_free(hashctx);
+	bzero(nbuf, sizeof(nbuf));
+	bzero(obuf, sizeof(obuf));
+	return r;
 }
 
 #if defined(DEBUG_KEX) || defined(DEBUG_KEXDH) || defined(DEBUG_KEXECDH)

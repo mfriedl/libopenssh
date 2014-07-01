@@ -33,13 +33,9 @@
 #include "key.h"
 #include "cipher.h"
 #include "kex.h"
-<<<<<<< kexdh.c
 #include "err.h"
 #include "sshbuf.h"
-=======
 #include "digest.h"
-#include "log.h"
->>>>>>> 1.24
 
 int
 kex_dh_hash(
@@ -53,16 +49,9 @@ kex_dh_hash(
     const BIGNUM *shared_secret,
     u_char **hash, size_t *hashlen)
 {
-<<<<<<< kexdh.c
 	struct sshbuf *b;
-	static u_char digest[EVP_MAX_MD_SIZE];
-	const EVP_MD *evp_md = EVP_sha1();
-	EVP_MD_CTX md;
-	int r;
-=======
-	Buffer b;
 	static u_char digest[SSH_DIGEST_MAX_LENGTH];
->>>>>>> 1.24
+	int r;
 
 	if ((b = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
@@ -85,34 +74,16 @@ kex_dh_hash(
 #ifdef DEBUG_KEX
 	sshbuf_dump(b, stderr);
 #endif
-<<<<<<< kexdh.c
-	if (EVP_DigestInit(&md, evp_md) != 1 ||
-	    EVP_DigestUpdate(&md, sshbuf_ptr(b), sshbuf_len(b)) != 1 ||
-	    EVP_DigestFinal(&md, digest, NULL) != 1) {
+	if (ssh_digest_buffer(SSH_DIGEST_SHA1, b, digest, sizeof(digest)) != 0) {
 		sshbuf_free(b);
 		return SSH_ERR_LIBCRYPTO_ERROR;
 	}
 	sshbuf_free(b);
-	*hash = digest;
-	*hashlen = EVP_MD_size(evp_md);
-=======
-	if (ssh_digest_buffer(SSH_DIGEST_SHA1, &b, digest, sizeof(digest)) != 0)
-		fatal("%s: ssh_digest_buffer failed", __func__);
 
-	buffer_free(&b);
-
->>>>>>> 1.24
-#ifdef DEBUG_KEX
-<<<<<<< kexdh.c
-	dump_digest("hash", digest, *hashlen);
-=======
-	dump_digest("hash", digest, ssh_digest_bytes(SSH_DIGEST_SHA1));
->>>>>>> 1.24
-#endif
-<<<<<<< kexdh.c
-	return 0;
-=======
 	*hash = digest;
 	*hashlen = ssh_digest_bytes(SSH_DIGEST_SHA1);
->>>>>>> 1.24
+#ifdef DEBUG_KEX
+	dump_digest("hash", digest, *hashlen);
+#endif
+	return 0;
 }

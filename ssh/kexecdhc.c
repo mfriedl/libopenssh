@@ -165,7 +165,7 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 #endif
 	/* calc and verify H */
 	if ((r = kex_ecdh_hash(
-	    kex->evp_md,
+	    kex->hash_alg,
 	    group,
 	    kex->client_version_string,
 	    kex->server_version_string,

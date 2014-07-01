@@ -207,7 +207,7 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 		goto out;
 	/* calc H */
 	if ((r = kexgex_hash(
-	    kex->evp_md,
+	    kex->hash_alg,
 	    kex->client_version_string,
 	    kex->server_version_string,
 	    sshbuf_ptr(kex->peer), sshbuf_len(kex->peer),

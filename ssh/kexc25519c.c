@@ -155,7 +155,7 @@ input_kex_ehdh_25519(int type, u_int32_t seq, struct ssh *ssh)
 		r = kex_send_newkeys(ssh);
 
 out:
-	explizit_bzero(kex->c25519_client_key, sizeof(kex->c25519_client_key));
+	bzero(kex->c25519_client_key, sizeof(kex->c25519_client_key));
 	free(server_host_key_blob);
 	free(server_pubkey);
 	free(signature);

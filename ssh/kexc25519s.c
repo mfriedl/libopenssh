@@ -28,14 +28,14 @@
 #include <string.h>
 #include <signal.h>
 
-#include "xmalloc.h"
-#include "buffer.h"
 #include "key.h"
 #include "cipher.h"
 #include "kex.h"
 #include "log.h"
 #include "packet.h"
 #include "ssh2.h"
+#include "sshbuf.h"
+#include "err.h"
 
 void
 kexc25519_server(Kex *kex)
