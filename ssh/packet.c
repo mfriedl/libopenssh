@@ -74,7 +74,7 @@
 #include "ssh.h"
 #include "packet.h"
 #include "roaming.h"
-#include "err.h"
+#include "ssherr.h"
 #include "sshbuf.h"
 
 #ifdef PACKET_DEBUG

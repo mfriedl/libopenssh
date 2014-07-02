@@ -21,7 +21,7 @@
 
 #include "xmalloc.h"
 #include "match.h"
-#include "err.h"
+#include "ssherr.h"
 #include "log.h"
 #include "canohost.h"
 #include "packet.h"

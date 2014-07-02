@@ -54,7 +54,7 @@
 #include <stdarg.h>
 
 #include "sshlogin.h"
-#include "err.h"
+#include "ssherr.h"
 #include "log.h"
 #include "sshbuf.h"
 #include "servconf.h"

@@ -36,7 +36,7 @@
 #include "pathnames.h"
 #include "log.h"
 #include "misc.h"
-#include "err.h"
+#include "ssherr.h"
 
 static int
 parse_prime(int linenum, char *line, struct dhgroup *dhg)

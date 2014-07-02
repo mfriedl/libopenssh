@@ -24,7 +24,7 @@
 #include <string.h>
 
 #include "xmalloc.h"
-#include "err.h"
+#include "ssherr.h"
 #include "rsa.h"
 #include "packet.h"
 #include "ssh1.h"

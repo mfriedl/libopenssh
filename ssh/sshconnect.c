@@ -52,7 +52,7 @@
 #include "monitor_fdpass.h"
 #include "ssh2.h"
 #include "version.h"
-#include "err.h"
+#include "ssherr.h"
 
 char *client_version_string = NULL;
 char *server_version_string = NULL;

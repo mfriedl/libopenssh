@@ -60,7 +60,7 @@
 #include <stdarg.h>
 
 #include "xmalloc.h"
-#include "err.h"
+#include "ssherr.h"
 #include "ssh.h"
 #include "ssh1.h"
 #include "ssh2.h"

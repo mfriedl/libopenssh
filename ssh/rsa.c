@@ -66,7 +66,7 @@
 
 #include "rsa.h"
 #include "log.h"
-#include "err.h"
+#include "ssherr.h"
 
 int
 rsa_public_encrypt(BIGNUM *out, BIGNUM *in, RSA *key)

@@ -102,7 +102,7 @@
 #include "match.h"
 #include "msg.h"
 #include "roaming.h"
-#include "err.h"
+#include "ssherr.h"
 
 /* import options */
 extern Options options;

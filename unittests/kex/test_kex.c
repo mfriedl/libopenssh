@@ -14,7 +14,7 @@
 
 #include "test_helper.h"
 
-#include "err.h"
+#include "ssherr.h"
 #include "ssh_api.h"
 #include "sshbuf.h"
 #include "packet.h"

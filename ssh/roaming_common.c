@@ -31,7 +31,7 @@
 #include "xmalloc.h"
 #include "cipher.h"
 #include "sshbuf.h"
-#include "err.h"
+#include "ssherr.h"
 #include "roaming.h"
 #include "digest.h"
 

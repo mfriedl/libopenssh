@@ -14,7 +14,7 @@
 
 #include "test_helper.h"
 
-#include "err.h"
+#include "ssherr.h"
 #include "sshbuf.h"
 
 #define NUM_FUZZ_TESTS (1 << 18)

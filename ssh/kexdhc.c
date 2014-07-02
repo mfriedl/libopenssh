@@ -40,7 +40,7 @@
 #include "ssh2.h"
 #include "dispatch.h"
 #include "compat.h"
-#include "err.h"
+#include "ssherr.h"
 #include "sshbuf.h"
 
 static int input_kex_dh(int, u_int32_t, struct ssh *);

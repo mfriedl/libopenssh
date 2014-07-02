@@ -46,7 +46,7 @@
 
 #include "packet.h"
 #include "sshbuf.h"
-#include "err.h"
+#include "ssherr.h"
 #include "log.h"
 #include "servconf.h"
 #include "key.h"

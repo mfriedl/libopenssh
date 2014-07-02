@@ -48,7 +48,7 @@
 #include "monitor.h"
 #include "roaming.h"
 
-#include "err.h"
+#include "ssherr.h"
 #include "sshbuf.h"
 #include "digest.h"
 

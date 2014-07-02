@@ -46,7 +46,7 @@
 #endif
 #include "monitor_wrap.h"
 #include "pathnames.h"
-#include "err.h"
+#include "ssherr.h"
 
 /* import */
 extern ServerOptions options;

@@ -51,7 +51,7 @@
 #include "hostfile.h"
 #include "log.h"
 #include "misc.h"
-#include "err.h"
+#include "ssherr.h"
 #include "digest.h"
 #include "hmac.h"
 

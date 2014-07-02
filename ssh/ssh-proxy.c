@@ -34,7 +34,7 @@
 #include "myproposal.h"
 #include "readconf.h"
 #include "authfile.h"
-#include "err.h"
+#include "ssherr.h"
 #include "sshbuf.h"
 
 struct side {

@@ -24,7 +24,7 @@
 
 #include "sshbuf.h"
 #include "compat.h"
-#include "err.h"
+#include "ssherr.h"
 #define SSHKEY_INTERNAL
 #include "key.h"
 #include "compat.h"

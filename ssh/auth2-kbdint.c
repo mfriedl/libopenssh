@@ -32,7 +32,7 @@
 #include "auth.h"
 #include "log.h"
 #include "servconf.h"
-#include "err.h"
+#include "ssherr.h"
 
 /* import */
 extern ServerOptions options;

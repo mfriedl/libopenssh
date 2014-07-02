@@ -33,7 +33,7 @@
 #include <stdarg.h>
 
 #include "sshbuf.h"
-#include "err.h"
+#include "ssherr.h"
 #include "log.h"
 #include "atomicio.h"
 #include "msg.h"

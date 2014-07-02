@@ -27,7 +27,7 @@
 #include "log.h"
 #include "sshbuf.h"
 #include "key.h"
-#include "err.h"
+#include "ssherr.h"
 #include "ssh.h"
 
 int

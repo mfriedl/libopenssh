@@ -26,7 +26,7 @@
 
 #include "xmalloc.h"
 #include "sshbuf.h"
-#include "err.h"
+#include "ssherr.h"
 #include "channels.h"
 #include "cipher.h"
 #include "dispatch.h"
@@ -42,7 +42,7 @@
 #include "roaming.h"
 #include "ssh2.h"
 #include "sshconnect.h"
-#include "err.h"
+#include "ssherr.h"
 #include "digest.h"
 
 /* import */

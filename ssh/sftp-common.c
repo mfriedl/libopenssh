@@ -38,7 +38,7 @@
 #include <util.h>
 
 #include "xmalloc.h"
-#include "err.h"
+#include "ssherr.h"
 #include "sshbuf.h"
 #include "log.h"
 

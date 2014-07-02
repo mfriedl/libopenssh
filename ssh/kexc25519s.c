@@ -35,7 +35,7 @@
 #include "packet.h"
 #include "ssh2.h"
 #include "sshbuf.h"
-#include "err.h"
+#include "ssherr.h"
 
 static int input_kex_c25519_init(int, u_int32_t, struct ssh *);
 

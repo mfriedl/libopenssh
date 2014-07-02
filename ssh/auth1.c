@@ -31,7 +31,7 @@
 #include "channels.h"
 #include "session.h"
 #include "uidswap.h"
-#include "err.h"
+#include "ssherr.h"
 #ifdef GSSAPI
 #include "ssh-gss.h"
 #endif

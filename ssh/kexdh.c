@@ -33,7 +33,7 @@
 #include "key.h"
 #include "cipher.h"
 #include "kex.h"
-#include "err.h"
+#include "ssherr.h"
 #include "sshbuf.h"
 #include "digest.h"
 

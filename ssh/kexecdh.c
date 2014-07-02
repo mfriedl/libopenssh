@@ -40,7 +40,7 @@
 #include "kex.h"
 #include "sshbuf.h"
 #include "digest.h"
-#include "err.h"
+#include "ssherr.h"
 
 int
 kex_ecdh_hash(

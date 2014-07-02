@@ -44,7 +44,7 @@
 #include "misc.h"
 
 #include "sftp.h"
-#include "err.h"
+#include "ssherr.h"
 #include "sshbuf.h"
 #include "sftp-common.h"
 #include "sftp-client.h"

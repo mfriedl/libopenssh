@@ -34,7 +34,7 @@
 #include "dispatch.h"
 #include "packet.h"
 #include "compat.h"
-#include "err.h"
+#include "ssherr.h"
 
 int
 dispatch_protocol_error(int type, u_int32_t seq, struct ssh *ssh)

@@ -51,7 +51,7 @@
 #include "misc.h"
 #include "log.h"
 #include "ssh.h"
-#include "err.h"
+#include "ssherr.h"
 
 /* remove newline at end of string */
 char *

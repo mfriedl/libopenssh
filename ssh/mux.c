@@ -58,7 +58,7 @@
 #include "pathnames.h"
 #include "misc.h"
 #include "match.h"
-#include "err.h"
+#include "ssherr.h"
 #include "sshbuf.h"
 #include "channels.h"
 #include "msg.h"

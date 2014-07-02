@@ -27,7 +27,7 @@
 #include <string.h>
 #include <openssl/evp.h>
 
-#include "err.h"
+#include "ssherr.h"
 
 /*
  * This is used by SSH1:

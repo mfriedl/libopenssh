@@ -42,7 +42,7 @@
 #include "dns.h"
 #include "ssh.h"
 #include "ssh2.h"
-#include "err.h"
+#include "ssherr.h"
 #include "atomicio.h"
 #include "krl.h"
 

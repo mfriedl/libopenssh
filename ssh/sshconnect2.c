@@ -65,7 +65,7 @@
 #include "uidswap.h"
 #include "hostfile.h"
 #include "compat.h"
-#include "err.h"
+#include "ssherr.h"
 
 #ifdef GSSAPI
 #include "ssh-gss.h"

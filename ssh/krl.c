@@ -29,7 +29,7 @@
 #include <unistd.h>
 
 #include "sshbuf.h"
-#include "err.h"
+#include "ssherr.h"
 #include "key.h"
 #include "authfile.h"
 #include "misc.h"

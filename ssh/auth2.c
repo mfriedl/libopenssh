@@ -51,7 +51,7 @@
 #include "ssh-gss.h"
 #endif
 #include "monitor_wrap.h"
-#include "err.h"
+#include "ssherr.h"
 
 /* import */
 extern ServerOptions options;

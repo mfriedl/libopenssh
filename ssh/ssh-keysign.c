@@ -48,7 +48,7 @@
 #include "pathnames.h"
 #include "readconf.h"
 #include "uidswap.h"
-#include "err.h"
+#include "ssherr.h"
 
 /* XXX readconf.c needs these */
 uid_t original_real_uid;

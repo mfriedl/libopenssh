@@ -36,7 +36,7 @@
 #include <string.h>
 
 #include "ssh2.h"
-#include "err.h"
+#include "ssherr.h"
 #include "misc.h"
 #include "sshbuf.h"
 #include "rsa.h"

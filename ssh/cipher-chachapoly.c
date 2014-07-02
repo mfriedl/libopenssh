@@ -23,7 +23,7 @@
 
 #include "log.h"
 #include "sshbuf.h"
-#include "err.h"
+#include "ssherr.h"
 #include "cipher-chachapoly.h"
 
 int chachapoly_init(struct chachapoly_ctx *ctx,

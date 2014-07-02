@@ -104,7 +104,7 @@
 #include "roaming.h"
 #include "ssh-sandbox.h"
 #include "version.h"
-#include "err.h"
+#include "ssherr.h"
 
 #ifndef O_NOCTTY
 #define O_NOCTTY	0

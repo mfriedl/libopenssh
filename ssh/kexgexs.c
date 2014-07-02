@@ -45,7 +45,7 @@
 #endif
 #include "monitor_wrap.h"
 #include "dispatch.h"
-#include "err.h"
+#include "ssherr.h"
 #include "sshbuf.h"
 
 static int input_kex_dh_gex_request(int, u_int32_t, struct ssh *);

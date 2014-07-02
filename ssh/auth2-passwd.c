@@ -29,7 +29,7 @@
 #include <stdarg.h>
 
 #include "packet.h"
-#include "err.h"
+#include "ssherr.h"
 #include "log.h"
 #include "key.h"
 #include "hostfile.h"

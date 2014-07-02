@@ -40,7 +40,7 @@
 #include "kex.h"
 #include "log.h"
 #include "digest.h"
-#include "err.h"
+#include "ssherr.h"
 
 extern int crypto_scalarmult_curve25519(u_char a[CURVE25519_SIZE],
     const u_char b[CURVE25519_SIZE], const u_char c[CURVE25519_SIZE])

@@ -41,7 +41,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#include "err.h"
+#include "ssherr.h"
 #include "cipher.h"
 #include "misc.h"
 #include "sshbuf.h"

@@ -68,7 +68,7 @@
 #include "log.h"
 #include "misc.h"
 #include "digest.h"
-#include "err.h"
+#include "ssherr.h"
 
 #ifdef ENABLE_PKCS11
 #include "ssh-pkcs11.h"

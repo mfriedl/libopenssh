@@ -57,7 +57,7 @@
 #endif
 #include "authfile.h"
 #include "monitor_wrap.h"
-#include "err.h"
+#include "ssherr.h"
 #include "krl.h"
 #include "compat.h"
 

@@ -39,7 +39,7 @@
 #include "ssh2.h"
 #include "sshbuf.h"
 #include "digest.h"
-#include "err.h"
+#include "ssherr.h"
 
 static int
 input_kex_c25519_reply(int type, u_int32_t seq, struct ssh *ssh);

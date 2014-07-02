@@ -55,7 +55,7 @@
 #include "ssh1.h"
 #include "compat.h"
 #include "sshbuf.h"
-#include "err.h"
+#include "ssherr.h"
 
 #define TTY_OP_END		0
 /*

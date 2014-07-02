@@ -74,7 +74,7 @@
 #include "serverloop.h"
 #include "misc.h"
 #include "roaming.h"
-#include "err.h"
+#include "ssherr.h"
 
 extern ServerOptions options;
 

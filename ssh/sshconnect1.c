@@ -44,7 +44,7 @@
 #include "hostfile.h"
 #include "auth.h"
 #include "digest.h"
-#include "err.h"
+#include "ssherr.h"
 
 /* Session id for the current session. */
 u_char session_id[16];

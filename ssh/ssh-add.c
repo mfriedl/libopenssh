@@ -59,7 +59,7 @@
 #include "authfile.h"
 #include "pathnames.h"
 #include "misc.h"
-#include "err.h"
+#include "ssherr.h"
 
 /* argv0 */
 extern char *__progname;

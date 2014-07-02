@@ -26,7 +26,7 @@
 #include "ssh2.h"
 #include "version.h"
 #include "myproposal.h"
-#include "err.h"
+#include "ssherr.h"
 #include "sshbuf.h"
 
 #include <string.h>

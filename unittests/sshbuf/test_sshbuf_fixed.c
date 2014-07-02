@@ -16,7 +16,7 @@
 
 #define SSHBUF_INTERNAL 1  /* access internals for testing */
 #include "sshbuf.h"
-#include "err.h"
+#include "ssherr.h"
 
 void sshbuf_fixed(void);
 

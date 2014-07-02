@@ -71,7 +71,7 @@
 #include "session.h"
 #include "servconf.h"
 #include "roaming.h"
-#include "err.h"
+#include "ssherr.h"
 
 /* Imports */
 extern int compat20;

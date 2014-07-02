@@ -37,7 +37,7 @@
 #include "sshbuf.h"
 #include "packet.h"
 #include "dispatch.h"
-#include "err.h"
+#include "ssherr.h"
 #include "log.h"
 
 static int auth2_challenge_start(struct ssh *);

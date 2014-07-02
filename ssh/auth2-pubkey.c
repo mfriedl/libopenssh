@@ -61,7 +61,7 @@
 #include "misc.h"
 #include "authfile.h"
 #include "match.h"
-#include "err.h"
+#include "ssherr.h"
 
 /* import */
 extern ServerOptions options;

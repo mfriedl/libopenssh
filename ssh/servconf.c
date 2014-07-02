@@ -48,7 +48,7 @@
 #include "groupaccess.h"
 #include "canohost.h"
 #include "packet.h"
-#include "err.h"
+#include "ssherr.h"
 #include "hostfile.h"
 #include "auth.h"
 

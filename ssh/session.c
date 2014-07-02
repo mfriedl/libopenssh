@@ -83,7 +83,7 @@
 #endif
 #include "monitor_wrap.h"
 #include "sftp.h"
-#include "err.h"
+#include "ssherr.h"
 #include "sshbuf.h"
 
 #ifdef KRB5

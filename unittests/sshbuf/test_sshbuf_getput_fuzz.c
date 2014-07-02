@@ -17,7 +17,7 @@
 #include <openssl/objects.h>
 
 #include "test_helper.h"
-#include "err.h"
+#include "ssherr.h"
 #include "sshbuf.h"
 
 void sshbuf_getput_fuzz_tests(void);

@@ -36,7 +36,7 @@
 #include "log.h"
 #include "dispatch.h"
 #include "sshbuf.h"
-#include "err.h"
+#include "ssherr.h"
 #include "servconf.h"
 #include "packet.h"
 #include "ssh-gss.h"

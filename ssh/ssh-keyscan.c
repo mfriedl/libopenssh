@@ -39,7 +39,7 @@
 #include "atomicio.h"
 #include "misc.h"
 #include "hostfile.h"
-#include "err.h"
+#include "ssherr.h"
 #include "ssh_api.h"
 
 /* Flag indicating whether IPv4 or IPv6.  This can be set on the command line.

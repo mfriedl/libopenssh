@@ -67,7 +67,7 @@
 #include "misc.h"
 #include "atomicio.h"
 #include "sshbuf.h"
-#include "err.h"
+#include "ssherr.h"
 
 /* openssh private key file format */
 #define MARK_BEGIN		"-----BEGIN OPENSSH PRIVATE KEY-----\n"

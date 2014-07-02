@@ -34,7 +34,7 @@
 #include <string.h>
 
 #include "sshbuf.h"
-#include "err.h"
+#include "ssherr.h"
 #define SSHKEY_INTERNAL
 #include "key.h"
 #include "digest.h"

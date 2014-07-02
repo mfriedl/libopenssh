@@ -19,7 +19,7 @@
 
 #include "test_helper.h"
 
-#include "err.h"
+#include "ssherr.h"
 #define SSHBUF_INTERNAL 1	/* access internals for testing */
 #include "key.h"
 

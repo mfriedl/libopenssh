@@ -76,7 +76,7 @@
 #include "compat.h"
 #include "ssh2.h"
 #include "roaming.h"
-#include "err.h"
+#include "ssherr.h"
 #include "authfd.h"
 
 #ifdef GSSAPI

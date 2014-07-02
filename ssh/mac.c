@@ -34,7 +34,7 @@
 #include "key.h"
 #include "mac.h"
 #include "misc.h"
-#include "err.h"
+#include "ssherr.h"
 #include "sshbuf.h"
 
 #include "digest.h"
