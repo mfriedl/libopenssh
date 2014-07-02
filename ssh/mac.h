@@ -40,9 +40,8 @@ struct sshmac {
 	u_int	key_len;
 	int	type;
 	int	etm;		/* Encrypt-then-MAC */
-	const EVP_MD	*evp_md;
-	HMAC_CTX	evp_ctx;
-	struct umac_ctx *umac_ctx;
+	struct ssh_hmac_ctx	*hmac_ctx;
+	struct umac_ctx		*umac_ctx;
 };
 
 int	 mac_valid(const char *);

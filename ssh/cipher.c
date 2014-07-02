@@ -44,12 +44,8 @@
 #include "err.h"
 #include "cipher.h"
 #include "misc.h"
-<<<<<<< cipher.c
-=======
-#include "cipher.h"
-#include "buffer.h"
+#include "sshbuf.h"
 #include "digest.h"
->>>>>>> 1.96
 
 extern const EVP_CIPHER *evp_ssh1_bf(void);
 extern const EVP_CIPHER *evp_ssh1_3des(void);
@@ -140,10 +136,7 @@ cipher_keylen(const struct sshcipher *c)
 }
 
 u_int
-<<<<<<< cipher.c
-cipher_authlen(const struct sshcipher *c)
-=======
-cipher_seclen(const Cipher *c)
+cipher_seclen(const struct sshcipher *c)
 {
 	if (strcmp("3des-cbc", c->name) == 0)
 		return 14;
@@ -151,8 +144,7 @@ cipher_seclen(const Cipher *c)
 }
 
 u_int
-cipher_authlen(const Cipher *c)
->>>>>>> 1.96
+cipher_authlen(const struct sshcipher *c)
 {
 	return (c->auth_len);
 }
@@ -325,7 +317,6 @@ cipher_init(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
 	}
 
 	if (cipher->discard_len > 0) {
-<<<<<<< cipher.c
 		if ((junk = malloc(cipher->discard_len)) == NULL ||
 		    (discard = malloc(cipher->discard_len)) == NULL) {
 			if (junk != NULL)
@@ -334,15 +325,7 @@ cipher_init(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
 			goto bad;
 		}
 		ret = EVP_Cipher(&cc->evp, discard, junk, cipher->discard_len);
-		bzero(discard, cipher->discard_len);
-=======
-		junk = xmalloc(cipher->discard_len);
-		discard = xmalloc(cipher->discard_len);
-		if (EVP_Cipher(&cc->evp, discard, junk,
-		    cipher->discard_len) == 0)
-			fatal("evp_crypt: EVP_Cipher failed during discard");
 		explicit_bzero(discard, cipher->discard_len);
->>>>>>> 1.96
 		free(junk);
 		free(discard);
 		if (ret != 1) {
@@ -447,27 +430,15 @@ cipher_set_key_string(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
 	u_char digest[16];
 	int ret = SSH_ERR_LIBCRYPTO_ERROR;
 
-<<<<<<< cipher.c
-	if (MD5_Init(&md) != 1 ||
-	    MD5_Update(&md, (const u_char *)pphrase, strlen(pphrase)) != 1 ||
-	    MD5_Final(digest, &md) != 1)
-		goto out;
-=======
-	if (ssh_digest_memory(SSH_DIGEST_MD5, passphrase, strlen(passphrase),
+	if (ssh_digest_memory(SSH_DIGEST_MD5, pphrase, strlen(pphrase),
 	    digest, sizeof(digest)) < 0)
-		fatal("%s: md5 failed", __func__);
->>>>>>> 1.96
+		goto out;
 
 	ret = cipher_init(cc, cipher, digest, 16, NULL, 0, do_encrypt);
 
-<<<<<<< cipher.c
  out:
-	memset(digest, 0, sizeof(digest));
-	memset(&md, 0, sizeof(md));
-	return ret;
-=======
 	explicit_bzero(digest, sizeof(digest));
->>>>>>> 1.96
+	return ret;
 }
 
 /*

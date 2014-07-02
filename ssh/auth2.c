@@ -68,12 +68,6 @@ extern struct authmethod method_hostbased;
 #ifdef GSSAPI
 extern struct authmethod method_gssapi;
 #endif
-<<<<<<< auth2.c
-#ifdef JPAKE
-extern struct authmethod method_jpake;
-#endif
-=======
->>>>>>> 1.130
 
 struct authmethod *authmethods[] = {
 	&method_none,
@@ -265,14 +259,7 @@ input_userauth_request(int type, u_int32_t seq, struct ssh *ssh)
 		    authctxt->user, authctxt->service, user, service);
 	}
 	/* reset state */
-<<<<<<< auth2.c
 	auth2_challenge_stop(ssh);
-#ifdef JPAKE
-	auth2_jpake_stop(ssh);
-#endif
-=======
-	auth2_challenge_stop(authctxt);
->>>>>>> 1.130
 
 #ifdef GSSAPI
 	/* XXX move to auth2_gssapi_stop() */

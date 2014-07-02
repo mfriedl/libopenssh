@@ -43,11 +43,8 @@
 #include "canohost.h"
 #include "hostfile.h"
 #include "auth.h"
-<<<<<<< sshconnect1.c
-#include "err.h"
-=======
 #include "digest.h"
->>>>>>> 1.74
+#include "err.h"
 
 /* Session id for the current session. */
 u_char session_id[16];
@@ -130,14 +127,9 @@ try_agent_authentication(struct ssh *ssh)
 			 * although it advertised it supports this.  Just
 			 * return a wrong value.
 			 */
-<<<<<<< sshconnect1.c
 			logit("Authentication agent failed to decrypt "
 			    "challenge: %s", ssh_err(r));
-			memset(response, 0, sizeof(response));
-=======
-			logit("Authentication agent failed to decrypt challenge.");
 			explicit_bzero(response, sizeof(response));
->>>>>>> 1.74
 		}
 		debug("Sending response to RSA challenge.");
 
@@ -180,13 +172,8 @@ static void
 respond_to_rsa_challenge(struct ssh *ssh, BIGNUM * challenge, RSA * prv)
 {
 	u_char buf[32], response[16];
-<<<<<<< sshconnect1.c
-	MD5_CTX md;
-	int r, len;
-=======
 	struct ssh_digest_ctx *md;
-	int i, len;
->>>>>>> 1.74
+	int r, len;
 
 	/* Decrypt the challenge using the private key. */
 	/* XXX think about Bleichenbacher, too */
@@ -489,17 +476,11 @@ try_challenge_response_authentication(struct ssh *ssh)
 			free(response);
 			break;
 		}
-<<<<<<< sshconnect1.c
 		if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_TIS_RESPONSE)) != 0 ||
 		    (r = ssh_put_password(ssh, response)) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
-		memset(response, 0, strlen(response));
-=======
-		packet_start(SSH_CMSG_AUTH_TIS_RESPONSE);
-		ssh_put_password(response);
 		explicit_bzero(response, strlen(response));
->>>>>>> 1.74
 		free(response);
 		ssh_packet_write_wait(ssh);
 		type = ssh_packet_read(ssh);
@@ -530,17 +511,11 @@ try_password_authentication(struct ssh *ssh, char *prompt)
 		if (i != 0)
 			error("Permission denied, please try again.");
 		password = read_passphrase(prompt, 0);
-<<<<<<< sshconnect1.c
 		if ((r = sshpkt_start(ssh, SSH_CMSG_AUTH_PASSWORD)) != 0 ||
 		    (r = ssh_put_password(ssh, password)) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
-		memset(password, 0, strlen(password));
-=======
-		packet_start(SSH_CMSG_AUTH_PASSWORD);
-		ssh_put_password(password);
 		explicit_bzero(password, strlen(password));
->>>>>>> 1.74
 		free(password);
 		ssh_packet_write_wait(ssh);
 

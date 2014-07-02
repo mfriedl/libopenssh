@@ -18,7 +18,7 @@
 #include <sys/types.h>
 #include <string.h>
 
-#include "buffer.h"
+#include "sshbuf.h"
 #include "digest.h"
 #include "hmac.h"
 

@@ -207,20 +207,8 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 #ifdef DEBUG_KEXDH
 	dump_digest("shared secret", kbuf, kout);
 #endif
-<<<<<<< kexgexc.c
 	if (ssh->compat & SSH_OLD_DHGEX)
 		kex->min = kex->max = -1;
-=======
-	if ((shared_secret = BN_new()) == NULL)
-		fatal("kexgex_client: BN_new failed");
-	if (BN_bin2bn(kbuf, kout, shared_secret) == NULL)
-		fatal("kexgex_client: BN_bin2bn failed");
-	explicit_bzero(kbuf, klen);
-	free(kbuf);
-
-	if (datafellows & SSH_OLD_DHGEX)
-		min = max = -1;
->>>>>>> 1.17
 
 	/* calc and verify H */
 	if ((r = kexgex_hash(
@@ -265,7 +253,7 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 	if (dh_server_pub)
 		BN_clear_free(dh_server_pub);
 	if (kbuf) {
-		bzero(kbuf, klen);
+		explicit_bzero(kbuf, klen);
 		free(kbuf);
 	}
 	if (shared_secret)

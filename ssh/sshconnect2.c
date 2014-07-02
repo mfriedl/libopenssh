@@ -64,13 +64,8 @@
 #include "pathnames.h"
 #include "uidswap.h"
 #include "hostfile.h"
-<<<<<<< sshconnect2.c
-#include "schnorr.h"
-#include "jpake.h"
 #include "compat.h"
 #include "err.h"
-=======
->>>>>>> 1.204
 
 #ifdef GSSAPI
 #include "ssh-gss.h"
@@ -279,7 +274,6 @@ struct cauthmethod {
 	int	*batch_flag;	/* flag in option struct that disables method */
 };
 
-<<<<<<< sshconnect2.c
 int	input_userauth_service_accept(int, u_int32_t, struct ssh *);
 int	input_userauth_success(int, u_int32_t, struct ssh *);
 int	input_userauth_success_unexpected(int, u_int32_t, struct ssh *);
@@ -289,34 +283,12 @@ int	input_userauth_error(int, u_int32_t, struct ssh *);
 int	input_userauth_info_req(int, u_int32_t, struct ssh *);
 int	input_userauth_pk_ok(int, u_int32_t, struct ssh *);
 int	input_userauth_passwd_changereq(int, u_int32_t, struct ssh *);
-int	input_userauth_jpake_server_step1(int, u_int32_t, struct ssh *);
-int	input_userauth_jpake_server_step2(int, u_int32_t, struct ssh *);
-int	input_userauth_jpake_server_confirm(int, u_int32_t, struct ssh *);
 
 int	userauth_none(struct ssh *);
 int	userauth_pubkey(struct ssh *);
 int	userauth_passwd(struct ssh *);
 int	userauth_kbdint(struct ssh *);
 int	userauth_hostbased(struct ssh *);
-int	userauth_jpake(struct ssh *);
-
-void	userauth_jpake_cleanup(struct ssh *);
-=======
-void	input_userauth_success(int, u_int32_t, void *);
-void	input_userauth_success_unexpected(int, u_int32_t, void *);
-void	input_userauth_failure(int, u_int32_t, void *);
-void	input_userauth_banner(int, u_int32_t, void *);
-void	input_userauth_error(int, u_int32_t, void *);
-void	input_userauth_info_req(int, u_int32_t, void *);
-void	input_userauth_pk_ok(int, u_int32_t, void *);
-void	input_userauth_passwd_changereq(int, u_int32_t, void *);
-
-int	userauth_none(Authctxt *);
-int	userauth_pubkey(Authctxt *);
-int	userauth_passwd(Authctxt *);
-int	userauth_kbdint(Authctxt *);
-int	userauth_hostbased(Authctxt *);
->>>>>>> 1.204
 
 #ifdef GSSAPI
 int	userauth_gssapi(struct ssh *);
@@ -965,7 +937,6 @@ userauth_passwd(struct ssh *ssh)
 	snprintf(prompt, sizeof(prompt), "%.30s@%.128s's password: ",
 	    authctxt->server_user, host);
 	password = read_passphrase(prompt, 0);
-<<<<<<< sshconnect2.c
 	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, authctxt->server_user)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, authctxt->service)) != 0 ||
@@ -977,21 +948,9 @@ userauth_passwd(struct ssh *ssh)
 		fatal("%s: %s", __func__, ssh_err(r));
 
 	if (password) {
-		memset(password, 0, strlen(password));
+		explicit_bzero(password, strlen(password));
 		free(password);
 	}
-=======
-	packet_start(SSH2_MSG_USERAUTH_REQUEST);
-	packet_put_cstring(authctxt->server_user);
-	packet_put_cstring(authctxt->service);
-	packet_put_cstring(authctxt->method->name);
-	packet_put_char(0);
-	packet_put_cstring(password);
-	explicit_bzero(password, strlen(password));
-	free(password);
-	packet_add_padding(64);
-	packet_send();
->>>>>>> 1.204
 
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_PASSWD_CHANGEREQ,
 	    &input_userauth_passwd_changereq);
@@ -1035,15 +994,10 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
 	    "Enter %.30s@%.128s's old password: ",
 	    authctxt->server_user, host);
 	password = read_passphrase(prompt, 0);
-<<<<<<< sshconnect2.c
 	if ((r = sshpkt_put_cstring(ssh, password)) != 0)
 		goto out;
 
-	memset(password, 0, strlen(password));
-=======
-	packet_put_cstring(password);
 	explicit_bzero(password, strlen(password));
->>>>>>> 1.204
 	free(password);
 	password = NULL;
 
@@ -1070,25 +1024,17 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
 		explicit_bzero(retype, strlen(retype));
 		free(retype);
 	}
-<<<<<<< sshconnect2.c
 	if ((r = sshpkt_put_cstring(ssh, password)) != 0 ||
 	    (r = sshpkt_add_padding(ssh, 64)) != 0 ||
 	    (r = sshpkt_send(ssh)) != 0)
 		goto out;
-=======
-	packet_put_cstring(password);
-	explicit_bzero(password, strlen(password));
-	free(password);
-	packet_add_padding(64);
-	packet_send();
->>>>>>> 1.204
 
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_PASSWD_CHANGEREQ,
 	    &input_userauth_passwd_changereq);
 	r = 0;
  out:
 	if (password) {
-		memset(password, 0, strlen(password));
+		explicit_bzero(password, strlen(password));
 		free(password);
 	}
 	free(info);
@@ -1096,251 +1042,6 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
 	return r;
 }
 
-<<<<<<< sshconnect2.c
-#ifdef JPAKE
-static char *
-pw_encrypt(const char *password, const char *crypt_scheme, const char *salt)
-{
-	/* OpenBSD crypt(3) handles all of these */
-	if (strcmp(crypt_scheme, "crypt") == 0 ||
-	    strcmp(crypt_scheme, "bcrypt") == 0 ||
-	    strcmp(crypt_scheme, "md5crypt") == 0 ||
-	    strcmp(crypt_scheme, "crypt-extended") == 0)
-		return xstrdup(crypt(password, salt));
-	error("%s: unsupported password encryption scheme \"%.100s\"",
-	    __func__, crypt_scheme);
-	return NULL;
-}
-
-static BIGNUM *
-jpake_password_to_secret(struct cauthctxt *authctxt, const char *crypt_scheme,
-    const char *salt)
-{
-	char prompt[256], *password, *crypted;
-	u_char *secret;
-	u_int secret_len;
-	BIGNUM *ret;
-
-	snprintf(prompt, sizeof(prompt), "%.30s@%.128s's password (JPAKE): ",
-	    authctxt->server_user, authctxt->host);
-	password = read_passphrase(prompt, 0);
-
-	if ((crypted = pw_encrypt(password, crypt_scheme, salt)) == NULL) {
-		logit("Disabling %s authentication", authctxt->method->name);
-		authctxt->method->enabled = NULL;
-		/* Continue with an empty password to fail gracefully */
-		crypted = xstrdup("");
-	}
-
-#ifdef JPAKE_DEBUG
-	debug3("%s: salt = %s", __func__, salt);
-	debug3("%s: scheme = %s", __func__, crypt_scheme);
-	debug3("%s: crypted = %s", __func__, crypted);
-#endif
-
-	if (hash_buffer(crypted, strlen(crypted), SSH_DIGEST_SHA1,
-	    &secret, &secret_len) != 0)
-		fatal("%s: hash_buffer", __func__);
-
-	bzero(password, strlen(password));
-	bzero(crypted, strlen(crypted));
-	free(password);
-	free(crypted);
-
-	if ((ret = BN_bin2bn(secret, secret_len, NULL)) == NULL)
-		fatal("%s: BN_bin2bn (secret)", __func__);
-	bzero(secret, secret_len);
-	free(secret);
-
-	return ret;
-}
-
-/* ARGSUSED */
-int
-input_userauth_jpake_server_step1(int type, u_int32_t seq, struct ssh *ssh)
-{
-	struct cauthctxt *authctxt = ssh->authctxt;
-	struct jpake_ctx *pctx = authctxt->methoddata;
-	u_char *x3_proof = NULL, *x4_proof = NULL, *x2_s_proof = NULL;
-	size_t x3_proof_len, x4_proof_len, len;
-	u_int x2_s_proof_len;
-	char *crypt_scheme, *salt;
-	int r;
-
-	/* Disable this message */
-	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_STEP1, NULL);
-
-	if ((pctx->g_x3 = BN_new()) == NULL ||
-	    (pctx->g_x4 = BN_new()) == NULL)
-		fatal("%s: BN_new", __func__);
-
-	/* Fetch step 1 values */
-	if ((r = sshpkt_get_cstring(ssh, &crypt_scheme, NULL)) != 0 ||
-	    (r = sshpkt_get_cstring(ssh, &salt, NULL)) != 0 ||
-	    (r = sshpkt_get_string(ssh, &pctx->server_id, &len)) != 0 ||
-	    (r = sshpkt_get_bignum2(ssh, pctx->g_x3)) != 0 ||
-	    (r = sshpkt_get_bignum2(ssh, pctx->g_x4)) != 0 ||
-	    (r = sshpkt_get_string(ssh, &x3_proof, &x3_proof_len)) != 0 ||
-	    (r = sshpkt_get_string(ssh, &x4_proof, &x4_proof_len)) != 0 ||
-	    (r = sshpkt_get_end(ssh)) != 0)
-		goto out;
-	pctx->server_id_len = len
-
-	JPAKE_DEBUG_CTX((pctx, "step 1 received in %s", __func__));
-
-	/* Obtain password and derive secret */
-	pctx->s = jpake_password_to_secret(authctxt, crypt_scheme, salt);
-	bzero(crypt_scheme, strlen(crypt_scheme));
-	bzero(salt, strlen(salt));
-	free(crypt_scheme);
-	free(salt);
-
-	JPAKE_DEBUG_BN((pctx->s, "%s: s = ", __func__));
-
-	/* Calculate step 2 values */
-	jpake_step2(pctx->grp, pctx->s, pctx->g_x1,
-	    pctx->g_x3, pctx->g_x4, pctx->x2,
-	    pctx->server_id, pctx->server_id_len,
-	    pctx->client_id, pctx->client_id_len,
-	    x3_proof, x3_proof_len,
-	    x4_proof, x4_proof_len,
-	    &pctx->a,
-	    &x2_s_proof, &x2_s_proof_len);
-
-	JPAKE_DEBUG_CTX((pctx, "step 2 sending in %s", __func__));
-
-	/* Send values for step 2 */
-	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP2)) != 0 ||
-	    (r = sshpkt_put_bignum2(ssh, pctx->a)) != 0 ||
-	    (r = sshpkt_put_string(ssh, x2_s_proof, x2_s_proof_len)) != 0 ||
-	    (r = sshpkt_send(ssh)) != 0)
-		goto out;
-
-	/* Expect step 2 packet from peer */
-	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_STEP2,
-	    input_userauth_jpake_server_step2);
-	r = 0;
- out:
-	if (x2_s_proof) {
-		bzero(x2_s_proof, x2_s_proof_len);
-		free(x2_s_proof);
-	}
-	if (x3_proof) {
-		bzero(x3_proof, x3_proof_len);
-		free(x3_proof);
-	}
-	if (x4_proof) {
-		bzero(x4_proof, x4_proof_len);
-		free(x4_proof);
-	}
-	if (crypt_scheme) {
-		bzero(crypt_scheme, strlen(crypt_scheme));
-		free(crypt_scheme);
-	}
-	if (salt) {
-		bzero(salt, strlen(salt));
-		free(salt);
-	}
-	if (r != 0)
-		userauth_jpake_cleanup(ssh);
-	return r;
-}
-
-/* ARGSUSED */
-int
-input_userauth_jpake_server_step2(int type, u_int32_t seq, struct ssh *ssh)
-{
-	struct cauthctxt *authctxt = ssh->authctxt;
-	struct jpake_ctx *pctx = authctxt->methoddata;
-	u_char *x4_s_proof = NULL;
-	size_t x4_s_proof_len;
-	int r;
-
-	/* Disable this message */
-	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_STEP2, NULL);
-
-	if ((pctx->b = BN_new()) == NULL)
-		fatal("%s: BN_new", __func__);
-
-	/* Fetch step 2 values */
-	if ((r = sshpkt_get_bignum2(ssh, pctx->b)) != 0 ||
-	    (r = sshpkt_get_string(ssh, &x4_s_proof, &x4_s_proof_len)) != 0 ||
-	    (r = sshpkt_get_end(ssh)) != 0)
-		goto out;
-
-	JPAKE_DEBUG_CTX((pctx, "step 2 received in %s", __func__));
-
-	/* Derive shared key and calculate confirmation hash */
-	jpake_key_confirm(pctx->grp, pctx->s, pctx->b,
-	    pctx->x2, pctx->g_x1, pctx->g_x2, pctx->g_x3, pctx->g_x4,
-	    pctx->client_id, pctx->client_id_len,
-	    pctx->server_id, pctx->server_id_len,
-	    ssh->kex->session_id, ssh->kex->session_id_len,
-	    x4_s_proof, x4_s_proof_len,
-	    &pctx->k,
-	    &pctx->h_k_cid_sessid, &pctx->h_k_cid_sessid_len);
-
-	JPAKE_DEBUG_CTX((pctx, "confirm sending in %s", __func__));
-
-	/* Send key confirmation proof */
-	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_JPAKE_CLIENT_CONFIRM)) != 0 ||
-	    (r = sshpkt_put_string(ssh, pctx->h_k_cid_sessid,
-	    pctx->h_k_cid_sessid_len)) != 0 ||
-	    (r = sshpkt_send(ssh)) != 0)
-		goto out;
-
-	/* Expect confirmation from peer */
-	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_CONFIRM,
-	    input_userauth_jpake_server_confirm);
-	r = 0;
- out:
-	if (x4_s_proof) {
-		bzero(x4_s_proof, x4_s_proof_len);
-		free(x4_s_proof);
-	}
-	if (r != 0)
-		userauth_jpake_cleanup(ssh);
-	return r;
-}
-
-/* ARGSUSED */
-int
-input_userauth_jpake_server_confirm(int type, u_int32_t seq, struct ssh *ssh)
-{
-	struct cauthctxt *authctxt = ssh->authctxt;
-	struct jpake_ctx *pctx = authctxt->methoddata;
-	size_t len;
-	int r;
-
-	/* Disable this message */
-	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_CONFIRM, NULL);
-
-	if ((r = sshpkt_get_string(ssh, &pctx->h_k_sid_sessid, &len)) != 0 ||
-	    (r = sshpkt_get_end(ssh)) != 0)
-		goto out;
-	pctx->h_k_sid_sessid_len = len;
-
-	JPAKE_DEBUG_CTX((pctx, "confirm received in %s", __func__));
-
-	/* Verify expected confirmation hash */
-	if (jpake_check_confirm(pctx->k,
-	    pctx->server_id, pctx->server_id_len,
-	    ssh->kex->session_id, ssh->kex->session_id_len,
-	    pctx->h_k_sid_sessid, pctx->h_k_sid_sessid_len) == 1)
-		debug("%s: %s success", __func__, authctxt->method->name);
-	else {
-		debug("%s: confirmation mismatch", __func__);
-		/* XXX stash this so if auth succeeds then we can warn/kill */
-	}
-
- out:
-	userauth_jpake_cleanup(ssh);
-	return r;
-}
-#endif /* JPAKE */
-
-=======
->>>>>>> 1.204
 static int
 identity_sign(struct identity *id, u_char **sigp, size_t *lenp,
     const u_char *data, size_t datalen, u_int compat)
@@ -1549,7 +1250,6 @@ load_identity_file(char *filename, int userprovided)
 				quit = 1;
 				break;
 			}
-<<<<<<< sshconnect2.c
 			/* FALLTHROUGH */
 		default:
 			error("Load key \"%s\": %s", filename, ssh_err(r));
@@ -1557,10 +1257,7 @@ load_identity_file(char *filename, int userprovided)
 			break;
 		}
 		if (i > 0) {
-			memset(passphrase, 0, strlen(passphrase));
-=======
 			explicit_bzero(passphrase, strlen(passphrase));
->>>>>>> 1.204
 			free(passphrase);
 		}
 		if (private != NULL || quit)
@@ -1833,15 +1530,9 @@ input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 		    (r = sshpkt_get_u8(ssh, &echo)) != 0)
 			goto out;
 		response = read_passphrase(prompt, echo ? RP_ECHO : 0);
-<<<<<<< sshconnect2.c
 		if ((r = sshpkt_put_cstring(ssh, response)) != 0)
 			goto out;
-		memset(response, 0, strlen(response));
-=======
-
-		packet_put_cstring(response);
 		explicit_bzero(response, strlen(response));
->>>>>>> 1.204
 		free(response);
 		free(prompt);
 		response = prompt = NULL;
@@ -2030,7 +1721,6 @@ userauth_hostbased(struct ssh *ssh)
 		free(blob);
 		return 0;
 	}
-<<<<<<< sshconnect2.c
 	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, authctxt->server_user)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, authctxt->service)) != 0 ||
@@ -2042,19 +1732,7 @@ userauth_hostbased(struct ssh *ssh)
 	    (r = sshpkt_put_string(ssh, signature, slen)) != 0 ||
 	    (r = sshpkt_send(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
-	memset(signature, 's', slen);
-=======
-	packet_start(SSH2_MSG_USERAUTH_REQUEST);
-	packet_put_cstring(authctxt->server_user);
-	packet_put_cstring(authctxt->service);
-	packet_put_cstring(authctxt->method->name);
-	packet_put_cstring(pkalg);
-	packet_put_string(blob, blen);
-	packet_put_cstring(chost);
-	packet_put_cstring(authctxt->local_user);
-	packet_put_string(signature, slen);
 	explicit_bzero(signature, slen);
->>>>>>> 1.204
 	free(signature);
 	free(chost);
 	free(pkalg);
@@ -2063,88 +1741,6 @@ userauth_hostbased(struct ssh *ssh)
 	return 1;
 }
 
-<<<<<<< sshconnect2.c
-#ifdef JPAKE
-int
-userauth_jpake(struct ssh *ssh)
-{
-	struct cauthctxt *authctxt = ssh->authctxt;
-	struct jpake_ctx *pctx;
-	u_char *x1_proof, *x2_proof;
-	u_int x1_proof_len, x2_proof_len;
-	int r;
-
-	if (authctxt->attempt++ >= options.number_of_password_prompts)
-		return 0;
-	if (authctxt->attempt != 1)
-		error("Permission denied, please try again.");
-
-	if (authctxt->methoddata != NULL)
-		fatal("%s: authctxt->methoddata already set (%p)",
-		    __func__, authctxt->methoddata);
-
-	authctxt->methoddata = pctx = jpake_new();
-
-	/*
-	 * Send request immediately, to get the protocol going while
-	 * we do the initial computations.
-	 */
-	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
-	    (r = sshpkt_put_cstring(ssh, authctxt->server_user)) != 0 ||
-	    (r = sshpkt_put_cstring(ssh, authctxt->service)) != 0 ||
-	    (r = sshpkt_put_cstring(ssh, authctxt->method->name)) != 0 ||
-	    (r = sshpkt_send(ssh)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-	ssh_packet_write_wait(ssh);
-
-	jpake_step1(pctx->grp,
-	    &pctx->client_id, &pctx->client_id_len,
-	    &pctx->x1, &pctx->x2, &pctx->g_x1, &pctx->g_x2,
-	    &x1_proof, &x1_proof_len,
-	    &x2_proof, &x2_proof_len);
-
-	JPAKE_DEBUG_CTX((pctx, "step 1 sending in %s", __func__));
-
-	if ((r = sshpkt_start(ssh,
-	    SSH2_MSG_USERAUTH_JPAKE_CLIENT_STEP1)) != 0 ||
-	    (r = sshpkt_put_string(ssh, pctx->client_id,
-	    pctx->client_id_len)) != 0 ||
-	    (r = sshpkt_put_bignum2(ssh, pctx->g_x1)) != 0 ||
-	    (r = sshpkt_put_bignum2(ssh, pctx->g_x2)) != 0 ||
-	    (r = sshpkt_put_string(ssh, x1_proof, x1_proof_len)) != 0 ||
-	    (r = sshpkt_put_string(ssh, x2_proof, x2_proof_len)) != 0 ||
-	    (r = sshpkt_send(ssh)) != 0)
-		fatal("%s: %s", __func__, ssh_err(r));
-
-	bzero(x1_proof, x1_proof_len);
-	bzero(x2_proof, x2_proof_len);
-	free(x1_proof);
-	free(x2_proof);
-
-	/* Expect step 1 packet from peer */
-	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_JPAKE_SERVER_STEP1,
-	    input_userauth_jpake_server_step1);
-	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_SUCCESS,
-	    &input_userauth_success_unexpected);
-
-	return 1;
-}
-
-void
-userauth_jpake_cleanup(struct ssh *ssh)
-{
-	struct cauthctxt *authctxt = ssh->authctxt;
-	debug3("%s: clean up", __func__);
-	if (authctxt->methoddata != NULL) {
-		jpake_free(authctxt->methoddata);
-		authctxt->methoddata = NULL;
-	}
-	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_SUCCESS, &input_userauth_success);
-}
-#endif /* JPAKE */
-
-=======
->>>>>>> 1.204
 /* find auth method */
 
 /*

@@ -106,18 +106,10 @@ static int
 mac_setup_by_alg(struct sshmac *mac, const struct macalg *macalg)
 {
 	mac->type = macalg->type;
-<<<<<<< mac.c
-	if (mac->type == SSH_EVP) {
-		mac->evp_md = macalg->mdfunc();
-		if ((evp_len = EVP_MD_size(mac->evp_md)) <= 0)
-			return SSH_ERR_LIBCRYPTO_ERROR;
-		mac->key_len = mac->mac_len = (u_int)evp_len;
-=======
 	if (mac->type == SSH_DIGEST) {
 		if ((mac->hmac_ctx = ssh_hmac_start(macalg->alg)) == NULL)
-			fatal("ssh_hmac_start(alg=%d) failed", macalg->alg);
+			return SSH_ERR_LIBCRYPTO_ERROR;
 		mac->key_len = mac->mac_len = ssh_hmac_bytes(macalg->alg);
->>>>>>> 1.27
 	} else {
 		mac->mac_len = macalg->len / 8;
 		mac->key_len = macalg->key_len / 8;
@@ -150,22 +142,10 @@ mac_init(struct sshmac *mac)
 	if (mac->key == NULL)
 		return SSH_ERR_INVALID_ARGUMENT;
 	switch (mac->type) {
-<<<<<<< mac.c
-	case SSH_EVP:
-		if (mac->evp_md == NULL)
-			return SSH_ERR_INVALID_ARGUMENT;
-		HMAC_CTX_init(&mac->evp_ctx);
-		if (HMAC_Init(&mac->evp_ctx, mac->key, mac->key_len,
-		    mac->evp_md) != 1) {
-			HMAC_CTX_cleanup(&mac->evp_ctx);
-			return SSH_ERR_LIBCRYPTO_ERROR;
-		}
-=======
 	case SSH_DIGEST:
 		if (mac->hmac_ctx == NULL ||
 		    ssh_hmac_init(mac->hmac_ctx, mac->key, mac->key_len) < 0)
-			return -1;
->>>>>>> 1.27
+			return SSH_ERR_INVALID_ARGUMENT;
 		return 0;
 	case SSH_UMAC:
 		if ((mac->umac_ctx = umac_new(mac->key)) == NULL)
@@ -193,27 +173,14 @@ mac_compute(struct sshmac *mac, u_int32_t seqno, const u_char *data, int datalen
 		return SSH_ERR_INTERNAL_ERROR;
 
 	switch (mac->type) {
-<<<<<<< mac.c
-	case SSH_EVP:
-		POKE_U32(b, seqno);
-=======
 	case SSH_DIGEST:
 		put_u32(b, seqno);
->>>>>>> 1.27
 		/* reset HMAC context */
-<<<<<<< mac.c
-		if (HMAC_Init(&mac->evp_ctx, NULL, 0, NULL) != 1 ||
-		    HMAC_Update(&mac->evp_ctx, b, sizeof(b)) != 1 ||
-		    HMAC_Update(&mac->evp_ctx, data, datalen) != 1 ||
-		    HMAC_Final(&mac->evp_ctx, u.m, NULL) != 1)
-			return SSH_ERR_LIBCRYPTO_ERROR;
-=======
 		if (ssh_hmac_init(mac->hmac_ctx, NULL, 0) < 0 ||
 		    ssh_hmac_update(mac->hmac_ctx, b, sizeof(b)) < 0 ||
 		    ssh_hmac_update(mac->hmac_ctx, data, datalen) < 0 ||
 		    ssh_hmac_final(mac->hmac_ctx, u.m, sizeof(u.m)) < 0)
-			fatal("ssh_hmac failed");
->>>>>>> 1.27
+			return SSH_ERR_LIBCRYPTO_ERROR;
 		break;
 	case SSH_UMAC:
 		POKE_U64(nonce, seqno);

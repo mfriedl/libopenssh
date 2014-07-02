@@ -1,8 +1,4 @@
-<<<<<<< key.c
-/* $OpenBSD: key.c,v 1.114 2013/12/29 04:20:04 djm Exp $ */
-=======
 /* $OpenBSD: key.c,v 1.116 2014/02/02 03:44:31 djm Exp $ */
->>>>>>> 1.116
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Alexander von Gernler.  All rights reserved.
@@ -1963,83 +1959,8 @@ sshkey_sign(const struct sshkey *key,
 		*sigp = NULL;
 	if (lenp != NULL)
 		*lenp = 0;
-<<<<<<< key.c
 	if (datalen > SSH_KEY_MAX_SIGN_DATA_SIZE)
 		return SSH_ERR_INVALID_ARGUMENT;
-=======
-	if (key == NULL) {
-		error("key_to_blob: key == NULL");
-		return 0;
-	}
-	buffer_init(&b);
-	type = force_plain ? key_type_plain(key->type) : key->type;
-	switch (type) {
-	case KEY_DSA_CERT_V00:
-	case KEY_RSA_CERT_V00:
-	case KEY_DSA_CERT:
-	case KEY_ECDSA_CERT:
-	case KEY_RSA_CERT:
-	case KEY_ED25519_CERT:
-		/* Use the existing blob */
-		buffer_append(&b, buffer_ptr(&key->cert->certblob),
-		    buffer_len(&key->cert->certblob));
-		break;
-	case KEY_DSA:
-		buffer_put_cstring(&b,
-		    key_ssh_name_from_type_nid(type, key->ecdsa_nid));
-		buffer_put_bignum2(&b, key->dsa->p);
-		buffer_put_bignum2(&b, key->dsa->q);
-		buffer_put_bignum2(&b, key->dsa->g);
-		buffer_put_bignum2(&b, key->dsa->pub_key);
-		break;
-	case KEY_ECDSA:
-		buffer_put_cstring(&b,
-		    key_ssh_name_from_type_nid(type, key->ecdsa_nid));
-		buffer_put_cstring(&b, key_curve_nid_to_name(key->ecdsa_nid));
-		buffer_put_ecpoint(&b, EC_KEY_get0_group(key->ecdsa),
-		    EC_KEY_get0_public_key(key->ecdsa));
-		break;
-	case KEY_RSA:
-		buffer_put_cstring(&b,
-		    key_ssh_name_from_type_nid(type, key->ecdsa_nid));
-		buffer_put_bignum2(&b, key->rsa->e);
-		buffer_put_bignum2(&b, key->rsa->n);
-		break;
-	case KEY_ED25519:
-		buffer_put_cstring(&b,
-		    key_ssh_name_from_type_nid(type, key->ecdsa_nid));
-		buffer_put_string(&b, key->ed25519_pk, ED25519_PK_SZ);
-		break;
-	default:
-		error("key_to_blob: unsupported key type %d", key->type);
-		buffer_free(&b);
-		return 0;
-	}
-	len = buffer_len(&b);
-	if (lenp != NULL)
-		*lenp = len;
-	if (blobp != NULL) {
-		*blobp = xmalloc(len);
-		memcpy(*blobp, buffer_ptr(&b), len);
-	}
-	explicit_bzero(buffer_ptr(&b), len);
-	buffer_free(&b);
-	return len;
-}
-
-int
-key_to_blob(const Key *key, u_char **blobp, u_int *lenp)
-{
-	return to_blob(key, blobp, lenp, 0);
-}
-
-int
-key_sign(
-    const Key *key,
-    u_char **sigp, u_int *lenp,
-    const u_char *data, u_int datalen)
-{
->>>>>>> 1.116
 	switch (key->type) {
 	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:

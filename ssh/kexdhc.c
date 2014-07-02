@@ -151,15 +151,6 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 #ifdef DEBUG_KEXDH
 	dump_digest("shared secret", kbuf, kout);
 #endif
-<<<<<<< kexdhc.c
-=======
-	if ((shared_secret = BN_new()) == NULL)
-		fatal("kexdh_client: BN_new failed");
-	if (BN_bin2bn(kbuf, kout, shared_secret) == NULL)
-		fatal("kexdh_client: BN_bin2bn failed");
-	explicit_bzero(kbuf, klen);
-	free(kbuf);
->>>>>>> 1.15
 
 	/* calc and verify H */
 	if ((r = kex_dh_hash(
@@ -201,7 +192,7 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 	if (dh_server_pub)
 		BN_clear_free(dh_server_pub);
 	if (kbuf) {
-		bzero(kbuf, klen);
+		explicit_bzero(kbuf, klen);
 		free(kbuf);
 	}
 	if (shared_secret)

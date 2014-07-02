@@ -254,7 +254,6 @@ load_identity(char *filename)
 	struct sshkey *prv;
 	int r;
 
-<<<<<<< ssh-keygen.c
 	if ((r = sshkey_load_private(filename, "", &prv, NULL)) == 0)
 		return prv;
 	if (r != SSH_ERR_KEY_WRONG_PASSPHRASE)
@@ -264,23 +263,10 @@ load_identity(char *filename)
 	else
 		pass = read_passphrase("Enter passphrase: ", RP_ALLOW_STDIN);
 	r = sshkey_load_private(filename, pass, &prv, NULL);
-	memset(pass, 0, strlen(pass));
+	explicit_bzero(pass, strlen(pass));
 	free(pass);
 	if (r != 0)
 		fatal("Load key \"%s\": %s", filename, ssh_err(r));
-=======
-	prv = key_load_private(filename, "", NULL);
-	if (prv == NULL) {
-		if (identity_passphrase)
-			pass = xstrdup(identity_passphrase);
-		else
-			pass = read_passphrase("Enter passphrase: ",
-			    RP_ALLOW_STDIN);
-		prv = key_load_private(filename, pass, NULL);
-		explicit_bzero(pass, strlen(pass));
-		free(pass);
-	}
->>>>>>> 1.240
 	return prv;
 }
 
@@ -1287,15 +1273,9 @@ do_change_passphrase(struct passwd *pw)
 			old_passphrase =
 			    read_passphrase("Enter old passphrase: ",
 			    RP_ALLOW_STDIN);
-<<<<<<< ssh-keygen.c
 		r = sshkey_load_private(identity_file, old_passphrase,
 		    &private, &comment);
-		memset(old_passphrase, 0, strlen(old_passphrase));
-=======
-		private = key_load_private(identity_file, old_passphrase,
-		    &comment);
 		explicit_bzero(old_passphrase, strlen(old_passphrase));
->>>>>>> 1.240
 		free(old_passphrase);
 		if (r != 0)
 			goto badkey;
@@ -1333,18 +1313,11 @@ do_change_passphrase(struct passwd *pw)
 	}
 
 	/* Save the file using the new passphrase. */
-<<<<<<< ssh-keygen.c
 	if ((r = sshkey_save_private(private, identity_file, passphrase1,
 	    comment, use_new_format, new_format_cipher, rounds)) != 0) {
 		printf("Saving key \"%s\" failed: %s.\n",
 		    identity_file, ssh_err(r));
-		memset(passphrase1, 0, strlen(passphrase1));
-=======
-	if (!key_save_private(private, identity_file, passphrase1, comment,
-	    use_new_format, new_format_cipher, rounds)) {
-		printf("Saving the key failed: %s.\n", identity_file);
 		explicit_bzero(passphrase1, strlen(passphrase1));
->>>>>>> 1.240
 		free(passphrase1);
 		sshkey_free(private);
 		free(comment);
@@ -1425,15 +1398,9 @@ do_change_comment(struct passwd *pw)
 			passphrase = read_passphrase("Enter passphrase: ",
 			    RP_ALLOW_STDIN);
 		/* Try to load using the passphrase. */
-<<<<<<< ssh-keygen.c
 		if ((r = sshkey_load_private(identity_file, passphrase,
 		    &private, &comment)) != 0) {
-			memset(passphrase, 0, strlen(passphrase));
-=======
-		private = key_load_private(identity_file, passphrase, &comment);
-		if (private == NULL) {
 			explicit_bzero(passphrase, strlen(passphrase));
->>>>>>> 1.240
 			free(passphrase);
 			printf("Cannot load private key \"%s\": %s.\n",
 			    identity_file, ssh_err(r));
@@ -1453,31 +1420,19 @@ do_change_comment(struct passwd *pw)
 		printf("Enter new comment: ");
 		fflush(stdout);
 		if (!fgets(new_comment, sizeof(new_comment), stdin)) {
-<<<<<<< ssh-keygen.c
-			memset(passphrase, 0, strlen(passphrase));
-			sshkey_free(private);
-=======
 			explicit_bzero(passphrase, strlen(passphrase));
-			key_free(private);
->>>>>>> 1.240
+			sshkey_free(private);
 			exit(1);
 		}
 		new_comment[strcspn(new_comment, "\n")] = '\0';
 	}
 
 	/* Save the file using the new passphrase. */
-<<<<<<< ssh-keygen.c
 	if ((r = sshkey_save_private(private, identity_file, passphrase,
 	    new_comment, use_new_format, new_format_cipher, rounds)) != 0) {
 		printf("Saving key \"%s\" failed: %s\n",
 		    identity_file, ssh_err(r));
-		memset(passphrase, 0, strlen(passphrase));
-=======
-	if (!key_save_private(private, identity_file, passphrase, new_comment,
-	    use_new_format, new_format_cipher, rounds)) {
-		printf("Saving the key failed: %s.\n", identity_file);
 		explicit_bzero(passphrase, strlen(passphrase));
->>>>>>> 1.240
 		free(passphrase);
 		sshkey_free(private);
 		free(comment);
@@ -2742,18 +2697,11 @@ passphrase_again:
 	}
 
 	/* Save the key with the given passphrase and comment. */
-<<<<<<< ssh-keygen.c
 	if ((r = sshkey_save_private(private, identity_file, passphrase1,
 	    comment, use_new_format, new_format_cipher, rounds)) != 0) {
 		printf("Saving key \"%s\" failed: %s\n",
 		    identity_file, ssh_err(r));
-		memset(passphrase1, 0, strlen(passphrase1));
-=======
-	if (!key_save_private(private, identity_file, passphrase1, comment,
-	    use_new_format, new_format_cipher, rounds)) {
-		printf("Saving the key failed: %s.\n", identity_file);
 		explicit_bzero(passphrase1, strlen(passphrase1));
->>>>>>> 1.240
 		free(passphrase1);
 		exit(1);
 	}

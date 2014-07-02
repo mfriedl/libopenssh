@@ -1,8 +1,4 @@
-<<<<<<< ssh-agent.c
-/* $OpenBSD: ssh-agent.c,v 1.180 2013/12/06 13:39:49 markus Exp $ */
-=======
 /* $OpenBSD: ssh-agent.c,v 1.183 2014/02/02 03:44:31 djm Exp $ */
->>>>>>> 1.183
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -69,11 +65,8 @@
 #include "compat.h"
 #include "log.h"
 #include "misc.h"
-<<<<<<< ssh-agent.c
-#include "err.h"
-=======
 #include "digest.h"
->>>>>>> 1.183
+#include "err.h"
 
 #ifdef ENABLE_PKCS11
 #include "ssh-pkcs11.h"
@@ -269,17 +262,10 @@ process_authentication_challenge1(SocketEntry *e)
 	u_int response_type;
 	BIGNUM *challenge;
 	Identity *id;
-<<<<<<< ssh-agent.c
 	int r, len;
 	struct sshbuf *msg;
-	MD5_CTX md;
-	struct sshkey *key;
-=======
-	int i, len;
-	Buffer msg;
 	struct ssh_digest_ctx *md;
-	Key *key;
->>>>>>> 1.183
+	struct sshkey *key;
 
 	if ((msg = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
@@ -311,7 +297,7 @@ process_authentication_challenge1(SocketEntry *e)
 		    private->rsa) != 0)) {
 			fatal("%s: rsa_public_encrypt: %s", __func__,
 			    ssh_err(r));
-			goto failure;
+			goto failure;	/* XXX ? */
 		}
 
 		/* The response is MD5 of decrypted challenge plus session id */

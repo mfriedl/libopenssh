@@ -85,13 +85,13 @@ int	 cipher_crypt(struct sshcipher_ctx *, u_int, u_char *, const u_char *,
     u_int, u_int, u_int);
 int	 cipher_get_length(struct sshcipher_ctx *, u_int *, u_int,
     const u_char *, u_int);
-<<<<<<< cipher.h
 int	 cipher_cleanup(struct sshcipher_ctx *);
 int	 cipher_set_key_string(struct sshcipher_ctx *, const struct sshcipher *,
     const char *, int);
 u_int	 cipher_blocksize(const struct sshcipher *);
 u_int	 cipher_keylen(const struct sshcipher *);
 u_int	 cipher_authlen(const struct sshcipher *);
+u_int	 cipher_seclen(const struct sshcipher *);
 u_int	 cipher_ivlen(const struct sshcipher *);
 u_int	 cipher_is_cbc(const struct sshcipher *);
 
@@ -101,21 +101,4 @@ int	 cipher_set_keyiv(struct sshcipher_ctx *, const u_char *);
 int	 cipher_get_keyiv_len(const struct sshcipher_ctx *);
 int	 cipher_get_keycontext(const struct sshcipher_ctx *, u_char *);
 void	 cipher_set_keycontext(struct sshcipher_ctx *, const u_char *);
-=======
-void	 cipher_cleanup(CipherContext *);
-void	 cipher_set_key_string(CipherContext *, const Cipher *, const char *, int);
-u_int	 cipher_blocksize(const Cipher *);
-u_int	 cipher_keylen(const Cipher *);
-u_int	 cipher_seclen(const Cipher *);
-u_int	 cipher_authlen(const Cipher *);
-u_int	 cipher_ivlen(const Cipher *);
-u_int	 cipher_is_cbc(const Cipher *);
-
-u_int	 cipher_get_number(const Cipher *);
-void	 cipher_get_keyiv(CipherContext *, u_char *, u_int);
-void	 cipher_set_keyiv(CipherContext *, u_char *);
-int	 cipher_get_keyiv_len(const CipherContext *);
-int	 cipher_get_keycontext(const CipherContext *, u_char *);
-void	 cipher_set_keycontext(CipherContext *, u_char *);
->>>>>>> 1.44
 #endif				/* CIPHER_H */

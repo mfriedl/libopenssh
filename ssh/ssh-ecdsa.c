@@ -64,7 +64,6 @@ ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	    digest, sizeof(digest)) != 0)
 		return SSH_ERR_LIBCRYPTO_ERROR;
 
-<<<<<<< ssh-ecdsa.c
 	if ((sig = ECDSA_do_sign(digest, dlen, key->ecdsa)) == NULL) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
@@ -81,26 +80,6 @@ ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	    (ret = sshbuf_put_stringb(b, bb)) != 0)
 		goto out;
 	len = sshbuf_len(b);
-=======
-	sig = ECDSA_do_sign(digest, dlen, key->ecdsa);
-	explicit_bzero(digest, sizeof(digest));
-
-	if (sig == NULL) {
-		error("%s: sign failed", __func__);
-		return -1;
-	}
-
-	buffer_init(&bb);
-	buffer_put_bignum2(&bb, sig->r);
-	buffer_put_bignum2(&bb, sig->s);
-	ECDSA_SIG_free(sig);
-
-	buffer_init(&b);
-	buffer_put_cstring(&b, key_ssh_name_plain(key));
-	buffer_put_string(&b, buffer_ptr(&bb), buffer_len(&bb));
-	buffer_free(&bb);
-	len = buffer_len(&b);
->>>>>>> 1.10
 	if (lenp != NULL)
 		*lenp = len;
 	if (sigp != NULL) {
@@ -112,7 +91,7 @@ ssh_ecdsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	}
 	ret = 0;
  out:
-	memset(digest, 'd', sizeof(digest));
+	explicit_bzero(digest, sizeof(digest));
 	if (b != NULL)
 		sshbuf_free(b);
 	if (bb != NULL)
@@ -160,7 +139,6 @@ ssh_ecdsa_verify(const struct sshkey *key,
 	}
 
 	/* parse signature */
-<<<<<<< ssh-ecdsa.c
 	if ((sig = ECDSA_SIG_new()) == NULL ||
 	    (sig->r = BN_new()) == NULL ||
 	    (sig->s = BN_new()) == NULL) {
@@ -176,23 +154,7 @@ ssh_ecdsa_verify(const struct sshkey *key,
 		ret = SSH_ERR_UNEXPECTED_TRAILING_DATA;
 		goto out;
 	}
-=======
-	if ((sig = ECDSA_SIG_new()) == NULL)
-		fatal("%s: ECDSA_SIG_new failed", __func__);
 
-	buffer_init(&bb);
-	buffer_append(&bb, sigblob, len);
-	buffer_get_bignum2(&bb, sig->r);
-	buffer_get_bignum2(&bb, sig->s);
-	if (buffer_len(&bb) != 0)
-		fatal("%s: remaining bytes in inner sigblob", __func__);
-	buffer_free(&bb);
-
-	/* clean up */
-	explicit_bzero(sigblob, len);
-	free(sigblob);
-
->>>>>>> 1.10
 	/* hash the data */
 	hash_alg = sshkey_ec_nid_to_hash_alg(key->ecdsa_nid);
 	if ((dlen = ssh_digest_bytes(hash_alg)) == 0) {
@@ -217,9 +179,8 @@ ssh_ecdsa_verify(const struct sshkey *key,
 		goto out;
 	}
 
-<<<<<<< ssh-ecdsa.c
  out:
-	memset(digest, 'd', sizeof(digest));
+	explicit_bzero(digest, sizeof(digest));
 	if (sigbuf != NULL)
 		sshbuf_free(sigbuf);
 	if (b != NULL)
@@ -227,14 +188,5 @@ ssh_ecdsa_verify(const struct sshkey *key,
 	if (sig != NULL)
 		ECDSA_SIG_free(sig);
 	free(ktype);
-=======
-	ret = ECDSA_do_verify(digest, dlen, sig, key->ecdsa);
-	explicit_bzero(digest, sizeof(digest));
-
-	ECDSA_SIG_free(sig);
-
-	debug("%s: signature %s", __func__,
-	    ret == 1 ? "correct" : ret == 0 ? "incorrect" : "error");
->>>>>>> 1.10
 	return ret;
 }

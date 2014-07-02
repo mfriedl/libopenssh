@@ -406,7 +406,6 @@ lock_agent(int agent_fd, int lock)
 		explicit_bzero(p2, strlen(p2));
 		free(p2);
 	}
-<<<<<<< ssh-add.c
 	if (passok) {
 		if ((r = ssh_lock_agent(agent_fd, lock, p1)) == 0) {
 			fprintf(stderr, "Agent %slocked.\n", lock ? "" : "un");
@@ -416,15 +415,7 @@ lock_agent(int agent_fd, int lock)
 			    lock ? "" : "un", ssh_err(r));
 		}
 	}
-	memset(p1, 0, strlen(p1));
-=======
-	if (passok && ssh_lock_agent(ac, lock, p1)) {
-		fprintf(stderr, "Agent %slocked.\n", lock ? "" : "un");
-		ret = 0;
-	} else
-		fprintf(stderr, "Failed to %slock agent.\n", lock ? "" : "un");
 	explicit_bzero(p1, strlen(p1));
->>>>>>> 1.109
 	free(p1);
 	return (ret);
 }

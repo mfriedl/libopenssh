@@ -554,18 +554,13 @@ proposals_match(char *my[PROPOSAL_MAX], char *peer[PROPOSAL_MAX])
 static int
 kex_choose_conf(struct ssh *ssh)
 {
+	struct kex *kex = ssh->kex;
 	struct newkeys *newkeys;
 	char **my = NULL, **peer = NULL;
 	char **cprop, **sprop;
 	int nenc, nmac, ncomp;
-<<<<<<< kex.c
-	u_int mode, ctos, need, authlen;
-	int r, first_kex_follows;
-	struct kex *kex = ssh->kex;
-=======
 	u_int mode, ctos, need, dh_need, authlen;
-	int first_kex_follows, type;
->>>>>>> 1.98
+	int r, first_kex_follows;
 
 	if ((r = kex_buf2prop(kex->my, NULL, &my)) != 0 ||
 	    (r = kex_buf2prop(kex->peer, &first_kex_follows, &peer)) != 0)
@@ -620,19 +615,12 @@ kex_choose_conf(struct ssh *ssh)
 		    authlen == 0 ? newkeys->mac.name : "<implicit>",
 		    newkeys->comp.name);
 	}
-<<<<<<< kex.c
 	if ((r = choose_kex(kex, cprop[PROPOSAL_KEX_ALGS],
 	    sprop[PROPOSAL_KEX_ALGS])) != 0 ||
 	    (r = choose_hostkeyalg(kex, cprop[PROPOSAL_SERVER_HOST_KEY_ALGS],
 	    sprop[PROPOSAL_SERVER_HOST_KEY_ALGS])) != 0)
 		goto out;
-	need = 0;
-=======
-	choose_kex(kex, cprop[PROPOSAL_KEX_ALGS], sprop[PROPOSAL_KEX_ALGS]);
-	choose_hostkeyalg(kex, cprop[PROPOSAL_SERVER_HOST_KEY_ALGS],
-	    sprop[PROPOSAL_SERVER_HOST_KEY_ALGS]);
 	need = dh_need = 0;
->>>>>>> 1.98
 	for (mode = 0; mode < MODE_MAX; mode++) {
 		newkeys = kex->newkeys[mode];
 		need = MAX(need, newkeys->enc.key_len);
@@ -795,18 +783,12 @@ derive_ssh1_session_id(BIGNUM *host_modulus, BIGNUM *server_modulus,
 		goto out;
 	}
 	memcpy(id, obuf, ssh_digest_bytes(SSH_DIGEST_MD5));
-<<<<<<< kex.c
 	r = 0;
  out:
 	ssh_digest_free(hashctx);
-	bzero(nbuf, sizeof(nbuf));
-	bzero(obuf, sizeof(obuf));
-	return r;
-=======
-
 	explicit_bzero(nbuf, sizeof(nbuf));
 	explicit_bzero(obuf, sizeof(obuf));
->>>>>>> 1.98
+	return r;
 }
 
 #if defined(DEBUG_KEX) || defined(DEBUG_KEXDH) || defined(DEBUG_KEXECDH)

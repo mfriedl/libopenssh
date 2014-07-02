@@ -1282,13 +1282,8 @@ ssh_put_password(struct ssh *ssh, char *password)
 	if ((padded = calloc(1, size)) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	strlcpy(padded, password, size);
-<<<<<<< sshconnect.c
 	r = sshpkt_put_string(ssh, padded, size);
-	memset(padded, 0, size);
-=======
-	packet_put_string(padded, size);
 	explicit_bzero(padded, size);
->>>>>>> 1.245
 	free(padded);
 	return r;
 }

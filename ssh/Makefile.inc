@@ -6,10 +6,9 @@ CFLAGS+=	-I${.CURDIR}/..
 WARNINGS=Yes
 
 CDIAGFLAGS=	-Wall
-<<<<<<< Makefile.inc
 CDIAGFLAGS+=	-Wchar-subscripts
 CDIAGFLAGS+=	-Wcomment
-CDIAGFLAGS+=	-Werror
+#CDIAGFLAGS+=	-Werror
 CDIAGFLAGS+=	-Wextra
 CDIAGFLAGS+=	-Wformat
 CDIAGFLAGS+=	-Wformat-security
@@ -18,18 +17,6 @@ CDIAGFLAGS+=	-Winline
 CDIAGFLAGS+=	-Wmissing-declarations
 CDIAGFLAGS+=	-Wmissing-prototypes
 CDIAGFLAGS+=	-Wparentheses
-=======
-CDIAGFLAGS+=	-Wchar-subscripts
-CDIAGFLAGS+=	-Wcomment
-CDIAGFLAGS+=	-Wextra
-CDIAGFLAGS+=	-Wformat
-CDIAGFLAGS+=	-Wformat-security
-CDIAGFLAGS+=	-Wimplicit
-CDIAGFLAGS+=	-Winline
-CDIAGFLAGS+=	-Wmissing-declarations
-CDIAGFLAGS+=	-Wmissing-prototypes
-CDIAGFLAGS+=	-Wparentheses
->>>>>>> 1.42
 CDIAGFLAGS+=	-Wpointer-arith
 CDIAGFLAGS+=	-Wreturn-type
 CDIAGFLAGS+=	-Wshadow
@@ -40,19 +27,12 @@ CDIAGFLAGS+=	-Wswitch
 CDIAGFLAGS+=	-Wtrigraphs
 CDIAGFLAGS+=	-Wuninitialized
 CDIAGFLAGS+=	-Wunused
-<<<<<<< Makefile.inc
-CDIAGFLAGS+=	-Wno-unused-parameter # Not clean for this yet
-#-Wno-error=address
-#CDIAGFLAGS+=	-Wcast-qual # XXX not clean
-#CDIAGFLAGS+=	-Wcast-align # XXX can't be clean with sockaddr casts?
-
-=======
 CDIAGFLAGS+=	-Wold-style-definition
 CDIAGFLAGS+=	-Wno-unused-parameter # Not clean for this yet
+#-Wno-error=address
 #CDIAGFLAGS+=	-Wwrite-strings # XXX too messy; needs libc changes
 #CDIAGFLAGS+=	-Wcast-qual # XXX not clean
 #CDIAGFLAGS+=	-Wcast-align # XXX can't be clean with sockaddr casts?
->>>>>>> 1.42
 
 #CDIAGFLAGS+=	-Werror
 #DEBUG=-g

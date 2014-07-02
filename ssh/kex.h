@@ -94,24 +94,8 @@ struct sshenc {
 	u_char	*key;
 	u_char	*iv;
 };
-<<<<<<< kex.h
 struct sshcomp {
 	u_int	type;
-=======
-struct Mac {
-	char	*name;
-	int	enabled;
-	u_int	mac_len;
-	u_char	*key;
-	u_int	key_len;
-	int	type;
-	int	etm;		/* Encrypt-then-MAC */
-	struct ssh_hmac_ctx	*hmac_ctx;
-	struct umac_ctx		*umac_ctx;
-};
-struct Comp {
-	int	type;
->>>>>>> 1.62
 	int	enabled;
 	char	*name;
 };

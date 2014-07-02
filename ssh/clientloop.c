@@ -1805,7 +1805,6 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 static int
 client_input_stdout_data(int type, u_int32_t seq, struct ssh *ssh)
 {
-<<<<<<< clientloop.c
 	u_char *data = NULL;
 	size_t data_len;
 	int r;
@@ -1817,23 +1816,14 @@ client_input_stdout_data(int type, u_int32_t seq, struct ssh *ssh)
  out:
 	r = 0;
 	if (data) {
-		memset(data, 0, data_len);
+		explicit_bzero(data, data_len);
 		free(data);
 	}
 	return r;
-=======
-	u_int data_len;
-	char *data = packet_get_string(&data_len);
-	packet_check_eom();
-	buffer_append(&stdout_buffer, data, data_len);
-	explicit_bzero(data, data_len);
-	free(data);
->>>>>>> 1.258
 }
 static int
 client_input_stderr_data(int type, u_int32_t seq, struct ssh *ssh)
 {
-<<<<<<< clientloop.c
 	u_char *data = NULL;
 	size_t data_len;
 	int r;
@@ -1845,18 +1835,10 @@ client_input_stderr_data(int type, u_int32_t seq, struct ssh *ssh)
 	r = 0;
  out:
 	if (data) {
-		memset(data, 0, data_len);
+		explicit_bzero(data, data_len);
 		free(data);
 	}
 	return r;
-=======
-	u_int data_len;
-	char *data = packet_get_string(&data_len);
-	packet_check_eom();
-	buffer_append(&stderr_buffer, data, data_len);
-	explicit_bzero(data, data_len);
-	free(data);
->>>>>>> 1.258
 }
 static int
 client_input_exit_status(int type, u_int32_t seq, struct ssh *ssh)

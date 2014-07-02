@@ -920,7 +920,6 @@ server_input_stdin_data(int type, u_int32_t seq, struct ssh *ssh)
 	/* Stdin data from the client.  Append it to the buffer. */
 	/* Ignore any data if the client has closed stdin. */
 	if (fdin == -1)
-<<<<<<< serverloop.c
 		return 0;
 	if ((r = sshpkt_get_string(ssh, &data, &data_len)) != 0 ||
 	    (r = sshpkt_get_end(ssh)) != 0 ||
@@ -929,18 +928,10 @@ server_input_stdin_data(int type, u_int32_t seq, struct ssh *ssh)
 	r = 0;
  out:
 	if (data) {
-		memset(data, 0, data_len);
+		explicit_bzero(data, data_len);
 		free(data);
 	}
 	return r;
-=======
-		return;
-	data = packet_get_string(&data_len);
-	packet_check_eom();
-	buffer_append(&stdin_buffer, data, data_len);
-	explicit_bzero(data, data_len);
-	free(data);
->>>>>>> 1.170
 }
 
 static int

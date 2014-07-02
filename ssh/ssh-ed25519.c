@@ -1,8 +1,4 @@
-<<<<<<< ssh-ed25519.c
 /* $OpenBSD: ssh-ed25519.c,v 1.4 2014/06/24 01:13:21 djm Exp $ */
-=======
-/* $OpenBSD: ssh-ed25519.c,v 1.2 2014/02/02 03:44:31 djm Exp $ */
->>>>>>> 1.2
 /*
  * Copyright (c) 2013 Markus Friedl <markus@openbsd.org>
  *
@@ -88,12 +84,6 @@ ssh_ed25519_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 		explicit_bzero(sig, slen);
 		free(sig);
 	}
-<<<<<<< ssh-ed25519.c
-=======
-	buffer_free(&b);
-	explicit_bzero(sig, slen);
-	free(sig);
->>>>>>> 1.2
 
 	return r;
 }
@@ -154,7 +144,6 @@ ssh_ed25519_verify(const struct sshkey *key,
 		goto out;
 	}
 	/* XXX compare 'm' and 'data' ? */
-<<<<<<< ssh-ed25519.c
 	/* success */
 	r = 0;
  out:
@@ -169,17 +158,4 @@ ssh_ed25519_verify(const struct sshkey *key,
 	sshbuf_free(b);
 	free(ktype);
 	return r;
-=======
-
-	explicit_bzero(sigblob, len);
-	explicit_bzero(sm, smlen);
-	explicit_bzero(m, smlen); /* NB. mlen may be invalid if ret != 0 */
-	free(sigblob);
-	free(sm);
-	free(m);
-	debug("%s: signature %scorrect", __func__, (ret != 0) ? "in" : "");
-
-	/* translate return code carefully */
-	return (ret == 0) ? 1 : -1;
->>>>>>> 1.2
 }

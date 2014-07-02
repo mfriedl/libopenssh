@@ -130,16 +130,6 @@ input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 #ifdef DEBUG_KEXECDH
 	dump_digest("shared secret", kbuf, klen);
 #endif
-<<<<<<< kexecdhs.c
-=======
-	if ((shared_secret = BN_new()) == NULL)
-		fatal("%s: BN_new failed", __func__);
-	if (BN_bin2bn(kbuf, klen, shared_secret) == NULL)
-		fatal("%s: BN_bin2bn failed", __func__);
-	explicit_bzero(kbuf, klen);
-	free(kbuf);
-
->>>>>>> 1.10
 	/* calc H */
 	if ((r = sshkey_to_blob(server_host_public, &server_host_key_blob,
 	    &sbloblen)) != 0)
@@ -197,7 +187,7 @@ input_kex_ecdh_init(int type, u_int32_t seq, struct ssh *ssh)
 	if (server_key)
 		EC_KEY_free(server_key);
 	if (kbuf) {
-		bzero(kbuf, klen);
+		explicit_bzero(kbuf, klen);
 		free(kbuf);
 	}
 	if (shared_secret)

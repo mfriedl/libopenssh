@@ -61,18 +61,9 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 		goto out;
 	}
 
-<<<<<<< ssh-dss.c
 	if ((sig = DSA_do_sign(digest, dlen, key->dsa)) == NULL) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
-=======
-	sig = DSA_do_sign(digest, dlen, key->dsa);
-	explicit_bzero(digest, sizeof(digest));
-
-	if (sig == NULL) {
-		error("ssh_dss_sign: sign failed");
-		return -1;
->>>>>>> 1.31
 	}
 
 	rlen = BN_num_bytes(sig->r);
@@ -81,16 +72,9 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 		ret = SSH_ERR_INTERNAL_ERROR;
 		goto out;
 	}
-<<<<<<< ssh-dss.c
-	bzero(sigblob, SIGBLOB_LEN);
+	explicit_bzero(sigblob, SIGBLOB_LEN);
 	BN_bn2bin(sig->r, sigblob + SIGBLOB_LEN - INTBLOB_LEN - rlen);
 	BN_bn2bin(sig->s, sigblob + SIGBLOB_LEN - slen);
-=======
-	explicit_bzero(sigblob, SIGBLOB_LEN);
-	BN_bn2bin(sig->r, sigblob+ SIGBLOB_LEN - INTBLOB_LEN - rlen);
-	BN_bn2bin(sig->s, sigblob+ SIGBLOB_LEN - slen);
-	DSA_SIG_free(sig);
->>>>>>> 1.31
 
 	if (compat & SSH_BUG_SIGBLOB) {
 		if (lenp != NULL)
@@ -125,7 +109,7 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 		ret = 0;
 	}
  out:
-	bzero(digest, sizeof(digest));
+	explicit_bzero(digest, sizeof(digest));
 	if (sig != NULL)
 		DSA_SIG_free(sig);
 	if (b != NULL)
@@ -189,19 +173,10 @@ ssh_dss_verify(const struct sshkey *key,
 		goto out;
 	}
 	if ((BN_bin2bn(sigblob, INTBLOB_LEN, sig->r) == NULL) ||
-<<<<<<< ssh-dss.c
 	    (BN_bin2bn(sigblob+ INTBLOB_LEN, INTBLOB_LEN, sig->s) == NULL)) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
 	}
-=======
-	    (BN_bin2bn(sigblob+ INTBLOB_LEN, INTBLOB_LEN, sig->s) == NULL))
-		fatal("%s: BN_bin2bn failed", __func__);
-
-	/* clean up */
-	explicit_bzero(sigblob, len);
-	free(sigblob);
->>>>>>> 1.31
 
 	/* sha1 the data */
 	if (ssh_digest_memory(SSH_DIGEST_SHA1, data, datalen,
@@ -210,7 +185,6 @@ ssh_dss_verify(const struct sshkey *key,
 		goto out;
 	}
 
-<<<<<<< ssh-dss.c
 	switch (DSA_do_verify(digest, dlen, sig, key->dsa)) {
 	case 1:
 		ret = 0;
@@ -224,7 +198,7 @@ ssh_dss_verify(const struct sshkey *key,
 	}
 
  out:
-	bzero(digest, sizeof(digest));
+	explicit_bzero(digest, sizeof(digest));
 	if (sig != NULL)
 		DSA_SIG_free(sig);
 	if (b != NULL)
@@ -232,17 +206,8 @@ ssh_dss_verify(const struct sshkey *key,
 	if (ktype != NULL)
 		free(ktype);
 	if (sigblob != NULL) {
-		memset(sigblob, 0, len);
+		explicit_bzero(sigblob, len);
 		free(sigblob);
 	}
-=======
-	ret = DSA_do_verify(digest, dlen, sig, key->dsa);
-	explicit_bzero(digest, sizeof(digest));
-
-	DSA_SIG_free(sig);
-
-	debug("%s: signature %s", __func__,
-	    ret == 1 ? "correct" : ret == 0 ? "incorrect" : "error");
->>>>>>> 1.31
 	return ret;
 }

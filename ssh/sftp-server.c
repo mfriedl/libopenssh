@@ -1274,16 +1274,10 @@ process_extended_statvfs(u_int32_t id)
 	struct statvfs st;
 	int r;
 
-<<<<<<< sftp-server.c
 	if ((r = sshbuf_get_cstring(iqueue, &path, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	debug3("request %u: statfs", id);
-	logit("statfs \"%s\"", path);
-=======
-	path = get_string(NULL);
 	debug3("request %u: statvfs", id);
 	logit("statvfs \"%s\"", path);
->>>>>>> 1.103
 
 	if (statvfs(path, &st) != 0)
 		send_status(id, errno_to_portable(errno));

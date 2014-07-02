@@ -153,12 +153,6 @@ int	bsdauth_respond(void *, u_int, char **);
 int	skey_query(void *, char **, char **, u_int *, char ***, u_int **);
 int	skey_respond(void *, u_int, char **);
 
-<<<<<<< auth.h
-void	auth2_jpake_get_pwdata(struct authctxt *, BIGNUM **, char **, char **);
-void	auth2_jpake_stop(struct ssh *);
-
-=======
->>>>>>> 1.77
 int	allowed_user(struct passwd *);
 struct passwd * getpwnamallow(const char *user);
 

@@ -1080,15 +1080,9 @@ is_key_revoked(struct ssh_krl *krl, const struct sshkey *key)
 	int r;
 
 	/* Check explicitly revoked hashes first */
-<<<<<<< krl.c
-	bzero(&rb, sizeof(rb));
+	memset(&rb, 0, sizeof(rb));
 	if ((rb.blob = sshkey_fingerprint_raw(key, SSH_FP_SHA1, &rb.len)) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
-=======
-	memset(&rb, 0, sizeof(rb));
-	if ((rb.blob = key_fingerprint_raw(key, SSH_FP_SHA1, &rb.len)) == NULL)
-		return -1;
->>>>>>> 1.14
 	erb = RB_FIND(revoked_blob_tree, &krl->revoked_sha1s, &rb);
 	free(rb.blob);
 	if (erb != NULL) {
@@ -1097,15 +1091,9 @@ is_key_revoked(struct ssh_krl *krl, const struct sshkey *key)
 	}
 
 	/* Next, explicit keys */
-<<<<<<< krl.c
-	bzero(&rb, sizeof(rb));
+	memset(&rb, 0, sizeof(rb));
 	if ((r = sshkey_plain_to_blob(key, &rb.blob, &rb.len)) != 0)
 		return r;
-=======
-	memset(&rb, 0, sizeof(rb));
-	if (plain_key_blob(key, &rb.blob, &rb.len) != 0)
-		return -1;
->>>>>>> 1.14
 	erb = RB_FIND(revoked_blob_tree, &krl->revoked_keys, &rb);
 	free(rb.blob);
 	if (erb != NULL) {

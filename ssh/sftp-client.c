@@ -343,8 +343,7 @@ get_decode_statvfs(struct sftp_conn *conn, struct sftp_statvfs *st,
 		    SSH2_FXP_EXTENDED_REPLY, type);
 	}
 
-<<<<<<< sftp-client.c
-	bzero(st, sizeof(*st));
+	memset(st, 0, sizeof(*st));
 	if ((r = sshbuf_get_u64(msg, &st->f_bsize)) == 0 ||
 	    (r = sshbuf_get_u64(msg, &st->f_frsize)) == 0 ||
 	    (r = sshbuf_get_u64(msg, &st->f_blocks)) == 0 ||
@@ -357,20 +356,6 @@ get_decode_statvfs(struct sftp_conn *conn, struct sftp_statvfs *st,
 	    (r = sshbuf_get_u64(msg, &flag)) == 0 ||
 	    (r = sshbuf_get_u64(msg, &st->f_namemax)) == 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-=======
-	memset(st, 0, sizeof(*st));
-	st->f_bsize = buffer_get_int64(&msg);
-	st->f_frsize = buffer_get_int64(&msg);
-	st->f_blocks = buffer_get_int64(&msg);
-	st->f_bfree = buffer_get_int64(&msg);
-	st->f_bavail = buffer_get_int64(&msg);
-	st->f_files = buffer_get_int64(&msg);
-	st->f_ffree = buffer_get_int64(&msg);
-	st->f_favail = buffer_get_int64(&msg);
-	st->f_fsid = buffer_get_int64(&msg);
-	flag = buffer_get_int64(&msg);
-	st->f_namemax = buffer_get_int64(&msg);
->>>>>>> 1.114
 
 	st->f_flag = (flag & SSH2_FXE_STATVFS_ST_RDONLY) ? ST_RDONLY : 0;
 	st->f_flag |= (flag & SSH2_FXE_STATVFS_ST_NOSUID) ? ST_NOSUID : 0;

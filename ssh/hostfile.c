@@ -335,13 +335,8 @@ free_hostkeys(struct hostkeys *hostkeys)
 	for (i = 0; i < hostkeys->num_entries; i++) {
 		free(hostkeys->entries[i].host);
 		free(hostkeys->entries[i].file);
-<<<<<<< hostfile.c
 		sshkey_free(hostkeys->entries[i].key);
-		bzero(hostkeys->entries + i, sizeof(*hostkeys->entries));
-=======
-		key_free(hostkeys->entries[i].key);
 		explicit_bzero(hostkeys->entries + i, sizeof(*hostkeys->entries));
->>>>>>> 1.55
 	}
 	free(hostkeys->entries);
 	explicit_bzero(hostkeys, sizeof(*hostkeys));

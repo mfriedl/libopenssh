@@ -1,8 +1,4 @@
-<<<<<<< authfd.c
-/* $OpenBSD: authfd.c,v 1.90 2013/12/06 13:39:49 markus Exp $ */
-=======
 /* $OpenBSD: authfd.c,v 1.92 2014/01/31 16:39:19 tedu Exp $ */
->>>>>>> 1.92
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland

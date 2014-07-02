@@ -1,8 +1,4 @@
-<<<<<<< digest.h
 /* $OpenBSD: digest.h,v 1.4 2014/05/02 03:27:54 djm Exp $ */
-=======
-/* $OpenBSD: digest.h,v 1.2 2014/01/27 18:58:14 markus Exp $ */
->>>>>>> 1.2
 /*
  * Copyright (c) 2013 Damien Miller <djm@mindrot.org>
  *
