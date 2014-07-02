@@ -121,21 +121,14 @@ int download_dir(struct sftp_conn *, const char *, const char *,
  * Upload 'local_path' to 'remote_path'. Preserve permissions and times
  * if 'pflag' is set
  */
-<<<<<<< sftp-client.h
-int do_upload(struct sftp_conn *, const char *, const char *, int, int);
-=======
-int do_upload(struct sftp_conn *, char *, char *, int, int, int);
->>>>>>> 1.25
+int do_upload(struct sftp_conn *, const char *, const char *, int, int, int);
 
 /*
  * Recursively upload 'local_directory' to 'remote_directory'. Preserve 
  * times if 'pflag' is set
  */
-<<<<<<< sftp-client.h
-int upload_dir(struct sftp_conn *, const char *, const char *, int, int, int);
-=======
-int upload_dir(struct sftp_conn *, char *, char *, int, int, int, int);
->>>>>>> 1.25
+int upload_dir(struct sftp_conn *, const char *, const char *, int, int, int,
+    int);
 
 /* Concatenate paths, taking care of slashes. Caller must free result. */
 char *path_append(const char *, const char *);

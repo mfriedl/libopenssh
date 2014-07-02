@@ -59,14 +59,8 @@ userauth_gssapi(struct ssh *ssh)
 	struct authctxt *authctxt = ssh->authctxt;
 	gss_OID_desc goid = {0, NULL};
 	Gssctxt *ctxt = NULL;
-<<<<<<< auth2-gss.c
 	int r, present;
 	u_int mechs;
-	gss_OID_set supported;
-=======
-	int mechs;
-	int present;
->>>>>>> 1.21
 	OM_uint32 ms;
 	size_t len;
 	u_char *doid = NULL;

@@ -712,11 +712,7 @@ privsep_preauth(struct authctxt *authctxt)
 static void
 privsep_postauth(struct ssh *ssh)
 {
-<<<<<<< sshd.c
 	struct authctxt *authctxt = ssh->authctxt;
-	u_int32_t rnd[256];
-=======
->>>>>>> 1.425
 
 	if (authctxt->pw->pw_uid == 0 || options.use_login) {
 		/* File descriptor passing is broken or root login */
@@ -1948,26 +1944,6 @@ main(int ac, char **av)
 	 */
 	remote_ip = ssh_remote_ipaddr(ssh);
 
-<<<<<<< sshd.c
-#ifdef LIBWRAP
-	/* Check whether logins are denied from this host. */
-	if (ssh_packet_connection_is_on_socket(ssh)) {
-		struct request_info req;
-
-		request_init(&req, RQ_DAEMON, __progname, RQ_FILE, sock_in, 0);
-		fromhost(&req);
-
-		if (!hosts_access(&req)) {
-			debug("Connection refused by tcp wrapper");
-			refuse(&req);
-			/* NOTREACHED */
-			fatal("libwrap refuse returns");
-		}
-	}
-#endif /* LIBWRAP */
-
-=======
->>>>>>> 1.425
 	/* Log the connection. */
 	verbose("Connection from %s port %d on %s port %d",
 	    remote_ip, remote_port,
@@ -2347,13 +2323,9 @@ sshd_hostkey_sign(struct sshkey *privkey, struct sshkey *pubkey,
 static void
 do_ssh2_kex(struct ssh *ssh)
 {
-<<<<<<< sshd.c
+	char *myproposal[PROPOSAL_MAX] = { KEX_SERVER };
 	struct kex *kex;
 	int r;
-=======
-	char *myproposal[PROPOSAL_MAX] = { KEX_SERVER };
-	Kex *kex;
->>>>>>> 1.425
 
 	if (options.ciphers != NULL) {
 		myproposal[PROPOSAL_ENC_ALGS_CTOS] =
@@ -2384,7 +2356,7 @@ do_ssh2_kex(struct ssh *ssh)
 		myproposal[PROPOSAL_KEX_ALGS] = options.kex_algorithms;
 
 	myproposal[PROPOSAL_KEX_ALGS] = compat_kex_proposal(
-	    myproposal[PROPOSAL_KEX_ALGS]);
+	    myproposal[PROPOSAL_KEX_ALGS], ssh->compat);
 
 	if (options.rekey_limit || options.rekey_interval)
 		ssh_packet_set_rekey_limits(ssh,

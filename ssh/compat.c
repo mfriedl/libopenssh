@@ -267,9 +267,9 @@ compat_pkalg_proposal(char *pkalg_prop, u_int compat)
 }
 
 char *
-compat_kex_proposal(char *kex_prop)
+compat_kex_proposal(char *kex_prop, u_int compat)
 {
-	if (!(datafellows & SSH_BUG_CURVE25519PAD))
+	if (!(compat & SSH_BUG_CURVE25519PAD))
 		return kex_prop;
 	debug2("%s: original KEX proposal: %s", __func__, kex_prop);
 	kex_prop = filter_proposal(kex_prop, "curve25519-sha256@libssh.org");

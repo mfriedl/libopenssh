@@ -129,17 +129,9 @@ mac_setup(struct sshmac *mac, char *name)
 	for (m = macs; m->name != NULL; m++) {
 		if (strcmp(name, m->name) != 0)
 			continue;
-<<<<<<< mac.c
 		if (mac != NULL)
 			return mac_setup_by_alg(mac, m);
 		return 0;
-=======
-		if (mac != NULL) {
-			mac_setup_by_alg(mac, m);
-			debug2("mac_setup: setup %s", name);
-		}
-		return (0);
->>>>>>> 1.28
 	}
 	return SSH_ERR_INVALID_ARGUMENT;
 }
@@ -148,11 +140,7 @@ int
 mac_init(struct sshmac *mac)
 {
 	if (mac->key == NULL)
-<<<<<<< mac.c
 		return SSH_ERR_INVALID_ARGUMENT;
-=======
-		fatal("%s: no key", __func__);
->>>>>>> 1.28
 	switch (mac->type) {
 	case SSH_DIGEST:
 		if (mac->hmac_ctx == NULL ||
@@ -245,11 +233,7 @@ mac_valid(const char *names)
 	    (p = strsep(&cp, MAC_SEP))) {
 		if (mac_setup(NULL, p) < 0) {
 			free(maclist);
-<<<<<<< mac.c
 			return 0;
-=======
-			return (0);
->>>>>>> 1.28
 		}
 	}
 	free(maclist);

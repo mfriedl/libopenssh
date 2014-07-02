@@ -1534,13 +1534,8 @@ download_dir(struct sftp_conn *conn, const char *src, const char *dst,
 }
 
 int
-<<<<<<< sftp-client.c
 do_upload(struct sftp_conn *conn, const char *local_path,
-    const char *remote_path, int preserve_flag, int fsync_flag)
-=======
-do_upload(struct sftp_conn *conn, char *local_path, char *remote_path,
-    int preserve_flag, int resume, int fsync_flag)
->>>>>>> 1.115
+    const char *remote_path, int preserve_flag, int resume, int fsync_flag)
 {
 	int r, local_fd;
 	u_int status = SSH2_FX_OK;
@@ -1589,10 +1584,6 @@ do_upload(struct sftp_conn *conn, char *local_path, char *remote_path,
 	if (!preserve_flag)
 		a.flags &= ~SSH2_FILEXFER_ATTR_ACMODTIME;
 
-<<<<<<< sftp-client.c
-	if ((msg = sshbuf_new()) == NULL)
-		fatal("%s: sshbuf_new failed", __func__);
-=======
 	if (resume) {
 		/* Get remote file size if it exists */
 		if ((c = do_stat(conn, remote_path, 0)) == NULL) {
@@ -1613,29 +1604,19 @@ do_upload(struct sftp_conn *conn, char *local_path, char *remote_path,
 		}
 	}
 
-	buffer_init(&msg);
->>>>>>> 1.115
+	if ((msg = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new failed", __func__);
 
 	/* Send open request */
 	id = conn->msg_id++;
-<<<<<<< sftp-client.c
 	if ((r = sshbuf_put_u8(msg, SSH2_FXP_OPEN)) != 0 ||
 	    (r = sshbuf_put_u32(msg, id)) != 0 ||
 	    (r = sshbuf_put_cstring(msg, remote_path)) != 0 ||
-	    (r = sshbuf_put_u32(msg,
-	    SSH2_FXF_WRITE|SSH2_FXF_CREAT|SSH2_FXF_TRUNC)) != 0 ||
+	    (r = sshbuf_put_u32(msg, SSH2_FXF_WRITE|SSH2_FXF_CREAT|
+	    (resume ? SSH2_FXF_APPEND : SSH2_FXF_TRUNC))) != 0 ||
 	    (r = encode_attrib(msg, &a)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	send_msg(conn, msg);
-=======
-	buffer_put_char(&msg, SSH2_FXP_OPEN);
-	buffer_put_int(&msg, id);
-	buffer_put_cstring(&msg, remote_path);
-	buffer_put_int(&msg, SSH2_FXF_WRITE|SSH2_FXF_CREAT|
-		      (resume ? SSH2_FXF_APPEND : SSH2_FXF_TRUNC));
-	encode_attrib(&msg, &a);
-	send_msg(conn, &msg);
->>>>>>> 1.115
 	debug3("Sent message SSH2_FXP_OPEN I:%u P:%s", id, remote_path);
 
 	sshbuf_reset(msg);
@@ -1773,13 +1754,8 @@ do_upload(struct sftp_conn *conn, char *local_path, char *remote_path,
 }
 
 static int
-<<<<<<< sftp-client.c
 upload_dir_internal(struct sftp_conn *conn, const char *src, const char *dst,
-    int depth, int preserve_flag, int print_flag, int fsync_flag)
-=======
-upload_dir_internal(struct sftp_conn *conn, char *src, char *dst, int depth,
-    int preserve_flag, int print_flag, int resume, int fsync_flag)
->>>>>>> 1.115
+    int depth, int preserve_flag, int print_flag, int resume, int fsync_flag)
 {
 	int ret = 0;
 	u_int status;
@@ -1872,13 +1848,8 @@ upload_dir_internal(struct sftp_conn *conn, char *src, char *dst, int depth,
 }
 
 int
-<<<<<<< sftp-client.c
 upload_dir(struct sftp_conn *conn, const char *src, const char *dst,
-    int preserve_flag, int print_flag, int fsync_flag)
-=======
-upload_dir(struct sftp_conn *conn, char *src, char *dst, int preserve_flag,
-    int print_flag, int resume, int fsync_flag)
->>>>>>> 1.115
+    int preserve_flag, int print_flag, int resume, int fsync_flag)
 {
 	char *dst_canon;
 	int ret;

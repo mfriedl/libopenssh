@@ -78,6 +78,7 @@ do_kex_with_key(char *kex, int key_type, int bits)
 	struct sshkey *private, *public;
 	struct sshbuf *state;
 	struct kex_params kex_params;
+	char *myproposal[PROPOSAL_MAX] = { KEX_CLIENT };
 
 	TEST_START("sshkey_generate");
 	ASSERT_INT_EQ(sshkey_generate(key_type, bits, &private), 0);

@@ -361,7 +361,6 @@ resolve_canonicalize(char **hostp, int port)
 }
 
 /*
-<<<<<<< ssh.c
  * Check the result of hostkey loading, ignoring some errors and
  * fatal()ing for others.
  */
@@ -386,7 +385,6 @@ check_load(int r, const char *path, const char *message)
 }
 
 /*
-=======
  * Read per-user configuration file.  Ignore the system wide config
  * file if the user specifies a config file on the command line.
  */
@@ -416,7 +414,6 @@ process_config_files(struct passwd *pw)
 }
 
 /*
->>>>>>> 1.401
  * Main program for the ssh client.
  */
 int

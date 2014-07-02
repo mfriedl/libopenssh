@@ -232,6 +232,7 @@ void
 connect_cb(int fd, short type, void *arg)
 {
 	struct session *s = arg;
+	char *myproposal[PROPOSAL_MAX] = { KEX_CLIENT };
 	int soerr;
 	int r;
 	socklen_t sz = sizeof(soerr);

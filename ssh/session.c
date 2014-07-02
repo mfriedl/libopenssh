@@ -1901,16 +1901,10 @@ session_env_req(Session *s)
 	u_int i;
 	int r;
 
-<<<<<<< session.c
 	if ((r = sshpkt_get_cstring(ssh, &name, NULL)) != 0 ||
 	    (r = sshpkt_get_cstring(ssh, &val, NULL)) != 0 ||
 	    (r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
-=======
-	name = packet_get_cstring(&name_len);
-	val = packet_get_cstring(&val_len);
-	packet_check_eom();
->>>>>>> 1.271
 
 	/* Don't set too many environment variables */
 	if (s->num_env > 128) {

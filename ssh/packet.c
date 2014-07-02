@@ -1099,21 +1099,12 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 		padlen += block_size;
 	if (state->extra_pad) {
 		/* will wrap if extra_pad+padlen > 255 */
-<<<<<<< packet.c
 		state->extra_pad =
 		    roundup(state->extra_pad, block_size);
 		pad = state->extra_pad -
 		    ((len + padlen) % state->extra_pad);
-		debug3("packet_send2: adding %d (len %d padlen %d extra_pad %d)",
-		    pad, len, padlen, state->extra_pad);
-=======
-		active_state->extra_pad =
-		    roundup(active_state->extra_pad, block_size);
-		pad = active_state->extra_pad -
-		    ((len + padlen) % active_state->extra_pad);
 		DBG(debug3("%s: adding %d (len %d padlen %d extra_pad %d)",
-		    __func__, pad, len, padlen, active_state->extra_pad));
->>>>>>> 1.194
+		    __func__, pad, len, padlen, state->extra_pad));
 		padlen += pad;
 		state->extra_pad = 0;
 	}
@@ -1812,37 +1803,7 @@ ssh_packet_process_incoming(struct ssh *ssh, const char *buf, u_int len)
 }
 
 int
-<<<<<<< packet.c
 ssh_packet_remaining(struct ssh *ssh)
-=======
-packet_remaining(void)
-{
-	return buffer_len(&active_state->incoming_packet);
-}
-
-/*
- * Returns a string from the packet data.  The string is allocated using
- * xmalloc; it is the responsibility of the calling program to free it when
- * no longer needed.  The length_ptr argument may be NULL, or point to an
- * integer into which the length of the string is stored.
- */
-
-void *
-packet_get_string(u_int *length_ptr)
-{
-	return buffer_get_string(&active_state->incoming_packet, length_ptr);
-}
-
-const void *
-packet_get_string_ptr(u_int *length_ptr)
-{
-	return buffer_get_string_ptr(&active_state->incoming_packet, length_ptr);
-}
-
-/* Ensures the returned string has no embedded \0 characters in it. */
-char *
-packet_get_cstring(u_int *length_ptr)
->>>>>>> 1.194
 {
 	return sshbuf_len(ssh->state->incoming_packet);
 }

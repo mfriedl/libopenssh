@@ -39,12 +39,3 @@ DPADD+= ${LIBGSSAPI} ${LIBKRB5}
 
 LDADD+=	-lcrypto -lutil -lz
 DPADD+=	${LIBCRYPTO} ${LIBUTIL} ${LIBZ}
-<<<<<<< Makefile
-
-#.if (${TCP_WRAPPERS:L} == "yes")
-#CFLAGS+= -DLIBWRAP
-#DPADD+= ${LIBWRAP}
-#LDADD+= -lwrap
-#.endif
-=======
->>>>>>> 1.82

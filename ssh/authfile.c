@@ -1,8 +1,4 @@
-<<<<<<< authfile.c
-/* $OpenBSD: authfile.c,v 1.104 2014/03/12 04:51:12 djm Exp $ */
-=======
 /* $OpenBSD: authfile.c,v 1.105 2014/04/28 03:09:18 djm Exp $ */
->>>>>>> 1.105
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -196,7 +192,6 @@ sshkey_private_to_blob2(const struct sshkey *prv, struct sshbuf *blob,
 		goto out;
 
 	/* uuencode */
-<<<<<<< authfile.c
 	if ((b64 = sshbuf_dtob64(encoded)) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
@@ -291,65 +286,6 @@ sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
 			if ((r = sshbuf_put_u8(encoded, *cp)) != 0)
 				goto out;
 		}
-=======
-	len = 2 * buffer_len(&encoded);
-	cp = xmalloc(len);
-	n = uuencode(buffer_ptr(&encoded), buffer_len(&encoded),
-	    (char *)cp, len);
-	if (n < 0)
-		fatal("%s: uuencode", __func__);
-
-	buffer_clear(blob);
-	buffer_append(blob, MARK_BEGIN, sizeof(MARK_BEGIN) - 1);
-	for (i = 0; i < n; i++) {
-		buffer_put_char(blob, cp[i]);
-		if (i % 70 == 69)
-			buffer_put_char(blob, '\n');
-	}
-	if (i % 70 != 69)
-		buffer_put_char(blob, '\n');
-	buffer_append(blob, MARK_END, sizeof(MARK_END) - 1);
-	free(cp);
-
-	return buffer_len(blob);
-}
-
-static Key *
-key_parse_private2(Buffer *blob, int type, const char *passphrase,
-    char **commentp)
-{
-	u_char *key = NULL, *cp, *salt = NULL, pad, last;
-	char *comment = NULL, *ciphername = NULL, *kdfname = NULL;
-	const u_char *kdfp;
-	u_int keylen = 0, ivlen, blocksize, slen, klen, len, rounds, nkeys;
-	u_int check1, check2, m1len, m2len;
-	size_t authlen;
-	const Cipher *c;
-	Buffer b, encoded, copy, kdf;
-	CipherContext ctx;
-	Key *k = NULL;
-	int dlen, ret, i;
-
-	buffer_init(&b);
-	buffer_init(&kdf);
-	buffer_init(&encoded);
-	buffer_init(&copy);
-
-	/* uudecode */
-	m1len = sizeof(MARK_BEGIN) - 1;
-	m2len = sizeof(MARK_END) - 1;
-	cp = buffer_ptr(blob);
-	len = buffer_len(blob);
-	if (len < m1len || memcmp(cp, MARK_BEGIN, m1len)) {
-		debug("%s: missing begin marker", __func__);
-		goto out;
-	}
-	cp += m1len;
-	len -= m1len;
-	while (len) {
-		if (*cp != '\n' && *cp != '\r')
-			buffer_put_char(&encoded, *cp);
->>>>>>> 1.105
 		last = *cp;
 		encoded_len--;
 		cp++;
@@ -398,15 +334,8 @@ key_parse_private2(Buffer *blob, int type, const char *passphrase,
 		r = SSH_ERR_KEY_WRONG_PASSPHRASE;
 		goto out;
 	}
-<<<<<<< authfile.c
 	if (strcmp(kdfname, "none") != 0 && strcmp(kdfname, "bcrypt") != 0) {
 		r = SSH_ERR_KEY_UNKNOWN_CIPHER;
-=======
-	kdfname = buffer_get_cstring_ret(&copy, NULL);
-	if (kdfname == NULL ||
-	    (strcmp(kdfname, "none") != 0 && strcmp(kdfname, "bcrypt") != 0)) {
-		error("%s: unknown kdf name", __func__);
->>>>>>> 1.105
 		goto out;
 	}
 	if (!strcmp(kdfname, "none") && strcmp(ciphername, "none") != 0) {

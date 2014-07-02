@@ -243,12 +243,8 @@ ssh2_capable(int remote_major, int remote_minor)
 static void
 keygrab_ssh2(con *c)
 {
-<<<<<<< ssh-keyscan.c
-	int r;
-=======
 	char *myproposal[PROPOSAL_MAX] = { KEX_CLIENT };
-	int j;
->>>>>>> 1.91
+	int r;
 
 	enable_compat20();
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] =

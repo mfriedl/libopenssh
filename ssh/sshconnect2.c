@@ -147,15 +147,8 @@ order_hostkeyalgs(char *host, struct sockaddr *hostaddr, u_short port)
 void
 ssh_kex2(struct ssh *ssh, u_short port)
 {
-<<<<<<< sshconnect2.c
-	int r;
-=======
 	char *myproposal[PROPOSAL_MAX] = { KEX_CLIENT };
-	Kex *kex;
-
-	xxx_host = host;
-	xxx_hostaddr = hostaddr;
->>>>>>> 1.206
+	int r;
 
 	if (options.ciphers == (char *)-1) {
 		logit("No valid ciphers for protocol version 2 given, using defaults.");
@@ -196,7 +189,7 @@ ssh_kex2(struct ssh *ssh, u_short port)
 	if (options.kex_algorithms != NULL)
 		myproposal[PROPOSAL_KEX_ALGS] = options.kex_algorithms;
 	myproposal[PROPOSAL_KEX_ALGS] = compat_kex_proposal(
-	    myproposal[PROPOSAL_KEX_ALGS]);
+	    myproposal[PROPOSAL_KEX_ALGS], ssh->compat);
 
 	if (options.rekey_limit || options.rekey_interval)
 		ssh_packet_set_rekey_limits(ssh,

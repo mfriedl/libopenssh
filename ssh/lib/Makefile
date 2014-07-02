@@ -48,17 +48,8 @@ install:
 .include "${.CURDIR}/../Makefile.inc"
 .include <bsd.own.mk>
 
-<<<<<<< Makefile
-# XXX leave on while refactoring to ensure we don't break it.
-KERBEROS5=no
-
-.if (${KERBEROS5:L} == "yes")
-CFLAGS+= -DKRB5 -I${DESTDIR}/usr/include/kerberosV
-=======
 # .if (${KERBEROS5:L} == "yes")
 # CFLAGS+= -DKRB5 -I${DESTDIR}/usr/include/kerberosV
->>>>>>> 1.75
-
 # SRCS+= gss-genr.c
 # CFLAGS+= -DGSSAPI
 # .endif # KERBEROS5

@@ -1109,7 +1109,6 @@ channel_decode_socks4(Channel *c, fd_set *readset, fd_set *writeset)
 	}
 	if (found < need)
 		return 0;
-<<<<<<< channels.c
 	if ((r = sshbuf_get_u8(c->input, &s4_req.version)) != 0 ||
 	    (r = sshbuf_get_u8(c->input, &s4_req.command)) != 0 ||
 	    (r = sshbuf_get_u16(c->input, &s4_req.dest_port)) != 0 ||
@@ -1121,17 +1120,6 @@ channel_decode_socks4(Channel *c, fd_set *readset, fd_set *writeset)
 	if (memchr(p, '\0', have) == NULL)
 		fatal("channel %d: decode socks4: user not nul terminated",
 		    c->self);
-=======
-	buffer_get(&c->input, (char *)&s4_req.version, 1);
-	buffer_get(&c->input, (char *)&s4_req.command, 1);
-	buffer_get(&c->input, (char *)&s4_req.dest_port, 2);
-	buffer_get(&c->input, (char *)&s4_req.dest_addr, 4);
-	have = buffer_len(&c->input);
-	p = buffer_ptr(&c->input);
-	if (memchr(p, '\0', have) == NULL)
-		fatal("channel %d: decode socks4: user not nul terminated",
-		    c->self);
->>>>>>> 1.332
 	len = strlen(p);
 	debug2("channel %u: decode socks4: user %s/%d", c->self, p, len);
 	len++;					/* trailing '\0' */
@@ -2407,17 +2395,11 @@ channel_output_poll(void)
 int
 channel_input_data(int type, u_int32_t seq, struct ssh *ssh)
 {
-<<<<<<< channels.c
 	int r;
 	u_int32_t id;
 	const u_char *data;
 	size_t data_len;
 	u_int win_len;
-=======
-	int id;
-	const u_char *data;
-	u_int data_len, win_len;
->>>>>>> 1.332
 	Channel *c;
 
 	/* Get the channel number and verify it. */

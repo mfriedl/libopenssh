@@ -405,16 +405,10 @@ do_convert_private_ssh2_from_blob(u_char *blob, u_int blen)
 	struct sshbuf *b;
 	struct sshkey *key = NULL;
 	char *type, *cipher;
-<<<<<<< ssh-keygen.c
 	u_char e1, e2, e3, *sig = NULL, data[] = "abcde12345";
 	int r, rlen, ktype;
 	u_int magic, i1, i2, i3, i4;
 	size_t slen;
-=======
-	u_char *sig = NULL, data[] = "abcde12345";
-	int magic, rlen, ktype, i1, i2, i3, i4;
-	u_int slen;
->>>>>>> 1.245
 	u_long e;
 
 	if ((b = sshbuf_from(blob, blen)) == NULL)
@@ -1863,8 +1857,7 @@ add_cert_option(char *opt)
 static void
 show_options(struct sshbuf *optbuf, int v00, int in_critical)
 {
-<<<<<<< ssh-keygen.c
-	char *name, *data;
+	char *name, *arg;
 	struct sshbuf *options, *option = NULL;
 	int r;
 
@@ -1876,21 +1869,6 @@ show_options(struct sshbuf *optbuf, int v00, int in_critical)
 		if ((r = sshbuf_get_cstring(options, &name, NULL)) != 0 ||
 		    (r = sshbuf_froms(options, &option)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
-=======
-	char *name, *arg;
-	const u_char *data;
-	u_int dlen;
-	Buffer options, option;
-
-	buffer_init(&options);
-	buffer_append(&options, buffer_ptr(optbuf), buffer_len(optbuf));
-
-	buffer_init(&option);
-	while (buffer_len(&options) != 0) {
-		name = buffer_get_string(&options, NULL);
-		data = buffer_get_string_ptr(&options, &dlen);
-		buffer_append(&option, data, dlen);
->>>>>>> 1.245
 		printf("                %s", name);
 		if ((v00 || !in_critical) && 
 		    (strcmp(name, "permit-X11-forwarding") == 0 ||
@@ -1902,17 +1880,11 @@ show_options(struct sshbuf *optbuf, int v00, int in_critical)
 		else if ((v00 || in_critical) &&
 		    (strcmp(name, "force-command") == 0 ||
 		    strcmp(name, "source-address") == 0)) {
-<<<<<<< ssh-keygen.c
-			if ((r = sshbuf_get_cstring(option, &data, NULL)) != 0)
+			if ((r = sshbuf_get_cstring(option, &arg, NULL)) != 0)
 				fatal("%s: buffer error: %s",
 				    __func__, ssh_err(r));
-			printf(" %s\n", data);
-			free(data);
-=======
-			arg = buffer_get_cstring(&option, NULL);
 			printf(" %s\n", arg);
 			free(arg);
->>>>>>> 1.245
 		} else {
 			printf(" UNKNOWN OPTION (len %zu)\n",
 			    sshbuf_len(option));

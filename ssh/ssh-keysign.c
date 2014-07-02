@@ -159,18 +159,10 @@ main(int argc, char **argv)
 #define NUM_KEYTYPES 4
 	struct sshkey *keys[NUM_KEYTYPES], *key = NULL;
 	struct passwd *pw;
-<<<<<<< ssh-keysign.c
 	int r, key_fd[NUM_KEYTYPES], i, found, version = 2, fd;
 	u_char *signature, *data, rver;
-	char *host;
-	size_t slen, dlen;
-	u_int32_t rnd[256];
-=======
-	int key_fd[NUM_KEYTYPES], i, found, version = 2, fd;
-	u_char *signature, *data;
 	char *host, *fp;
-	u_int slen, dlen;
->>>>>>> 1.41
+	size_t slen, dlen;
 
 	/* Ensure that stdin and stdout are connected */
 	if ((fd = open(_PATH_DEVNULL, O_RDWR)) < 2)
@@ -259,9 +251,9 @@ main(int argc, char **argv)
 		}
 	}
 	if (!found) {
-		fp = key_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
+		fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
 		fatal("no matching hostkey found for key %s %s",
-		    key_type(key), fp);
+		    sshkey_type(key), fp ? fp : "");
 	}
 
 	if ((r = sshkey_sign(keys[i], &signature, &slen, data, dlen, 0)) != 0)
