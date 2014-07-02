@@ -121,7 +121,7 @@ ssh_rsa_verify(const struct sshkey *key,
 	u_char digest[SSH_DIGEST_MAX_LENGTH], *osigblob, *sigblob = NULL;
 	size_t len, diff, modlen;
 	u_int dlen;
-	int nid, hash_alg, ret = SSH_ERR_INTERNAL_ERROR;
+	int hash_alg, ret = SSH_ERR_INTERNAL_ERROR;
 
 	if (key == NULL || sshkey_type_plain(key->type) != KEY_RSA ||
 	    key->rsa == NULL)
@@ -170,7 +170,6 @@ ssh_rsa_verify(const struct sshkey *key,
 
 	/* hash the data */
 	hash_alg = SSH_DIGEST_SHA1;
-	nid = NID_sha1;
 	if ((dlen = ssh_digest_bytes(hash_alg)) == 0) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
@@ -181,7 +180,7 @@ ssh_rsa_verify(const struct sshkey *key,
 		goto out;
 	}
 
-	ret = openssh_RSA_verify(nid, digest, dlen, sigblob, len, key->rsa);
+	ret = openssh_RSA_verify(hash_alg, digest, dlen, sigblob, len, key->rsa);
  out:
 	if (sigblob != NULL) {
 		memset(sigblob, 's', len);
