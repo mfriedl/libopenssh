@@ -1,4 +1,4 @@
-/* $OpenBSD: myproposal.h,v 1.38 2014/03/27 23:01:27 markus Exp $ */
+/* $OpenBSD: myproposal.h,v 1.40 2014/04/30 19:07:48 naddy Exp $ */
 
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
@@ -23,6 +23,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#ifdef WITH_OPENSSL
 
 #define KEX_SERVER_KEX		\
 	"curve25519-sha256@libssh.org," \
@@ -84,6 +86,34 @@
 	"hmac-ripemd160@openssh.com," \
 	"hmac-sha1-96," \
 	"hmac-md5-96"
+
+#else
+
+#define KEX_SERVER_KEX		\
+	"curve25519-sha256@libssh.org"
+#define	KEX_DEFAULT_PK_ALG	\
+	"ssh-ed25519-cert-v01@openssh.com," \
+	"ssh-ed25519"
+#define	KEX_SERVER_ENCRYPT \
+	"aes128-ctr,aes192-ctr,aes256-ctr," \
+	"chacha20-poly1305@openssh.com"
+#define	KEX_SERVER_MAC \
+	"umac-64-etm@openssh.com," \
+	"umac-128-etm@openssh.com," \
+	"hmac-sha2-256-etm@openssh.com," \
+	"hmac-sha2-512-etm@openssh.com," \
+	"umac-64@openssh.com," \
+	"umac-128@openssh.com," \
+	"hmac-sha2-256," \
+	"hmac-sha2-512"
+
+#define KEX_CLIENT_KEX KEX_SERVER_KEX
+#define	KEX_CLIENT_ENCRYPT KEX_SERVER_ENCRYPT
+#define KEX_CLIENT_MAC KEX_SERVER_MAC "," \
+	"hmac-sha1-etm@openssh.com," \
+	"hmac-sha1"
+
+#endif /* WITH_OPENSSL */
 
 #define	KEX_DEFAULT_COMP	"none,zlib@openssh.com,zlib"
 #define	KEX_DEFAULT_LANG	""

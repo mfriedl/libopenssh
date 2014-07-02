@@ -45,18 +45,30 @@ int ssh_digest_copy_state(struct ssh_digest_ctx *from,
 /* One-shot API */
 int ssh_digest_memory(int alg, const void *m, size_t mlen,
     u_char *d, size_t dlen)
+<<<<<<< digest.h
 	__bounded((__buffer__, 2, 3))
 	__bounded((__buffer__, 4, 5));
 int ssh_digest_buffer(int alg, const struct sshbuf *b, u_char *d, size_t dlen)
 	__bounded((__buffer__, 3, 4));
+=======
+	__attribute__((__bounded__(__buffer__, 2, 3)))
+	__attribute__((__bounded__(__buffer__, 4, 5)));
+int ssh_digest_buffer(int alg, const Buffer *b, u_char *d, size_t dlen)
+	__attribute__((__bounded__(__buffer__, 3, 4)));
+>>>>>>> 1.4
 
 /* Update API */
 struct ssh_digest_ctx *ssh_digest_start(int alg);
 int ssh_digest_update(struct ssh_digest_ctx *ctx, const void *m, size_t mlen)
+<<<<<<< digest.h
 	__bounded((__buffer__, 2, 3));
 int ssh_digest_update_buffer(struct ssh_digest_ctx *ctx, const struct sshbuf *);
+=======
+	__attribute__((__bounded__(__buffer__, 2, 3)));
+int ssh_digest_update_buffer(struct ssh_digest_ctx *ctx, const Buffer *b);
+>>>>>>> 1.4
 int ssh_digest_final(struct ssh_digest_ctx *ctx, u_char *d, size_t dlen)
-	__bounded((__buffer__, 2, 3));
+	__attribute__((__bounded__(__buffer__, 2, 3)));
 void ssh_digest_free(struct ssh_digest_ctx *ctx);
 
 #endif /* _DIGEST_H */

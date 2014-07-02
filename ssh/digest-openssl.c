@@ -22,9 +22,8 @@
 
 #include <openssl/evp.h>
 
-#include "sshbuf.h"
+#include "buffer.h"
 #include "digest.h"
-#include "err.h"
 
 struct ssh_digest_ctx {
 	int alg;
@@ -108,9 +107,9 @@ ssh_digest_update(struct ssh_digest_ctx *ctx, const void *m, size_t mlen)
 }
 
 int
-ssh_digest_update_buffer(struct ssh_digest_ctx *ctx, const struct sshbuf *b)
+ssh_digest_update_buffer(struct ssh_digest_ctx *ctx, const Buffer *b)
 {
-	return ssh_digest_update(ctx, sshbuf_ptr(b), sshbuf_len(b));
+	return ssh_digest_update(ctx, buffer_ptr(b), buffer_len(b));
 }
 
 int
@@ -155,7 +154,7 @@ ssh_digest_memory(int alg, const void *m, size_t mlen, u_char *d, size_t dlen)
 }
 
 int
-ssh_digest_buffer(int alg, const struct sshbuf *b, u_char *d, size_t dlen)
+ssh_digest_buffer(int alg, const Buffer *b, u_char *d, size_t dlen)
 {
-	return ssh_digest_memory(alg, sshbuf_ptr(b), sshbuf_len(b), d, dlen);
+	return ssh_digest_memory(alg, buffer_ptr(b), buffer_len(b), d, dlen);
 }

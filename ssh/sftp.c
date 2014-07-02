@@ -1,4 +1,4 @@
-/* $OpenBSD: sftp.c,v 1.160 2014/04/22 10:07:12 logan Exp $ */
+/* $OpenBSD: sftp.c,v 1.162 2014/04/29 20:36:51 dtucker Exp $ */
 /*
  * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
  *
@@ -1821,6 +1821,7 @@ complete_match(EditLine *el, struct sftp_conn *conn, char *remote_path,
 			pwdlen = tmplen + 1;	/* track last seen '/' */
 	}
 	free(tmp);
+	tmp = NULL;
 
 	if (g.gl_matchc == 0)
 		goto out;
@@ -1828,7 +1829,6 @@ complete_match(EditLine *el, struct sftp_conn *conn, char *remote_path,
 	if (g.gl_matchc > 1)
 		complete_display(g.gl_pathv, pwdlen);
 
-	tmp = NULL;
 	/* Don't try to extend globs */
 	if (file == NULL || hadglob)
 		goto out;
@@ -1891,7 +1891,7 @@ complete_match(EditLine *el, struct sftp_conn *conn, char *remote_path,
 	lf = el_line(el);
 	if (g.gl_matchc == 1) {
 		i = 0;
-		if (!terminated)
+		if (!terminated && quote != '\0')
 			ins[i++] = quote;
 		if (*(lf->cursor - 1) != '/' &&
 		    (lastarg || *(lf->cursor) != ' '))

@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.425 2014/04/19 14:53:48 tedu Exp $ */
+/* $OpenBSD: sshd.c,v 1.426 2014/04/29 18:01:49 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -62,8 +62,9 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <openssl/dh.h>
+#ifdef WITH_OPENSSL
 #include <openssl/bn.h>
+#endif
 
 #include "xmalloc.h"
 #include "ssh.h"
@@ -81,7 +82,6 @@
 #include "digest.h"
 #include "key.h"
 #include "kex.h"
-#include "dh.h"
 #include "myproposal.h"
 #include "authfile.h"
 #include "pathnames.h"
@@ -233,8 +233,15 @@ struct sshbuf *loginmsg = NULL;
 void destroy_sensitive_data(void);
 void demote_sensitive_data(void);
 
+<<<<<<< sshd.c
 static void do_ssh1_kex(struct ssh *ssh);
 static void do_ssh2_kex(struct ssh *ssh);
+=======
+#ifdef WITH_SSH1
+static void do_ssh1_kex(void);
+#endif
+static void do_ssh2_kex(void);
+>>>>>>> 1.426
 
 /*
  * Close all listening sockets
@@ -712,8 +719,11 @@ privsep_preauth(struct authctxt *authctxt)
 static void
 privsep_postauth(struct ssh *ssh)
 {
+<<<<<<< sshd.c
 	struct authctxt *authctxt = ssh->authctxt;
 
+=======
+>>>>>>> 1.426
 	if (authctxt->pw->pw_uid == 0 || options.use_login) {
 		/* File descriptor passing is broken or root login */
 		use_privsep = 0;
@@ -919,7 +929,13 @@ static void
 usage(void)
 {
 	fprintf(stderr, "%s, %s\n",
-	    SSH_VERSION, SSLeay_version(SSLEAY_VERSION));
+	    SSH_VERSION,
+#ifdef WITH_OPENSSL
+	    SSLeay_version(SSLEAY_VERSION)
+#else
+	    "without OpenSSL"
+#endif
+	);
 	fprintf(stderr,
 "usage: sshd [-46DdeiqTt] [-b bits] [-C connection_spec] [-c host_cert_file]\n"
 "            [-E log_file] [-f config_file] [-g login_grace_time]\n"
@@ -955,8 +971,10 @@ send_rexec_state(int fd, struct sshbuf *conf)
 	if ((r = sshbuf_put_cstring(m, (const char *)sshbuf_ptr(conf))) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
+#ifdef WITH_SSH1
 	if (sensitive_data.server_key != NULL &&
 	    sensitive_data.server_key->type == KEY_RSA1) {
+<<<<<<< sshd.c
 		if ((r = sshbuf_put_u32(m, 1)) != 0 ||
 		    (r = sshbuf_put_bignum1(m,
 		    sensitive_data.server_key->rsa->e)) != 0 ||
@@ -973,6 +991,18 @@ send_rexec_state(int fd, struct sshbuf *conf)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	} else if ((r = sshbuf_put_u32(m, 0)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+=======
+		buffer_put_int(&m, 1);
+		buffer_put_bignum(&m, sensitive_data.server_key->rsa->e);
+		buffer_put_bignum(&m, sensitive_data.server_key->rsa->n);
+		buffer_put_bignum(&m, sensitive_data.server_key->rsa->d);
+		buffer_put_bignum(&m, sensitive_data.server_key->rsa->iqmp);
+		buffer_put_bignum(&m, sensitive_data.server_key->rsa->p);
+		buffer_put_bignum(&m, sensitive_data.server_key->rsa->q);
+	} else
+#endif
+		buffer_put_int(&m, 0);
+>>>>>>> 1.426
 
 	if (ssh_msg_send(fd, 0, m) == -1)
 		fatal("%s: ssh_msg_send failed", __func__);
@@ -1009,8 +1039,14 @@ recv_rexec_state(int fd, struct sshbuf *conf)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	free(cp);
 
+<<<<<<< sshd.c
 	if (key_follows) {
+=======
+	if (buffer_get_int(&m)) {
+#ifdef WITH_SSH1
+>>>>>>> 1.426
 		if (sensitive_data.server_key != NULL)
+<<<<<<< sshd.c
 			sshkey_free(sensitive_data.server_key);
 		sensitive_data.server_key = sshkey_new_private(KEY_RSA1);
 		if (sensitive_data.server_key == NULL)
@@ -1031,6 +1067,21 @@ recv_rexec_state(int fd, struct sshbuf *conf)
 		if ((r = rsa_generate_additional_parameters(
 		    sensitive_data.server_key->rsa)) != 0)
 			fatal("generate RSA parameters failed: %s", ssh_err(r));
+=======
+			key_free(sensitive_data.server_key);
+		sensitive_data.server_key = key_new_private(KEY_RSA1);
+		buffer_get_bignum(&m, sensitive_data.server_key->rsa->e);
+		buffer_get_bignum(&m, sensitive_data.server_key->rsa->n);
+		buffer_get_bignum(&m, sensitive_data.server_key->rsa->d);
+		buffer_get_bignum(&m, sensitive_data.server_key->rsa->iqmp);
+		buffer_get_bignum(&m, sensitive_data.server_key->rsa->p);
+		buffer_get_bignum(&m, sensitive_data.server_key->rsa->q);
+		rsa_generate_additional_parameters(
+		    sensitive_data.server_key->rsa);
+#else
+		fatal("ssh1 not supported");
+#endif
+>>>>>>> 1.426
 	}
 	sshbuf_free(m);
 
@@ -1512,7 +1563,9 @@ main(int ac, char **av)
 	else
 		closefrom(REEXEC_DEVCRYPTO_RESERVED_FD);
 
+#ifdef WITH_OPENSSL
 	OpenSSL_add_all_algorithms();
+#endif
 
 	/* If requested, redirect the logs to the specified logfile. */
 	if (logfile != NULL) {
@@ -1602,7 +1655,12 @@ main(int ac, char **av)
 	}
 
 	debug("sshd version %s, %s", SSH_VERSION,
-	    SSLeay_version(SSLEAY_VERSION));
+#ifdef WITH_OPENSSL
+	    SSLeay_version(SSLEAY_VERSION)
+#else
+	    "without OpenSSL"
+#endif
+	);
 
 	/* load host keys */
 	sensitive_data.host_keys = xcalloc(options.num_host_key_files,
@@ -1715,6 +1773,8 @@ main(int ac, char **av)
 		debug("host certificate: #%d type %d %s", j, key->type,
 		    sshkey_type(key));
 	}
+
+#ifdef WITH_SSH1
 	/* Check certain values for sanity. */
 	if (options.protocol & SSH_PROTO_1) {
 		if (options.server_key_bits < 512 ||
@@ -1739,6 +1799,7 @@ main(int ac, char **av)
 			    options.server_key_bits);
 		}
 	}
+#endif
 
 	if (use_privsep) {
 		struct stat st;
@@ -1997,8 +2058,17 @@ main(int ac, char **av)
 		do_ssh2_kex(ssh);
 		do_authentication2(ssh);
 	} else {
+<<<<<<< sshd.c
 		do_ssh1_kex(ssh);
 		do_authentication(ssh);
+=======
+#ifdef WITH_SSH1
+		do_ssh1_kex();
+		do_authentication(authctxt);
+#else
+		fatal("ssh1 not supported");
+#endif
+>>>>>>> 1.426
 	}
 	/*
 	 * If we use privilege separation, the unprivileged child transfers
@@ -2053,6 +2123,7 @@ main(int ac, char **av)
 	exit(0);
 }
 
+#ifdef WITH_SSH1
 /*
  * Decrypt session_key_int using our private server key and private host key
  * (key with larger modulus first).
@@ -2300,6 +2371,7 @@ do_ssh1_kex(struct ssh *ssh)
 		fatal("%s: %s", __func__, ssh_err(r));
 	ssh_packet_write_wait(ssh);
 }
+#endif
 
 int
 sshd_hostkey_sign(struct sshkey *privkey, struct sshkey *pubkey,
@@ -2367,14 +2439,20 @@ do_ssh2_kex(struct ssh *ssh)
 	    list_hostkey_types(), ssh->compat);
 
 	/* start key exchange */
+<<<<<<< sshd.c
 	if ((r = kex_setup(ssh, myproposal)) != 0)
 		fatal("kex_setup: %s", ssh_err(r));
 	kex = ssh->kex;
+=======
+	kex = kex_setup(myproposal);
+#ifdef WITH_OPENSSL
+>>>>>>> 1.426
 	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
 	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
 	kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
 	kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
 	kex->kex[KEX_ECDH_SHA2] = kexecdh_server;
+#endif
 	kex->kex[KEX_C25519_SHA256] = kexc25519_server;
 	kex->server = 1;
 	kex->client_version_string=client_version_string;

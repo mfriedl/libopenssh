@@ -18,7 +18,7 @@
 #include <sys/types.h>
 #include <string.h>
 
-#include "sshbuf.h"
+#include "buffer.h"
 #include "digest.h"
 #include "hmac.h"
 
@@ -94,7 +94,7 @@ ssh_hmac_update(struct ssh_hmac_ctx *ctx, const void *m, size_t mlen)
 }
 
 int
-ssh_hmac_update_buffer(struct ssh_hmac_ctx *ctx, const struct sshbuf *b)
+ssh_hmac_update_buffer(struct ssh_hmac_ctx *ctx, const Buffer *b)
 {
 	return ssh_digest_update_buffer(ctx->digest, b);
 }

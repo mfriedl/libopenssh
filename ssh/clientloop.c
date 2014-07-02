@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.258 2014/02/02 03:44:31 djm Exp $ */
+/* $OpenBSD: clientloop.c,v 1.259 2014/04/29 13:10:30 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -2159,12 +2159,20 @@ client_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 		if ((r = sshpkt_get_end(ssh)) != 0)
 			goto out;
 	}
+<<<<<<< clientloop.c
 	if (reply && c != NULL) {
 		if ((r = sshpkt_start(ssh, success ?
 		    SSH2_MSG_CHANNEL_SUCCESS : SSH2_MSG_CHANNEL_FAILURE)) != 0 ||
 		    (r = sshpkt_put_u32(ssh, c->remote_id)) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)
 			goto out;
+=======
+	if (reply && c != NULL && !(c->flags & CHAN_CLOSE_SENT)) {
+		packet_start(success ?
+		    SSH2_MSG_CHANNEL_SUCCESS : SSH2_MSG_CHANNEL_FAILURE);
+		packet_put_int(c->remote_id);
+		packet_send();
+>>>>>>> 1.259
 	}
 	r = 0;
  out:

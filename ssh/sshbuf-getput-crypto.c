@@ -1,4 +1,4 @@
-/*	$OpenBSD$	*/
+/*	$OpenBSD: sshbuf-getput-crypto.c,v 1.1 2014/04/30 05:29:56 djm Exp $	*/
 /*
  * Copyright (c) 2011 Damien Miller
  *
@@ -23,7 +23,7 @@
 #include <openssl/bn.h>
 #include <openssl/ec.h>
 
-#include "err.h"
+#include "ssherr.h"
 #define SSHBUF_INTERNAL
 #include "sshbuf.h"
 

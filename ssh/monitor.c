@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.131 2014/02/02 03:44:31 djm Exp $ */
+/* $OpenBSD: monitor.c,v 1.133 2014/05/03 17:20:34 markus Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -32,7 +32,9 @@
 #include <sys/param.h>
 #include <sys/queue.h>
 
+#ifdef WITH_OPENSSL
 #include <openssl/dh.h>
+#endif
 
 #include <errno.h>
 #include <fcntl.h>
@@ -122,8 +124,15 @@ int mm_answer_gss_checkmic(int, struct sshbuf *);
 
 static int monitor_read_log(struct monitor *);
 
+<<<<<<< monitor.c
 static struct authctxt *authctxt;
+=======
+static Authctxt *authctxt;
+
+#ifdef WITH_SSH1
+>>>>>>> 1.133
 static BIGNUM *ssh1_challenge = NULL;	/* used for ssh1 rsa auth */
+#endif
 
 /* local state for key verify */
 static u_char *key_blob = NULL;
@@ -153,7 +162,9 @@ struct mon_table {
 #define MON_PERMIT	0x1000	/* Request is permitted */
 
 struct mon_table mon_dispatch_proto20[] = {
+#ifdef WITH_OPENSSL
     {MONITOR_REQ_MODULI, MON_ONCE, mm_answer_moduli},
+#endif
     {MONITOR_REQ_SIGN, MON_ONCE, mm_answer_sign},
     {MONITOR_REQ_PWNAM, MON_ONCE, mm_answer_pwnamallow},
     {MONITOR_REQ_AUTHSERV, MON_ONCE, mm_answer_authserv},
@@ -173,7 +184,9 @@ struct mon_table mon_dispatch_proto20[] = {
 };
 
 struct mon_table mon_dispatch_postauth20[] = {
+#ifdef WITH_OPENSSL
     {MONITOR_REQ_MODULI, 0, mm_answer_moduli},
+#endif
     {MONITOR_REQ_SIGN, 0, mm_answer_sign},
     {MONITOR_REQ_PTY, 0, mm_answer_pty},
     {MONITOR_REQ_PTYCLEANUP, 0, mm_answer_pty_cleanup},
@@ -182,6 +195,7 @@ struct mon_table mon_dispatch_postauth20[] = {
 };
 
 struct mon_table mon_dispatch_proto15[] = {
+#ifdef WITH_SSH1
     {MONITOR_REQ_PWNAM, MON_ONCE, mm_answer_pwnamallow},
     {MONITOR_REQ_SESSKEY, MON_ONCE, mm_answer_sesskey},
     {MONITOR_REQ_SESSID, MON_ONCE, mm_answer_sessid},
@@ -192,13 +206,16 @@ struct mon_table mon_dispatch_proto15[] = {
     {MONITOR_REQ_RSARESPONSE, MON_ONCE|MON_AUTHDECIDE, mm_answer_rsa_response},
     {MONITOR_REQ_BSDAUTHQUERY, MON_ISAUTH, mm_answer_bsdauthquery},
     {MONITOR_REQ_BSDAUTHRESPOND, MON_AUTH, mm_answer_bsdauthrespond},
+#endif
     {0, 0, NULL}
 };
 
 struct mon_table mon_dispatch_postauth15[] = {
+#ifdef WITH_SSH1
     {MONITOR_REQ_PTY, MON_ONCE, mm_answer_pty},
     {MONITOR_REQ_PTYCLEANUP, MON_ONCE, mm_answer_pty_cleanup},
     {MONITOR_REQ_TERM, 0, mm_answer_term},
+#endif
     {0, 0, NULL}
 };
 
@@ -540,6 +557,7 @@ monitor_reset_key_state(void)
 	hostbased_chost = NULL;
 }
 
+#ifdef WITH_OPENSSL
 int
 mm_answer_moduli(int sock, struct sshbuf *m)
 {
@@ -578,6 +596,7 @@ mm_answer_moduli(int sock, struct sshbuf *m)
 	mm_request_send(sock, MONITOR_ANS_MODULI, m);
 	return (0);
 }
+#endif
 
 int
 mm_answer_sign(int sock, struct sshbuf *m)
@@ -908,6 +927,7 @@ mm_answer_keyallowed(int sock, struct sshbuf *m)
 			    cuser, chost);
 			auth_method = "hostbased";
 			break;
+#ifdef WITH_SSH1
 		case MM_RSAHOSTKEY:
 			key->type = KEY_RSA1; /* XXX */
 			allowed = options.rhosts_rsa_authentication &&
@@ -917,6 +937,7 @@ mm_answer_keyallowed(int sock, struct sshbuf *m)
 				auth_clear_options();
 			auth_method = "rsa";
 			break;
+#endif
 		default:
 			fatal("%s: unknown key type %d", __func__, type);
 			break;
@@ -1286,6 +1307,7 @@ mm_answer_pty_cleanup(int sock, struct sshbuf *m)
 	return (0);
 }
 
+#ifdef WITH_SSH1
 int
 mm_answer_sesskey(int sock, struct sshbuf *m)
 {
@@ -1476,6 +1498,7 @@ mm_answer_rsa_response(int sock, struct sshbuf *m)
 
 	return (success);
 }
+#endif
 
 int
 mm_answer_term(int sock, struct sshbuf *req)
@@ -1526,15 +1549,88 @@ monitor_apply_keystate(struct monitor *pmonitor)
 	}
 
 	/* Update with new address */
+<<<<<<< monitor.c
 	if (options.compression) {
 		ssh_packet_set_compress_hooks(ssh, pmonitor->m_zlib,
 		    (ssh_packet_comp_alloc_func *)mm_zalloc,
 		    (ssh_packet_comp_free_func *)mm_zfree);
 	}
+=======
+	if (options.compression)
+		mm_init_compression(pmonitor->m_zlib);
+
+	packet_set_postauth();
+
+>>>>>>> 1.133
 	if (options.rekey_limit || options.rekey_interval)
 		ssh_packet_set_rekey_limits(ssh,
 		    (u_int32_t)options.rekey_limit,
 		    (time_t)options.rekey_interval);
+<<<<<<< monitor.c
+=======
+
+	/* Network I/O buffers */
+	/* XXX inefficient for large buffers, need: buffer_init_from_string */
+	buffer_clear(packet_get_input());
+	buffer_append(packet_get_input(), child_state.input, child_state.ilen);
+	explicit_bzero(child_state.input, child_state.ilen);
+	free(child_state.input);
+
+	buffer_clear(packet_get_output());
+	buffer_append(packet_get_output(), child_state.output,
+		      child_state.olen);
+	explicit_bzero(child_state.output, child_state.olen);
+	free(child_state.output);
+
+	/* Roaming */
+	if (compat20)
+		roam_set_bytes(child_state.sent_bytes, child_state.recv_bytes);
+}
+
+static Kex *
+mm_get_kex(Buffer *m)
+{
+	Kex *kex;
+	void *blob;
+	u_int bloblen;
+
+	kex = xcalloc(1, sizeof(*kex));
+	kex->session_id = buffer_get_string(m, &kex->session_id_len);
+	if (session_id2 == NULL ||
+	    kex->session_id_len != session_id2_len ||
+	    timingsafe_bcmp(kex->session_id, session_id2, session_id2_len) != 0)
+		fatal("mm_get_get: internal error: bad session id");
+	kex->we_need = buffer_get_int(m);
+#ifdef WITH_OPENSSL
+	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
+	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
+	kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
+	kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
+	kex->kex[KEX_ECDH_SHA2] = kexecdh_server;
+#endif
+	kex->kex[KEX_C25519_SHA256] = kexc25519_server;
+	kex->server = 1;
+	kex->hostkey_type = buffer_get_int(m);
+	kex->kex_type = buffer_get_int(m);
+	blob = buffer_get_string(m, &bloblen);
+	buffer_init(&kex->my);
+	buffer_append(&kex->my, blob, bloblen);
+	free(blob);
+	blob = buffer_get_string(m, &bloblen);
+	buffer_init(&kex->peer);
+	buffer_append(&kex->peer, blob, bloblen);
+	free(blob);
+	kex->done = 1;
+	kex->flags = buffer_get_int(m);
+	kex->client_version_string = buffer_get_string(m, NULL);
+	kex->server_version_string = buffer_get_string(m, NULL);
+	kex->load_host_public_key=&get_hostkey_public_by_type;
+	kex->load_host_private_key=&get_hostkey_private_by_type;
+	kex->host_key_index=&get_hostkey_index;
+	kex->sign = sshd_hostkey_sign;
+
+	return (kex);
+>>>>>>> 1.133
 }
 
 /* This function requries careful sanity checking */

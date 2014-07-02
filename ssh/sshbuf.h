@@ -1,4 +1,4 @@
-/*	$OpenBSD$	*/
+/*	$OpenBSD: sshbuf.h,v 1.1 2014/04/30 05:29:56 djm Exp $	*/
 /*
  * Copyright (c) 2011 Damien Miller
  *
@@ -24,16 +24,36 @@
 #include <openssl/bn.h>
 #include <openssl/ec.h>
 
-#ifdef WITH_LEAKMALLOC
-#include "leakmalloc.h"
-#endif
-
 #define SSHBUF_SIZE_MAX		0x8000000	/* Hard maximum size */
 #define SSHBUF_REFS_MAX		0x100000	/* Max child buffers */
-#define SSHBUF_MAX_BIGNUM	(8192 / 8)	/* Max bignum *bytes* */
+#define SSHBUF_MAX_BIGNUM	(16384 / 8)	/* Max bignum *bytes* */
 #define SSHBUF_MAX_ECPOINT	((528 * 2 / 8) + 1) /* Max EC point *bytes* */
 
-struct sshbuf;
+/*
+ * NB. do not depend on the internals of this. It will be made opaque
+ * one day.
+ */
+struct sshbuf {
+	u_char *d;		/* Data */
+	const u_char *cd;	/* Const data */
+	size_t off;		/* First available byte is buf->d + buf->off */
+	size_t size;		/* Last byte is buf->d + buf->size - 1 */
+	size_t max_size;	/* Maximum size of buffer */
+	size_t alloc;		/* Total bytes allocated to buf->d */
+	int readonly;		/* Refers to external, const data */
+	int dont_free;		/* Kludge to support sshbuf_init */
+	u_int refcount;		/* Tracks self and number of child buffers */
+	struct sshbuf *parent;	/* If child, pointer to parent */
+};
+
+#ifndef SSHBUF_NO_DEPREACTED
+/*
+ * NB. Please do not use sshbuf_init() in new code. Please use sshbuf_new()
+ * instead. sshbuf_init() is deprectated and will go away soon (it is
+ * only included to allow compat with buffer_* in OpenSSH)
+ */
+void sshbuf_init(struct sshbuf *buf);
+#endif
 
 /*
  * Create a new sshbuf buffer.
@@ -272,9 +292,9 @@ const struct sshbuf *sshbuf_parent(const struct sshbuf *buf);
  */
 u_int	sshbuf_refcount(const struct sshbuf *buf);
 
-# define SSHBUF_SIZE_INIT		256		/* Initial allocation */
-# define SSHBUF_SIZE_INC		256		/* Preferred increment length */
-# define SSHBUF_PACK_MIN		8192		/* Minimim packable offset */
+# define SSHBUF_SIZE_INIT	256		/* Initial allocation */
+# define SSHBUF_SIZE_INC	256		/* Preferred increment length */
+# define SSHBUF_PACK_MIN	8192		/* Minimim packable offset */
 
 /* # define SSHBUF_ABORT abort */
 /* # define SSHBUF_DEBUG */

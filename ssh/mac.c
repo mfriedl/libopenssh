@@ -1,4 +1,4 @@
-/* $OpenBSD: mac.c,v 1.28 2014/02/07 06:55:54 djm Exp $ */
+/* $OpenBSD: mac.c,v 1.30 2014/04/30 19:07:48 naddy Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
@@ -167,7 +167,8 @@ mac_compute(struct sshmac *mac, u_int32_t seqno, const u_char *data, int datalen
 		u_char m[MAC_DIGEST_LEN_MAX];
 		u_int64_t for_align;
 	} u;
-	u_char b[4], nonce[8];
+	u_char b[4];
+	u_char nonce[8];
 
 	if (mac->mac_len > sizeof(u))
 		return SSH_ERR_INTERNAL_ERROR;

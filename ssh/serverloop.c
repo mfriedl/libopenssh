@@ -1,4 +1,4 @@
-/* $OpenBSD: serverloop.c,v 1.170 2014/02/02 03:44:31 djm Exp $ */
+/* $OpenBSD: serverloop.c,v 1.171 2014/04/29 13:10:30 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1234,12 +1234,20 @@ server_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 	} else if ((c->type == SSH_CHANNEL_LARVAL ||
 	    c->type == SSH_CHANNEL_OPEN) && strcmp(c->ctype, "session") == 0)
 		success = session_input_channel_req(c, rtype);
+<<<<<<< serverloop.c
 	if (reply) {
 		if ((r = sshpkt_start(ssh, success ? SSH2_MSG_CHANNEL_SUCCESS :
 		    SSH2_MSG_CHANNEL_FAILURE)) != 0 ||
 		    (r = sshpkt_put_u32(ssh, c->remote_id)) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)
 			goto out;
+=======
+	if (reply && !(c->flags & CHAN_CLOSE_SENT)) {
+		packet_start(success ?
+		    SSH2_MSG_CHANNEL_SUCCESS : SSH2_MSG_CHANNEL_FAILURE);
+		packet_put_int(c->remote_id);
+		packet_send();
+>>>>>>> 1.171
 	}
 	r = 0;
  out:
