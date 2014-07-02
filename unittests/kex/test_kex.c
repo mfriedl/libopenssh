@@ -139,8 +139,9 @@ do_kex_with_key(char *kex, int key_type, int bits)
 	server2->kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
 	server2->kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
 	server2->kex->kex[KEX_ECDH_SHA2] = kexecdh_server;
-	server2->kex->load_host_public_key= server->kex->load_host_public_key;
-	server2->kex->load_host_private_key= server->kex->load_host_private_key;
+	server2->kex->load_host_public_key = server->kex->load_host_public_key;
+	server2->kex->load_host_private_key = server->kex->load_host_private_key;
+	server2->kex->sign = server->kex->sign;
 	TEST_DONE();
 
 	TEST_START("rekeying server2");

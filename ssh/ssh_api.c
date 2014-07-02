@@ -38,6 +38,8 @@ int	_ssh_order_hostkeyalgs(struct ssh *);
 int	_ssh_verify_host_key(struct sshkey *, struct ssh *);
 struct sshkey *_ssh_host_public_key(int, struct ssh *);
 struct sshkey *_ssh_host_private_key(int, struct ssh *);
+int	_ssh_host_key_sign(struct sshkey *, struct sshkey *, u_char **,
+    size_t *, u_char *, size_t, u_int);
 
 /*
  * stubs for the server side implementation of kex.
@@ -100,6 +102,7 @@ ssh_init(struct ssh **sshp, int is_server, struct kex_params *kex_params)
 		ssh->kex->kex[KEX_C25519_SHA256] = kexc25519_server;
 		ssh->kex->load_host_public_key=&_ssh_host_public_key;
 		ssh->kex->load_host_private_key=&_ssh_host_private_key;
+		ssh->kex->sign=&_ssh_host_key_sign;
 	} else {
 		ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
 		ssh->kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
@@ -510,4 +513,11 @@ _ssh_order_hostkeyalgs(struct ssh *ssh)
 		free(replace);
 	kex_prop_free(proposal);
 	return r;
+}
+
+int
+_ssh_host_key_sign(struct sshkey *privkey, struct sshkey *pubkey,
+    u_char **signature, size_t *slen, u_char *data, size_t dlen, u_int compat)
+{
+	return sshkey_sign(privkey, signature, slen, data, dlen, compat);
 }
