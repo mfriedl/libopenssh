@@ -951,20 +951,12 @@ do_gen_all_hostkeys(struct passwd *pw)
 			fatal("sshkey_from_private failed: %s", ssh_err(r));
 		snprintf(comment, sizeof comment, "%s@%s", pw->pw_name,
 		    hostname);
-<<<<<<< ssh-keygen.c
 		if ((r = sshkey_save_private(private, identity_file, "",
-		    comment)) != 0) {
+		    comment, use_new_format, new_format_cipher, rounds)) != 0) {
 			printf("Saving key \"%s\" failed: %s\n", identity_file,
 			    ssh_err(r));
 			sshkey_free(private);
 			sshkey_free(public);
-=======
-		if (!key_save_private(private, identity_file, "", comment,
-		    use_new_format, new_format_cipher, rounds)) {
-			printf("Saving the key failed: %s.\n", identity_file);
-			key_free(private);
-			key_free(public);
->>>>>>> 1.238
 			first = 0;
 			continue;
 		}
@@ -1321,16 +1313,10 @@ do_change_passphrase(struct passwd *pw)
 	}
 
 	/* Save the file using the new passphrase. */
-<<<<<<< ssh-keygen.c
 	if ((r = sshkey_save_private(private, identity_file, passphrase1,
-	    comment)) != 0) {
+	    comment, use_new_format, new_format_cipher, rounds)) != 0) {
 		printf("Saving key \"%s\" failed: %s.\n",
 		    identity_file, ssh_err(r));
-=======
-	if (!key_save_private(private, identity_file, passphrase1, comment,
-	    use_new_format, new_format_cipher, rounds)) {
-		printf("Saving the key failed: %s.\n", identity_file);
->>>>>>> 1.238
 		memset(passphrase1, 0, strlen(passphrase1));
 		free(passphrase1);
 		sshkey_free(private);
@@ -1442,16 +1428,10 @@ do_change_comment(struct passwd *pw)
 	}
 
 	/* Save the file using the new passphrase. */
-<<<<<<< ssh-keygen.c
 	if ((r = sshkey_save_private(private, identity_file, passphrase,
-	    new_comment)) != 0) {
+	    new_comment, use_new_format, new_format_cipher, rounds)) != 0) {
 		printf("Saving key \"%s\" failed: %s\n",
 		    identity_file, ssh_err(r));
-=======
-	if (!key_save_private(private, identity_file, passphrase, new_comment,
-	    use_new_format, new_format_cipher, rounds)) {
-		printf("Saving the key failed: %s.\n", identity_file);
->>>>>>> 1.238
 		memset(passphrase, 0, strlen(passphrase));
 		free(passphrase);
 		sshkey_free(private);
@@ -2280,13 +2260,8 @@ main(int argc, char **argv)
 	struct sshkey *private, *public;
 	struct passwd *pw;
 	struct stat st;
-<<<<<<< ssh-keygen.c
 	int r, opt, type, fd;
-	u_int32_t memory = 0, generator_wanted = 0, trials = 100;
-=======
-	int opt, type, fd;
 	u_int32_t memory = 0, generator_wanted = 0;
->>>>>>> 1.238
 	int do_gen_candidates = 0, do_screen_candidates = 0;
 	int gen_all_hostkeys = 0, gen_krl = 0, update_krl = 0, check_krl = 0;
 	unsigned long start_lineno = 0, lines_to_process = 0;
@@ -2722,16 +2697,10 @@ passphrase_again:
 	}
 
 	/* Save the key with the given passphrase and comment. */
-<<<<<<< ssh-keygen.c
 	if ((r = sshkey_save_private(private, identity_file, passphrase1,
-	    comment)) != 0) {
+	    comment, use_new_format, new_format_cipher, rounds)) != 0) {
 		printf("Saving key \"%s\" failed: %s\n",
 		    identity_file, ssh_err(r));
-=======
-	if (!key_save_private(private, identity_file, passphrase1, comment,
-	    use_new_format, new_format_cipher, rounds)) {
-		printf("Saving the key failed: %s.\n", identity_file);
->>>>>>> 1.238
 		memset(passphrase1, 0, strlen(passphrase1));
 		free(passphrase1);
 		exit(1);

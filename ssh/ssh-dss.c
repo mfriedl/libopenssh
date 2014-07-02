@@ -44,29 +44,19 @@ int
 ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
     const u_char *data, size_t datalen, u_int compat)
 {
-<<<<<<< ssh-dss.c
 	DSA_SIG *sig = NULL;
-	const EVP_MD *evp_md = EVP_sha1();
-	EVP_MD_CTX md;
-	u_char digest[EVP_MAX_MD_SIZE], sigblob[SIGBLOB_LEN];
+	u_char digest[SSH_DIGEST_MAX_LENGTH], sigblob[SIGBLOB_LEN];
 	size_t rlen, slen, len;
-	u_int dlen;
+	u_int dlen = ssh_digest_bytes(SSH_DIGEST_SHA1);
 	struct sshbuf *b = NULL;
 	int ret = SSH_ERR_INVALID_ARGUMENT;
-=======
-	DSA_SIG *sig;
-	u_char digest[SSH_DIGEST_MAX_LENGTH], sigblob[SIGBLOB_LEN];
-	u_int rlen, slen, len, dlen = ssh_digest_bytes(SSH_DIGEST_SHA1);
-	Buffer b;
->>>>>>> 1.30
 
-<<<<<<< ssh-dss.c
-	if (key == NULL || key->dsa == NULL || (key->type != KEY_DSA &&
-	    key->type != KEY_DSA_CERT && key->type != KEY_DSA_CERT_V00))
+	if (key == NULL || sshkey_type_plain(key->type) != KEY_DSA ||
+	    key->dsa == NULL)
 		return SSH_ERR_INVALID_ARGUMENT;
-	if (EVP_DigestInit(&md, evp_md) != 1 ||
-	    EVP_DigestUpdate(&md, data, datalen) != 1 ||
-	    EVP_DigestFinal(&md, digest, &dlen) != 1) {
+
+	if (ssh_digest_memory(SSH_DIGEST_SHA1, data, datalen,
+	    digest, sizeof(digest)) != 0) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
 	}
@@ -74,26 +64,6 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	if ((sig = DSA_do_sign(digest, dlen, key->dsa)) == NULL) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
-=======
-	if (key == NULL || key_type_plain(key->type) != KEY_DSA ||
-	    key->dsa == NULL) {
-		error("%s: no DSA key", __func__);
-		return -1;
-	}
-
-	if (ssh_digest_memory(SSH_DIGEST_SHA1, data, datalen,
-	    digest, sizeof(digest)) != 0) {
-		error("%s: ssh_digest_memory failed", __func__);
-		return -1;
-	}
-
-	sig = DSA_do_sign(digest, dlen, key->dsa);
-	memset(digest, 'd', sizeof(digest));
-
-	if (sig == NULL) {
-		error("ssh_dss_sign: sign failed");
-		return -1;
->>>>>>> 1.30
 	}
 
 	rlen = BN_num_bytes(sig->r);
@@ -139,7 +109,6 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 		ret = 0;
 	}
  out:
-	bzero(&md, sizeof(md));
 	bzero(digest, sizeof(digest));
 	if (sig != NULL)
 		DSA_SIG_free(sig);
@@ -153,35 +122,18 @@ ssh_dss_verify(const struct sshkey *key,
     const u_char *signature, size_t signaturelen,
     const u_char *data, size_t datalen, u_int compat)
 {
-<<<<<<< ssh-dss.c
 	DSA_SIG *sig = NULL;
-	const EVP_MD *evp_md = EVP_sha1();
-	EVP_MD_CTX md;
-	u_char digest[EVP_MAX_MD_SIZE], *sigblob = NULL;
+	u_char digest[SSH_DIGEST_MAX_LENGTH], *sigblob = NULL;
 	size_t len;
-	u_int dlen;
+	u_int dlen = ssh_digest_bytes(SSH_DIGEST_SHA1);
 	int ret = SSH_ERR_INTERNAL_ERROR;
 	struct sshbuf *b = NULL;
 	char *ktype = NULL;
-=======
-	DSA_SIG *sig;
-	u_char digest[SSH_DIGEST_MAX_LENGTH], *sigblob;
-	u_int len, dlen = ssh_digest_bytes(SSH_DIGEST_SHA1);
-	int rlen, ret;
-	Buffer b;
->>>>>>> 1.30
 
-<<<<<<< ssh-dss.c
-	if (key == NULL || key->dsa == NULL || (key->type != KEY_DSA &&
-	    key->type != KEY_DSA_CERT && key->type != KEY_DSA_CERT_V00))
-		return SSH_ERR_INVALID_ARGUMENT;
-=======
-	if (key == NULL || key_type_plain(key->type) != KEY_DSA ||
+	if (key == NULL || sshkey_type_plain(key->type) != KEY_DSA ||
 	    key->dsa == NULL) {
-		error("%s: no DSA key", __func__);
-		return -1;
+		return SSH_ERR_INVALID_ARGUMENT;
 	}
->>>>>>> 1.30
 
 	/* fetch signature */
 	if (compat & SSH_BUG_SIGBLOB) {
@@ -199,31 +151,12 @@ ssh_dss_verify(const struct sshkey *key,
 			goto out;
 		}
 		if (strcmp("ssh-dss", ktype) != 0) {
-<<<<<<< ssh-dss.c
 			ret = SSH_ERR_KEY_TYPE_MISMATCH;
 			goto out;
-=======
-			error("%s: cannot handle type %s", __func__, ktype);
-			buffer_free(&b);
-			free(ktype);
-			return -1;
->>>>>>> 1.30
 		}
-<<<<<<< ssh-dss.c
 		if (sshbuf_len(b) != 0) {
 			ret = SSH_ERR_UNEXPECTED_TRAILING_DATA;
 			goto out;
-=======
-		free(ktype);
-		sigblob = buffer_get_string(&b, &len);
-		rlen = buffer_len(&b);
-		buffer_free(&b);
-		if (rlen != 0) {
-			error("%s: remaining bytes in signature %d",
-			    __func__, rlen);
-			free(sigblob);
-			return -1;
->>>>>>> 1.30
 		}
 	}
 
@@ -233,41 +166,21 @@ ssh_dss_verify(const struct sshkey *key,
 	}
 
 	/* parse signature */
-<<<<<<< ssh-dss.c
 	if ((sig = DSA_SIG_new()) == NULL ||
 	    (sig->r = BN_new()) == NULL ||
 	    (sig->s = BN_new()) == NULL) {
 		ret = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-=======
-	if ((sig = DSA_SIG_new()) == NULL)
-		fatal("%s: DSA_SIG_new failed", __func__);
-	if ((sig->r = BN_new()) == NULL)
-		fatal("%s: BN_new failed", __func__);
-	if ((sig->s = BN_new()) == NULL)
-		fatal("ssh_dss_verify: BN_new failed");
->>>>>>> 1.30
 	if ((BN_bin2bn(sigblob, INTBLOB_LEN, sig->r) == NULL) ||
-<<<<<<< ssh-dss.c
 	    (BN_bin2bn(sigblob+ INTBLOB_LEN, INTBLOB_LEN, sig->s) == NULL)) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
 	}
-=======
-	    (BN_bin2bn(sigblob+ INTBLOB_LEN, INTBLOB_LEN, sig->s) == NULL))
-		fatal("%s: BN_bin2bn failed", __func__);
-
-	/* clean up */
-	memset(sigblob, 0, len);
-	free(sigblob);
->>>>>>> 1.30
 
 	/* sha1 the data */
-<<<<<<< ssh-dss.c
-	if (EVP_DigestInit(&md, evp_md) != 1 ||
-	    EVP_DigestUpdate(&md, data, datalen) != 1 ||
-	    EVP_DigestFinal(&md, digest, &dlen) != 1) {
+	if (ssh_digest_memory(SSH_DIGEST_SHA1, data, datalen,
+	    digest, sizeof(digest)) != 0) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
 	}
@@ -286,7 +199,6 @@ ssh_dss_verify(const struct sshkey *key,
 
  out:
 	bzero(digest, sizeof(digest));
-	bzero(&md, sizeof(md));
 	if (sig != NULL)
 		DSA_SIG_free(sig);
 	if (b != NULL)
@@ -297,20 +209,5 @@ ssh_dss_verify(const struct sshkey *key,
 		memset(sigblob, 0, len);
 		free(sigblob);
 	}
-=======
-	if (ssh_digest_memory(SSH_DIGEST_SHA1, data, datalen,
-	    digest, sizeof(digest)) != 0) {
-		error("%s: digest_memory failed", __func__);
-		return -1;
-	}
-
-	ret = DSA_do_verify(digest, dlen, sig, key->dsa);
-	memset(digest, 'd', sizeof(digest));
-
-	DSA_SIG_free(sig);
-
-	debug("%s: signature %s", __func__,
-	    ret == 1 ? "correct" : ret == 0 ? "incorrect" : "error");
->>>>>>> 1.30
 	return ret;
 }

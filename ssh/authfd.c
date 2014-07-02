@@ -1,4 +1,4 @@
-/* $OpenBSD: authfd.c,v 1.91 2013/12/29 04:29:25 djm Exp $ */
+/* $OpenBSD: authfd.c,v 1.90 2013/12/06 13:39:49 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -41,13 +41,9 @@
 #include <sys/socket.h>
 
 #include <openssl/evp.h>
-#include <openssl/crypto.h>
 
-<<<<<<< authfd.c
 #include <openssl/crypto.h>
 #include <errno.h>
-=======
->>>>>>> 1.91
 #include <fcntl.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -502,66 +498,10 @@ static int
 ssh_encode_identity_ssh2(struct sshbuf *b, struct sshkey *key,
     const char *comment)
 {
-<<<<<<< authfd.c
 	int r;
 
-	if ((r = sshbuf_put_cstring(b, sshkey_ssh_name(key))) != 0)
-		return r;
-	switch (key->type) {
-	case KEY_RSA:
-		if ((r = sshbuf_put_bignum2(b, key->rsa->n)) != 0 ||
-		    (r = sshbuf_put_bignum2(b, key->rsa->e)) != 0 ||
-		    (r = sshbuf_put_bignum2(b, key->rsa->d)) != 0 ||
-		    (r = sshbuf_put_bignum2(b, key->rsa->iqmp)) != 0 ||
-		    (r = sshbuf_put_bignum2(b, key->rsa->p)) != 0 ||
-		    (r = sshbuf_put_bignum2(b, key->rsa->q)) != 0)
-			return r;
-		break;
-	case KEY_RSA_CERT_V00:
-	case KEY_RSA_CERT:
-		if (key->cert == NULL || sshbuf_len(key->cert->certblob) == 0)
-			return SSH_ERR_INVALID_ARGUMENT;
-		if ((r = sshbuf_put_stringb(b, key->cert->certblob)) != 0 ||
-		    (r = sshbuf_put_bignum2(b, key->rsa->d)) != 0 ||
-		    (r = sshbuf_put_bignum2(b, key->rsa->iqmp)) != 0 ||
-		    (r = sshbuf_put_bignum2(b, key->rsa->p)) != 0 ||
-		    (r = sshbuf_put_bignum2(b, key->rsa->q)) != 0)
-			return r;
-		break;
-	case KEY_DSA:
-		if ((r = sshbuf_put_bignum2(b, key->dsa->p)) != 0 ||
-		    (r = sshbuf_put_bignum2(b, key->dsa->q)) != 0 ||
-		    (r = sshbuf_put_bignum2(b, key->dsa->g)) != 0 ||
-		    (r = sshbuf_put_bignum2(b, key->dsa->pub_key)) != 0 ||
-		    (r = sshbuf_put_bignum2(b, key->dsa->priv_key)) != 0)
-			return r;
-		break;
-	case KEY_DSA_CERT_V00:
-	case KEY_DSA_CERT:
-		if (key->cert == NULL || sshbuf_len(key->cert->certblob) == 0)
-			return SSH_ERR_INVALID_ARGUMENT;
-		if ((r = sshbuf_put_stringb(b, key->cert->certblob)) != 0 ||
-		    (r = sshbuf_put_bignum2(b, key->dsa->priv_key)) != 0)
-			return r;
-		break;
-	case KEY_ECDSA:
-		if ((r = sshbuf_put_cstring(b,
-		    sshkey_curve_nid_to_name(key->ecdsa_nid))) != 0 ||
-		    (r = sshbuf_put_eckey(b, key->ecdsa)) != 0 ||
-		    (r = sshbuf_put_bignum2(b,
-		    EC_KEY_get0_private_key(key->ecdsa))) != 0)
-			return r;
-		break;
-	case KEY_ECDSA_CERT:
-		if (key->cert == NULL || sshbuf_len(key->cert->certblob) == 0)
-			return SSH_ERR_INVALID_ARGUMENT;
-		if ((r = sshbuf_put_stringb(b, key->cert->certblob)) != 0 ||
-		    (r = sshbuf_put_bignum2(b,
-		    EC_KEY_get0_private_key(key->ecdsa))) != 0)
-			return r;
-		break;
-	}
-	if ((r = sshbuf_put_cstring(b, comment)) != 0)
+	if ((r = sshkey_private_serialize(key, b)) != 0 ||
+	    (r = sshbuf_put_cstring(b, comment)) != 0)
 		return r;
 	return 0;
 }
@@ -583,10 +523,6 @@ encode_constraints(struct sshbuf *m, u_int life, u_int confirm)
 	r = 0;
  out:
 	return r;
-=======
-	key_private_serialize(key, b);
-	buffer_put_cstring(b, comment);
->>>>>>> 1.91
 }
 
 /*
@@ -663,7 +599,6 @@ ssh_remove_identity(int sock, struct sshkey *key)
 		return SSH_ERR_ALLOC_FAIL;
 
 	if (key->type == KEY_RSA1) {
-<<<<<<< authfd.c
 		if ((r = sshbuf_put_u8(msg,
 		    SSH_AGENTC_REMOVE_RSA_IDENTITY)) != 0 ||
 		    (r = sshbuf_put_u32(msg, BN_num_bits(key->rsa->n))) != 0 ||
@@ -679,17 +614,6 @@ ssh_remove_identity(int sock, struct sshkey *key)
 		    SSH2_AGENTC_REMOVE_IDENTITY)) != 0 ||
 		    (r = sshbuf_put_string(msg, blob, blen)) != 0)
 			goto out;
-=======
-		buffer_put_char(&msg, SSH_AGENTC_REMOVE_RSA_IDENTITY);
-		buffer_put_int(&msg, BN_num_bits(key->rsa->n));
-		buffer_put_bignum(&msg, key->rsa->e);
-		buffer_put_bignum(&msg, key->rsa->n);
-	} else if (key->type != KEY_UNSPEC) {
-		key_to_blob(key, &blob, &blen);
-		buffer_put_char(&msg, SSH2_AGENTC_REMOVE_IDENTITY);
-		buffer_put_string(&msg, blob, blen);
-		free(blob);
->>>>>>> 1.91
 	} else {
 		r = SSH_ERR_INVALID_ARGUMENT;
 		goto out;

@@ -123,8 +123,8 @@ userauth_pubkey(struct ssh *ssh)
 		    "(received %d, expected %d)", __func__, key->type, pktype);
 		goto done;
 	}
-	if (key_type_plain(key->type) == KEY_RSA &&
-	    (datafellows & SSH_BUG_RSASIGMD5) != 0) {
+	if (sshkey_type_plain(key->type) == KEY_RSA &&
+	    (ssh->compat & SSH_BUG_RSASIGMD5) != 0) {
 		logit("Refusing RSA key because client uses unsafe "
 		    "signature scheme");
 		goto done;

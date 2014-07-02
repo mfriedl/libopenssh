@@ -88,11 +88,7 @@ schnorr_hash(const BIGNUM *p, const BIGNUM *q, const BIGNUM *g,
 
 	SCHNORR_DEBUG_BUF((sshbuf_ptr(b), sshbuf_len(b),
 	    "%s: hashblob", __func__));
-<<<<<<< schnorr.c
-	if (hash_buffer(sshbuf_ptr(b), sshbuf_len(b), evp_md,
-=======
-	if (hash_buffer(buffer_ptr(&b), buffer_len(&b), hash_alg,
->>>>>>> 1.9
+	if (hash_buffer(sshbuf_ptr(b), sshbuf_len(b), hash_alg,
 	    &digest, &digest_len) != 0) {
 		error("%s: hash_buffer", __func__);
 		goto out;
@@ -228,13 +224,8 @@ schnorr_sign_buf(const BIGNUM *grp_p, const BIGNUM *grp_q, const BIGNUM *grp_g,
 	BIGNUM *rv, *e;
 	int r;
 
-<<<<<<< schnorr.c
-	if (schnorr_sign(grp_p, grp_q, grp_g, EVP_sha256(),
-	    x, g_x, id, idlen, &rv, &e) != 0)
-=======
 	if (schnorr_sign(grp_p, grp_q, grp_g, SSH_DIGEST_SHA256,
-	    x, g_x, id, idlen, &r, &e) != 0)
->>>>>>> 1.9
+	    x, g_x, id, idlen, &rv, &e) != 0)
 		return -1;
 
 	/* Signature is (e, r) */
@@ -398,13 +389,8 @@ schnorr_verify_buf(const BIGNUM *grp_p, const BIGNUM *grp_q,
 		goto out;
 	}
 
-<<<<<<< schnorr.c
-	ret = schnorr_verify(grp_p, grp_q, grp_g, EVP_sha256(),
-	    g_x, id, idlen, rv, e);
-=======
 	ret = schnorr_verify(grp_p, grp_q, grp_g, SSH_DIGEST_SHA256,
-	    g_x, id, idlen, r, e);
->>>>>>> 1.9
+	    g_x, id, idlen, rv, e);
  out:
 	BN_clear_free(e);
 	BN_clear_free(rv);

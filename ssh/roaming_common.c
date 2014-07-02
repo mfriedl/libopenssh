@@ -223,17 +223,9 @@ resend_bytes(int fd, u_int64_t *offset)
 void
 calculate_new_key(u_int64_t *key, u_int64_t cookie, u_int64_t challenge)
 {
-<<<<<<< roaming_common.c
-	int r;
-
-	const EVP_MD *md = EVP_sha1();
-	EVP_MD_CTX ctx;
-	u_char hash[EVP_MAX_MD_SIZE];
-	struct sshbuf *b;
-=======
 	u_char hash[SSH_DIGEST_MAX_LENGTH];
-	Buffer b;
->>>>>>> 1.12
+	struct sshbuf *b;
+	int r;
 
 	if ((b = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
@@ -242,25 +234,12 @@ calculate_new_key(u_int64_t *key, u_int64_t cookie, u_int64_t challenge)
 	    (r = sshbuf_put_u64(b, challenge)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
-<<<<<<< roaming_common.c
-	EVP_DigestInit(&ctx, md);
-	EVP_DigestUpdate(&ctx, sshbuf_ptr(b), sshbuf_len(b));
-	EVP_DigestFinal(&ctx, hash, NULL);
-=======
-	if (ssh_digest_buffer(SSH_DIGEST_SHA1, &b, hash, sizeof(hash)) != 0)
+	if (ssh_digest_buffer(SSH_DIGEST_SHA1, b, hash, sizeof(hash)) != 0)
 		fatal("%s: digest_buffer failed", __func__);
->>>>>>> 1.12
 
-<<<<<<< roaming_common.c
 	sshbuf_reset(b);
-	if ((r = sshbuf_put(b, hash, EVP_MD_size(md))) != 0 ||
+	if ((r = sshbuf_put(b, hash, ssh_digest_bytes(SSH_DIGEST_SHA1))) != 0 ||
 	    (r = sshbuf_get_u64(b, key)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	sshbuf_free(b);
-=======
-	buffer_clear(&b);
-	buffer_append(&b, hash, ssh_digest_bytes(SSH_DIGEST_SHA1));
-	*key = buffer_get_int64(&b);
-	buffer_free(&b);
->>>>>>> 1.12
 }

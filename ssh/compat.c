@@ -165,15 +165,9 @@ compat_datafellows(const char *version)
 	for (i = 0; check[i].pat; i++) {
 		if (match_pattern_list(version, check[i].pat,
 		    strlen(check[i].pat), 0) == 1) {
-<<<<<<< compat.c
-			debug("match: %s pat %s", version, check[i].pat);
-			return check[i].bugs;
-=======
-			datafellows = check[i].bugs;
 			debug("match: %s pat %s compat 0x%08x",
-			    version, check[i].pat, datafellows);
-			return;
->>>>>>> 1.82
+			    version, check[i].pat, check[i].bugs);
+			return check[i].bugs;
 		}
 	}
 	debug("no match: %s", version);
@@ -211,84 +205,42 @@ proto_spec(const char *spec)
 	return ret;
 }
 
-<<<<<<< compat.c
-char *
-compat_cipher_proposal(char *cipher_prop, u_int compat)
-=======
 /*
  * Filters a proposal string, excluding any algorithm matching the 'filter'
  * pattern list.
  */
 static char *
 filter_proposal(char *proposal, const char *filter)
->>>>>>> 1.82
 {
-<<<<<<< compat.c
-	char *orig_prop, *fix_ciphers, *cp, *tmp;
-	size_t maxlen;
-=======
-	Buffer b;
 	char *orig_prop, *fix_prop;
 	char *cp, *tmp;
->>>>>>> 1.82
+	size_t maxlen;
 
-<<<<<<< compat.c
-	if (!(compat & SSH_BUG_BIGENDIANAES))
-		return cipher_prop;
-
-	tmp = orig_prop = strdup(cipher_prop);
+	tmp = orig_prop = strdup(proposal);
 	if (!tmp)
 		return NULL;
 	maxlen = strlen(orig_prop) + 1;
-	if ((fix_ciphers = calloc(1, maxlen)) == NULL) {
+	if ((fix_prop = calloc(1, maxlen)) == NULL) {
 		free(orig_prop);
 		return NULL;
 	}
-=======
-	buffer_init(&b);
-	tmp = orig_prop = xstrdup(proposal);
->>>>>>> 1.82
 	while ((cp = strsep(&tmp, ",")) != NULL) {
-<<<<<<< compat.c
-		if (strncmp(cp, "aes", 3) != 0) {
-			if (*fix_ciphers != '\0')
-				strlcat(fix_ciphers, ",", maxlen);
-			strlcat(fix_ciphers, cp, maxlen);
-		}
-=======
 		if (match_pattern_list(cp, filter, strlen(cp), 0) != 1) {
-			if (buffer_len(&b) > 0)
-				buffer_append(&b, ",", 1);
-			buffer_append(&b, cp, strlen(cp));
+			if (*fix_prop != '\0')
+				strlcat(fix_prop, ",", maxlen);
+			strlcat(fix_prop, cp, maxlen);
 		} else
 			debug2("Compat: skipping algorithm \"%s\"", cp);
->>>>>>> 1.82
 	}
-<<<<<<< compat.c
-=======
-	buffer_append(&b, "\0", 1);
-	fix_prop = xstrdup(buffer_ptr(&b));
-	buffer_free(&b);
->>>>>>> 1.82
 	free(orig_prop);
-<<<<<<< compat.c
-	debug2("Original cipher proposal: %s", cipher_prop);
-	debug2("Compat cipher proposal: %s", fix_ciphers);
-	if (!*fix_ciphers) {
-		free(fix_ciphers);
-		return NULL;
-	}
-	return fix_ciphers;
-=======
 
 	return fix_prop;
->>>>>>> 1.82
 }
 
 char *
-compat_cipher_proposal(char *cipher_prop)
+compat_cipher_proposal(char *cipher_prop, u_int compat)
 {
-	if (!(datafellows & SSH_BUG_BIGENDIANAES))
+	if (!(compat & SSH_BUG_BIGENDIANAES))
 		return cipher_prop;
 	debug2("%s: original cipher proposal: %s", __func__, cipher_prop);
 	cipher_prop = filter_proposal(cipher_prop, "aes*");
@@ -298,11 +250,10 @@ compat_cipher_proposal(char *cipher_prop)
 	return cipher_prop;
 }
 
-
 char *
-compat_pkalg_proposal(char *pkalg_prop)
+compat_pkalg_proposal(char *pkalg_prop, u_int compat)
 {
-	if (!(datafellows & SSH_BUG_RSASIGMD5))
+	if (!(compat & SSH_BUG_RSASIGMD5))
 		return pkalg_prop;
 	debug2("%s: original public key proposal: %s", __func__, pkalg_prop);
 	pkalg_prop = filter_proposal(pkalg_prop, "ssh-rsa");

@@ -54,11 +54,8 @@
 #include "hostfile.h"
 #include "log.h"
 #include "misc.h"
-<<<<<<< hostfile.c
 #include "err.h"
-=======
 #include "digest.h"
->>>>>>> 1.53
 
 struct hostkeys {
 	struct hostkey_entry *entries;

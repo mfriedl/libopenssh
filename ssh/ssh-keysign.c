@@ -157,13 +157,8 @@ main(int argc, char **argv)
 {
 	struct sshbuf *b;
 	Options options;
-<<<<<<< ssh-keysign.c
-#define NUM_KEYTYPES 3
-	struct sshkey *keys[NUM_KEYTYPES], *key = NULL;
-=======
 #define NUM_KEYTYPES 4
-	Key *keys[NUM_KEYTYPES], *key = NULL;
->>>>>>> 1.39
+	struct sshkey *keys[NUM_KEYTYPES], *key = NULL;
 	struct passwd *pw;
 	int r, key_fd[NUM_KEYTYPES], i, found, version = 2, fd;
 	u_char *signature, *data, rver;

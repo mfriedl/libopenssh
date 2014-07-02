@@ -13,8 +13,7 @@ SRCS=	authfd.c authfile.c canohost.c \
 	kexdhc.c kexgexc.c kexecdhc.c msg.c progressmeter.c dns.c \
 	monitor_fdpass.c umac.c addrmatch.c schnorr.c jpake.c ssh-pkcs11.c \
 	krl.c smult_curve25519_ref.c kexc25519.c kexc25519c.c \
-<<<<<<< Makefile
-	chacha.c poly1305.c cipher-chachapoly.c \
+	chacha.c poly1305.c cipher-chachapoly.c ssh-ed25519.c digest.c \
 	sshbuf-getput-basic.c \
 	sshbuf-getput-crypto.c \
 	sshbuf-misc.c \
@@ -25,12 +24,9 @@ SRCS=	authfd.c authfile.c canohost.c \
 SRCS+=	kexdhs.c kexgexs.c kexecdhs.c kexc25519s.c
 SRCS+=	ssh_api.c
 SRCS+=	roaming_dummy.c
-=======
-	chacha.c poly1305.c cipher-chachapoly.c ssh-ed25519.c digest.c
 
 # ed25519, from supercop
 SRCS+=	sc25519.c ge25519.c fe25519.c ed25519.c verify.c hash.c blocks.c
->>>>>>> 1.71
 
 SRCS+=	umac128.c
 CLEANFILES+=   umac128.c

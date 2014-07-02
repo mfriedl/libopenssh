@@ -53,7 +53,7 @@ DPADD+=         ${.CURDIR}/../lib/${__objdir}/libssh.a
 LDADD+=         -L${.CURDIR}/../lib -lssh
 DPADD+=         ${.CURDIR}/../lib/libssh.a
 .endif
-<<<<<<< Makefile.inc
+
 DPADD+=         ${.CURDIR}/../lib/shlib_version
 LDADD+=         -lcrypto -lz
 DPADD+=         ${LIBCRYPTO} ${LIBZ}
@@ -80,7 +80,4 @@ DPADD+=         ${LEAKMALLOC_DIR}/libleakmalloc.a
 CDIAGFLAGS+=	-Wuninitialized
 .endif
 
-=======
-
 LDADD+=		-lutil
->>>>>>> 1.40

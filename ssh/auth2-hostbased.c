@@ -104,17 +104,13 @@ userauth_hostbased(struct ssh *ssh)
 		    "(received %d, expected %d)", __func__, key->type, pktype);
 		goto done;
 	}
-<<<<<<< auth2-hostbased.c
-	service = ssh->compat & SSH_BUG_HBSERVICE ? "ssh-userauth" :
-=======
-	if (key_type_plain(key->type) == KEY_RSA &&
-	    (datafellows & SSH_BUG_RSASIGMD5) != 0) {
+	if (sshkey_type_plain(key->type) == KEY_RSA &&
+	    (ssh->compat & SSH_BUG_RSASIGMD5) != 0) {
 		error("Refusing RSA key because peer uses unsafe "
 		    "signature format");
 		goto done;
 	}
-	service = datafellows & SSH_BUG_HBSERVICE ? "ssh-userauth" :
->>>>>>> 1.17
+	service = ssh->compat & SSH_BUG_HBSERVICE ? "ssh-userauth" :
 	    authctxt->service;
 	if ((b = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);

@@ -176,12 +176,7 @@ mac_compute(struct sshmac *mac, u_int32_t seqno, const u_char *data, int datalen
 	u_char b[4], nonce[8];
 
 	if (mac->mac_len > sizeof(u))
-<<<<<<< mac.c
 		return SSH_ERR_INTERNAL_ERROR;
-=======
-		fatal("mac_compute: mac too long %u %zu",
-		    mac->mac_len, sizeof(u));
->>>>>>> 1.26
 
 	switch (mac->type) {
 	case SSH_EVP:

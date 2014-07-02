@@ -15,7 +15,6 @@
 #ifndef AUTHFILE_H
 #define AUTHFILE_H
 
-<<<<<<< authfile.h
 #ifdef WITH_LEAKMALLOC
 #include "leakmalloc.h"
 #endif
@@ -24,7 +23,7 @@ struct sshbuf;
 struct sshkey;
 
 int sshkey_save_private(struct sshkey *, const char *,
-    const char *, const char *);
+    const char *, const char *, int, const char *, int);
 int sshkey_load_file(int, const char *, struct sshbuf *);
 int sshkey_load_cert(const char *, struct sshkey **);
 int sshkey_load_public(const char *, struct sshkey **, char **);
@@ -41,20 +40,5 @@ int sshkey_load_private_type(int, const char *, const char *,
 int sshkey_load_private_pem(int, int, const char *, struct sshkey **, char **);
 int sshkey_perm_ok(int, const char *);
 int sshkey_in_file(struct sshkey *, const char *, int);
-=======
-int	 key_save_private(Key *, const char *, const char *, const char *,
-    int, const char *, int);
-int	 key_load_file(int, const char *, Buffer *);
-Key	*key_load_cert(const char *);
-Key	*key_load_public(const char *, char **);
-Key	*key_load_public_type(int, const char *, char **);
-Key	*key_parse_private(Buffer *, const char *, const char *, char **);
-Key	*key_load_private(const char *, const char *, char **);
-Key	*key_load_private_cert(int, const char *, const char *, int *);
-Key	*key_load_private_type(int, const char *, const char *, char **, int *);
-Key	*key_load_private_pem(int, int, const char *, char **);
-int	 key_perm_ok(int, const char *);
-int	 key_in_file(Key *, const char *, int);
->>>>>>> 1.17
 
 #endif

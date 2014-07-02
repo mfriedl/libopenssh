@@ -655,10 +655,10 @@ ssh_exchange_identification(struct ssh *ssh, int timeout_ms)
 		fatal("Protocol major versions differ: %d vs. %d",
 		    (options.protocol & SSH_PROTO_2) ? PROTOCOL_MAJOR_2 : PROTOCOL_MAJOR_1,
 		    remote_major);
-	if ((datafellows & SSH_BUG_DERIVEKEY) != 0)
+	if ((ssh->compat & SSH_BUG_DERIVEKEY) != 0)
 		fatal("Server version \"%.100s\" uses unsafe key agreement; "
 		    "refusing connection", remote_version);
-	if ((datafellows & SSH_BUG_RSASIGMD5) != 0)
+	if ((ssh->compat & SSH_BUG_RSASIGMD5) != 0)
 		logit("Server version \"%.100s\" uses unsafe RSA signature "
 		    "scheme; disabling use of RSA keys", remote_version);
 	if (!client_banner_sent)

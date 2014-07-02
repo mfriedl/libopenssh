@@ -340,26 +340,14 @@ cipher_init(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
  * cipher_crypt() returns 0 on success and -1 if the decryption integrity
  * check fails.
  */
-<<<<<<< cipher.c
 int
 cipher_crypt(struct sshcipher_ctx *cc, u_int seqnr,
     u_char *dest, const u_char *src, u_int len, u_int aadlen, u_int authlen)
-=======
-int
-cipher_crypt(CipherContext *cc, u_int seqnr, u_char *dest, const u_char *src,
-    u_int len, u_int aadlen, u_int authlen)
->>>>>>> 1.93
 {
-<<<<<<< cipher.c
 	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0) {
 		return chachapoly_crypt(&cc->cp_ctx, seqnr, dest, src, len,
 		    aadlen, authlen, cc->encrypt);
 	}	
-=======
-	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0)
-		return chachapoly_crypt(&cc->cp_ctx, seqnr, dest, src, len,
-		    aadlen, authlen, cc->encrypt);
->>>>>>> 1.93
 	if (authlen) {
 		u_char lastiv[1];
 
@@ -388,18 +376,9 @@ cipher_crypt(CipherContext *cc, u_int seqnr, u_char *dest, const u_char *src,
 		return SSH_ERR_LIBCRYPTO_ERROR;
 	if (authlen) {
 		/* compute tag (on encrypt) or verify tag (on decrypt) */
-<<<<<<< cipher.c
 		if (EVP_Cipher(&cc->evp, NULL, NULL, 0) < 0)
 			return cc->encrypt ?
 			    SSH_ERR_LIBCRYPTO_ERROR : SSH_ERR_MAC_INVALID;
-=======
-		if (EVP_Cipher(&cc->evp, NULL, NULL, 0) < 0) {
-			if (cc->encrypt)
-				fatal("%s: EVP_Cipher(final) failed", __func__);
-			else
-				return -1;
-		}
->>>>>>> 1.93
 		if (cc->encrypt &&
 		    !EVP_CIPHER_CTX_ctrl(&cc->evp, EVP_CTRL_GCM_GET_TAG,
 		    authlen, dest + aadlen + len))

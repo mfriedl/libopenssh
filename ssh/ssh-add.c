@@ -320,13 +320,8 @@ add_file(int agent_fd, const char *filename, int key_only)
 static int
 update_card(int agent_fd, int add, const char *id)
 {
-<<<<<<< ssh-add.c
-	char *pin;
-	int r, ret = -1;
-=======
 	char *pin = NULL;
-	int ret = -1;
->>>>>>> 1.108
+	int r, ret = -1;
 
 	if (add) {
 		if ((pin = read_passphrase("Enter passphrase for PKCS#11: ",
@@ -334,13 +329,8 @@ update_card(int agent_fd, int add, const char *id)
 			return -1;
 	}
 
-<<<<<<< ssh-add.c
-	if ((r = ssh_update_card(agent_fd, add, id, pin, lifetime,
-	    confirm)) == 0) {
-=======
-	if (ssh_update_card(ac, add, id, pin == NULL ? "" : pin,
-	    lifetime, confirm)) {
->>>>>>> 1.108
+	if ((r = ssh_update_card(agent_fd, add, id, pin == NULL ? "" : pin,
+	    lifetime, confirm)) == 0) {
 		fprintf(stderr, "Card %s: %s\n",
 		    add ? "added" : "removed", id);
 		ret = 0;

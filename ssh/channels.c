@@ -1465,7 +1465,6 @@ port_open_helper(Channel *c, char *rtype)
 	c->remote_name = xstrdup(buf);
 
 	if (compat20) {
-<<<<<<< channels.c
 		if ((r = sshpkt_start(ssh, SSH2_MSG_CHANNEL_OPEN)) != 0 ||
 		    (r = sshpkt_put_cstring(ssh, rtype)) != 0 ||
 		    (r = sshpkt_put_u32(ssh, c->self)) != 0 ||
@@ -1473,31 +1472,11 @@ port_open_helper(Channel *c, char *rtype)
 		    (r = sshpkt_put_u32(ssh, c->local_maxpacket)) != 0 ||
 		    (r = sshpkt_put_cstring(ssh, c->path)) != 0 ||
 		    (r = sshpkt_put_u32(ssh,
-		    direct ? c->host_port : c->listening_port)) != 0 ||
+		    direct ? c->host_port : local_port)) != 0 ||
 		    (r = sshpkt_put_cstring(ssh, remote_ipaddr)) != 0 ||
 		    (r = sshpkt_put_u32(ssh, (u_int)remote_port)) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)
 			CHANNEL_PACKET_ERROR(c, r);
-=======
-		packet_start(SSH2_MSG_CHANNEL_OPEN);
-		packet_put_cstring(rtype);
-		packet_put_int(c->self);
-		packet_put_int(c->local_window_max);
-		packet_put_int(c->local_maxpacket);
-		if (direct) {
-			/* target host, port */
-			packet_put_cstring(c->path);
-			packet_put_int(c->host_port);
-		} else {
-			/* listen address, port */
-			packet_put_cstring(c->path);
-			packet_put_int(local_port);
-		}
-		/* originator host and port */
-		packet_put_cstring(remote_ipaddr);
-		packet_put_int((u_int)remote_port);
-		packet_send();
->>>>>>> 1.328
 	} else {
 		u_int flags = ssh_packet_get_protocol_flags(ssh);
 

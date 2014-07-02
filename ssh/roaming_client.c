@@ -45,11 +45,8 @@
 #include "roaming.h"
 #include "ssh2.h"
 #include "sshconnect.h"
-<<<<<<< roaming_client.c
 #include "err.h"
-=======
 #include "digest.h"
->>>>>>> 1.7
 
 /* import */
 extern Options options;
@@ -102,15 +99,8 @@ request_roaming(struct ssh *ssh)
 static void
 roaming_auth_required(struct ssh *ssh)
 {
-<<<<<<< roaming_client.c
-	u_char digest[SHA_DIGEST_LENGTH];
-	EVP_MD_CTX md;
-	struct sshbuf *b;
-	const EVP_MD *evp_md = EVP_sha1();
-=======
 	u_char digest[SSH_DIGEST_MAX_LENGTH];
-	Buffer b;
->>>>>>> 1.7
+	struct sshbuf *b;
 	u_int64_t chall, oldchall;
 	int r;
 
@@ -124,38 +114,21 @@ roaming_auth_required(struct ssh *ssh)
 	}
 	lastseenchall = chall;
 
-<<<<<<< roaming_client.c
 	if ((b = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
 	if ((r = sshbuf_put_u64(b, cookie)) != 0 ||
 	    (r = sshbuf_put_u64(b, chall)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-
-	EVP_DigestInit(&md, evp_md);
-	EVP_DigestUpdate(&md, sshbuf_ptr(b), sshbuf_len(b));
-	EVP_DigestFinal(&md, digest, NULL);
-	sshbuf_free(b);
-=======
-	buffer_init(&b);
-	buffer_put_int64(&b, cookie);
-	buffer_put_int64(&b, chall);
-	if (ssh_digest_buffer(SSH_DIGEST_SHA1, &b, digest, sizeof(digest)) != 0)
+	if (ssh_digest_buffer(SSH_DIGEST_SHA1, b, digest, sizeof(digest)) != 0)
 		fatal("%s: ssh_digest_buffer failed", __func__);
-	buffer_free(&b);
->>>>>>> 1.7
 
-<<<<<<< roaming_client.c
+	sshbuf_free(b);
+
 	if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ROAMING_AUTH)) != 0 ||
 	    (r = sshpkt_put_u64(ssh, key1 ^ get_recv_bytes())) != 0 ||
 	    (r = sshpkt_put(ssh, digest, sizeof(digest))) != 0 ||
 	    (r = sshpkt_send(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
-=======
-	packet_start(SSH2_MSG_KEX_ROAMING_AUTH);
-	packet_put_int64(key1 ^ get_recv_bytes());
-	packet_put_raw(digest, ssh_digest_bytes(SSH_DIGEST_SHA1));
-	packet_send();
->>>>>>> 1.7
 
 	oldkey1 = key1;
 	oldkey2 = key2;

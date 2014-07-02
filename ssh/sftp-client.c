@@ -504,22 +504,16 @@ static int
 do_lsreaddir(struct sftp_conn *conn, const char *path, int print_flag,
     SFTP_DIRENT ***dir)
 {
-<<<<<<< sftp-client.c
 	struct sshbuf *msg;
 	u_int count, id, i, expected_id, ents = 0;
 	size_t handle_len;
-	u_char *handle;
-	int r;
 	u_char type;
-=======
-	Buffer msg;
-	u_int count, type, id, handle_len, i, expected_id, ents = 0;
 	char *handle;
 	int status = SSH2_FX_FAILURE;
+	int r;
 
 	if (dir)
 		*dir = NULL;
->>>>>>> 1.111
 
 	id = conn->msg_id++;
 
@@ -570,31 +564,16 @@ do_lsreaddir(struct sftp_conn *conn, const char *path, int print_flag,
 			fatal("ID mismatch (%u != %u)", id, expected_id);
 
 		if (type == SSH2_FXP_STATUS) {
-<<<<<<< sftp-client.c
-			u_int status;
+			u_int rstatus;
 
-			if ((r = sshbuf_get_u32(msg, &status)) != 0)
+			if ((r = sshbuf_get_u32(msg, &rstatus)) != 0)
 				fatal("%s: buffer error: %s",
 				    __func__, ssh_err(r));
-=======
-			status = buffer_get_int(&msg);
->>>>>>> 1.111
-			debug3("Received SSH2_FXP_STATUS %d", status);
-			if (status == SSH2_FX_EOF)
+			debug3("Received SSH2_FXP_STATUS %d", rstatus);
+			if (rstatus == SSH2_FX_EOF)
 				break;
-<<<<<<< sftp-client.c
-			} else {
-				error("Couldn't read directory: %s",
-				    fx2txt(status));
-				do_close(conn, handle, handle_len);
-				free(handle);
-				sshbuf_free(msg);
-				return(status);
-			}
-=======
-			error("Couldn't read directory: %s", fx2txt(status));
+			error("Couldn't read directory: %s", fx2txt(rstatus));
 			goto out;
->>>>>>> 1.111
 		} else if (type != SSH2_FXP_NAME)
 			fatal("Expected SSH2_FXP_NAME(%u) packet, got %u",
 			    SSH2_FXP_NAME, type);
@@ -648,12 +627,8 @@ do_lsreaddir(struct sftp_conn *conn, const char *path, int print_flag,
 	}
 	status = 0;
 
-<<<<<<< sftp-client.c
-	sshbuf_free(msg);
-=======
  out:
-	buffer_free(&msg);
->>>>>>> 1.111
+	sshbuf_free(msg);
 	do_close(conn, handle, handle_len);
 	free(handle);
 

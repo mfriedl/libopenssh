@@ -64,12 +64,8 @@ void     enable_compat13(void);
 void     enable_compat20(void);
 u_int    compat_datafellows(const char *);
 int	 proto_spec(const char *);
-<<<<<<< compat.h
 char	*compat_cipher_proposal(char *, u_int);
-=======
-char	*compat_cipher_proposal(char *);
-char	*compat_pkalg_proposal(char *);
->>>>>>> 1.44
+char	*compat_pkalg_proposal(char *, u_int);
 
 extern int compat13;
 extern int compat20;

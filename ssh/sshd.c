@@ -475,30 +475,22 @@ sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 
 	ssh->compat = compat_datafellows(remote_version);
 
-<<<<<<< sshd.c
-	if (ssh->compat & SSH_BUG_PROBE) {
-=======
-	if ((datafellows & SSH_BUG_PROBE) != 0) {
->>>>>>> 1.414
+	if ((ssh->compat & SSH_BUG_PROBE) != 0) {
 		logit("probed from %s with %s.  Don't panic.",
 		    ssh_remote_ipaddr(ssh), client_version_string);
 		cleanup_exit(255);
 	}
-<<<<<<< sshd.c
 
-	if (ssh->compat & SSH_BUG_SCANNER) {
-=======
-	if ((datafellows & SSH_BUG_SCANNER) != 0) {
->>>>>>> 1.414
+	if ((ssh->compat & SSH_BUG_SCANNER) != 0) {
 		logit("scanned from %s with %s.  Don't panic.",
 		    ssh_remote_ipaddr(ssh), client_version_string);
 		cleanup_exit(255);
 	}
-	if ((datafellows & SSH_BUG_RSASIGMD5) != 0) {
+	if ((ssh->compat & SSH_BUG_RSASIGMD5) != 0) {
 		logit("Client version \"%.100s\" uses unsafe RSA signature "
 		    "scheme; disabling use of RSA keys", remote_version);
 	}
-	if ((datafellows & SSH_BUG_DERIVEKEY) != 0) {
+	if ((ssh->compat & SSH_BUG_DERIVEKEY) != 0) {
 		fatal("Client version \"%.100s\" uses unsafe key agreement; "
 		    "refusing connection", remote_version);
 	}
@@ -795,19 +787,12 @@ list_hostkey_types(void)
 		case KEY_RSA:
 		case KEY_DSA:
 		case KEY_ECDSA:
-<<<<<<< sshd.c
+		case KEY_ED25519:
 			if ((r = sshbuf_putf(b, "%s%s",
 			    sshbuf_len(b) > 0 ? "," : "",
 			    sshkey_ssh_name(key))) != 0)
 				fatal("%s: buffer error: %s",
 				    __func__, ssh_err(r));
-=======
-		case KEY_ED25519:
-			if (buffer_len(&b) > 0)
-				buffer_append(&b, ",", 1);
-			p = key_ssh_name(key);
-			buffer_append(&b, p, strlen(p));
->>>>>>> 1.414
 			break;
 		}
 		/* If the private key has a cert peer, then list that too */
@@ -820,19 +805,12 @@ list_hostkey_types(void)
 		case KEY_RSA_CERT:
 		case KEY_DSA_CERT:
 		case KEY_ECDSA_CERT:
-<<<<<<< sshd.c
+		case KEY_ED25519_CERT:
 			if ((r = sshbuf_putf(b, "%s%s",
 			    sshbuf_len(b) > 0 ? "," : "",
 			    sshkey_ssh_name(key))) != 0)
 				fatal("%s: buffer error: %s",
 				    __func__, ssh_err(r));
-=======
-		case KEY_ED25519_CERT:
-			if (buffer_len(&b) > 0)
-				buffer_append(&b, ",", 1);
-			p = key_ssh_name(key);
-			buffer_append(&b, p, strlen(p));
->>>>>>> 1.414
 			break;
 		}
 	}
@@ -2414,7 +2392,7 @@ do_ssh2_kex(struct ssh *ssh)
 		    (time_t)options.rekey_interval);
 
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = compat_pkalg_proposal(
-	    list_hostkey_types());
+	    list_hostkey_types(), ssh->compat);
 
 	/* start key exchange */
 	if ((r = kex_setup(ssh, myproposal)) != 0)
