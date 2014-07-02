@@ -1234,20 +1234,12 @@ server_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 	} else if ((c->type == SSH_CHANNEL_LARVAL ||
 	    c->type == SSH_CHANNEL_OPEN) && strcmp(c->ctype, "session") == 0)
 		success = session_input_channel_req(c, rtype);
-<<<<<<< serverloop.c
-	if (reply) {
+	if (reply && !(c->flags & CHAN_CLOSE_SENT)) {
 		if ((r = sshpkt_start(ssh, success ? SSH2_MSG_CHANNEL_SUCCESS :
 		    SSH2_MSG_CHANNEL_FAILURE)) != 0 ||
 		    (r = sshpkt_put_u32(ssh, c->remote_id)) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)
 			goto out;
-=======
-	if (reply && !(c->flags & CHAN_CLOSE_SENT)) {
-		packet_start(success ?
-		    SSH2_MSG_CHANNEL_SUCCESS : SSH2_MSG_CHANNEL_FAILURE);
-		packet_put_int(c->remote_id);
-		packet_send();
->>>>>>> 1.171
 	}
 	r = 0;
  out:

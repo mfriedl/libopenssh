@@ -19,27 +19,23 @@ SRCS=	ssh.c readconf.c clientloop.c sshtty.c \
 
 .include <bsd.own.mk>
 
-<<<<<<< Makefile
-# XXX leave on while refactoring to ensure we don't break it.
-=======
 .if (${OPENSSL:L} == "yes")
 SRCS+=	sshconnect1.c
 .endif
 
->>>>>>> 1.63
-KERBEROS5=no
+#KERBEROS5=no
 
-.if (${KERBEROS5:L} == "yes")
-CFLAGS+= -DKRB5 -I${DESTDIR}/usr/include/kerberosV -DGSSAPI
-.endif # KERBEROS5
+#.if (${KERBEROS5:L} == "yes")
+#CFLAGS+= -DKRB5 -I${DESTDIR}/usr/include/kerberosV -DGSSAPI
+#.endif # KERBEROS5
 
 .include <bsd.prog.mk>
 
-.if (${KERBEROS5:L} == "yes")
-DPADD+=  ${LIBGSSAPI} ${LIBKRB5}
-LDADD+=  -lgssapi -lkrb5 -lasn1
-LDADD+=  -lwind -lroken -lcom_err -lpthread -lheimbase
-.endif # KERBEROS5
+#.if (${KERBEROS5:L} == "yes")
+#DPADD+=  ${LIBGSSAPI} ${LIBKRB5}
+#LDADD+=  -lgssapi -lkrb5 -lasn1
+#LDADD+=  -lwind -lroken -lcom_err -lpthread -lheimbase
+#.endif # KERBEROS5
 
 .if (${OPENSSL:L} == "yes")
 LDADD+=	-lcrypto -lutil

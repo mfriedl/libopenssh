@@ -537,12 +537,12 @@ getpwnamallow(const char *user)
 int
 auth_key_is_revoked(struct sshkey *k)
 {
-#ifdef WITH_OPENSSL
 	char *key_fp;
 	int r;
 
 	if (options.revoked_keys_file == NULL)
 		return 0;
+#ifdef WITH_OPENSSL
 	switch ((r = ssh_krl_file_contains_key(options.revoked_keys_file, k))) {
 	case 0:
 		/* Not revoked */
@@ -557,12 +557,9 @@ auth_key_is_revoked(struct sshkey *k)
 		    options.revoked_keys_file, ssh_err(r));
 		return 1;
 	}
-<<<<<<< auth.c
+#endif /* WITH_OPENSSL */
 
 	/* Fall back to treating the file as a list of keys */
-=======
-#endif
->>>>>>> 1.104
 	debug3("%s: treating %s as a key list", __func__,
 	    options.revoked_keys_file);
 
@@ -570,32 +567,20 @@ auth_key_is_revoked(struct sshkey *k)
 	case SSH_ERR_KEY_NOT_FOUND:
 		/* key not revoked */
 		return 0;
-<<<<<<< auth.c
 	case 0:
 		/* found: key revoked */
-=======
-	case -1:
-		/* Error opening revoked_keys_file: refuse all keys */
-		error("Revoked keys file is unreadable: refusing public key "
-		    "authentication");
-		return 1;
 #ifdef WITH_OPENSSL
-	case 1:
->>>>>>> 1.104
  revoked:
+#endif /* WITH_OPENSSL */
 		key_fp = sshkey_fingerprint(k, SSH_FP_MD5, SSH_FP_HEX);
 		error("WARNING: authentication attempt with a revoked "
 		    "%s key %s ", sshkey_type(k), key_fp);
 		free(key_fp);
 		return 1;
-<<<<<<< auth.c
 	default:
 		error("Error in revoked keys file %s: %s, refusing key",
 		    options.revoked_keys_file, ssh_err(r));
 		return 1;
-=======
-#endif
->>>>>>> 1.104
 	}
 	/* NOTREACHED */
 }

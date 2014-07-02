@@ -226,7 +226,7 @@ process_request_identities(SocketEntry *e, int version)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	TAILQ_FOREACH(id, &tab->idlist, next) {
 		if (id->key->type == KEY_RSA1) {
-<<<<<<< ssh-agent.c
+#ifdef WITH_SSH1
 			if ((r = sshbuf_put_u32(msg,
 			    BN_num_bits(id->key->rsa->n))) != 0 ||
 			    (r = sshbuf_put_bignum1(msg,
@@ -235,13 +235,7 @@ process_request_identities(SocketEntry *e, int version)
 			    id->key->rsa->n)) != 0)
 				fatal("%s: buffer error: %s",
 				    __func__, ssh_err(r));
-=======
-#ifdef WITH_SSH1
-			buffer_put_int(&msg, BN_num_bits(id->key->rsa->n));
-			buffer_put_bignum(&msg, id->key->rsa->e);
-			buffer_put_bignum(&msg, id->key->rsa->n);
 #endif
->>>>>>> 1.185
 		} else {
 			u_char *blob;
 			size_t blen;

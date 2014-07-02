@@ -1800,74 +1800,8 @@ ssh_packet_process_incoming(struct ssh *ssh, const char *buf, u_int len)
 		state->packet_discard -= len;
 		return;
 	}
-<<<<<<< packet.c
 	if ((r = sshbuf_put(ssh->state->input, buf, len)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
-=======
-	buffer_append(&active_state->input, buf, len);
-}
-
-/* Returns a character from the packet. */
-
-u_int
-packet_get_char(void)
-{
-	char ch;
-
-	buffer_get(&active_state->incoming_packet, &ch, 1);
-	return (u_char) ch;
-}
-
-/* Returns an integer from the packet data. */
-
-u_int
-packet_get_int(void)
-{
-	return buffer_get_int(&active_state->incoming_packet);
-}
-
-/* Returns an 64 bit integer from the packet data. */
-
-u_int64_t
-packet_get_int64(void)
-{
-	return buffer_get_int64(&active_state->incoming_packet);
-}
-
-/*
- * Returns an arbitrary precision integer from the packet data.  The integer
- * must have been initialized before this call.
- */
-
-#ifdef WITH_OPENSSL
-void
-packet_get_bignum(BIGNUM * value)
-{
-	buffer_get_bignum(&active_state->incoming_packet, value);
-}
-
-void
-packet_get_bignum2(BIGNUM * value)
-{
-	buffer_get_bignum2(&active_state->incoming_packet, value);
-}
-
-void
-packet_get_ecpoint(const EC_GROUP *curve, EC_POINT *point)
-{
-	buffer_get_ecpoint(&active_state->incoming_packet, curve, point);
-}
-#endif
-
-void *
-packet_get_raw(u_int *length_ptr)
-{
-	u_int bytes = buffer_len(&active_state->incoming_packet);
-
-	if (length_ptr != NULL)
-		*length_ptr = bytes;
-	return buffer_ptr(&active_state->incoming_packet);
->>>>>>> 1.196
 }
 
 int
@@ -2304,7 +2238,6 @@ ssh_packet_restore_state(struct ssh *ssh,
 		add_recv_bytes(len);
 	}
 }
-<<<<<<< packet.c
 
 /* Reset after_authentication and reset compression in post-auth privsep */
 static int
@@ -2869,25 +2802,3 @@ sshpkt_add_padding(struct ssh *ssh, u_char pad)
 	ssh->state->extra_pad = pad;
 	return 0;
 }
-=======
-
-/* Reset after_authentication and reset compression in post-auth privsep */
-void
-packet_set_postauth(void)
-{
-	Comp *comp;
-	int mode;
-
-	debug("%s: called", __func__);
-	/* This was set in net child, but is not visible in user child */
-	active_state->after_authentication = 1;
-	active_state->rekeying = 0;
-	for (mode = 0; mode < MODE_MAX; mode++) {
-		if (active_state->newkeys[mode] == NULL)
-			continue;
-		comp = &active_state->newkeys[mode]->comp;
-		if (comp && comp->enabled)
-			packet_init_compression();
-	}
-}
->>>>>>> 1.196

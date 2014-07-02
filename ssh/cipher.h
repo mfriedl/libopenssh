@@ -69,12 +69,8 @@ struct sshcipher_ctx {
 	int	encrypt;
 	EVP_CIPHER_CTX evp;
 	struct chachapoly_ctx cp_ctx; /* XXX union with evp? */
-<<<<<<< cipher.h
-	const struct sshcipher *cipher;
-=======
 	struct aesctr_ctx ac_ctx; /* XXX union with evp? */
-	const Cipher *cipher;
->>>>>>> 1.45
+	const struct sshcipher *cipher;
 };
 
 u_int	 cipher_mask_ssh1(int);

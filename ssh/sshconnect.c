@@ -1280,17 +1280,12 @@ ssh_login(struct ssh *ssh, Sensitive *sensitive, const char *orighost,
 		ssh_kex2(ssh, port);
 		ssh_userauth2(ssh, local_user, server_user, sensitive);
 	} else {
-<<<<<<< sshconnect.c
+#ifdef WITH_SSH1
 		ssh_kex(ssh, host, hostaddr);
 		ssh_userauth1(ssh, local_user, server_user, host, sensitive);
-=======
-#ifdef WITH_SSH1
-		ssh_kex(host, hostaddr);
-		ssh_userauth1(local_user, server_user, host, sensitive);
 #else
 		fatal("ssh1 is not unsupported");
 #endif
->>>>>>> 1.248
 	}
 	free(local_user);
 }

@@ -50,12 +50,8 @@
 #ifdef WITH_SSH1
 extern const EVP_CIPHER *evp_ssh1_bf(void);
 extern const EVP_CIPHER *evp_ssh1_3des(void);
-<<<<<<< cipher.c
 extern int ssh1_3des_iv(EVP_CIPHER_CTX *, int, u_char *, int);
-=======
-extern void ssh1_3des_iv(EVP_CIPHER_CTX *, int, u_char *, int);
 #endif
->>>>>>> 1.98
 
 struct sshcipher {
 	char	*name;
@@ -77,13 +73,9 @@ struct sshcipher {
 #endif
 };
 
-<<<<<<< cipher.c
 static const struct sshcipher ciphers[] = {
 	{ "none",	SSH_CIPHER_NONE, 8, 0, 0, 0, 0, 0, EVP_enc_null },
-=======
-static const struct Cipher ciphers[] = {
 #ifdef WITH_SSH1
->>>>>>> 1.98
 	{ "des",	SSH_CIPHER_DES, 8, 8, 0, 0, 0, 1, EVP_des_cbc },
 	{ "3des",	SSH_CIPHER_3DES, 8, 16, 0, 0, 0, 1, evp_ssh1_3des },
 	{ "blowfish",	SSH_CIPHER_BLOWFISH, 8, 32, 0, 0, 0, 1, evp_ssh1_bf },
@@ -293,12 +285,8 @@ cipher_init(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
     const u_char *key, u_int keylen, const u_char *iv, u_int ivlen,
     int do_encrypt)
 {
-<<<<<<< cipher.c
 	int ret = SSH_ERR_INTERNAL_ERROR;
-=======
 #ifdef WITH_OPENSSL
-	static int dowarn = 1;
->>>>>>> 1.98
 	const EVP_CIPHER *type;
 	int klen;
 	u_char *junk, *discard;
@@ -317,26 +305,19 @@ cipher_init(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
 
 	cc->cipher = cipher;
 
-<<<<<<< cipher.c
 	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0)
 		return chachapoly_init(&cc->cp_ctx, key, keylen);
 
-=======
-	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0) {
-		chachapoly_init(&cc->cp_ctx, key, keylen);
-		return;
-	}
 #ifndef WITH_OPENSSL
 	if ((cc->cipher->flags & CFLAG_AESCTR) != 0) {
 		aesctr_keysetup(&cc->ac_ctx, key, 8 * keylen, 8 * ivlen);
 		aesctr_ivsetup(&cc->ac_ctx, iv);
-		return;
+		return 0;
 	}
 	if ((cc->cipher->flags & CFLAG_NONE) != 0)
-		return;
-	fatal("unsupported cipher");
+		return 0;
+	return SSH_ERR_INVALID_ARGUMENT;
 #else
->>>>>>> 1.98
 	type = (*cipher->evptype)();
 	EVP_CIPHER_CTX_init(&cc->evp);
 	if (EVP_CipherInit(&cc->evp, type, NULL, (u_char *)iv,
@@ -381,11 +362,8 @@ cipher_init(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
 			goto bad;
 		}
 	}
-<<<<<<< cipher.c
 	return 0;
-=======
 #endif
->>>>>>> 1.98
 }
 
 /*
@@ -407,9 +385,7 @@ cipher_crypt(struct sshcipher_ctx *cc, u_int seqnr,
 	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0) {
 		return chachapoly_crypt(&cc->cp_ctx, seqnr, dest, src, len,
 		    aadlen, authlen, cc->encrypt);
-<<<<<<< cipher.c
 	}	
-=======
 #ifndef WITH_OPENSSL
 	if ((cc->cipher->flags & CFLAG_AESCTR) != 0) {
 		if (aadlen)
@@ -422,9 +398,8 @@ cipher_crypt(struct sshcipher_ctx *cc, u_int seqnr,
 		memcpy(dest, src, aadlen + len);
 		return 0;
 	}
-	fatal("unsupported cipher");
+	return SSH_ERR_INVALID_ARGUMENT;
 #else
->>>>>>> 1.98
 	if (authlen) {
 		u_char lastiv[1];
 
@@ -490,13 +465,9 @@ cipher_cleanup(struct sshcipher_ctx *cc)
 		explicit_bzero(&cc->ac_ctx, sizeof(cc->ac_ctx));
 #ifdef WITH_OPENSSL
 	else if (EVP_CIPHER_CTX_cleanup(&cc->evp) == 0)
-<<<<<<< cipher.c
 		return SSH_ERR_LIBCRYPTO_ERROR;
-	return 0;
-=======
-		error("cipher_cleanup: EVP_CIPHER_CTX_cleanup failed");
 #endif
->>>>>>> 1.98
+	return 0;
 }
 
 /*
@@ -529,13 +500,8 @@ cipher_set_key_string(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
 int
 cipher_get_keyiv_len(const struct sshcipher_ctx *cc)
 {
-<<<<<<< cipher.c
 	const struct sshcipher *c = cc->cipher;
-	int ivlen;
-=======
-	const Cipher *c = cc->cipher;
 	int ivlen = 0;
->>>>>>> 1.98
 
 	if (c->number == SSH_CIPHER_3DES)
 		ivlen = 24;
@@ -551,12 +517,8 @@ cipher_get_keyiv_len(const struct sshcipher_ctx *cc)
 int
 cipher_get_keyiv(struct sshcipher_ctx *cc, u_char *iv, u_int len)
 {
-<<<<<<< cipher.c
 	const struct sshcipher *c = cc->cipher;
-=======
-	const Cipher *c = cc->cipher;
 #ifdef WITH_OPENSSL
->>>>>>> 1.98
 	int evplen;
 #endif
 
@@ -566,7 +528,7 @@ cipher_get_keyiv(struct sshcipher_ctx *cc, u_char *iv, u_int len)
 		return 0;
 	}
 	if ((cc->cipher->flags & CFLAG_NONE) != 0)
-		return;
+		return 0;
 
 	switch (c->number) {
 #ifdef WITH_OPENSSL
@@ -590,13 +552,9 @@ cipher_get_keyiv(struct sshcipher_ctx *cc, u_char *iv, u_int len)
 #endif
 #ifdef WITH_SSH1
 	case SSH_CIPHER_3DES:
-<<<<<<< cipher.c
 		return ssh1_3des_iv(&cc->evp, 0, iv, 24);
-=======
-		ssh1_3des_iv(&cc->evp, 0, iv, 24);
 		break;
 #endif
->>>>>>> 1.98
 	default:
 		return SSH_ERR_INVALID_ARGUMENT;
 	}
@@ -606,23 +564,15 @@ cipher_get_keyiv(struct sshcipher_ctx *cc, u_char *iv, u_int len)
 int
 cipher_set_keyiv(struct sshcipher_ctx *cc, const u_char *iv)
 {
-<<<<<<< cipher.c
 	const struct sshcipher *c = cc->cipher;
-=======
-	const Cipher *c = cc->cipher;
 #ifdef WITH_OPENSSL
->>>>>>> 1.98
 	int evplen = 0;
 #endif
 
 	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0)
-<<<<<<< cipher.c
 		return 0;
-=======
-		return;
 	if ((cc->cipher->flags & CFLAG_NONE) != 0)
-		return;
->>>>>>> 1.98
+		return 0;
 
 	switch (c->number) {
 #ifdef WITH_OPENSSL
@@ -643,13 +593,9 @@ cipher_set_keyiv(struct sshcipher_ctx *cc, const u_char *iv)
 #endif
 #ifdef WITH_SSH1
 	case SSH_CIPHER_3DES:
-<<<<<<< cipher.c
 		return ssh1_3des_iv(&cc->evp, 1, (u_char *)iv, 24);
-=======
-		ssh1_3des_iv(&cc->evp, 1, iv, 24);
 		break;
 #endif
->>>>>>> 1.98
 	default:
 		return SSH_ERR_INVALID_ARGUMENT;
 	}
@@ -664,12 +610,8 @@ cipher_set_keyiv(struct sshcipher_ctx *cc, const u_char *iv)
 int
 cipher_get_keycontext(const struct sshcipher_ctx *cc, u_char *dat)
 {
-<<<<<<< cipher.c
-	const struct sshcipher *c = cc->cipher;
-=======
 #ifdef WITH_OPENSSL
-	const Cipher *c = cc->cipher;
->>>>>>> 1.98
+	const struct sshcipher *c = cc->cipher;
 	int plen = 0;
 
 	if (c->evptype == EVP_rc4) {
@@ -687,12 +629,8 @@ cipher_get_keycontext(const struct sshcipher_ctx *cc, u_char *dat)
 void
 cipher_set_keycontext(struct sshcipher_ctx *cc, const u_char *dat)
 {
-<<<<<<< cipher.c
-	const struct sshcipher *c = cc->cipher;
-=======
 #ifdef WITH_OPENSSL
-	const Cipher *c = cc->cipher;
->>>>>>> 1.98
+	const struct sshcipher *c = cc->cipher;
 	int plen;
 
 	if (c->evptype == EVP_rc4) {

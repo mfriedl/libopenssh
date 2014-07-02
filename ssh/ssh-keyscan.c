@@ -168,12 +168,8 @@ strnnsep(char **stringp, char *delim)
 	return (tok);
 }
 
-<<<<<<< ssh-keyscan.c
-static struct sshkey *
-=======
 #ifdef WITH_SSH1
-static Key *
->>>>>>> 1.92
+static struct sshkey *
 keygrab_ssh1(con *c)
 {
 	static struct sshkey *rsa;
@@ -258,34 +254,18 @@ keygrab_ssh2(con *c)
 	    (c->c_keytype == KT_RSA ? "ssh-rsa" :
 	    (c->c_keytype == KT_ED25519 ? "ssh-ed25519" :
 	    "ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521"));
-<<<<<<< ssh-keyscan.c
 	if ((r = kex_setup(c->c_ssh, myproposal)) != 0) {
 		free(c->c_ssh);
 		fprintf(stderr, "kex_setup: %s\n", ssh_err(r));
-=======
-	c->c_kex = kex_setup(myproposal);
-#ifdef WITH_OPENSSL
-	c->c_kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
-	c->c_kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
-	c->c_kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
-	c->c_kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
-	c->c_kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
-#endif
-	c->c_kex->kex[KEX_C25519_SHA256] = kexc25519_client;
-	c->c_kex->verify_host_key = hostjump;
-
-	if (!(j = setjmp(kexjmp))) {
-		nonfatal_fatal = 1;
-		dispatch_run(DISPATCH_BLOCK, &c->c_kex->done, c->c_kex);
-		fprintf(stderr, "Impossible! dispatch_run() returned!\n");
->>>>>>> 1.92
 		exit(1);
 	}
+#ifdef WITH_OPENSSL
 	c->c_ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
 	c->c_ssh->kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
 	c->c_ssh->kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
 	c->c_ssh->kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
 	c->c_ssh->kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
+#endif
 	c->c_ssh->kex->kex[KEX_C25519_SHA256] = kexc25519_client;
 	ssh_set_verify_host_key_callback(c->c_ssh, key_print_wrapper);
 	/*

@@ -29,7 +29,7 @@ int ssh_hmac_init(struct ssh_hmac_ctx *ctx, const void *key, size_t klen)
 	__attribute__((__bounded__(__buffer__, 2, 3)));
 int ssh_hmac_update(struct ssh_hmac_ctx *ctx, const void *m, size_t mlen)
 	__attribute__((__bounded__(__buffer__, 2, 3)));
-int ssh_hmac_update_buffer(struct ssh_hmac_ctx *ctx, const Buffer *b);
+int ssh_hmac_update_buffer(struct ssh_hmac_ctx *ctx, const struct sshbuf *b);
 int ssh_hmac_final(struct ssh_hmac_ctx *ctx, u_char *d, size_t dlen)
 	__attribute__((__bounded__(__buffer__, 2, 3)));
 void ssh_hmac_free(struct ssh_hmac_ctx *ctx);

@@ -45,12 +45,8 @@
 #include "ssh.h"
 #ifdef WITH_OPENSSL
 #include "dh.h"
-<<<<<<< monitor_wrap.c
-#include "sshbuf.h"
-=======
 #endif
-#include "buffer.h"
->>>>>>> 1.80
+#include "sshbuf.h"
 #include "key.h"
 #include "cipher.h"
 #include "kex.h"

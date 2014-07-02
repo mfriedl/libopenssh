@@ -210,18 +210,13 @@ main(int argc, char **argv)
 		keys[i] = NULL;
 		if (key_fd[i] == -1)
 			continue;
-<<<<<<< ssh-keysign.c
+#ifdef WITH_OPENSSL
+/* XXX wrong api */
 		r = sshkey_load_private_pem(key_fd[i], KEY_UNSPEC,
 		    NULL, &(keys[i]), NULL);
 		if (r != 0)
 			error("Load private: %s", ssh_err(r));
-=======
-#ifdef WITH_OPENSSL
-/* XXX wrong api */
-		keys[i] = key_load_private_pem(key_fd[i], KEY_UNSPEC,
-		    NULL, NULL);
 #endif
->>>>>>> 1.42
 		close(key_fd[i]);
 		if (keys[i] != NULL)
 			found = 1;

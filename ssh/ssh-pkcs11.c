@@ -376,13 +376,8 @@ pkcs11_open_session(struct pkcs11_provider *p, CK_ULONG slotidx, char *pin)
  * keysp points to an (possibly empty) array with *nkeys keys.
  */
 static int pkcs11_fetch_keys_filter(struct pkcs11_provider *, CK_ULONG,
-<<<<<<< ssh-pkcs11.c
     CK_ATTRIBUTE [], CK_ATTRIBUTE [3], struct sshkey ***, int *)
-	__bounded((__minbytes__,4, 3 * sizeof(CK_ATTRIBUTE)));
-=======
-    CK_ATTRIBUTE [], CK_ATTRIBUTE [3], Key ***, int *)
 	__attribute__((__bounded__(__minbytes__,4, 3 * sizeof(CK_ATTRIBUTE))));
->>>>>>> 1.13
 
 static int
 pkcs11_fetch_keys(struct pkcs11_provider *p, CK_ULONG slotidx,

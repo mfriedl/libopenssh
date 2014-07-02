@@ -636,14 +636,10 @@ sshkey_private_to_blob(struct sshkey *key, struct sshbuf *blob,
 	switch (key->type) {
 #ifdef WITH_SSH1
 	case KEY_RSA1:
-<<<<<<< authfile.c
 		return sshkey_private_rsa1_to_blob(key, blob,
 		    passphrase, comment);
-=======
-		return key_private_rsa1_to_blob(key, blob, passphrase, comment);
 #endif
 #ifdef WITH_OPENSSL
->>>>>>> 1.106
 	case KEY_DSA:
 	case KEY_ECDSA:
 	case KEY_RSA:
@@ -651,13 +647,9 @@ sshkey_private_to_blob(struct sshkey *key, struct sshbuf *blob,
 			return sshkey_private_to_blob2(key, blob, passphrase,
 			    comment, new_format_cipher, new_format_rounds);
 		}
-<<<<<<< authfile.c
 		return sshkey_private_pem_to_blob(key, blob,
 		    passphrase, comment);
-=======
-		return key_private_pem_to_blob(key, blob, passphrase, comment);
 #endif
->>>>>>> 1.106
 	case KEY_ED25519:
 		return sshkey_private_to_blob2(key, blob, passphrase,
 		    comment, new_format_cipher, new_format_rounds);
@@ -943,16 +935,10 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 }
 #endif
 
-<<<<<<< authfile.c
+#ifdef WITH_OPENSSL
 static int
 sshkey_parse_private_pem(struct sshbuf *blob, int type, const char *passphrase,
     struct sshkey **keyp, char **commentp)
-=======
-#ifdef WITH_OPENSSL
-static Key *
-key_parse_private_pem(Buffer *blob, int type, const char *passphrase,
-    char **commentp)
->>>>>>> 1.106
 {
 	EVP_PKEY *pk = NULL;
 	struct sshkey *prv = NULL;
@@ -1112,41 +1098,27 @@ sshkey_parse_private_type(struct sshbuf *blob, int type, const char *passphrase,
 	switch (type) {
 #ifdef WITH_SSH1
 	case KEY_RSA1:
-<<<<<<< authfile.c
 		return sshkey_parse_private_rsa1(blob, passphrase,
 		    keyp, commentp);
-=======
-		return key_parse_private_rsa1(blob, passphrase, commentp);
 #endif
 #ifdef WITH_OPENSSL
->>>>>>> 1.106
 	case KEY_DSA:
 	case KEY_ECDSA:
 	case KEY_RSA:
-<<<<<<< authfile.c
 		return sshkey_parse_private_pem(blob, type, passphrase,
 		    keyp, commentp);
-=======
-		return key_parse_private_pem(blob, type, passphrase, commentp);
 #endif
->>>>>>> 1.106
 	case KEY_ED25519:
 		return sshkey_parse_private2(blob, type, passphrase,
 		    keyp, commentp);
 	case KEY_UNSPEC:
-<<<<<<< authfile.c
 		if ((r = sshkey_parse_private2(blob, type, passphrase, keyp,
 		    commentp)) == 0)
 			return 0;
+#ifdef WITH_OPENSSL
 		return sshkey_parse_private_pem(blob, type, passphrase,
 		    keyp, commentp);
-=======
-		if ((k = key_parse_private2(blob, type, passphrase, commentp)))
-			return k;
-#ifdef WITH_OPENSSL
-		return key_parse_private_pem(blob, type, passphrase, commentp);
 #endif
->>>>>>> 1.106
 	default:
 		return SSH_ERR_KEY_TYPE_UNKNOWN;
 	}
@@ -1199,17 +1171,13 @@ int
 sshkey_parse_private(struct sshbuf *buffer, const char *passphrase,
     const char *filename, struct sshkey **keyp, char **commentp)
 {
-<<<<<<< authfile.c
+#ifdef WITH_SSH1
 	struct sshkey *key;
 	int r;
 
 	*keyp = NULL;
 	if (commentp != NULL)
 		*commentp = NULL;
-=======
-#ifdef WITH_SSH1
-	Key *pub, *prv;
->>>>>>> 1.106
 
 	/* it's a SSH v1 key if the public key part is readable */
 	if ((r = sshkey_parse_public_rsa1(buffer, &key, NULL)) == 0) {
@@ -1225,16 +1193,12 @@ sshkey_parse_private(struct sshbuf *buffer, const char *passphrase,
 		sshkey_free(key);
 		return SSH_ERR_ALLOC_FAIL;
 	}
-<<<<<<< authfile.c
 	*keyp = key;
 	return 0;
-=======
-	return prv;
 #else
-	return key_parse_private_type(buffer, KEY_UNSPEC,
-	    passphrase, commentp);
+	return sshkey_parse_private_type(buffer, KEY_UNSPEC,
+	    passphrase, &key, commentp);
 #endif
->>>>>>> 1.106
 }
 
 /* XXX this is almost identical to sshkey_load_private_type() */
@@ -1346,7 +1310,6 @@ sshkey_load_public(const char *filename, struct sshkey **keyp, char **commentp)
 	}
 
 	/* try rsa1 public key */
-<<<<<<< authfile.c
 	if ((pub = sshkey_new(KEY_RSA1)) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	if ((r = sshkey_try_load_public(pub, filename, commentp)) == 0) {
@@ -1354,13 +1317,7 @@ sshkey_load_public(const char *filename, struct sshkey **keyp, char **commentp)
 		return 0;
 	}
 	sshkey_free(pub);
-=======
-	pub = key_new(KEY_RSA1);
-	if (key_try_load_public(pub, filename, commentp) == 1)
-		return pub;
-	key_free(pub);
 #endif
->>>>>>> 1.106
 
 	/* try ssh2 public key */
 	if ((pub = sshkey_new(KEY_UNSPEC)) == NULL)
@@ -1370,7 +1327,9 @@ sshkey_load_public(const char *filename, struct sshkey **keyp, char **commentp)
 		return 0;
 	}
 
+#ifdef WITH_SSH1
  skip:
+#endif
 	/* try .pub suffix */
 	if (pub == NULL && (pub = sshkey_new(KEY_UNSPEC)) == NULL)
 		return SSH_ERR_ALLOC_FAIL;

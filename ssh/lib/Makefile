@@ -1,13 +1,9 @@
 #	$OpenBSD: Makefile,v 1.78 2014/04/30 19:07:48 naddy Exp $
 
 .PATH:		${.CURDIR}/..
+.include "${.CURDIR}/../Makefile.inc"
 
 LIB=	ssh
-<<<<<<< Makefile
-SRCS=	authfd.c authfile.c canohost.c \
-	channels.c cipher.c cipher-3des1.c cipher-bf1.c \
-	cleanup.c compat.c crc32.c deattack.c fatal.c \
-=======
 
 # These are files intended for a standalone libopenssh in the future.
 LIB_SRCS= \
@@ -24,7 +20,6 @@ SRCS=	${LIB_SRCS} \
 	authfd.c authfile.c bufaux.c buffer.c canohost.c \
 	channels.c cipher.c \
 	cleanup.c compat.c compress.c crc32.c deattack.c fatal.c \
->>>>>>> 1.78
 	hostfile.c log.c match.c nchan.c packet.c readpass.c \
 	ttymodes.c xmalloc.c atomicio.c \
 	key.c dispatch.c kex.c mac.c uidswap.c uuencode.c misc.c \
@@ -32,32 +27,19 @@ SRCS=	${LIB_SRCS} \
 	monitor_fdpass.c addrmatch.c \
 	smult_curve25519_ref.c kexc25519.c kexc25519c.c \
 	chacha.c poly1305.c cipher-chachapoly.c ssh-ed25519.c hmac.c umac.c
+SRCS+=	kexc25519s.c
+SRCS+=	ssh_api.c
+SRCS+=	roaming_dummy.c
 
 .if (${OPENSSL:L} == "yes")
 SRCS+=	bufec.c bufbn.c cipher-3des1.c cipher-bf1.c rsa.c \
 	ssh-dss.c ssh-rsa.c ssh-ecdsa.c dh.c kexdh.c kexgex.c kexecdh.c \
-<<<<<<< Makefile
-	kexdhc.c kexgexc.c kexecdhc.c msg.c progressmeter.c dns.c \
-	monitor_fdpass.c umac.c addrmatch.c ssh-pkcs11.c \
-	krl.c smult_curve25519_ref.c kexc25519.c kexc25519c.c \
-	chacha.c poly1305.c cipher-chachapoly.c ssh-ed25519.c \
-	sshbuf-getput-basic.c \
-	sshbuf-getput-crypto.c \
-	sshbuf-misc.c \
-	sshbuf.c \
-	digest-openssl.c hmac.c \
-	err.c
-
-SRCS+=	kexdhs.c kexgexs.c kexecdhs.c kexc25519s.c
-SRCS+=	ssh_api.c
-SRCS+=	roaming_dummy.c
-=======
 	kexdhc.c kexgexc.c kexecdhc.c ssh-pkcs11.c \
 	krl.c digest-openssl.c
+SRCS+=	kexdhs.c kexgexs.c kexecdhs.c
 .else
 SRCS+=	digest-libc.c rijndael.c cipher-aesctr.c
 .endif
->>>>>>> 1.78
 
 # ed25519, from supercop
 SRCS+=	sc25519.c ge25519.c fe25519.c ed25519.c verify.c hash.c blocks.c

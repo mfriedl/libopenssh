@@ -1,8 +1,4 @@
-<<<<<<< cipher-chachapoly.h
 /* $OpenBSD: cipher-chachapoly.h,v 1.4 2014/06/24 01:13:21 djm Exp $ */
-=======
-/* $OpenBSD: cipher-chachapoly.h,v 1.3 2014/05/02 03:27:54 djm Exp $ */
->>>>>>> 1.3
 
 /*
  * Copyright (c) Damien Miller 2013 <djm@mindrot.org>

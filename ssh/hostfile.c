@@ -297,17 +297,12 @@ load_hostkeys(struct hostkeys *hostkeys, const char *host, const char *path)
 			break;
 		}
 		if (!hostfile_read_key(&cp, &kbits, key)) {
-<<<<<<< hostfile.c
 			sshkey_free(key);
+#ifdef WITH_SSH1
 			if ((key = sshkey_new(KEY_RSA1)) == NULL) {
 				error("%s: sshkey_new failed", __func__);
 				break;
 			}
-=======
-			key_free(key);
-#ifdef WITH_SSH1
-			key = key_new(KEY_RSA1);
->>>>>>> 1.56
 			if (!hostfile_read_key(&cp, &kbits, key)) {
 				sshkey_free(key);
 				continue;

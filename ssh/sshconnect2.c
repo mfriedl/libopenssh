@@ -197,34 +197,19 @@ ssh_kex2(struct ssh *ssh, u_short port)
 		    (time_t)options.rekey_interval);
 
 	/* start key exchange */
-<<<<<<< sshconnect2.c
 	if ((r = kex_setup(ssh, myproposal)) != 0)
 		fatal("kex_setup: %s", ssh_err(r));
+#ifdef WITH_OPENSSL
 	ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
 	ssh->kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
 	ssh->kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
 	ssh->kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
 	ssh->kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
+#endif
 	ssh->kex->kex[KEX_C25519_SHA256] = kexc25519_client;
 	ssh->kex->client_version_string=client_version_string;
 	ssh->kex->server_version_string=server_version_string;
 	ssh->kex->verify_host_key=&verify_host_key_callback;
-=======
-	kex = kex_setup(myproposal);
-#ifdef WITH_OPENSSL
-	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
-	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
-	kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
-	kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
-	kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
-#endif
-	kex->kex[KEX_C25519_SHA256] = kexc25519_client;
-	kex->client_version_string=client_version_string;
-	kex->server_version_string=server_version_string;
-	kex->verify_host_key=&verify_host_key_callback;
-
-	xxx_kex = kex;
->>>>>>> 1.207
 
 	if ((r = ssh_dispatch_run(ssh, DISPATCH_BLOCK, &ssh->kex->done)) != 0)
 		fatal("%s: ssh_dispatch_run failed: %s", __func__, ssh_err(r));

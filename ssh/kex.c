@@ -749,15 +749,10 @@ kex_derive_keys(struct ssh *ssh, u_char *hash, u_int hashlen,
 	return 0;
 }
 
-<<<<<<< kex.c
+#ifdef WITH_OPENSSL
 int
 kex_derive_keys_bn(struct ssh *ssh, u_char *hash, u_int hashlen,
     const BIGNUM *secret)
-=======
-#ifdef WITH_OPENSSL
-void
-kex_derive_keys_bn(Kex *kex, u_char *hash, u_int hashlen, const BIGNUM *secret)
->>>>>>> 1.99
 {
 	struct sshbuf *shared_secret;
 	int r;
@@ -773,22 +768,8 @@ kex_derive_keys_bn(Kex *kex, u_char *hash, u_int hashlen, const BIGNUM *secret)
 }
 #endif
 
-<<<<<<< kex.c
-int
-=======
-Newkeys *
-kex_get_newkeys(int mode)
-{
-	Newkeys *ret;
-
-	ret = current_keys[mode];
-	current_keys[mode] = NULL;
-	return ret;
-}
-
 #ifdef WITH_SSH1
-void
->>>>>>> 1.99
+int
 derive_ssh1_session_id(BIGNUM *host_modulus, BIGNUM *server_modulus,
     u_int8_t cookie[8], u_int8_t id[16])
 {
