@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.71 2014/01/09 23:20:01 djm Exp $
+#	$OpenBSD: Makefile,v 1.74 2014/01/29 06:18:35 djm Exp $
 
 .PATH:		${.CURDIR}/..
 
@@ -11,8 +11,9 @@ SRCS=	authfd.c authfile.c canohost.c \
 	key.c dispatch.c kex.c mac.c uidswap.c uuencode.c misc.c \
 	ssh-dss.c ssh-rsa.c ssh-ecdsa.c dh.c kexdh.c kexgex.c kexecdh.c \
 	kexdhc.c kexgexc.c kexecdhc.c msg.c progressmeter.c dns.c \
-	monitor_fdpass.c umac.c addrmatch.c schnorr.c jpake.c ssh-pkcs11.c \
+	monitor_fdpass.c umac.c addrmatch.c ssh-pkcs11.c \
 	krl.c smult_curve25519_ref.c kexc25519.c kexc25519c.c \
+<<<<<<< Makefile
 	chacha.c poly1305.c cipher-chachapoly.c ssh-ed25519.c digest.c \
 	sshbuf-getput-basic.c \
 	sshbuf-getput-crypto.c \
@@ -24,6 +25,10 @@ SRCS=	authfd.c authfile.c canohost.c \
 SRCS+=	kexdhs.c kexgexs.c kexecdhs.c kexc25519s.c
 SRCS+=	ssh_api.c
 SRCS+=	roaming_dummy.c
+=======
+	chacha.c poly1305.c cipher-chachapoly.c ssh-ed25519.c \
+	digest-openssl.c hmac.c
+>>>>>>> 1.74
 
 # ed25519, from supercop
 SRCS+=	sc25519.c ge25519.c fe25519.c ed25519.c verify.c hash.c blocks.c

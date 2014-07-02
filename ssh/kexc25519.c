@@ -68,10 +68,16 @@ kexc25519_shared_key(const u_char key[CURVE25519_SIZE],
 #ifdef DEBUG_KEXECDH
 	dump_digest("shared secret", shared_key, CURVE25519_SIZE);
 #endif
+<<<<<<< kexc25519.c
 	sshbuf_reset(out);
 	r = sshbuf_put_bignum2_bytes(out, shared_key, CURVE25519_SIZE);
 	memset(shared_key, 0, CURVE25519_SIZE);	/* XXX explicit_bzero() */
 	return r;
+=======
+	buffer_clear(out);
+	buffer_put_bignum2_from_string(out, shared_key, CURVE25519_SIZE);
+	explicit_bzero(shared_key, CURVE25519_SIZE);
+>>>>>>> 1.5
 }
 
 int

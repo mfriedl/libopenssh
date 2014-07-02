@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.201 2014/01/09 23:20:00 djm Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.204 2014/02/02 03:44:32 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -64,10 +64,13 @@
 #include "pathnames.h"
 #include "uidswap.h"
 #include "hostfile.h"
+<<<<<<< sshconnect2.c
 #include "schnorr.h"
 #include "jpake.h"
 #include "compat.h"
 #include "err.h"
+=======
+>>>>>>> 1.204
 
 #ifdef GSSAPI
 #include "ssh-gss.h"
@@ -276,6 +279,7 @@ struct cauthmethod {
 	int	*batch_flag;	/* flag in option struct that disables method */
 };
 
+<<<<<<< sshconnect2.c
 int	input_userauth_service_accept(int, u_int32_t, struct ssh *);
 int	input_userauth_success(int, u_int32_t, struct ssh *);
 int	input_userauth_success_unexpected(int, u_int32_t, struct ssh *);
@@ -297,6 +301,22 @@ int	userauth_hostbased(struct ssh *);
 int	userauth_jpake(struct ssh *);
 
 void	userauth_jpake_cleanup(struct ssh *);
+=======
+void	input_userauth_success(int, u_int32_t, void *);
+void	input_userauth_success_unexpected(int, u_int32_t, void *);
+void	input_userauth_failure(int, u_int32_t, void *);
+void	input_userauth_banner(int, u_int32_t, void *);
+void	input_userauth_error(int, u_int32_t, void *);
+void	input_userauth_info_req(int, u_int32_t, void *);
+void	input_userauth_pk_ok(int, u_int32_t, void *);
+void	input_userauth_passwd_changereq(int, u_int32_t, void *);
+
+int	userauth_none(Authctxt *);
+int	userauth_pubkey(Authctxt *);
+int	userauth_passwd(Authctxt *);
+int	userauth_kbdint(Authctxt *);
+int	userauth_hostbased(Authctxt *);
+>>>>>>> 1.204
 
 #ifdef GSSAPI
 int	userauth_gssapi(struct ssh *);
@@ -336,13 +356,6 @@ struct cauthmethod authmethods[] = {
 		NULL,
 		&options.pubkey_authentication,
 		NULL},
-#ifdef JPAKE
-	{"jpake-01@openssh.com",
-		userauth_jpake,
-		userauth_jpake_cleanup,
-		&options.zero_knowledge_password_authentication,
-		&options.batch_mode},
-#endif
 	{"keyboard-interactive",
 		userauth_kbdint,
 		NULL,
@@ -952,6 +965,7 @@ userauth_passwd(struct ssh *ssh)
 	snprintf(prompt, sizeof(prompt), "%.30s@%.128s's password: ",
 	    authctxt->server_user, host);
 	password = read_passphrase(prompt, 0);
+<<<<<<< sshconnect2.c
 	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, authctxt->server_user)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, authctxt->service)) != 0 ||
@@ -966,6 +980,18 @@ userauth_passwd(struct ssh *ssh)
 		memset(password, 0, strlen(password));
 		free(password);
 	}
+=======
+	packet_start(SSH2_MSG_USERAUTH_REQUEST);
+	packet_put_cstring(authctxt->server_user);
+	packet_put_cstring(authctxt->service);
+	packet_put_cstring(authctxt->method->name);
+	packet_put_char(0);
+	packet_put_cstring(password);
+	explicit_bzero(password, strlen(password));
+	free(password);
+	packet_add_padding(64);
+	packet_send();
+>>>>>>> 1.204
 
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_PASSWD_CHANGEREQ,
 	    &input_userauth_passwd_changereq);
@@ -1009,10 +1035,15 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
 	    "Enter %.30s@%.128s's old password: ",
 	    authctxt->server_user, host);
 	password = read_passphrase(prompt, 0);
+<<<<<<< sshconnect2.c
 	if ((r = sshpkt_put_cstring(ssh, password)) != 0)
 		goto out;
 
 	memset(password, 0, strlen(password));
+=======
+	packet_put_cstring(password);
+	explicit_bzero(password, strlen(password));
+>>>>>>> 1.204
 	free(password);
 	password = NULL;
 
@@ -1031,18 +1062,26 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
 		    authctxt->server_user, host);
 		retype = read_passphrase(prompt, 0);
 		if (strcmp(password, retype) != 0) {
-			memset(password, 0, strlen(password));
+			explicit_bzero(password, strlen(password));
 			free(password);
 			logit("Mismatch; try again, EOF to quit.");
 			password = NULL;
 		}
-		memset(retype, 0, strlen(retype));
+		explicit_bzero(retype, strlen(retype));
 		free(retype);
 	}
+<<<<<<< sshconnect2.c
 	if ((r = sshpkt_put_cstring(ssh, password)) != 0 ||
 	    (r = sshpkt_add_padding(ssh, 64)) != 0 ||
 	    (r = sshpkt_send(ssh)) != 0)
 		goto out;
+=======
+	packet_put_cstring(password);
+	explicit_bzero(password, strlen(password));
+	free(password);
+	packet_add_padding(64);
+	packet_send();
+>>>>>>> 1.204
 
 	ssh_dispatch_set(ssh, SSH2_MSG_USERAUTH_PASSWD_CHANGEREQ,
 	    &input_userauth_passwd_changereq);
@@ -1057,6 +1096,7 @@ input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
 	return r;
 }
 
+<<<<<<< sshconnect2.c
 #ifdef JPAKE
 static char *
 pw_encrypt(const char *password, const char *crypt_scheme, const char *salt)
@@ -1299,6 +1339,8 @@ input_userauth_jpake_server_confirm(int type, u_int32_t seq, struct ssh *ssh)
 }
 #endif /* JPAKE */
 
+=======
+>>>>>>> 1.204
 static int
 identity_sign(struct identity *id, u_char **sigp, size_t *lenp,
     const u_char *data, size_t datalen, u_int compat)
@@ -1507,6 +1549,7 @@ load_identity_file(char *filename, int userprovided)
 				quit = 1;
 				break;
 			}
+<<<<<<< sshconnect2.c
 			/* FALLTHROUGH */
 		default:
 			error("Load key \"%s\": %s", filename, ssh_err(r));
@@ -1515,6 +1558,9 @@ load_identity_file(char *filename, int userprovided)
 		}
 		if (i > 0) {
 			memset(passphrase, 0, strlen(passphrase));
+=======
+			explicit_bzero(passphrase, strlen(passphrase));
+>>>>>>> 1.204
 			free(passphrase);
 		}
 		if (private != NULL || quit)
@@ -1578,7 +1624,7 @@ pubkey_prepare(struct ssh *ssh)
 		/* If IdentitiesOnly set and key not found then don't use it */
 		if (!found && options.identities_only) {
 			TAILQ_REMOVE(&files, id, next);
-			bzero(id, sizeof(*id));
+			explicit_bzero(id, sizeof(*id));
 			free(id);
 		}
 	}
@@ -1787,9 +1833,15 @@ input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 		    (r = sshpkt_get_u8(ssh, &echo)) != 0)
 			goto out;
 		response = read_passphrase(prompt, echo ? RP_ECHO : 0);
+<<<<<<< sshconnect2.c
 		if ((r = sshpkt_put_cstring(ssh, response)) != 0)
 			goto out;
 		memset(response, 0, strlen(response));
+=======
+
+		packet_put_cstring(response);
+		explicit_bzero(response, strlen(response));
+>>>>>>> 1.204
 		free(response);
 		free(prompt);
 		response = prompt = NULL;
@@ -1978,6 +2030,7 @@ userauth_hostbased(struct ssh *ssh)
 		free(blob);
 		return 0;
 	}
+<<<<<<< sshconnect2.c
 	if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_REQUEST)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, authctxt->server_user)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, authctxt->service)) != 0 ||
@@ -1990,6 +2043,18 @@ userauth_hostbased(struct ssh *ssh)
 	    (r = sshpkt_send(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
 	memset(signature, 's', slen);
+=======
+	packet_start(SSH2_MSG_USERAUTH_REQUEST);
+	packet_put_cstring(authctxt->server_user);
+	packet_put_cstring(authctxt->service);
+	packet_put_cstring(authctxt->method->name);
+	packet_put_cstring(pkalg);
+	packet_put_string(blob, blen);
+	packet_put_cstring(chost);
+	packet_put_cstring(authctxt->local_user);
+	packet_put_string(signature, slen);
+	explicit_bzero(signature, slen);
+>>>>>>> 1.204
 	free(signature);
 	free(chost);
 	free(pkalg);
@@ -1998,6 +2063,7 @@ userauth_hostbased(struct ssh *ssh)
 	return 1;
 }
 
+<<<<<<< sshconnect2.c
 #ifdef JPAKE
 int
 userauth_jpake(struct ssh *ssh)
@@ -2077,6 +2143,8 @@ userauth_jpake_cleanup(struct ssh *ssh)
 }
 #endif /* JPAKE */
 
+=======
+>>>>>>> 1.204
 /* find auth method */
 
 /*

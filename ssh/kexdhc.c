@@ -1,4 +1,4 @@
-/* $OpenBSD: kexdhc.c,v 1.14 2014/01/12 08:13:13 djm Exp $ */
+/* $OpenBSD: kexdhc.c,v 1.15 2014/02/02 03:44:31 djm Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
@@ -151,6 +151,15 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 #ifdef DEBUG_KEXDH
 	dump_digest("shared secret", kbuf, kout);
 #endif
+<<<<<<< kexdhc.c
+=======
+	if ((shared_secret = BN_new()) == NULL)
+		fatal("kexdh_client: BN_new failed");
+	if (BN_bin2bn(kbuf, kout, shared_secret) == NULL)
+		fatal("kexdh_client: BN_bin2bn failed");
+	explicit_bzero(kbuf, klen);
+	free(kbuf);
+>>>>>>> 1.15
 
 	/* calc and verify H */
 	if ((r = kex_dh_hash(

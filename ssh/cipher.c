@@ -1,4 +1,4 @@
-/* $OpenBSD: cipher.c,v 1.93 2013/12/06 13:34:54 markus Exp $ */
+/* $OpenBSD: cipher.c,v 1.96 2014/02/02 03:44:31 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -37,8 +37,6 @@
 
 #include <sys/types.h>
 
-#include <openssl/md5.h>
-
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -46,6 +44,12 @@
 #include "err.h"
 #include "cipher.h"
 #include "misc.h"
+<<<<<<< cipher.c
+=======
+#include "cipher.h"
+#include "buffer.h"
+#include "digest.h"
+>>>>>>> 1.96
 
 extern const EVP_CIPHER *evp_ssh1_bf(void);
 extern const EVP_CIPHER *evp_ssh1_3des(void);
@@ -136,7 +140,19 @@ cipher_keylen(const struct sshcipher *c)
 }
 
 u_int
+<<<<<<< cipher.c
 cipher_authlen(const struct sshcipher *c)
+=======
+cipher_seclen(const Cipher *c)
+{
+	if (strcmp("3des-cbc", c->name) == 0)
+		return 14;
+	return cipher_keylen(c);
+}
+
+u_int
+cipher_authlen(const Cipher *c)
+>>>>>>> 1.96
 {
 	return (c->auth_len);
 }
@@ -309,6 +325,7 @@ cipher_init(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
 	}
 
 	if (cipher->discard_len > 0) {
+<<<<<<< cipher.c
 		if ((junk = malloc(cipher->discard_len)) == NULL ||
 		    (discard = malloc(cipher->discard_len)) == NULL) {
 			if (junk != NULL)
@@ -318,6 +335,14 @@ cipher_init(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
 		}
 		ret = EVP_Cipher(&cc->evp, discard, junk, cipher->discard_len);
 		bzero(discard, cipher->discard_len);
+=======
+		junk = xmalloc(cipher->discard_len);
+		discard = xmalloc(cipher->discard_len);
+		if (EVP_Cipher(&cc->evp, discard, junk,
+		    cipher->discard_len) == 0)
+			fatal("evp_crypt: EVP_Cipher failed during discard");
+		explicit_bzero(discard, cipher->discard_len);
+>>>>>>> 1.96
 		free(junk);
 		free(discard);
 		if (ret != 1) {
@@ -405,7 +430,7 @@ int
 cipher_cleanup(struct sshcipher_ctx *cc)
 {
 	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0)
-		memset(&cc->cp_ctx, 0, sizeof(cc->cp_ctx));
+		explicit_bzero(&cc->cp_ctx, sizeof(cc->cp_ctx));
 	else if (EVP_CIPHER_CTX_cleanup(&cc->evp) == 0)
 		return SSH_ERR_LIBCRYPTO_ERROR;
 	return 0;
@@ -419,21 +444,30 @@ int
 cipher_set_key_string(struct sshcipher_ctx *cc, const struct sshcipher *cipher,
     const char *pphrase, int do_encrypt)
 {
-	MD5_CTX md;
 	u_char digest[16];
 	int ret = SSH_ERR_LIBCRYPTO_ERROR;
 
+<<<<<<< cipher.c
 	if (MD5_Init(&md) != 1 ||
 	    MD5_Update(&md, (const u_char *)pphrase, strlen(pphrase)) != 1 ||
 	    MD5_Final(digest, &md) != 1)
 		goto out;
+=======
+	if (ssh_digest_memory(SSH_DIGEST_MD5, passphrase, strlen(passphrase),
+	    digest, sizeof(digest)) < 0)
+		fatal("%s: md5 failed", __func__);
+>>>>>>> 1.96
 
 	ret = cipher_init(cc, cipher, digest, 16, NULL, 0, do_encrypt);
 
+<<<<<<< cipher.c
  out:
 	memset(digest, 0, sizeof(digest));
 	memset(&md, 0, sizeof(md));
 	return ret;
+=======
+	explicit_bzero(digest, sizeof(digest));
+>>>>>>> 1.96
 }
 
 /*

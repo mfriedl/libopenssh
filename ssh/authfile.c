@@ -1,4 +1,8 @@
+<<<<<<< authfile.c
 /* $OpenBSD: authfile.c,v 1.104 2014/03/12 04:51:12 djm Exp $ */
+=======
+/* $OpenBSD: authfile.c,v 1.103 2014/02/02 03:44:31 djm Exp $ */
+>>>>>>> 1.103
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -134,6 +138,7 @@ sshkey_private_to_blob2(const struct sshkey *prv, struct sshbuf *blob,
 	if (strcmp(kdfname, "bcrypt") == 0) {
 		arc4random_buf(salt, SALT_LEN);
 		if (bcrypt_pbkdf(passphrase, strlen(passphrase),
+<<<<<<< authfile.c
 		    salt, SALT_LEN, key, keylen + ivlen, rounds) < 0) {
 			r = SSH_ERR_INVALID_ARGUMENT;
 			goto out;
@@ -158,6 +163,30 @@ sshkey_private_to_blob2(const struct sshkey *prv, struct sshbuf *blob,
 	    (r = sshkey_to_blob(prv, &pubkeyblob, &pubkeylen)) != 0 ||
 	    (r = sshbuf_put_string(encoded, pubkeyblob, pubkeylen)) != 0)
 		goto out;
+=======
+		    salt, SALT_LEN, key, keylen + ivlen, rounds) < 0)
+			fatal("bcrypt_pbkdf failed");
+		buffer_put_string(&kdf, salt, SALT_LEN);
+		buffer_put_int(&kdf, rounds);
+	}
+	cipher_init(&ctx, c, key, keylen, key + keylen , ivlen, 1);
+	explicit_bzero(key, keylen + ivlen);
+	free(key);
+
+	buffer_init(&encoded);
+	buffer_append(&encoded, AUTH_MAGIC, sizeof(AUTH_MAGIC));
+	buffer_put_cstring(&encoded, ciphername);
+	buffer_put_cstring(&encoded, kdfname);
+	buffer_put_string(&encoded, buffer_ptr(&kdf), buffer_len(&kdf));
+	buffer_put_int(&encoded, 1);			/* number of keys */
+	key_to_blob(prv, &cp, &len);			/* public key */
+	buffer_put_string(&encoded, cp, len);
+
+	explicit_bzero(cp, len);
+	free(cp);
+
+	buffer_free(&kdf);
+>>>>>>> 1.103
 
 	/* set up the buffer that will be encrypted */
 
@@ -436,6 +465,7 @@ sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
 	free(ciphername);
 	free(kdfname);
 	free(comment);
+<<<<<<< authfile.c
 	if (salt != NULL) {
 		explicit_bzero(salt, slen);
 		free(salt);
@@ -449,6 +479,16 @@ sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
 	sshbuf_free(kdf);
 	sshbuf_free(decrypted);
 	return r;
+=======
+	if (key)
+		explicit_bzero(key, keylen + ivlen);
+	free(key);
+	buffer_free(&encoded);
+	buffer_free(&copy);
+	buffer_free(&kdf);
+	buffer_free(&b);
+	return k;
+>>>>>>> 1.103
 }
 
 /*
@@ -531,6 +571,7 @@ sshkey_private_rsa1_to_blob(struct sshkey *key, struct sshbuf *blob,
 	if ((r = sshbuf_reserve(encrypted, sshbuf_len(buffer), &cp)) != 0)
 		goto out;
 
+<<<<<<< authfile.c
 	if ((r = cipher_set_key_string(&ciphercontext, cipher, passphrase,
 	    CIPHER_ENCRYPT)) != 0)
 		goto out;
@@ -539,8 +580,23 @@ sshkey_private_rsa1_to_blob(struct sshkey *key, struct sshbuf *blob,
 		goto out;
 	if ((r = cipher_cleanup(&ciphercontext)) != 0)
 		goto out;
+=======
+	cipher_set_key_string(&ciphercontext, cipher, passphrase,
+	    CIPHER_ENCRYPT);
+	if (cipher_crypt(&ciphercontext, 0, cp,
+	    buffer_ptr(&buffer), buffer_len(&buffer), 0, 0) != 0)
+		fatal("%s: cipher_crypt failed", __func__);
+	cipher_cleanup(&ciphercontext);
+	explicit_bzero(&ciphercontext, sizeof(ciphercontext));
+>>>>>>> 1.103
 
+<<<<<<< authfile.c
 	r = sshbuf_putb(blob, encrypted);
+=======
+	/* Destroy temporary data. */
+	explicit_bzero(buf, sizeof(buf));
+	buffer_free(&buffer);
+>>>>>>> 1.103
 
  out:
 	explicit_bzero(&ciphercontext, sizeof(ciphercontext));
@@ -749,16 +805,37 @@ sshkey_load_file(int fd, const char *filename, struct sshbuf *blob)
 		if ((len = atomicio(read, fd, buf, sizeof(buf))) == 0) {
 			if (errno == EPIPE)
 				break;
+<<<<<<< authfile.c
 			r = SSH_ERR_SYSTEM_ERROR;
 			goto out;
+=======
+			debug("%s: read from key file %.200s%sfailed: %.100s",
+			    __func__, filename == NULL ? "" : filename,
+			    filename == NULL ? "" : " ", strerror(errno));
+			buffer_clear(blob);
+			explicit_bzero(buf, sizeof(buf));
+			return 0;
+>>>>>>> 1.103
 		}
+<<<<<<< authfile.c
 		if ((r = sshbuf_put(blob, buf, len)) != 0)
 			goto out;
 		if (sshbuf_len(blob) > MAX_KEY_FILE_SIZE) {
 			r = SSH_ERR_INVALID_FORMAT;
 			goto out;
+=======
+		buffer_append(blob, buf, len);
+		if (buffer_len(blob) > MAX_KEY_FILE_SIZE) {
+			buffer_clear(blob);
+			explicit_bzero(buf, sizeof(buf));
+			goto toobig;
+>>>>>>> 1.103
 		}
 	}
+<<<<<<< authfile.c
+=======
+	explicit_bzero(buf, sizeof(buf));
+>>>>>>> 1.103
 	if ((st.st_mode & (S_IFSOCK|S_IFCHR|S_IFIFO)) == 0 &&
 	    st.st_size != (off_t)sshbuf_len(blob)) {
 		r = SSH_ERR_FILE_CHANGED;
@@ -866,6 +943,7 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 		goto out;
 
 	/* Rest of the buffer is encrypted.  Decrypt it using the passphrase. */
+<<<<<<< authfile.c
 	if ((r = cipher_set_key_string(&ciphercontext, cipher, passphrase,
 	    CIPHER_DECRYPT)) != 0)
 		goto out;
@@ -876,6 +954,16 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 	}
 	if ((r = cipher_cleanup(&ciphercontext)) != 0)
 		goto out;
+=======
+	cipher_set_key_string(&ciphercontext, cipher, passphrase,
+	    CIPHER_DECRYPT);
+	if (cipher_crypt(&ciphercontext, 0, cp,
+	    buffer_ptr(&copy), buffer_len(&copy), 0, 0) != 0)
+		fatal("%s: cipher_crypt failed", __func__);
+	cipher_cleanup(&ciphercontext);
+	explicit_bzero(&ciphercontext, sizeof(ciphercontext));
+	buffer_free(&copy);
+>>>>>>> 1.103
 
 	if ((r = sshbuf_get_u16(decrypted, &check1)) != 0 ||
 	    (r = sshbuf_get_u16(decrypted, &check2)) != 0)

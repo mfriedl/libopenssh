@@ -1,4 +1,4 @@
-/* $OpenBSD: rsa.c,v 1.30 2013/05/17 00:13:14 djm Exp $ */
+/* $OpenBSD: rsa.c,v 1.31 2014/02/02 03:44:31 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -102,6 +102,7 @@ rsa_public_encrypt(BIGNUM *out, BIGNUM *in, RSA *key)
 	}
 	r = 0;
 
+<<<<<<< rsa.c
  out:
 	if (outbuf != NULL) {
 		memset(outbuf, 0, olen);
@@ -112,6 +113,12 @@ rsa_public_encrypt(BIGNUM *out, BIGNUM *in, RSA *key)
 		free(inbuf);
 	}
 	return r;
+=======
+	explicit_bzero(outbuf, olen);
+	explicit_bzero(inbuf, ilen);
+	free(outbuf);
+	free(inbuf);
+>>>>>>> 1.31
 }
 
 int
@@ -135,6 +142,7 @@ rsa_private_decrypt(BIGNUM *out, BIGNUM *in, RSA *key)
 
 	if ((len = RSA_private_decrypt(ilen, inbuf, outbuf, key,
 	    RSA_PKCS1_PADDING)) <= 0) {
+<<<<<<< rsa.c
 		r = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
 	} else if (BN_bin2bn(outbuf, len, out) == NULL) {
@@ -152,6 +160,18 @@ rsa_private_decrypt(BIGNUM *out, BIGNUM *in, RSA *key)
 		free(inbuf);
 	}
 	return r;
+=======
+		error("rsa_private_decrypt() failed");
+	} else {
+		if (BN_bin2bn(outbuf, len, out) == NULL)
+			fatal("rsa_private_decrypt: BN_bin2bn failed");
+	}
+	explicit_bzero(outbuf, olen);
+	explicit_bzero(inbuf, ilen);
+	free(outbuf);
+	free(inbuf);
+	return len;
+>>>>>>> 1.31
 }
 
 /* calculate p-1 and q-1 */

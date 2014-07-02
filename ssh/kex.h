@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.h,v 1.60 2014/01/12 08:13:13 djm Exp $ */
+/* $OpenBSD: kex.h,v 1.62 2014/01/27 18:58:14 markus Exp $ */
 
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
@@ -94,8 +94,24 @@ struct sshenc {
 	u_char	*key;
 	u_char	*iv;
 };
+<<<<<<< kex.h
 struct sshcomp {
 	u_int	type;
+=======
+struct Mac {
+	char	*name;
+	int	enabled;
+	u_int	mac_len;
+	u_char	*key;
+	u_int	key_len;
+	int	type;
+	int	etm;		/* Encrypt-then-MAC */
+	struct ssh_hmac_ctx	*hmac_ctx;
+	struct umac_ctx		*umac_ctx;
+};
+struct Comp {
+	int	type;
+>>>>>>> 1.62
 	int	enabled;
 	char	*name;
 };
@@ -112,6 +128,7 @@ struct kex {
 	size_t	session_id_len;
 	struct newkeys	*newkeys[MODE_MAX];
 	u_int	we_need;
+	u_int	dh_need;
 	int	server;
 	char	*name;
 	int	hostkey_type;

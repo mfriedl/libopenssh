@@ -14,7 +14,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+<<<<<<< cipher-chachapoly.c
 /* $OpenBSD: cipher-chachapoly.c,v 1.5 2014/06/24 01:13:21 djm Exp $ */
+=======
+/* $OpenBSD: cipher-chachapoly.c,v 1.4 2014/01/31 16:39:19 tedu Exp $ */
+>>>>>>> 1.4
 
 #include <sys/types.h>
 #include <stdarg.h> /* needed for log.h */
@@ -58,8 +62,13 @@ chachapoly_crypt(struct chachapoly_ctx *ctx, u_int seqnr, u_char *dest,
 	 * Run ChaCha20 once to generate the Poly1305 key. The IV is the
 	 * packet sequence number.
 	 */
+<<<<<<< cipher-chachapoly.c
 	memset(poly_key, 0, sizeof(poly_key));
 	POKE_U64(seqbuf, seqnr);
+=======
+	memset(poly_key, 0, sizeof(poly_key));
+	put_u64(seqbuf, seqnr);
+>>>>>>> 1.4
 	chacha_ivsetup(&ctx->main_ctx, seqbuf, NULL);
 	chacha_encrypt_bytes(&ctx->main_ctx,
 	    poly_key, poly_key, sizeof(poly_key));

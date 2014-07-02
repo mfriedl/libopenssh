@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.414 2014/01/09 23:26:48 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.418 2014/02/02 03:44:32 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -64,7 +64,6 @@
 
 #include <openssl/dh.h>
 #include <openssl/bn.h>
-#include <openssl/md5.h>
 #include <openssl/rand.h>
 
 #include "xmalloc.h"
@@ -80,6 +79,7 @@
 #include "uidswap.h"
 #include "compat.h"
 #include "cipher.h"
+#include "digest.h"
 #include "key.h"
 #include "kex.h"
 #include "dh.h"
@@ -349,7 +349,7 @@ grace_alarm_handler(int sig)
 	 */
 	if (getpgid(0) == getpid()) {
 		signal(SIGTERM, SIG_IGN);
-		killpg(0, SIGTERM);
+		kill(0, SIGTERM);
 	}
 
 	/* Log error and exit. */
@@ -563,7 +563,7 @@ destroy_sensitive_data(void)
 		}
 	}
 	sensitive_data.ssh1_host_key = NULL;
-	memset(sensitive_data.ssh1_cookie, 0, SSH_SESSION_KEY_LENGTH);
+	explicit_bzero(sensitive_data.ssh1_cookie, SSH_SESSION_KEY_LENGTH);
 }
 
 /* Demote private to public keys for network child */
@@ -610,7 +610,7 @@ privsep_preauth_child(void)
 
 	arc4random_buf(rnd, sizeof(rnd));
 	RAND_seed(rnd, sizeof(rnd));
-	bzero(rnd, sizeof(rnd));
+	explicit_bzero(rnd, sizeof(rnd));
 
 	/* Demote the private keys to public keys. */
 	demote_sensitive_data();
@@ -618,7 +618,7 @@ privsep_preauth_child(void)
 	if ((pw = getpwnam(SSH_PRIVSEP_USER)) == NULL)
 		fatal("Privilege separation user %s does not exist",
 		    SSH_PRIVSEP_USER);
-	memset(pw->pw_passwd, 0, strlen(pw->pw_passwd));
+	explicit_bzero(pw->pw_passwd, strlen(pw->pw_passwd));
 	endpwent();
 
 	/* Change our root directory */
@@ -753,7 +753,7 @@ privsep_postauth(struct ssh *ssh)
 
 	arc4random_buf(rnd, sizeof(rnd));
 	RAND_seed(rnd, sizeof(rnd));
-	bzero(rnd, sizeof(rnd));
+	explicit_bzero(rnd, sizeof(rnd));
 
 	/* Drop privileges */
 	do_setusercontext(authctxt->pw);
@@ -1362,7 +1362,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			 */
 			arc4random_buf(rnd, sizeof(rnd));
 			RAND_seed(rnd, sizeof(rnd));
-			bzero(rnd, sizeof(rnd));
+			explicit_bzero(rnd, sizeof(rnd));
 		}
 
 		/* child process check (or debug mode) */
@@ -2270,7 +2270,7 @@ do_ssh1_kex(struct ssh *ssh)
 			    (u_long)sizeof(session_key));
 			rsafail++;
 		} else {
-			memset(session_key, 0, sizeof(session_key));
+			explicit_bzero(session_key, sizeof(session_key));
 			BN_bn2bin(session_key_int,
 			    session_key + sizeof(session_key) - len);
 
@@ -2290,20 +2290,26 @@ do_ssh1_kex(struct ssh *ssh)
 	if (rsafail) {
 		int bytes = BN_num_bytes(session_key_int);
 		u_char *buf = xmalloc(bytes);
-		MD5_CTX md;
+		struct ssh_digest_ctx *md;
 
 		logit("do_connection: generating a fake encryption key");
 		BN_bn2bin(session_key_int, buf);
-		MD5_Init(&md);
-		MD5_Update(&md, buf, bytes);
-		MD5_Update(&md, sensitive_data.ssh1_cookie, SSH_SESSION_KEY_LENGTH);
-		MD5_Final(session_key, &md);
-		MD5_Init(&md);
-		MD5_Update(&md, session_key, 16);
-		MD5_Update(&md, buf, bytes);
-		MD5_Update(&md, sensitive_data.ssh1_cookie, SSH_SESSION_KEY_LENGTH);
-		MD5_Final(session_key + 16, &md);
-		memset(buf, 0, bytes);
+		if ((md = ssh_digest_start(SSH_DIGEST_MD5)) == NULL ||
+		    ssh_digest_update(md, buf, bytes) < 0 ||
+		    ssh_digest_update(md, sensitive_data.ssh1_cookie,
+		    SSH_SESSION_KEY_LENGTH) < 0 ||
+		    ssh_digest_final(md, session_key, sizeof(session_key)) < 0)
+			fatal("%s: md5 failed", __func__);
+		ssh_digest_free(md);
+		if ((md = ssh_digest_start(SSH_DIGEST_MD5)) == NULL ||
+		    ssh_digest_update(md, session_key, 16) < 0 ||
+		    ssh_digest_update(md, sensitive_data.ssh1_cookie,
+		    SSH_SESSION_KEY_LENGTH) < 0 ||
+		    ssh_digest_final(md, session_key + 16,
+		    sizeof(session_key) - 16) < 0)
+			fatal("%s: md5 failed", __func__);
+		ssh_digest_free(md);
+		explicit_bzero(buf, bytes);
 		free(buf);
 		for (i = 0; i < 16; i++)
 			session_id[i] = session_key[i] ^ session_key[i + 16];
@@ -2322,7 +2328,7 @@ do_ssh1_kex(struct ssh *ssh)
 	    cipher_type);
 
 	/* Destroy our copy of the session key.  It is no longer needed. */
-	memset(session_key, 0, sizeof(session_key));
+	explicit_bzero(session_key, sizeof(session_key));
 
 	debug("Received session key; encryption turned on.");
 

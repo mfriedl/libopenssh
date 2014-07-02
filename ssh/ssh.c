@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh.c,v 1.397 2013/12/29 05:42:16 djm Exp $ */
+/* $OpenBSD: ssh.c,v 1.399 2014/02/04 00:24:29 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -223,7 +223,7 @@ resolve_host(const char *name, u_int port, int logerr, char *cname, size_t clen)
 	int gaierr, loglevel = SYSLOG_LEVEL_DEBUG1;
 
 	snprintf(strport, sizeof strport, "%u", port);
-	bzero(&hints, sizeof(hints));
+	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = options.address_family;
 	hints.ai_socktype = SOCK_STREAM;
 	if (cname != NULL)
@@ -774,7 +774,6 @@ main(int ac, char **av)
 	if (!host)
 		usage();
 
-	lowercase(host);
 	host_arg = xstrdup(host);
 
 	OpenSSL_add_all_algorithms();
@@ -906,6 +905,7 @@ main(int ac, char **av)
 	}
 
 	/* If canonicalization requested then try to apply it */
+	lowercase(host);
 	if (options.canonicalize_hostname != SSH_CANONICALISE_NO)
 		addrs = resolve_canonicalize(&host, options.port);
 	/*
@@ -1699,8 +1699,8 @@ load_public_identity_files(void)
 #endif /* PKCS11 */
 
 	n_ids = 0;
-	bzero(identity_files, sizeof(identity_files));
-	bzero(identity_keys, sizeof(identity_keys));
+	memset(identity_files, 0, sizeof(identity_files));
+	memset(identity_keys, 0, sizeof(identity_keys));
 
 #ifdef ENABLE_PKCS11
 	if (options.pkcs11_provider != NULL &&
@@ -1778,9 +1778,9 @@ load_public_identity_files(void)
 	memcpy(options.identity_files, identity_files, sizeof(identity_files));
 	memcpy(options.identity_keys, identity_keys, sizeof(identity_keys));
 
-	bzero(pwname, strlen(pwname));
+	explicit_bzero(pwname, strlen(pwname));
 	free(pwname);
-	bzero(pwdir, strlen(pwdir));
+	explicit_bzero(pwdir, strlen(pwdir));
 	free(pwdir);
 }
 

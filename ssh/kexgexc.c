@@ -1,4 +1,4 @@
-/* $OpenBSD: kexgexc.c,v 1.15 2014/01/12 08:13:13 djm Exp $ */
+/* $OpenBSD: kexgexc.c,v 1.17 2014/02/02 03:44:31 djm Exp $ */
 /*
  * Copyright (c) 2000 Niels Provos.  All rights reserved.
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
@@ -54,7 +54,7 @@ kexgex_client(struct ssh *ssh)
 	int r;
 	u_int nbits;
 
-	nbits = dh_estimate(kex->we_need * 8);
+	nbits = dh_estimate(kex->dh_need * 8);
 
 	kex->min = DH_GRP_MIN;
 	kex->max = DH_GRP_MAX;
@@ -207,8 +207,20 @@ input_kex_dh_gex_reply(int type, u_int32_t seq, struct ssh *ssh)
 #ifdef DEBUG_KEXDH
 	dump_digest("shared secret", kbuf, kout);
 #endif
+<<<<<<< kexgexc.c
 	if (ssh->compat & SSH_OLD_DHGEX)
 		kex->min = kex->max = -1;
+=======
+	if ((shared_secret = BN_new()) == NULL)
+		fatal("kexgex_client: BN_new failed");
+	if (BN_bin2bn(kbuf, kout, shared_secret) == NULL)
+		fatal("kexgex_client: BN_bin2bn failed");
+	explicit_bzero(kbuf, klen);
+	free(kbuf);
+
+	if (datafellows & SSH_OLD_DHGEX)
+		min = max = -1;
+>>>>>>> 1.17
 
 	/* calc and verify H */
 	if ((r = kexgex_hash(

@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.256 2013/11/20 20:54:10 deraadt Exp $ */
+/* $OpenBSD: clientloop.c,v 1.258 2014/02/02 03:44:31 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -550,7 +550,7 @@ client_global_request_reply(int type, u_int32_t seq, struct ssh *ssh)
 		gc->cb(ssh, type, seq, gc->ctx);
 	if (--gc->ref_count <= 0) {
 		TAILQ_REMOVE(&global_confirms, gc, entry);
-		bzero(gc, sizeof(*gc));
+		explicit_bzero(gc, sizeof(*gc));
 		free(gc);
 	}
 
@@ -887,7 +887,7 @@ process_cmdline(struct ssh *ssh)
 	int cancel_port, ok;
 	Forward fwd;
 
-	bzero(&fwd, sizeof(fwd));
+	memset(&fwd, 0, sizeof(fwd));
 	fwd.listen_host = fwd.connect_host = NULL;
 
 	leave_raw_mode(options.request_tty == REQUEST_TTY_FORCE);
@@ -1805,6 +1805,7 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 static int
 client_input_stdout_data(int type, u_int32_t seq, struct ssh *ssh)
 {
+<<<<<<< clientloop.c
 	u_char *data = NULL;
 	size_t data_len;
 	int r;
@@ -1820,10 +1821,19 @@ client_input_stdout_data(int type, u_int32_t seq, struct ssh *ssh)
 		free(data);
 	}
 	return r;
+=======
+	u_int data_len;
+	char *data = packet_get_string(&data_len);
+	packet_check_eom();
+	buffer_append(&stdout_buffer, data, data_len);
+	explicit_bzero(data, data_len);
+	free(data);
+>>>>>>> 1.258
 }
 static int
 client_input_stderr_data(int type, u_int32_t seq, struct ssh *ssh)
 {
+<<<<<<< clientloop.c
 	u_char *data = NULL;
 	size_t data_len;
 	int r;
@@ -1839,6 +1849,14 @@ client_input_stderr_data(int type, u_int32_t seq, struct ssh *ssh)
 		free(data);
 	}
 	return r;
+=======
+	u_int data_len;
+	char *data = packet_get_string(&data_len);
+	packet_check_eom();
+	buffer_append(&stderr_buffer, data, data_len);
+	explicit_bzero(data, data_len);
+	free(data);
+>>>>>>> 1.258
 }
 static int
 client_input_exit_status(int type, u_int32_t seq, struct ssh *ssh)

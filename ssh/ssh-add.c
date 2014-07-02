@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-add.c,v 1.108 2013/12/19 00:10:30 djm Exp $ */
+/* $OpenBSD: ssh-add.c,v 1.109 2014/02/02 03:44:31 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -86,7 +86,7 @@ static void
 clear_pass(void)
 {
 	if (pass) {
-		memset(pass, 0, strlen(pass));
+		explicit_bzero(pass, strlen(pass));
 		free(pass);
 		pass = NULL;
 	}
@@ -403,9 +403,10 @@ lock_agent(int agent_fd, int lock)
 			fprintf(stderr, "Passwords do not match.\n");
 			passok = 0;
 		}
-		memset(p2, 0, strlen(p2));
+		explicit_bzero(p2, strlen(p2));
 		free(p2);
 	}
+<<<<<<< ssh-add.c
 	if (passok) {
 		if ((r = ssh_lock_agent(agent_fd, lock, p1)) == 0) {
 			fprintf(stderr, "Agent %slocked.\n", lock ? "" : "un");
@@ -416,6 +417,14 @@ lock_agent(int agent_fd, int lock)
 		}
 	}
 	memset(p1, 0, strlen(p1));
+=======
+	if (passok && ssh_lock_agent(ac, lock, p1)) {
+		fprintf(stderr, "Agent %slocked.\n", lock ? "" : "un");
+		ret = 0;
+	} else
+		fprintf(stderr, "Failed to %slock agent.\n", lock ? "" : "un");
+	explicit_bzero(p1, strlen(p1));
+>>>>>>> 1.109
 	free(p1);
 	return (ret);
 }

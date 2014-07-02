@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-rsa.c,v 1.50 2014/01/09 23:20:00 djm Exp $ */
+/* $OpenBSD: ssh-rsa.c,v 1.51 2014/02/02 03:44:31 djm Exp $ */
 /*
  * Copyright (c) 2000, 2003 Markus Friedl <markus@openbsd.org>
  *
@@ -69,14 +69,30 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 		goto out;
 	}
 
+<<<<<<< ssh-rsa.c
 	if (RSA_sign(nid, digest, dlen, sig, &len, key->rsa) != 1) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
+=======
+	slen = RSA_size(key->rsa);
+	sig = xmalloc(slen);
+
+	ok = RSA_sign(nid, digest, dlen, sig, &len, key->rsa);
+	explicit_bzero(digest, sizeof(digest));
+
+	if (ok != 1) {
+		int ecode = ERR_get_error();
+
+		error("%s: RSA_sign failed: %s", __func__,
+		    ERR_error_string(ecode, NULL));
+		free(sig);
+		return -1;
+>>>>>>> 1.51
 	}
 	if (len < slen) {
 		size_t diff = slen - len;
 		memmove(sig + diff, sig, len);
-		memset(sig, 0, diff);
+		explicit_bzero(sig, diff);
 	} else if (len > slen) {
 		ret = SSH_ERR_INTERNAL_ERROR;
 		goto out;
@@ -99,6 +115,7 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 		}
 		memcpy(*sigp, sshbuf_ptr(b), len);
 	}
+<<<<<<< ssh-rsa.c
 	ret = 0;
  out:
 	bzero(digest, sizeof(digest));
@@ -108,6 +125,12 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	}
 	if (b != NULL)
 		sshbuf_free(b);
+=======
+	buffer_free(&b);
+	explicit_bzero(sig, slen);
+	free(sig);
+
+>>>>>>> 1.51
 	return 0;
 }
 
@@ -164,7 +187,7 @@ ssh_rsa_verify(const struct sshkey *key,
 			goto out;
 		}
 		memmove(sigblob + diff, sigblob, len);
-		memset(sigblob, 0, diff);
+		explicit_bzero(sigblob, diff);
 		len = modlen;
 	}
 
@@ -191,6 +214,14 @@ ssh_rsa_verify(const struct sshkey *key,
 	if (b != NULL)
 		sshbuf_free(b);
 	bzero(digest, sizeof(digest));
+=======
+	ret = openssh_RSA_verify(hash_alg, digest, dlen, sigblob, len,
+	    key->rsa);
+	explicit_bzero(digest, sizeof(digest));
+	explicit_bzero(sigblob, len);
+	free(sigblob);
+	debug("%s: signature %scorrect", __func__, (ret == 0) ? "in" : "");
+>>>>>>> 1.51
 	return ret;
 }
 

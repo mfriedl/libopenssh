@@ -1,4 +1,4 @@
-/* $OpenBSD: cipher-3des1.c,v 1.9 2013/11/08 00:39:15 djm Exp $ */
+/* $OpenBSD: cipher-3des1.c,v 1.10 2014/02/02 03:44:31 djm Exp $ */
 /*
  * Copyright (c) 2003 Markus Friedl.  All rights reserved.
  *
@@ -81,7 +81,11 @@ ssh1_3des_init(EVP_CIPHER_CTX *ctx, const u_char *key, const u_char *iv,
 	if (EVP_CipherInit(&c->k1, EVP_des_cbc(), k1, NULL, enc) == 0 ||
 	    EVP_CipherInit(&c->k2, EVP_des_cbc(), k2, NULL, !enc) == 0 ||
 	    EVP_CipherInit(&c->k3, EVP_des_cbc(), k3, NULL, enc) == 0) {
+<<<<<<< cipher-3des1.c
 		bzero(c, sizeof(*c));
+=======
+		explicit_bzero(c, sizeof(*c));
+>>>>>>> 1.10
 		free(c);
 		EVP_CIPHER_CTX_set_app_data(ctx, NULL);
 		return 0;
@@ -112,7 +116,11 @@ ssh1_3des_cleanup(EVP_CIPHER_CTX *ctx)
 		EVP_CIPHER_CTX_cleanup(&c->k1);
 		EVP_CIPHER_CTX_cleanup(&c->k2);
 		EVP_CIPHER_CTX_cleanup(&c->k3);
+<<<<<<< cipher-3des1.c
 		bzero(c, sizeof(*c));
+=======
+		explicit_bzero(c, sizeof(*c));
+>>>>>>> 1.10
 		free(c);
 		EVP_CIPHER_CTX_set_app_data(ctx, NULL);
 	}

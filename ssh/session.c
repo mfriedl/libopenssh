@@ -1,4 +1,4 @@
-/* $OpenBSD: session.c,v 1.268 2013/10/29 09:48:02 djm Exp $ */
+/* $OpenBSD: session.c,v 1.270 2014/01/31 16:39:19 tedu Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -445,7 +445,7 @@ do_authenticated1(struct ssh *ssh)
 	}
 }
 
-#define USE_PIPES
+#define USE_PIPES 1
 /*
  * This is called to fork and execute a command when we have no tty.  This
  * will call do_child from the child, and server_loop from the parent after
@@ -1542,7 +1542,7 @@ session_unused(int id)
 		fatal("%s: insane session id %d (max %d nalloc %d)",
 		    __func__, id, options.max_sessions, sessions_nalloc);
 	}
-	bzero(&sessions[id], sizeof(*sessions));
+	memset(&sessions[id], 0, sizeof(*sessions));
 	sessions[id].self = id;
 	sessions[id].used = 0;
 	sessions[id].chanid = CHANNEL_ID_NONE;

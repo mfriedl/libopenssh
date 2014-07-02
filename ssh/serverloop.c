@@ -1,4 +1,4 @@
-/* $OpenBSD: serverloop.c,v 1.169 2013/12/19 00:19:12 dtucker Exp $ */
+/* $OpenBSD: serverloop.c,v 1.170 2014/02/02 03:44:31 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -920,6 +920,7 @@ server_input_stdin_data(int type, u_int32_t seq, struct ssh *ssh)
 	/* Stdin data from the client.  Append it to the buffer. */
 	/* Ignore any data if the client has closed stdin. */
 	if (fdin == -1)
+<<<<<<< serverloop.c
 		return 0;
 	if ((r = sshpkt_get_string(ssh, &data, &data_len)) != 0 ||
 	    (r = sshpkt_get_end(ssh)) != 0 ||
@@ -932,6 +933,14 @@ server_input_stdin_data(int type, u_int32_t seq, struct ssh *ssh)
 		free(data);
 	}
 	return r;
+=======
+		return;
+	data = packet_get_string(&data_len);
+	packet_check_eom();
+	buffer_append(&stdin_buffer, data, data_len);
+	explicit_bzero(data, data_len);
+	free(data);
+>>>>>>> 1.170
 }
 
 static int

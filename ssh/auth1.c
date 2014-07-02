@@ -1,4 +1,4 @@
-/* $OpenBSD: auth1.c,v 1.79 2013/05/19 02:42:42 djm Exp $ */
+/* $OpenBSD: auth1.c,v 1.80 2014/02/02 03:44:31 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -124,7 +124,7 @@ auth1_process_password(struct ssh *ssh)
 	/* Try authentication with the password. */
 	authenticated = PRIVSEP(auth_password(authctxt, password));
 
-	memset(password, 0, dlen);
+	explicit_bzero(password, dlen);
 	free(password);
 
 	return (authenticated);
@@ -231,7 +231,7 @@ auth1_process_tis_response(struct ssh *ssh)
 	    (r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
 	authenticated = verify_response(authctxt, response);
-	memset(response, 'r', dlen);
+	explicit_bzero(response, dlen);
 	free(response);
 
 	return (authenticated);

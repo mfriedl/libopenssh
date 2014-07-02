@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.128 2013/11/04 11:51:16 markus Exp $ */
+/* $OpenBSD: monitor.c,v 1.131 2014/02/02 03:44:31 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -73,7 +73,6 @@
 #include "misc.h"
 #include "compat.h"
 #include "ssh2.h"
-#include "jpake.h"
 #include "roaming.h"
 #include "err.h"
 #include "authfd.h"
@@ -93,6 +92,7 @@ static struct sshbuf *child_state;
 
 /* Functions on the monitor that answer unprivileged requests */
 
+<<<<<<< monitor.c
 int mm_answer_moduli(int, struct sshbuf *);
 int mm_answer_sign(int, struct sshbuf *);
 int mm_answer_pwnamallow(int, struct sshbuf *);
@@ -118,6 +118,28 @@ int mm_answer_jpake_step1(int, struct sshbuf *);
 int mm_answer_jpake_step2(int, struct sshbuf *);
 int mm_answer_jpake_key_confirm(int, struct sshbuf *);
 int mm_answer_jpake_check_confirm(int, struct sshbuf *);
+=======
+int mm_answer_moduli(int, Buffer *);
+int mm_answer_sign(int, Buffer *);
+int mm_answer_pwnamallow(int, Buffer *);
+int mm_answer_auth2_read_banner(int, Buffer *);
+int mm_answer_authserv(int, Buffer *);
+int mm_answer_authpassword(int, Buffer *);
+int mm_answer_bsdauthquery(int, Buffer *);
+int mm_answer_bsdauthrespond(int, Buffer *);
+int mm_answer_skeyquery(int, Buffer *);
+int mm_answer_skeyrespond(int, Buffer *);
+int mm_answer_keyallowed(int, Buffer *);
+int mm_answer_keyverify(int, Buffer *);
+int mm_answer_pty(int, Buffer *);
+int mm_answer_pty_cleanup(int, Buffer *);
+int mm_answer_term(int, Buffer *);
+int mm_answer_rsa_keyallowed(int, Buffer *);
+int mm_answer_rsa_challenge(int, Buffer *);
+int mm_answer_rsa_response(int, Buffer *);
+int mm_answer_sesskey(int, Buffer *);
+int mm_answer_sessid(int, Buffer *);
+>>>>>>> 1.131
 
 #ifdef GSSAPI
 int mm_answer_gss_setup_ctx(int, struct sshbuf *);
@@ -174,13 +196,6 @@ struct mon_table mon_dispatch_proto20[] = {
     {MONITOR_REQ_GSSSTEP, MON_ISAUTH, mm_answer_gss_accept_ctx},
     {MONITOR_REQ_GSSUSEROK, MON_AUTH, mm_answer_gss_userok},
     {MONITOR_REQ_GSSCHECKMIC, MON_ISAUTH, mm_answer_gss_checkmic},
-#endif
-#ifdef JPAKE
-    {MONITOR_REQ_JPAKE_GET_PWDATA, MON_ONCE, mm_answer_jpake_get_pwdata},
-    {MONITOR_REQ_JPAKE_STEP1, MON_ISAUTH, mm_answer_jpake_step1},
-    {MONITOR_REQ_JPAKE_STEP2, MON_ONCE, mm_answer_jpake_step2},
-    {MONITOR_REQ_JPAKE_KEY_CONFIRM, MON_ONCE, mm_answer_jpake_key_confirm},
-    {MONITOR_REQ_JPAKE_CHECK_CONFIRM, MON_AUTH, mm_answer_jpake_check_confirm},
 #endif
     {0, 0, NULL}
 };
@@ -309,15 +324,6 @@ monitor_child_preauth(struct authctxt *_authctxt, struct monitor *pmonitor)
 			if (!authenticated)
 				authctxt->failures++;
 		}
-#ifdef JPAKE
-		/* Cleanup JPAKE context after authentication */
-		if (ent->flags & MON_AUTHDECIDE) {
-			if (authctxt->jpake_ctx != NULL) {
-				jpake_free(authctxt->jpake_ctx);
-				authctxt->jpake_ctx = NULL;
-			}
-		}
-#endif
 	}
 
 	if (!authctxt->valid)
@@ -474,7 +480,7 @@ monitor_read(struct monitor *pmonitor, struct mon_table *ent,
 	struct pollfd pfd[2];
 
 	for (;;) {
-		bzero(&pfd, sizeof(pfd));
+		memset(&pfd, 0, sizeof(pfd));
 		pfd[0].fd = pmonitor->m_sendfd;
 		pfd[0].events = POLLIN;
 		pfd[1].fd = pmonitor->m_log_recvfd;
@@ -805,7 +811,7 @@ mm_answer_authpassword(int sock, struct sshbuf *m)
 	/* Only authenticate if the context is valid */
 	authenticated = options.password_authentication &&
 	    auth_password(authctxt, passwd);
-	memset(passwd, 0, strlen(passwd));
+	explicit_bzero(passwd, strlen(passwd));
 	free(passwd);
 
 	sshbuf_reset(m);
@@ -1557,7 +1563,70 @@ monitor_apply_keystate(struct monitor *pmonitor)
 		ssh_packet_set_rekey_limits(ssh,
 		    (u_int32_t)options.rekey_limit,
 		    (time_t)options.rekey_interval);
+<<<<<<< monitor.c
 	debug3("%s: done", __func__);
+=======
+
+	/* Network I/O buffers */
+	/* XXX inefficient for large buffers, need: buffer_init_from_string */
+	buffer_clear(packet_get_input());
+	buffer_append(packet_get_input(), child_state.input, child_state.ilen);
+	explicit_bzero(child_state.input, child_state.ilen);
+	free(child_state.input);
+
+	buffer_clear(packet_get_output());
+	buffer_append(packet_get_output(), child_state.output,
+		      child_state.olen);
+	explicit_bzero(child_state.output, child_state.olen);
+	free(child_state.output);
+
+	/* Roaming */
+	if (compat20)
+		roam_set_bytes(child_state.sent_bytes, child_state.recv_bytes);
+}
+
+static Kex *
+mm_get_kex(Buffer *m)
+{
+	Kex *kex;
+	void *blob;
+	u_int bloblen;
+
+	kex = xcalloc(1, sizeof(*kex));
+	kex->session_id = buffer_get_string(m, &kex->session_id_len);
+	if (session_id2 == NULL ||
+	    kex->session_id_len != session_id2_len ||
+	    timingsafe_bcmp(kex->session_id, session_id2, session_id2_len) != 0)
+		fatal("mm_get_get: internal error: bad session id");
+	kex->we_need = buffer_get_int(m);
+	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
+	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
+	kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
+	kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
+	kex->kex[KEX_ECDH_SHA2] = kexecdh_server;
+	kex->kex[KEX_C25519_SHA256] = kexc25519_server;
+	kex->server = 1;
+	kex->hostkey_type = buffer_get_int(m);
+	kex->kex_type = buffer_get_int(m);
+	blob = buffer_get_string(m, &bloblen);
+	buffer_init(&kex->my);
+	buffer_append(&kex->my, blob, bloblen);
+	free(blob);
+	blob = buffer_get_string(m, &bloblen);
+	buffer_init(&kex->peer);
+	buffer_append(&kex->peer, blob, bloblen);
+	free(blob);
+	kex->done = 1;
+	kex->flags = buffer_get_int(m);
+	kex->client_version_string = buffer_get_string(m, NULL);
+	kex->server_version_string = buffer_get_string(m, NULL);
+	kex->load_host_public_key=&get_hostkey_public_by_type;
+	kex->load_host_private_key=&get_hostkey_private_by_type;
+	kex->host_key_index=&get_hostkey_index;
+	kex->sign = sshd_hostkey_sign;
+
+	return (kex);
+>>>>>>> 1.131
 }
 
 /* This function requries careful sanity checking */
@@ -1759,6 +1828,7 @@ mm_answer_gss_userok(int sock, struct sshbuf *m)
 }
 #endif /* GSSAPI */
 
+<<<<<<< monitor.c
 #ifdef JPAKE
 int
 mm_answer_jpake_step1(int sock, struct sshbuf *m)
@@ -1978,3 +2048,5 @@ mm_answer_jpake_check_confirm(int sock, struct sshbuf *m)
 }
 
 #endif /* JPAKE */
+=======
+>>>>>>> 1.131

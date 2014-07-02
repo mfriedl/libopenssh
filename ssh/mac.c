@@ -1,4 +1,4 @@
-/* $OpenBSD: mac.c,v 1.26 2014/01/04 17:50:55 tedu Exp $ */
+/* $OpenBSD: mac.c,v 1.27 2014/01/27 18:58:14 markus Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
@@ -37,16 +37,18 @@
 #include "err.h"
 #include "sshbuf.h"
 
+#include "digest.h"
+#include "hmac.h"
 #include "umac.h"
 
-#define SSH_EVP		1	/* OpenSSL EVP-based MAC */
+#define SSH_DIGEST	1	/* SSH_DIGEST_XXX */
 #define SSH_UMAC	2	/* UMAC (not integrated with OpenSSL) */
 #define SSH_UMAC128	3
 
 struct macalg {
 	char		*name;
 	int		type;
-	const EVP_MD *	(*mdfunc)(void);
+	int		alg;
 	int		truncatebits;	/* truncate digest if != 0 */
 	int		key_len;	/* just for UMAC */
 	int		len;		/* just for UMAC */
@@ -55,29 +57,29 @@ struct macalg {
 
 static const struct macalg macs[] = {
 	/* Encrypt-and-MAC (encrypt-and-authenticate) variants */
-	{ "hmac-sha1",				SSH_EVP, EVP_sha1, 0, 0, 0, 0 },
-	{ "hmac-sha1-96",			SSH_EVP, EVP_sha1, 96, 0, 0, 0 },
-	{ "hmac-sha2-256",			SSH_EVP, EVP_sha256, 0, 0, 0, 0 },
-	{ "hmac-sha2-512",			SSH_EVP, EVP_sha512, 0, 0, 0, 0 },
-	{ "hmac-md5",				SSH_EVP, EVP_md5, 0, 0, 0, 0 },
-	{ "hmac-md5-96",			SSH_EVP, EVP_md5, 96, 0, 0, 0 },
-	{ "hmac-ripemd160",			SSH_EVP, EVP_ripemd160, 0, 0, 0, 0 },
-	{ "hmac-ripemd160@openssh.com",		SSH_EVP, EVP_ripemd160, 0, 0, 0, 0 },
-	{ "umac-64@openssh.com",		SSH_UMAC, NULL, 0, 128, 64, 0 },
-	{ "umac-128@openssh.com",		SSH_UMAC128, NULL, 0, 128, 128, 0 },
+	{ "hmac-sha1",				SSH_DIGEST, SSH_DIGEST_SHA1, 0, 0, 0, 0 },
+	{ "hmac-sha1-96",			SSH_DIGEST, SSH_DIGEST_SHA1, 96, 0, 0, 0 },
+	{ "hmac-sha2-256",			SSH_DIGEST, SSH_DIGEST_SHA256, 0, 0, 0, 0 },
+	{ "hmac-sha2-512",			SSH_DIGEST, SSH_DIGEST_SHA512, 0, 0, 0, 0 },
+	{ "hmac-md5",				SSH_DIGEST, SSH_DIGEST_MD5, 0, 0, 0, 0 },
+	{ "hmac-md5-96",			SSH_DIGEST, SSH_DIGEST_MD5, 96, 0, 0, 0 },
+	{ "hmac-ripemd160",			SSH_DIGEST, SSH_DIGEST_RIPEMD160, 0, 0, 0, 0 },
+	{ "hmac-ripemd160@openssh.com",		SSH_DIGEST, SSH_DIGEST_RIPEMD160, 0, 0, 0, 0 },
+	{ "umac-64@openssh.com",		SSH_UMAC, 0, 0, 128, 64, 0 },
+	{ "umac-128@openssh.com",		SSH_UMAC128, 0, 0, 128, 128, 0 },
 
 	/* Encrypt-then-MAC variants */
-	{ "hmac-sha1-etm@openssh.com",		SSH_EVP, EVP_sha1, 0, 0, 0, 1 },
-	{ "hmac-sha1-96-etm@openssh.com",	SSH_EVP, EVP_sha1, 96, 0, 0, 1 },
-	{ "hmac-sha2-256-etm@openssh.com",	SSH_EVP, EVP_sha256, 0, 0, 0, 1 },
-	{ "hmac-sha2-512-etm@openssh.com",	SSH_EVP, EVP_sha512, 0, 0, 0, 1 },
-	{ "hmac-md5-etm@openssh.com",		SSH_EVP, EVP_md5, 0, 0, 0, 1 },
-	{ "hmac-md5-96-etm@openssh.com",	SSH_EVP, EVP_md5, 96, 0, 0, 1 },
-	{ "hmac-ripemd160-etm@openssh.com",	SSH_EVP, EVP_ripemd160, 0, 0, 0, 1 },
-	{ "umac-64-etm@openssh.com",		SSH_UMAC, NULL, 0, 128, 64, 1 },
-	{ "umac-128-etm@openssh.com",		SSH_UMAC128, NULL, 0, 128, 128, 1 },
+	{ "hmac-sha1-etm@openssh.com",		SSH_DIGEST, SSH_DIGEST_SHA1, 0, 0, 0, 1 },
+	{ "hmac-sha1-96-etm@openssh.com",	SSH_DIGEST, SSH_DIGEST_SHA1, 96, 0, 0, 1 },
+	{ "hmac-sha2-256-etm@openssh.com",	SSH_DIGEST, SSH_DIGEST_SHA256, 0, 0, 0, 1 },
+	{ "hmac-sha2-512-etm@openssh.com",	SSH_DIGEST, SSH_DIGEST_SHA512, 0, 0, 0, 1 },
+	{ "hmac-md5-etm@openssh.com",		SSH_DIGEST, SSH_DIGEST_MD5, 0, 0, 0, 1 },
+	{ "hmac-md5-96-etm@openssh.com",	SSH_DIGEST, SSH_DIGEST_MD5, 96, 0, 0, 1 },
+	{ "hmac-ripemd160-etm@openssh.com",	SSH_DIGEST, SSH_DIGEST_RIPEMD160, 0, 0, 0, 1 },
+	{ "umac-64-etm@openssh.com",		SSH_UMAC, 0, 0, 128, 64, 1 },
+	{ "umac-128-etm@openssh.com",		SSH_UMAC128, 0, 0, 128, 128, 1 },
 
-	{ NULL,					0, NULL, 0, 0, 0, 0 }
+	{ NULL,					0, 0, 0, 0, 0, 0 }
 };
 
 /* Returns a list of supported MACs separated by the specified char. */
@@ -103,14 +105,19 @@ mac_alg_list(char sep)
 static int
 mac_setup_by_alg(struct sshmac *mac, const struct macalg *macalg)
 {
-	int evp_len;
-
 	mac->type = macalg->type;
+<<<<<<< mac.c
 	if (mac->type == SSH_EVP) {
 		mac->evp_md = macalg->mdfunc();
 		if ((evp_len = EVP_MD_size(mac->evp_md)) <= 0)
 			return SSH_ERR_LIBCRYPTO_ERROR;
 		mac->key_len = mac->mac_len = (u_int)evp_len;
+=======
+	if (mac->type == SSH_DIGEST) {
+		if ((mac->hmac_ctx = ssh_hmac_start(macalg->alg)) == NULL)
+			fatal("ssh_hmac_start(alg=%d) failed", macalg->alg);
+		mac->key_len = mac->mac_len = ssh_hmac_bytes(macalg->alg);
+>>>>>>> 1.27
 	} else {
 		mac->mac_len = macalg->len / 8;
 		mac->key_len = macalg->key_len / 8;
@@ -143,6 +150,7 @@ mac_init(struct sshmac *mac)
 	if (mac->key == NULL)
 		return SSH_ERR_INVALID_ARGUMENT;
 	switch (mac->type) {
+<<<<<<< mac.c
 	case SSH_EVP:
 		if (mac->evp_md == NULL)
 			return SSH_ERR_INVALID_ARGUMENT;
@@ -152,6 +160,12 @@ mac_init(struct sshmac *mac)
 			HMAC_CTX_cleanup(&mac->evp_ctx);
 			return SSH_ERR_LIBCRYPTO_ERROR;
 		}
+=======
+	case SSH_DIGEST:
+		if (mac->hmac_ctx == NULL ||
+		    ssh_hmac_init(mac->hmac_ctx, mac->key, mac->key_len) < 0)
+			return -1;
+>>>>>>> 1.27
 		return 0;
 	case SSH_UMAC:
 		if ((mac->umac_ctx = umac_new(mac->key)) == NULL)
@@ -179,14 +193,27 @@ mac_compute(struct sshmac *mac, u_int32_t seqno, const u_char *data, int datalen
 		return SSH_ERR_INTERNAL_ERROR;
 
 	switch (mac->type) {
+<<<<<<< mac.c
 	case SSH_EVP:
 		POKE_U32(b, seqno);
+=======
+	case SSH_DIGEST:
+		put_u32(b, seqno);
+>>>>>>> 1.27
 		/* reset HMAC context */
+<<<<<<< mac.c
 		if (HMAC_Init(&mac->evp_ctx, NULL, 0, NULL) != 1 ||
 		    HMAC_Update(&mac->evp_ctx, b, sizeof(b)) != 1 ||
 		    HMAC_Update(&mac->evp_ctx, data, datalen) != 1 ||
 		    HMAC_Final(&mac->evp_ctx, u.m, NULL) != 1)
 			return SSH_ERR_LIBCRYPTO_ERROR;
+=======
+		if (ssh_hmac_init(mac->hmac_ctx, NULL, 0) < 0 ||
+		    ssh_hmac_update(mac->hmac_ctx, b, sizeof(b)) < 0 ||
+		    ssh_hmac_update(mac->hmac_ctx, data, datalen) < 0 ||
+		    ssh_hmac_final(mac->hmac_ctx, u.m, sizeof(u.m)) < 0)
+			fatal("ssh_hmac failed");
+>>>>>>> 1.27
 		break;
 	case SSH_UMAC:
 		POKE_U64(nonce, seqno);
@@ -218,9 +245,9 @@ mac_clear(struct sshmac *mac)
 	} else if (mac->type == SSH_UMAC128) {
 		if (mac->umac_ctx != NULL)
 			umac128_delete(mac->umac_ctx);
-	} else if (mac->evp_md != NULL)
-		HMAC_cleanup(&mac->evp_ctx);
-	mac->evp_md = NULL;
+	} else if (mac->hmac_ctx != NULL)
+		ssh_hmac_free(mac->hmac_ctx);
+	mac->hmac_ctx = NULL;
 	mac->umac_ctx = NULL;
 }
 

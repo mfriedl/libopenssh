@@ -1,4 +1,4 @@
-/* $OpenBSD: sftp-client.c,v 1.111 2013/12/05 22:59:45 djm Exp $ */
+/* $OpenBSD: sftp-client.c,v 1.114 2014/01/31 16:39:19 tedu Exp $ */
 /*
  * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
  *
@@ -343,6 +343,7 @@ get_decode_statvfs(struct sftp_conn *conn, struct sftp_statvfs *st,
 		    SSH2_FXP_EXTENDED_REPLY, type);
 	}
 
+<<<<<<< sftp-client.c
 	bzero(st, sizeof(*st));
 	if ((r = sshbuf_get_u64(msg, &st->f_bsize)) == 0 ||
 	    (r = sshbuf_get_u64(msg, &st->f_frsize)) == 0 ||
@@ -356,6 +357,20 @@ get_decode_statvfs(struct sftp_conn *conn, struct sftp_statvfs *st,
 	    (r = sshbuf_get_u64(msg, &flag)) == 0 ||
 	    (r = sshbuf_get_u64(msg, &st->f_namemax)) == 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+=======
+	memset(st, 0, sizeof(*st));
+	st->f_bsize = buffer_get_int64(&msg);
+	st->f_frsize = buffer_get_int64(&msg);
+	st->f_blocks = buffer_get_int64(&msg);
+	st->f_bfree = buffer_get_int64(&msg);
+	st->f_bavail = buffer_get_int64(&msg);
+	st->f_files = buffer_get_int64(&msg);
+	st->f_ffree = buffer_get_int64(&msg);
+	st->f_favail = buffer_get_int64(&msg);
+	st->f_fsid = buffer_get_int64(&msg);
+	flag = buffer_get_int64(&msg);
+	st->f_namemax = buffer_get_int64(&msg);
+>>>>>>> 1.114
 
 	st->f_flag = (flag & SSH2_FXE_STATVFS_ST_RDONLY) ? ST_RDONLY : 0;
 	st->f_flag |= (flag & SSH2_FXE_STATVFS_ST_NOSUID) ? ST_NOSUID : 0;
@@ -1217,7 +1232,11 @@ do_download(struct sftp_conn *conn, const char *remote_path,
 			    local_path, strerror(errno));
 			goto fail;
 		}
-		if ((size_t)st.st_size > size) {
+		if (st.st_size < 0) {
+			error("\"%s\" has negative size", local_path);
+			goto fail;
+		}
+		if ((u_int64_t)st.st_size > size) {
 			error("Unable to resume download of \"%s\": "
 			    "local file is larger than remote", local_path);
  fail:
