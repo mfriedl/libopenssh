@@ -1450,6 +1450,7 @@ sshkey_generate(int type, u_int bits, struct sshkey **keyp)
 			break;
 		}
 		crypto_sign_ed25519_keypair(k->ed25519_pk, k->ed25519_sk);
+		ret = 0;
 		break;
 	case KEY_DSA:
 		ret = dsa_generate_private_key(bits, &k->dsa);
