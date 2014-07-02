@@ -1,4 +1,4 @@
-/* $OpenBSD: readconf.c,v 1.216 2014/01/29 06:18:35 djm Exp $ */
+/* $OpenBSD: readconf.c,v 1.219 2014/04/23 12:42:34 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -335,6 +335,7 @@ add_identity_file(Options *options, const char *dir, const char *filename,
     int userprovided)
 {
 	char *path;
+	int i;
 
 	if (options->num_identity_files >= SSH_MAX_IDENTITY_FILES)
 		fatal("Too many identity files specified (max %d)",
@@ -344,6 +345,16 @@ add_identity_file(Options *options, const char *dir, const char *filename,
 		path = xstrdup(filename);
 	else
 		(void)xasprintf(&path, "%.100s%.100s", dir, filename);
+
+	/* Avoid registering duplicates */
+	for (i = 0; i < options->num_identity_files; i++) {
+		if (options->identity_file_userprovided[i] == userprovided &&
+		    strcmp(options->identity_files[i], path) == 0) {
+			debug2("%s: ignoring duplicate key %s", __func__, path);
+			free(path);
+			return;
+		}
+	}
 
 	options->identity_file_userprovided[options->num_identity_files] =
 	    userprovided;
@@ -527,16 +538,27 @@ match_cfg_line(Options *options, char **condition, struct passwd *pw,
 			    "r", ruser,
 			    "u", pw->pw_name,
 			    (char *)NULL);
-			r = execute_in_shell(cmd);
-			if (r == -1) {
-				fatal("%.200s line %d: match exec '%.100s' "
-				    "error", filename, linenum, cmd);
-			} else if (r == 0) {
-				debug("%.200s line %d: matched "
-				    "'exec \"%.100s\"' ",
+			if (result != 1) {
+				/* skip execution if prior predicate failed */
+				debug("%.200s line %d: skipped exec \"%.100s\"",
 				    filename, linenum, cmd);
-			} else
-				result = 0;
+			} else {
+				r = execute_in_shell(cmd);
+				if (r == -1) {
+					fatal("%.200s line %d: match exec "
+					    "'%.100s' error", filename,
+					    linenum, cmd);
+				} else if (r == 0) {
+					debug("%.200s line %d: matched "
+					    "'exec \"%.100s\"'", filename,
+					    linenum, cmd);
+				} else {
+					debug("%.200s line %d: no match "
+					    "'exec \"%.100s\"'", filename,
+					    linenum, cmd);
+					result = 0;
+				}
+			}
 			free(cmd);
 		} else {
 			error("Unsupported Match attribute %s", attrib);
@@ -1446,6 +1468,13 @@ read_config_file(const char *filename, struct passwd *pw, const char *host,
 	return 1;
 }
 
+/* Returns 1 if a string option is unset or set to "none" or 0 otherwise. */
+int
+option_clear_or_none(const char *o)
+{
+	return o == NULL || strcasecmp(o, "none") == 0;
+}
+
 /*
  * Initializes options to special values that indicate that they have not yet
  * been set.  Read_config_file will only set options with this value. Options
@@ -1543,10 +1572,24 @@ initialize_options(Options * options)
 }
 
 /*
+ * A petite version of fill_default_options() that just fills the options
+ * needed for hostname canonicalization to proceed.
+ */
+void
+fill_default_options_for_canonicalization(Options *options)
+{
+	if (options->canonicalize_max_dots == -1)
+		options->canonicalize_max_dots = 1;
+	if (options->canonicalize_fallback_local == -1)
+		options->canonicalize_fallback_local = 1;
+	if (options->canonicalize_hostname == -1)
+		options->canonicalize_hostname = SSH_CANONICALISE_NO;
+}
+
+/*
  * Called after processing other sources of option data, this fills those
  * options for which no value has been specified with their default values.
  */
-
 void
 fill_default_options(Options * options)
 {
@@ -1699,7 +1742,7 @@ fill_default_options(Options * options)
 		options->canonicalize_hostname = SSH_CANONICALISE_NO;
 #define CLEAR_ON_NONE(v) \
 	do { \
-		if (v != NULL && strcasecmp(v, "none") == 0) { \
+		if (option_clear_or_none(v)) { \
 			free(v); \
 			v = NULL; \
 		} \

@@ -1,4 +1,8 @@
+<<<<<<< ssh-ed25519.c
 /* $OpenBSD: ssh-ed25519.c,v 1.4 2014/06/24 01:13:21 djm Exp $ */
+=======
+/* $OpenBSD: ssh-ed25519.c,v 1.3 2014/02/23 20:03:42 djm Exp $ */
+>>>>>>> 1.3
 /*
  * Copyright (c) 2013 Markus Friedl <markus@openbsd.org>
  *
@@ -20,6 +24,7 @@
 
 #include "crypto_api.h"
 
+#include <limits.h>
 #include <string.h>
 #include <stdarg.h>
 
@@ -39,6 +44,7 @@ ssh_ed25519_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	int r, ret;
 	struct sshbuf *b = NULL;
 
+<<<<<<< ssh-ed25519.c
 	if (lenp != NULL)
 		*lenp = 0;
 	if (sigp != NULL)
@@ -49,6 +55,18 @@ ssh_ed25519_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	    key->ed25519_sk == NULL ||
 	    datalen >= INT_MAX - crypto_sign_ed25519_BYTES)
 		return SSH_ERR_INVALID_ARGUMENT;
+=======
+	if (key == NULL || key_type_plain(key->type) != KEY_ED25519 ||
+	    key->ed25519_sk == NULL) {
+		error("%s: no ED25519 key", __func__);
+		return -1;
+	}
+
+	if (datalen >= UINT_MAX - crypto_sign_ed25519_BYTES) {
+		error("%s: datalen %u too long", __func__, datalen);
+		return -1;
+	}
+>>>>>>> 1.3
 	smlen = slen = datalen + crypto_sign_ed25519_BYTES;
 	if ((sig = malloc(slen)) == NULL)
 		return SSH_ERR_ALLOC_FAIL;

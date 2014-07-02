@@ -1,4 +1,4 @@
-/* $OpenBSD: compat.c,v 1.82 2013/12/30 23:52:27 djm Exp $ */
+/* $OpenBSD: compat.c,v 1.85 2014/04/20 02:49:32 djm Exp $ */
 /*
  * Copyright (c) 1999, 2000, 2001, 2002 Markus Friedl.  All rights reserved.
  *
@@ -89,6 +89,9 @@ compat_datafellows(const char *version)
 		{ "Sun_SSH_1.0*",	SSH_BUG_NOREKEY|SSH_BUG_EXTEOF},
 		{ "OpenSSH_4*",		0 },
 		{ "OpenSSH_5*",		SSH_NEW_OPENSSH|SSH_BUG_DYNAMIC_RPORT},
+		{ "OpenSSH_6.6.1*",	SSH_NEW_OPENSSH},
+		{ "OpenSSH_6.5*,"
+		  "OpenSSH_6.6*",	SSH_NEW_OPENSSH|SSH_BUG_CURVE25519PAD},
 		{ "OpenSSH*",		SSH_NEW_OPENSSH },
 		{ "*MindTerm*",		0 },
 		{ "2.1.0*",		SSH_BUG_SIGBLOB|SSH_BUG_HMAC|
@@ -261,5 +264,18 @@ compat_pkalg_proposal(char *pkalg_prop, u_int compat)
 	if (*pkalg_prop == '\0')
 		fatal("No supported PK algorithms found");
 	return pkalg_prop;
+}
+
+char *
+compat_kex_proposal(char *kex_prop)
+{
+	if (!(datafellows & SSH_BUG_CURVE25519PAD))
+		return kex_prop;
+	debug2("%s: original KEX proposal: %s", __func__, kex_prop);
+	kex_prop = filter_proposal(kex_prop, "curve25519-sha256@libssh.org");
+	debug2("%s: compat KEX proposal: %s", __func__, kex_prop);
+	if (*kex_prop == '\0')
+		fatal("No supported key exchange algorithms found");
+	return kex_prop;
 }
 

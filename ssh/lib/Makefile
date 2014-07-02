@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.74 2014/01/29 06:18:35 djm Exp $
+#	$OpenBSD: Makefile,v 1.75 2014/04/22 11:47:55 henning Exp $
 
 .PATH:		${.CURDIR}/..
 
@@ -48,15 +48,20 @@ install:
 .include "${.CURDIR}/../Makefile.inc"
 .include <bsd.own.mk>
 
+<<<<<<< Makefile
 # XXX leave on while refactoring to ensure we don't break it.
 KERBEROS5=no
 
 .if (${KERBEROS5:L} == "yes")
 CFLAGS+= -DKRB5 -I${DESTDIR}/usr/include/kerberosV
+=======
+# .if (${KERBEROS5:L} == "yes")
+# CFLAGS+= -DKRB5 -I${DESTDIR}/usr/include/kerberosV
+>>>>>>> 1.75
 
-SRCS+= gss-genr.c
-CFLAGS+= -DGSSAPI
-.endif # KERBEROS5
+# SRCS+= gss-genr.c
+# CFLAGS+= -DGSSAPI
+# .endif # KERBEROS5
 
 NOPIC= yes
 .include <bsd.lib.mk>

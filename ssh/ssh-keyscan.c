@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keyscan.c,v 1.89 2013/12/06 13:39:49 markus Exp $ */
+/* $OpenBSD: ssh-keyscan.c,v 1.91 2014/03/27 23:01:27 markus Exp $ */
 /*
  * Copyright 1995, 1996 by David Mazieres <dm@lcs.mit.edu>.
  *
@@ -54,7 +54,7 @@ int ssh_port = SSH_DEFAULT_PORT;
 #define KT_ECDSA	8
 #define KT_ED25519	16
 
-int get_keytypes = KT_RSA|KT_ECDSA;/* Get RSA and ECDSA keys by default */
+int get_keytypes = KT_RSA|KT_ECDSA|KT_ED25519;
 
 int hash_hosts = 0;		/* Hash hostname on output */
 
@@ -243,7 +243,12 @@ ssh2_capable(int remote_major, int remote_minor)
 static void
 keygrab_ssh2(con *c)
 {
+<<<<<<< ssh-keyscan.c
 	int r;
+=======
+	char *myproposal[PROPOSAL_MAX] = { KEX_CLIENT };
+	int j;
+>>>>>>> 1.91
 
 	enable_compat20();
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] =

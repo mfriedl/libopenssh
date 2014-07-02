@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $OpenBSD: krl.c,v 1.14 2014/01/31 16:39:19 tedu Exp $ */
+/* $OpenBSD: krl.c,v 1.15 2014/04/28 03:09:18 djm Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -756,11 +756,19 @@ format_timestamp(u_int64_t timestamp, char *ts, size_t nts)
 static int
 parse_revoked_certs(struct sshbuf *buf, struct ssh_krl *krl)
 {
+<<<<<<< krl.c
 	int r = SSH_ERR_INTERNAL_ERROR, nbits;
 	u_char type;
 	const u_char *blob;
 	size_t blen;
 	struct sshbuf *subsect = NULL;
+=======
+	int ret = -1, nbits;
+	u_char type;
+	const u_char *blob;
+	u_int blen;
+	Buffer subsect;
+>>>>>>> 1.15
 	u_int64_t serial, serial_lo, serial_hi;
 	BIGNUM *bitmap = NULL;
 	char *key_id = NULL;
@@ -868,6 +876,7 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 	struct sshbuf *copy = NULL, *sect = NULL;
 	struct ssh_krl *krl = NULL;
 	char timestamp[64];
+<<<<<<< krl.c
 	int r = SSH_ERR_INTERNAL_ERROR, sig_seen;
 	struct sshkey *key = NULL, **ca_used = NULL;
 	u_char type, *rdata = NULL;
@@ -879,6 +888,25 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 	if (sshbuf_len(buf) < sizeof(KRL_MAGIC) - 1 ||
 	    memcmp(sshbuf_ptr(buf), KRL_MAGIC, sizeof(KRL_MAGIC) - 1) != 0)
 		return SSH_ERR_KRL_BAD_MAGIC;
+=======
+	int ret = -1, r, sig_seen;
+	Key *key = NULL, **ca_used = NULL;
+	u_char type, *rdata = NULL;
+	const u_char *blob;
+	u_int i, j, sig_off, sects_off, rlen, blen, format_version, nca_used;
+
+	nca_used = 0;
+	*krlp = NULL;
+	if (buffer_len(buf) < sizeof(KRL_MAGIC) - 1 ||
+	    memcmp(buffer_ptr(buf), KRL_MAGIC, sizeof(KRL_MAGIC) - 1) != 0) {
+		debug3("%s: not a KRL", __func__);
+		/*
+		 * Return success but a NULL *krlp here to signal that the
+		 * file might be a simple list of keys.
+		 */
+		return 0;
+	}
+>>>>>>> 1.15
 
 	/* Take a copy of the KRL buffer so we can verify its signature later */
 	if ((copy = sshbuf_fromb(buf)) == NULL ||

@@ -33,8 +33,8 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $OpenBSD: ssh.1,v 1.343 2013/12/07 11:58:46 naddy Exp $
-.Dd $Mdocdate: December 7 2013 $
+.\" $OpenBSD: ssh.1,v 1.345 2014/04/19 18:42:19 tedu Exp $
+.Dd $Mdocdate: April 19 2014 $
 .Dt SSH 1
 .Os
 .Sh NAME
@@ -154,23 +154,6 @@ The supported values are
 .Dq blowfish ,
 and
 .Dq des .
-.Ar 3des
-(triple-des) is an encrypt-decrypt-encrypt triple with three different keys.
-It is believed to be secure.
-.Ar blowfish
-is a fast block cipher; it appears very secure and is much faster than
-.Ar 3des .
-.Ar des
-is only supported in the
-.Nm
-client for interoperability with legacy protocol 1 implementations
-that do not support the
-.Ar 3des
-cipher.
-Its use is strongly discouraged due to cryptographic weaknesses.
-The default is
-.Dq 3des .
-.Pp
 For protocol version 2,
 .Ar cipher_spec
 is a comma-separated list of ciphers
@@ -1465,7 +1448,6 @@ if an error occurred.
 .Xr ssh-keygen 1 ,
 .Xr ssh-keyscan 1 ,
 .Xr tun 4 ,
-.Xr hosts.equiv 5 ,
 .Xr ssh_config 5 ,
 .Xr ssh-keysign 8 ,
 .Xr sshd 8

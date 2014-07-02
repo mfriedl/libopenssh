@@ -1,4 +1,4 @@
-/* $OpenBSD: mux.c,v 1.44 2013/07/12 00:19:58 djm Exp $ */
+/* $OpenBSD: mux.c,v 1.45 2014/04/28 03:09:18 djm Exp $ */
 /*
  * Copyright (c) 2002-2008 Damien Miller <djm@openbsd.org>
  *
@@ -1019,9 +1019,16 @@ static int
 mux_master_read_cb(Channel *c)
 {
 	struct mux_master_state *state = (struct mux_master_state *)c->mux_ctx;
+<<<<<<< mux.c
 	struct sshbuf *in = NULL, *out = NULL;
 	u_int type, rid, i;
 	int r, ret = -1;
+=======
+	Buffer in, out;
+	const u_char *ptr;
+	u_int type, rid, have, i;
+	int ret = -1;
+>>>>>>> 1.45
 
 	/* Setup ctx and  */
 	if (c->mux_ctx == NULL) {
@@ -1440,6 +1447,7 @@ mux_client_write_packet(int fd, struct sshbuf *m)
 static int
 mux_client_read_packet(int fd, struct sshbuf *m)
 {
+<<<<<<< mux.c
 	struct sshbuf *queue;
 	u_int need;
 	int oerrno, r;
@@ -1447,6 +1455,15 @@ mux_client_read_packet(int fd, struct sshbuf *m)
 	if ((queue = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
 	if (mux_client_read(fd, queue, 4) != 0) {
+=======
+	Buffer queue;
+	u_int need, have;
+	const u_char *ptr;
+	int oerrno;
+
+	buffer_init(&queue);
+	if (mux_client_read(fd, &queue, 4) != 0) {
+>>>>>>> 1.45
 		if ((oerrno = errno) == EPIPE)
 			debug3("%s: read header failed: %s", __func__,
 			    strerror(errno));

@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect.c,v 1.245 2014/02/02 03:44:31 djm Exp $ */
+/* $OpenBSD: sshconnect.c,v 1.247 2014/04/01 03:34:10 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -261,7 +261,7 @@ static int
 ssh_create_socket(int privileged, struct addrinfo *ai)
 {
 	int sock, r, gaierr;
-	struct addrinfo hints, *res;
+	struct addrinfo hints, *res = NULL;
 
 	sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
 	if (sock < 0) {
@@ -274,17 +274,19 @@ ssh_create_socket(int privileged, struct addrinfo *ai)
 	if (options.bind_address == NULL && !privileged)
 		return sock;
 
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = ai->ai_family;
-	hints.ai_socktype = ai->ai_socktype;
-	hints.ai_protocol = ai->ai_protocol;
-	hints.ai_flags = AI_PASSIVE;
-	gaierr = getaddrinfo(options.bind_address, NULL, &hints, &res);
-	if (gaierr) {
-		error("getaddrinfo: %s: %s", options.bind_address,
-		    ssh_gai_strerror(gaierr));
-		close(sock);
-		return -1;
+	if (options.bind_address) {
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = ai->ai_family;
+		hints.ai_socktype = ai->ai_socktype;
+		hints.ai_protocol = ai->ai_protocol;
+		hints.ai_flags = AI_PASSIVE;
+		gaierr = getaddrinfo(options.bind_address, NULL, &hints, &res);
+		if (gaierr) {
+			error("getaddrinfo: %s: %s", options.bind_address,
+			    ssh_gai_strerror(gaierr));
+			close(sock);
+			return -1;
+		}
 	}
 	/*
 	 * If we are running as root and want to connect to a privileged
@@ -292,7 +294,7 @@ ssh_create_socket(int privileged, struct addrinfo *ai)
 	 */
 	if (privileged) {
 		PRIV_START;
-		r = bindresvport_sa(sock, res->ai_addr);
+		r = bindresvport_sa(sock, res ? res->ai_addr : NULL);
 		PRIV_END;
 		if (r < 0) {
 			error("bindresvport_sa: af=%d %s", ai->ai_family,
@@ -309,7 +311,8 @@ ssh_create_socket(int privileged, struct addrinfo *ai)
 			return -1;
 		}
 	}
-	freeaddrinfo(res);
+	if (res != NULL)
+		freeaddrinfo(res);
 	return sock;
 }
 
@@ -1198,11 +1201,13 @@ verify_host_key(char *host, struct sockaddr *hostaddr, struct sshkey *host_key)
 {
 	int flags = 0;
 	char *fp;
+	Key *plain = NULL;
 
 	fp = sshkey_fingerprint(host_key, SSH_FP_MD5, SSH_FP_HEX);
 	debug("Server host key: %s %s", sshkey_type(host_key), fp);
 	free(fp);
 
+<<<<<<< sshconnect.c
 	/* XXX certs are not yet supported for DNS */
 	if (!sshkey_is_cert(host_key) && options.verify_host_key_dns &&
 	    verify_host_key_dns(host, hostaddr, host_key, &flags) == 0) {
@@ -1219,8 +1224,35 @@ verify_host_key(char *host, struct sockaddr *hostaddr, struct sshkey *host_key)
 				warn_changed_key(host_key);
 				error("Update the SSHFP RR in DNS with the new "
 				    "host key to get rid of this message.");
+=======
+	if (options.verify_host_key_dns) {
+		/*
+		 * XXX certs are not yet supported for DNS, so downgrade
+		 * them and try the plain key.
+		 */
+		plain = key_from_private(host_key);
+		if (key_is_cert(plain))
+			key_drop_cert(plain);
+		if (verify_host_key_dns(host, hostaddr, plain, &flags) == 0) {
+			if (flags & DNS_VERIFY_FOUND) {
+				if (options.verify_host_key_dns == 1 &&
+				    flags & DNS_VERIFY_MATCH &&
+				    flags & DNS_VERIFY_SECURE) {
+					key_free(plain);
+					return 0;
+				}
+				if (flags & DNS_VERIFY_MATCH) {
+					matching_host_key_dns = 1;
+				} else {
+					warn_changed_key(plain);
+					error("Update the SSHFP RR in DNS "
+					    "with the new host key to get rid "
+					    "of this message.");
+				}
+>>>>>>> 1.247
 			}
 		}
+		key_free(plain);
 	}
 
 	return check_host_key(host, hostaddr, options.port, host_key, RDRW,

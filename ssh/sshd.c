@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.418 2014/02/02 03:44:32 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.425 2014/04/19 14:53:48 tedu Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -64,7 +64,6 @@
 
 #include <openssl/dh.h>
 #include <openssl/bn.h>
-#include <openssl/rand.h>
 
 #include "xmalloc.h"
 #include "ssh.h"
@@ -106,13 +105,6 @@
 #include "ssh-sandbox.h"
 #include "version.h"
 #include "err.h"
-
-#ifdef LIBWRAP
-#include <tcpd.h>
-#include <syslog.h>
-int allow_severity = LOG_INFO;
-int deny_severity = LOG_WARNING;
-#endif /* LIBWRAP */
 
 #ifndef O_NOCTTY
 #define O_NOCTTY	0
@@ -601,16 +593,17 @@ demote_sensitive_data(void)
 static void
 privsep_preauth_child(void)
 {
-	u_int32_t rnd[256];
 	gid_t gidset[1];
 	struct passwd *pw;
 
 	/* Enable challenge-response authentication for privilege separation */
 	privsep_challenge_enable();
 
-	arc4random_buf(rnd, sizeof(rnd));
-	RAND_seed(rnd, sizeof(rnd));
-	explicit_bzero(rnd, sizeof(rnd));
+#ifdef GSSAPI
+	/* Cache supported mechanism OIDs for later use */
+	if (options.gss_authentication)
+		ssh_gssapi_prepare_supported_oids();
+#endif
 
 	/* Demote the private keys to public keys. */
 	demote_sensitive_data();
@@ -719,8 +712,11 @@ privsep_preauth(struct authctxt *authctxt)
 static void
 privsep_postauth(struct ssh *ssh)
 {
+<<<<<<< sshd.c
 	struct authctxt *authctxt = ssh->authctxt;
 	u_int32_t rnd[256];
+=======
+>>>>>>> 1.425
 
 	if (authctxt->pw->pw_uid == 0 || options.use_login) {
 		/* File descriptor passing is broken or root login */
@@ -750,10 +746,6 @@ privsep_postauth(struct ssh *ssh)
 
 	/* Demote the private keys to public keys. */
 	demote_sensitive_data();
-
-	arc4random_buf(rnd, sizeof(rnd));
-	RAND_seed(rnd, sizeof(rnd));
-	explicit_bzero(rnd, sizeof(rnd));
 
 	/* Drop privileges */
 	do_setusercontext(authctxt->pw);
@@ -1164,7 +1156,6 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 	struct sockaddr_storage from;
 	socklen_t fromlen;
 	pid_t pid;
-	u_char rnd[256];
 
 	/* setup fd set for accept */
 	fdset = NULL;
@@ -1355,14 +1346,6 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			}
 
 			close(*newsock);
-
-			/*
-			 * Ensure that our random state differs
-			 * from that of the child
-			 */
-			arc4random_buf(rnd, sizeof(rnd));
-			RAND_seed(rnd, sizeof(rnd));
-			explicit_bzero(rnd, sizeof(rnd));
 		}
 
 		/* child process check (or debug mode) */
@@ -1965,6 +1948,7 @@ main(int ac, char **av)
 	 */
 	remote_ip = ssh_remote_ipaddr(ssh);
 
+<<<<<<< sshd.c
 #ifdef LIBWRAP
 	/* Check whether logins are denied from this host. */
 	if (ssh_packet_connection_is_on_socket(ssh)) {
@@ -1982,6 +1966,8 @@ main(int ac, char **av)
 	}
 #endif /* LIBWRAP */
 
+=======
+>>>>>>> 1.425
 	/* Log the connection. */
 	verbose("Connection from %s port %d on %s port %d",
 	    remote_ip, remote_port,
@@ -2361,8 +2347,13 @@ sshd_hostkey_sign(struct sshkey *privkey, struct sshkey *pubkey,
 static void
 do_ssh2_kex(struct ssh *ssh)
 {
+<<<<<<< sshd.c
 	struct kex *kex;
 	int r;
+=======
+	char *myproposal[PROPOSAL_MAX] = { KEX_SERVER };
+	Kex *kex;
+>>>>>>> 1.425
 
 	if (options.ciphers != NULL) {
 		myproposal[PROPOSAL_ENC_ALGS_CTOS] =
@@ -2391,6 +2382,9 @@ do_ssh2_kex(struct ssh *ssh)
 	}
 	if (options.kex_algorithms != NULL)
 		myproposal[PROPOSAL_KEX_ALGS] = options.kex_algorithms;
+
+	myproposal[PROPOSAL_KEX_ALGS] = compat_kex_proposal(
+	    myproposal[PROPOSAL_KEX_ALGS]);
 
 	if (options.rekey_limit || options.rekey_interval)
 		ssh_packet_set_rekey_limits(ssh,
@@ -2444,7 +2438,8 @@ cleanup_exit(int i)
 
 	if (the_authctxt) {
 		do_cleanup(the_authctxt);
-		if (use_privsep && privsep_is_preauth && pmonitor->m_pid > 1) {
+		if (use_privsep && privsep_is_preauth &&
+		    pmonitor != NULL && pmonitor->m_pid > 1) {
 			debug("Killing privsep child %d", pmonitor->m_pid);
 			if (kill(pmonitor->m_pid, SIGKILL) != 0 &&
 			    errno != ESRCH)

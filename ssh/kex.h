@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.h,v 1.62 2014/01/27 18:58:14 markus Exp $ */
+/* $OpenBSD: kex.h,v 1.63 2014/03/26 04:55:35 djm Exp $ */
 
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
@@ -188,6 +188,7 @@ int	 kex_c25519_hash(int, const char *, const char *, const char *, size_t,
     const char *, size_t, const u_char *, size_t, const u_char *, const u_char *,
     const u_char *, size_t, u_char **, size_t *);
 
+<<<<<<< kex.h
 void	kexc25519_keygen(u_char key[CURVE25519_SIZE], u_char pub[CURVE25519_SIZE])
 	__attribute__((__bounded__(__minbytes__, 1, CURVE25519_SIZE)))
 	__attribute__((__bounded__(__minbytes__, 2, CURVE25519_SIZE)));
@@ -195,6 +196,16 @@ int	kexc25519_shared_key(const u_char key[CURVE25519_SIZE],
     const u_char pub[CURVE25519_SIZE], struct sshbuf *out)
 	__attribute__((__bounded__(__minbytes__, 1, CURVE25519_SIZE)))
 	__attribute__((__bounded__(__minbytes__, 2, CURVE25519_SIZE)));
+=======
+#define CURVE25519_SIZE 32
+void	kexc25519_keygen(u_char[CURVE25519_SIZE], u_char[CURVE25519_SIZE])
+	__bounded((__minbytes__, 1, CURVE25519_SIZE))
+	__bounded((__minbytes__, 2, CURVE25519_SIZE));
+void kexc25519_shared_key(const u_char key[CURVE25519_SIZE],
+    const u_char pub[CURVE25519_SIZE], Buffer *out)
+	__bounded((__minbytes__, 1, CURVE25519_SIZE))
+	__bounded((__minbytes__, 2, CURVE25519_SIZE));
+>>>>>>> 1.63
 
 int
 derive_ssh1_session_id(BIGNUM *, BIGNUM *, u_int8_t[8], u_int8_t[16]);

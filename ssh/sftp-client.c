@@ -1,4 +1,4 @@
-/* $OpenBSD: sftp-client.c,v 1.114 2014/01/31 16:39:19 tedu Exp $ */
+/* $OpenBSD: sftp-client.c,v 1.115 2014/04/21 14:36:16 logan Exp $ */
 /*
  * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
  *
@@ -1534,8 +1534,13 @@ download_dir(struct sftp_conn *conn, const char *src, const char *dst,
 }
 
 int
+<<<<<<< sftp-client.c
 do_upload(struct sftp_conn *conn, const char *local_path,
     const char *remote_path, int preserve_flag, int fsync_flag)
+=======
+do_upload(struct sftp_conn *conn, char *local_path, char *remote_path,
+    int preserve_flag, int resume, int fsync_flag)
+>>>>>>> 1.115
 {
 	int r, local_fd;
 	u_int status = SSH2_FX_OK;
@@ -1545,7 +1550,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 	u_char *handle, *data;
 	struct sshbuf *msg;
 	struct stat sb;
-	Attrib a;
+	Attrib a, *c = NULL;
 	u_int32_t startid;
 	u_int32_t ackid;
 	struct outstanding_ack {
@@ -1584,11 +1589,36 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 	if (!preserve_flag)
 		a.flags &= ~SSH2_FILEXFER_ATTR_ACMODTIME;
 
+<<<<<<< sftp-client.c
 	if ((msg = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
+=======
+	if (resume) {
+		/* Get remote file size if it exists */
+		if ((c = do_stat(conn, remote_path, 0)) == NULL) {
+			close(local_fd);                
+			return -1;
+		}
+
+		if ((off_t)c->size >= sb.st_size) {
+			error("destination file bigger or same size as "
+			      "source file");
+			close(local_fd);
+			return -1;
+		}
+
+		if (lseek(local_fd, (off_t)c->size, SEEK_SET) == -1) {
+			close(local_fd);
+			return -1;
+		}
+	}
+
+	buffer_init(&msg);
+>>>>>>> 1.115
 
 	/* Send open request */
 	id = conn->msg_id++;
+<<<<<<< sftp-client.c
 	if ((r = sshbuf_put_u8(msg, SSH2_FXP_OPEN)) != 0 ||
 	    (r = sshbuf_put_u32(msg, id)) != 0 ||
 	    (r = sshbuf_put_cstring(msg, remote_path)) != 0 ||
@@ -1597,6 +1627,15 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 	    (r = encode_attrib(msg, &a)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	send_msg(conn, msg);
+=======
+	buffer_put_char(&msg, SSH2_FXP_OPEN);
+	buffer_put_int(&msg, id);
+	buffer_put_cstring(&msg, remote_path);
+	buffer_put_int(&msg, SSH2_FXF_WRITE|SSH2_FXF_CREAT|
+		      (resume ? SSH2_FXF_APPEND : SSH2_FXF_TRUNC));
+	encode_attrib(&msg, &a);
+	send_msg(conn, &msg);
+>>>>>>> 1.115
 	debug3("Sent message SSH2_FXP_OPEN I:%u P:%s", id, remote_path);
 
 	sshbuf_reset(msg);
@@ -1613,7 +1652,7 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 	data = xmalloc(conn->transfer_buflen);
 
 	/* Read from local and write to remote */
-	offset = progress_counter = 0;
+	offset = progress_counter = (resume ? c->size : 0);
 	if (showprogress)
 		start_progress_meter(local_path, sb.st_size,
 		    &progress_counter);
@@ -1734,8 +1773,13 @@ do_upload(struct sftp_conn *conn, const char *local_path,
 }
 
 static int
+<<<<<<< sftp-client.c
 upload_dir_internal(struct sftp_conn *conn, const char *src, const char *dst,
     int depth, int preserve_flag, int print_flag, int fsync_flag)
+=======
+upload_dir_internal(struct sftp_conn *conn, char *src, char *dst, int depth,
+    int preserve_flag, int print_flag, int resume, int fsync_flag)
+>>>>>>> 1.115
 {
 	int ret = 0;
 	u_int status;
@@ -1805,12 +1849,12 @@ upload_dir_internal(struct sftp_conn *conn, const char *src, const char *dst,
 				continue;
 
 			if (upload_dir_internal(conn, new_src, new_dst,
-			    depth + 1, preserve_flag, print_flag,
+			    depth + 1, preserve_flag, print_flag, resume,
 			    fsync_flag) == -1)
 				ret = -1;
 		} else if (S_ISREG(sb.st_mode)) {
 			if (do_upload(conn, new_src, new_dst,
-			    preserve_flag, fsync_flag) == -1) {
+			    preserve_flag, resume, fsync_flag) == -1) {
 				error("Uploading of file %s to %s failed!",
 				    new_src, new_dst);
 				ret = -1;
@@ -1828,8 +1872,13 @@ upload_dir_internal(struct sftp_conn *conn, const char *src, const char *dst,
 }
 
 int
+<<<<<<< sftp-client.c
 upload_dir(struct sftp_conn *conn, const char *src, const char *dst,
     int preserve_flag, int print_flag, int fsync_flag)
+=======
+upload_dir(struct sftp_conn *conn, char *src, char *dst, int preserve_flag,
+    int print_flag, int resume, int fsync_flag)
+>>>>>>> 1.115
 {
 	char *dst_canon;
 	int ret;
@@ -1840,7 +1889,7 @@ upload_dir(struct sftp_conn *conn, const char *src, const char *dst,
 	}
 
 	ret = upload_dir_internal(conn, src, dst_canon, 0, preserve_flag,
-	    print_flag, fsync_flag);
+	    print_flag, resume, fsync_flag);
 
 	free(dst_canon);
 	return ret;
