@@ -41,8 +41,8 @@ LDADD+=-L${.CURDIR}/../../ssh/lib -lssh
 DPADD+=${.CURDIR}/../../ssh/lib/libssh.a
 .endif
 
-LDADD+= -lcrypto
-DPADD+= ${LIBCRYPTO}
+LDADD+= -lcrypto -lutil
+DPADD+= ${LIBCRYPTO} ${LIBUTIL}
 
 .if defined(LEAKMALLOC)
 DEBUG=		-g
