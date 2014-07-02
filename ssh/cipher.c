@@ -412,6 +412,8 @@ cipher_get_length(struct sshcipher_ctx *cc, u_int *plenp, u_int seqnr,
 int
 cipher_cleanup(struct sshcipher_ctx *cc)
 {
+	if (cc == NULL || cc->cipher == NULL)
+		return 0;
 	if ((cc->cipher->flags & CFLAG_CHACHAPOLY) != 0)
 		explicit_bzero(&cc->cp_ctx, sizeof(cc->cp_ctx));
 	else if (EVP_CIPHER_CTX_cleanup(&cc->evp) == 0)
