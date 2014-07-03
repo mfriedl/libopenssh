@@ -41,6 +41,7 @@ LDADD+=-L${.CURDIR}/../../ssh/lib -lssh
 DPADD+=${.CURDIR}/../../ssh/lib/libssh.a
 .endif
 
+CFLAGS+=-DWITH_OPENSSL
 LDADD+= -lcrypto -lutil
 DPADD+= ${LIBCRYPTO} ${LIBUTIL}
 
