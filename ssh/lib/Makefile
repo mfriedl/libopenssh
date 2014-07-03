@@ -17,9 +17,9 @@ LIB_SRCS+=	sshbuf-getput-crypto.c
 .endif
 
 SRCS=	${LIB_SRCS} \
-	authfd.c authfile.c bufaux.c buffer.c canohost.c \
+	authfd.c authfile.c canohost.c \
 	channels.c cipher.c \
-	cleanup.c compat.c compress.c crc32.c deattack.c fatal.c \
+	cleanup.c compat.c crc32.c deattack.c fatal.c \
 	hostfile.c log.c match.c nchan.c packet.c readpass.c \
 	ttymodes.c xmalloc.c atomicio.c \
 	key.c dispatch.c kex.c mac.c uidswap.c uuencode.c misc.c \
@@ -32,7 +32,7 @@ SRCS+=	ssh_api.c
 SRCS+=	roaming_dummy.c
 
 .if (${OPENSSL:L} == "yes")
-SRCS+=	bufec.c bufbn.c cipher-3des1.c cipher-bf1.c rsa.c \
+SRCS+=	cipher-3des1.c cipher-bf1.c rsa.c \
 	ssh-dss.c ssh-rsa.c ssh-ecdsa.c dh.c kexdh.c kexgex.c kexecdh.c \
 	kexdhc.c kexgexc.c kexecdhc.c ssh-pkcs11.c \
 	krl.c digest-openssl.c
