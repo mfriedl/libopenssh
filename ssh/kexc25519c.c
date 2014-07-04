@@ -156,7 +156,7 @@ input_kex_c25519_reply(int type, u_int32_t seq, struct ssh *ssh)
 
 	r = 0;
 out:
-	bzero(kex->c25519_client_key, sizeof(kex->c25519_client_key));
+	explicit_bzero(kex->c25519_client_key, sizeof(kex->c25519_client_key));
 	free(server_host_key_blob);
 	free(server_pubkey);
 	free(signature);

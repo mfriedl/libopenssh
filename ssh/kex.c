@@ -377,28 +377,28 @@ kex_free_newkeys(struct newkeys *newkeys)
 	if (newkeys == NULL)
 		return;
 	if (newkeys->enc.key) {
-		bzero(newkeys->enc.key, newkeys->enc.key_len);
+		explicit_bzero(newkeys->enc.key, newkeys->enc.key_len);
 		free(newkeys->enc.key);
 		newkeys->enc.key = NULL;
 	}
 	if (newkeys->enc.iv) {
-		bzero(newkeys->enc.iv, newkeys->enc.block_size);
+		explicit_bzero(newkeys->enc.iv, newkeys->enc.block_size);
 		free(newkeys->enc.iv);
 		newkeys->enc.iv = NULL;
 	}
 	free(newkeys->enc.name);
-	bzero(&newkeys->enc, sizeof(newkeys->enc));
+	explicit_bzero(&newkeys->enc, sizeof(newkeys->enc));
 	free(newkeys->comp.name);
-	bzero(&newkeys->comp, sizeof(newkeys->comp));
+	explicit_bzero(&newkeys->comp, sizeof(newkeys->comp));
 	mac_clear(&newkeys->mac);
 	if (newkeys->mac.key) {
-		bzero(newkeys->mac.key, newkeys->mac.key_len);
+		explicit_bzero(newkeys->mac.key, newkeys->mac.key_len);
 		free(newkeys->mac.key);
 		newkeys->mac.key = NULL;
 	}
 	free(newkeys->mac.name);
-	bzero(&newkeys->mac, sizeof(newkeys->mac));
-	bzero(newkeys, sizeof(*newkeys));
+	explicit_bzero(&newkeys->mac, sizeof(newkeys->mac));
+	explicit_bzero(newkeys, sizeof(*newkeys));
 	free(newkeys);
 }
 

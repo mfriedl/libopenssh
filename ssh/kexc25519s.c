@@ -145,7 +145,7 @@ input_kex_c25519_init(int type, u_int32_t seq, struct ssh *ssh)
 
 	/* have keys, free server key */
 out:
-	bzero(server_key, sizeof(server_key));
+	explicit_bzero(server_key, sizeof(server_key));
 	free(server_host_key_blob);
 	free(signature);
 	free(client_pubkey);
