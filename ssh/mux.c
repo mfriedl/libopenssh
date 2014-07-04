@@ -65,7 +65,7 @@
 #include "packet.h"
 #include "monitor_fdpass.h"
 #include "sshpty.h"
-#include "key.h"
+#include "sshkey.h"
 #include "readconf.h"
 #include "clientloop.h"
 

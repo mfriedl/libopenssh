@@ -25,7 +25,7 @@
 
 #include "ssherr.h"
 #include "authfile.h"
-#include "key.h"
+#include "sshkey.h"
 #include "sshbuf.h"
 
 #include "common.h"

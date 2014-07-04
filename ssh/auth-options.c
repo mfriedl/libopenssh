@@ -29,7 +29,7 @@
 #include "channels.h"
 #include "servconf.h"
 #include "misc.h"
-#include "key.h"
+#include "sshkey.h"
 #include "auth-options.h"
 #include "hostfile.h"
 #include "auth.h"
@@ -582,12 +582,7 @@ auth_cert_options(struct sshkey *k, struct passwd *pw)
 
 	if (sshkey_cert_is_legacy(k)) {
 		/* All options are in the one field for v00 certs */
-<<<<<<< auth-options.c
 		if (parse_option_list(k->cert->critical, pw,
-=======
-		if (parse_option_list(buffer_ptr(k->cert->critical),
-		    buffer_len(k->cert->critical), pw,
->>>>>>> 1.63
 		    OPTIONS_CRITICAL|OPTIONS_EXTENSIONS, 1,
 		    &cert_no_port_forwarding_flag,
 		    &cert_no_agent_forwarding_flag,
@@ -599,22 +594,12 @@ auth_cert_options(struct sshkey *k, struct passwd *pw)
 			return -1;
 	} else {
 		/* Separate options and extensions for v01 certs */
-<<<<<<< auth-options.c
 		if (parse_option_list(k->cert->critical, pw,
-=======
-		if (parse_option_list(buffer_ptr(k->cert->critical),
-		    buffer_len(k->cert->critical), pw,
->>>>>>> 1.63
 		    OPTIONS_CRITICAL, 1, NULL, NULL, NULL, NULL, NULL,
 		    &cert_forced_command,
 		    &cert_source_address_done) == -1)
 			return -1;
-<<<<<<< auth-options.c
 		if (parse_option_list(k->cert->extensions, pw,
-=======
-		if (parse_option_list(buffer_ptr(k->cert->extensions),
-		    buffer_len(k->cert->extensions), pw,
->>>>>>> 1.63
 		    OPTIONS_EXTENSIONS, 1,
 		    &cert_no_port_forwarding_flag,
 		    &cert_no_agent_forwarding_flag,

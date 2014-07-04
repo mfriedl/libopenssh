@@ -27,15 +27,8 @@
 #include <string.h>
 #include <openssl/evp.h>
 
-<<<<<<< cipher-3des1.c
-#include "ssherr.h"
-=======
 #include <string.h>
-
-#include "xmalloc.h"
-#include "log.h"
 #include "ssherr.h"
->>>>>>> 1.11
 
 /*
  * This is used by SSH1:

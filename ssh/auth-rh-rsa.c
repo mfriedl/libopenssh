@@ -22,7 +22,7 @@
 #include "uidswap.h"
 #include "log.h"
 #include "servconf.h"
-#include "key.h"
+#include "sshkey.h"
 #include "hostfile.h"
 #include "pathnames.h"
 #include "auth.h"

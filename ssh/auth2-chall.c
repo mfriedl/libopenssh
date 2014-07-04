@@ -31,7 +31,7 @@
 
 #include "xmalloc.h"
 #include "ssh2.h"
-#include "key.h"
+#include "sshkey.h"
 #include "hostfile.h"
 #include "auth.h"
 #include "sshbuf.h"

@@ -23,7 +23,7 @@
 #include <signal.h>
 
 #include "cipher.h"
-#include "key.h"
+#include "sshkey.h"
 #include "kex.h"
 #include "ssh.h"
 #include "ssh2.h"

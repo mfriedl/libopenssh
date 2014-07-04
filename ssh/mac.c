@@ -31,7 +31,7 @@
 #include <signal.h>
 
 #include "cipher.h"
-#include "key.h"
+#include "sshkey.h"
 #include "mac.h"
 #include "misc.h"
 #include "ssherr.h"

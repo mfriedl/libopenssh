@@ -38,7 +38,7 @@
 #include "packet.h"
 #include "compat.h"
 #include "cipher.h"
-#include "key.h"
+#include "sshkey.h"
 #include "kex.h"
 #include "log.h"
 #include "mac.h"

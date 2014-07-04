@@ -31,7 +31,7 @@
 #include "log.h"
 #include "servconf.h"
 #include "canohost.h"
-#include "key.h"
+#include "sshkey.h"
 #include "hostfile.h"
 #include "auth.h"
 #include "misc.h"

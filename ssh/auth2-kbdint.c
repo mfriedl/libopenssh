@@ -27,7 +27,7 @@
 
 #include "xmalloc.h"
 #include "packet.h"
-#include "key.h"
+#include "sshkey.h"
 #include "hostfile.h"
 #include "auth.h"
 #include "log.h"

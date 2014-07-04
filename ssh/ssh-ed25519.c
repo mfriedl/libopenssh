@@ -24,15 +24,9 @@
 #include <stdarg.h>
 
 #include "log.h"
-<<<<<<< ssh-ed25519.c
 #include "sshbuf.h"
-#include "key.h"
-#include "ssherr.h"
-=======
-#include "buffer.h"
 #include "sshkey.h"
 #include "ssherr.h"
->>>>>>> 1.4
 #include "ssh.h"
 
 int
@@ -133,19 +127,11 @@ ssh_ed25519_verify(const struct sshkey *key,
 	if (datalen >= SIZE_MAX - len)
 		return SSH_ERR_INVALID_ARGUMENT;
 	smlen = len + datalen;
-<<<<<<< ssh-ed25519.c
 	mlen = smlen;
 	if ((sm = malloc(smlen)) == NULL || (m = malloc(mlen)) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-=======
-	mlen = smlen;
-	if ((sm = malloc(smlen)) == NULL || (m = xmalloc(mlen)) == NULL) {
-		r = SSH_ERR_ALLOC_FAIL;
-		goto out;
-	}
->>>>>>> 1.4
 	memcpy(sm, sigblob, len);
 	memcpy(sm+len, data, datalen);
 	if ((ret = crypto_sign_ed25519_open(m, &mlen, sm, smlen,
@@ -158,7 +144,6 @@ ssh_ed25519_verify(const struct sshkey *key,
 		goto out;
 	}
 	/* XXX compare 'm' and 'data' ? */
-<<<<<<< ssh-ed25519.c
 	/* success */
 	r = 0;
  out:
@@ -174,21 +159,3 @@ ssh_ed25519_verify(const struct sshkey *key,
 	free(ktype);
 	return r;
 }
-=======
-	/* success */
-	r = 0;
- out:
-	if (sm != NULL) {
-		explicit_bzero(sm, smlen);
-		free(sm);
-	}
-	if (m != NULL) {
-		explicit_bzero(m, smlen); /* NB mlen may be invalid if r != 0 */
-		free(m);
-	}
-	sshbuf_free(b);
-	free(ktype);
-	return r;
-}
-
->>>>>>> 1.4

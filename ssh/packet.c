@@ -65,18 +65,14 @@
 #include "ssh1.h"
 #include "ssh2.h"
 #include "cipher.h"
-#include "key.h"
+#include "sshkey.h"
 #include "kex.h"
 #include "mac.h"
 #include "log.h"
 #include "canohost.h"
 #include "misc.h"
 #include "ssh.h"
-<<<<<<< packet.c
 #include "packet.h"
-=======
-#include "ssherr.h"
->>>>>>> 1.197
 #include "roaming.h"
 #include "ssherr.h"
 #include "sshbuf.h"
@@ -275,17 +271,11 @@ ssh_alloc_session_state(void)
 struct ssh *
 ssh_packet_set_connection(struct ssh *ssh, int fd_in, int fd_out)
 {
-<<<<<<< packet.c
 	struct session_state *state;
 	const struct sshcipher *none = cipher_by_name("none");
 	int r;
-=======
-	const Cipher *none = cipher_by_name("none");
-	int r;
->>>>>>> 1.197
 
 	if (none == NULL)
-<<<<<<< packet.c
 		fatal("%s: cannot load cipher 'none'", __func__);
 	if (ssh == NULL)
 		ssh = ssh_alloc_session_state();
@@ -302,28 +292,6 @@ ssh_packet_set_connection(struct ssh *ssh, int fd_in, int fd_out)
 	state->newkeys[MODE_IN] = state->newkeys[MODE_OUT] = NULL;
 	deattack_init(&state->deattack);
 	return ssh;
-=======
-		fatal("packet_set_connection: cannot load cipher 'none'");
-	if (active_state == NULL)
-		active_state = alloc_session_state();
-	active_state->connection_in = fd_in;
-	active_state->connection_out = fd_out;
-	if ((r = cipher_init(&active_state->send_context, none,
-	    (const u_char *)"", 0, NULL, 0, CIPHER_ENCRYPT)) != 0 ||
-	    (r = cipher_init(&active_state->receive_context, none,
-	    (const u_char *)"", 0, NULL, 0, CIPHER_DECRYPT)) != 0)
-		fatal("%s: cipher_init: %s", __func__, ssh_err(r));
-	active_state->newkeys[MODE_IN] = active_state->newkeys[MODE_OUT] = NULL;
-	if (!active_state->initialized) {
-		active_state->initialized = 1;
-		buffer_init(&active_state->input);
-		buffer_init(&active_state->output);
-		buffer_init(&active_state->outgoing_packet);
-		buffer_init(&active_state->incoming_packet);
-		TAILQ_INIT(&active_state->outgoing);
-		active_state->p_send.packets = active_state->p_read.packets = 0;
-	}
->>>>>>> 1.197
 }
 
 void
@@ -418,23 +386,10 @@ ssh_packet_connection_is_on_socket(struct ssh *ssh)
 void
 ssh_packet_get_bytes(struct ssh *ssh, u_int64_t *ibytes, u_int64_t *obytes)
 {
-<<<<<<< packet.c
 	if (ibytes)
 		*ibytes = ssh->state->p_read.bytes;
 	if (obytes)
 		*obytes = ssh->state->p_send.bytes;
-=======
-	CipherContext *cc;
-	int r;
-
-	if (mode == MODE_OUT)
-		cc = &active_state->send_context;
-	else
-		cc = &active_state->receive_context;
-
-	if ((r = cipher_get_keyiv(cc, iv, len)) != 0)
-		fatal("%s: cipher_get_keyiv: %s", __func__, ssh_err(r));
->>>>>>> 1.197
 }
 
 /* Serialise compression state into a blob for privsep */
@@ -516,24 +471,6 @@ ssh_packet_set_compress_hooks(struct ssh *ssh, void *ctx,
 	ssh->state->compression_in_stream.zfree = (free_func)freefunc;
 	ssh->state->compression_in_stream.opaque = ctx;
 }
-
-<<<<<<< packet.c
-=======
-void
-packet_set_iv(int mode, u_char *dat)
-{
-	CipherContext *cc;
-	int r;
-
-	if (mode == MODE_OUT)
-		cc = &active_state->send_context;
-	else
-		cc = &active_state->receive_context;
-
-	if ((r = cipher_set_keyiv(cc, dat)) != 0)
-		fatal("%s: cipher_set_keyiv: %s", __func__, ssh_err(r));
-}
->>>>>>> 1.197
 
 int
 ssh_packet_connection_af(struct ssh *ssh)
@@ -709,7 +646,6 @@ start_compression_out(struct ssh *ssh, int level)
 static int
 start_compression_in(struct ssh *ssh)
 {
-<<<<<<< packet.c
 	if (ssh->state->compression_in_started == 1)
 		inflateEnd(&ssh->state->compression_in_stream);
 	switch (inflateInit(&ssh->state->compression_in_stream)) {
@@ -722,24 +658,6 @@ start_compression_in(struct ssh *ssh)
 		return SSH_ERR_INTERNAL_ERROR;
 	}
 	return 0;
-=======
-	const Cipher *cipher = cipher_by_number(number);
-	int r;
-
-	if (cipher == NULL)
-		fatal("packet_set_encryption_key: unknown cipher number %d", number);
-	if (keylen < 20)
-		fatal("packet_set_encryption_key: keylen too small: %d", keylen);
-	if (keylen > SSH_SESSION_KEY_LENGTH)
-		fatal("packet_set_encryption_key: keylen too big: %d", keylen);
-	memcpy(active_state->ssh1_key, key, keylen);
-	active_state->ssh1_keylen = keylen;
-	if ((r = cipher_init(&active_state->send_context, cipher,
-	    key, keylen, NULL, 0, CIPHER_ENCRYPT)) != 0 ||
-	    (r = cipher_init(&active_state->receive_context, cipher,
-	    key, keylen, NULL, 0, CIPHER_DECRYPT)) != 0)
-		fatal("%s: cipher_init: %s", __func__, ssh_err(r));
->>>>>>> 1.197
 }
 
 int
@@ -990,12 +908,8 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	struct sshcomp *comp;
 	struct sshcipher_ctx *cc;
 	u_int64_t *max_blocks;
-<<<<<<< packet.c
-	int crypt_type, r;
 	const char *wmsg;
-=======
 	int r, crypt_type;
->>>>>>> 1.197
 
 	debug2("set_newkeys: mode %d", mode);
 
@@ -1042,7 +956,6 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	}
 	mac->enabled = 1;
 	DBG(debug("cipher_init_context: %d", mode));
-<<<<<<< packet.c
 	if ((r = cipher_init(cc, enc->cipher, enc->key, enc->key_len,
 	    enc->iv, enc->iv_len, crypt_type)) != 0)
 		return r;
@@ -1051,11 +964,6 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 		error("Warning: %s", wmsg);
 		state->cipher_warning_done = 1;
 	}
-=======
-	if ((r = cipher_init(cc, enc->cipher, enc->key, enc->key_len,
-	    enc->iv, enc->iv_len, crypt_type)) != 0)
-		fatal("%s: cipher_init: %s", __func__, ssh_err(r));
->>>>>>> 1.197
 	/* Deleting the keys does not gain extra security */
 	/* explicit_bzero(enc->iv,  enc->block_size);
 	   explicit_bzero(enc->key, enc->key_len);

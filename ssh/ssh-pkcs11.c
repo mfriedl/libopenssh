@@ -30,7 +30,7 @@
 
 #include "log.h"
 #include "misc.h"
-#include "key.h"
+#include "sshkey.h"
 #include "ssh-pkcs11.h"
 #include "xmalloc.h"
 

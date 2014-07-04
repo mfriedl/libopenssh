@@ -21,7 +21,7 @@
 
 #include "ssherr.h"
 #define SSHBUF_INTERNAL 1	/* access internals for testing */
-#include "key.h"
+#include "sshkey.h"
 
 
 void sshkey_tests(void);

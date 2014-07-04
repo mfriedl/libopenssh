@@ -25,7 +25,7 @@ SRCS=	${LIB_SRCS} \
 	cleanup.c compat.c crc32.c deattack.c fatal.c \
 	hostfile.c log.c match.c nchan.c packet.c readpass.c \
 	ttymodes.c xmalloc.c atomicio.c \
-	key.c dispatch.c kex.c mac.c uidswap.c uuencode.c misc.c \
+	dispatch.c kex.c mac.c uidswap.c uuencode.c misc.c \
 	msg.c progressmeter.c dns.c \
 	monitor_fdpass.c addrmatch.c \
 	smult_curve25519_ref.c kexc25519.c kexc25519c.c \
@@ -38,12 +38,8 @@ SRCS+=	roaming_dummy.c
 SRCS+=	cipher-3des1.c cipher-bf1.c rsa.c \
 	ssh-dss.c ssh-rsa.c ssh-ecdsa.c dh.c kexdh.c kexgex.c kexecdh.c \
 	kexdhc.c kexgexc.c kexecdhc.c ssh-pkcs11.c \
-<<<<<<< Makefile
-	krl.c digest-openssl.c
-SRCS+=	kexdhs.c kexgexs.c kexecdhs.c
-=======
 	krl.c
->>>>>>> 1.79
+SRCS+=	kexdhs.c kexgexs.c kexecdhs.c
 .else
 SRCS+=	rijndael.c cipher-aesctr.c
 .endif

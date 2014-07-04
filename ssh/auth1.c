@@ -25,7 +25,7 @@
 #include "log.h"
 #include "servconf.h"
 #include "compat.h"
-#include "key.h"
+#include "sshkey.h"
 #include "hostfile.h"
 #include "auth.h"
 #include "channels.h"
@@ -312,11 +312,7 @@ do_authloop(struct ssh *ssh)
 			return;
 
 		if (++authctxt->failures >= options.max_authtries)
-<<<<<<< auth1.c
-			ssh_packet_disconnect(ssh, AUTH_FAIL_MSG, authctxt->user);
-=======
-			auth_maxtries_exceeded(authctxt);
->>>>>>> 1.81
+			auth_maxtries_exceeded(ssh, authctxt);
 
 		if ((r = sshpkt_start(ssh, SSH_SMSG_FAILURE)) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)

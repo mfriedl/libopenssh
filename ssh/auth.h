@@ -133,14 +133,10 @@ void	do_authentication2(struct ssh *);
 void	auth_info(struct authctxt *, const char *, ...)
 	    __attribute__((__format__ (printf, 2, 3)))
 	    __attribute__((__nonnull__ (2)));
-<<<<<<< auth.h
 void	auth_log(struct authctxt *, int, int, const char *, const char *);
+void	auth_maxtries_exceeded(struct ssh *, struct authctxt *)
+	    __attribute__((noreturn));
 void	userauth_finish(struct ssh *, int, const char *, const char *);
-=======
-void	auth_log(Authctxt *, int, int, const char *, const char *);
-void	auth_maxtries_exceeded(Authctxt *) __attribute__((noreturn));
-void	userauth_finish(Authctxt *, int, const char *, const char *);
->>>>>>> 1.78
 int	auth_root_allowed(const char *);
 
 char	*auth2_read_banner(void);

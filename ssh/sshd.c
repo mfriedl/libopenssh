@@ -80,7 +80,7 @@
 #include "compat.h"
 #include "cipher.h"
 #include "digest.h"
-#include "key.h"
+#include "sshkey.h"
 #include "kex.h"
 #include "myproposal.h"
 #include "authfile.h"
@@ -1023,7 +1023,6 @@ recv_rexec_state(int fd, struct sshbuf *conf)
 	if (key_follows) {
 #ifdef WITH_SSH1
 		if (sensitive_data.server_key != NULL)
-<<<<<<< sshd.c
 			sshkey_free(sensitive_data.server_key);
 		sensitive_data.server_key = sshkey_new_private(KEY_RSA1);
 		if (sensitive_data.server_key == NULL)
@@ -1044,20 +1043,6 @@ recv_rexec_state(int fd, struct sshbuf *conf)
 		if ((r = rsa_generate_additional_parameters(
 		    sensitive_data.server_key->rsa)) != 0)
 			fatal("generate RSA parameters failed: %s", ssh_err(r));
-=======
-			key_free(sensitive_data.server_key);
-		sensitive_data.server_key = key_new_private(KEY_RSA1);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->e);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->n);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->d);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->iqmp);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->p);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->q);
-		if (rsa_generate_additional_parameters(
-		    sensitive_data.server_key->rsa) != 0)
-			fatal("%s: rsa_generate_additional_parameters "
-			    "error", __func__);
->>>>>>> 1.427
 #else
 		fatal("ssh1 not supported");
 #endif
@@ -2121,26 +2106,16 @@ ssh1_session_key(BIGNUM *session_key_int)
 			    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n),
 			    SSH_KEY_BITS_RESERVED);
 		}
-<<<<<<< sshd.c
 		if ((r = rsa_private_decrypt(session_key_int, session_key_int,
 		    sensitive_data.server_key->rsa) != 0)) {
 			error("%s: rsa_private_decrypt: %s",
 			    __func__, ssh_err(r));
-=======
-		if (rsa_private_decrypt(session_key_int, session_key_int,
-		    sensitive_data.server_key->rsa) != 0)
->>>>>>> 1.427
 			rsafail++;
-<<<<<<< sshd.c
 		}
 		if ((r = rsa_private_decrypt(session_key_int, session_key_int,
 		    sensitive_data.ssh1_host_key->rsa) != 0)) {
 			error("%s: rsa_private_decrypt: %s",
 			    __func__, ssh_err(r));
-=======
-		if (rsa_private_decrypt(session_key_int, session_key_int,
-		    sensitive_data.ssh1_host_key->rsa) != 0)
->>>>>>> 1.427
 			rsafail++;
 		}
 	} else {
@@ -2155,26 +2130,16 @@ ssh1_session_key(BIGNUM *session_key_int)
 			    BN_num_bits(sensitive_data.server_key->rsa->n),
 			    SSH_KEY_BITS_RESERVED);
 		}
-<<<<<<< sshd.c
 		if ((r = rsa_private_decrypt(session_key_int, session_key_int,
 		    sensitive_data.ssh1_host_key->rsa)) != 0) {
 			error("%s: rsa_private_decrypt: %s",
 			    __func__, ssh_err(r));
-=======
-		if (rsa_private_decrypt(session_key_int, session_key_int,
-		    sensitive_data.ssh1_host_key->rsa) != 0)
->>>>>>> 1.427
 			rsafail++;
-<<<<<<< sshd.c
 		}
 		if ((r = rsa_private_decrypt(session_key_int, session_key_int,
 		    sensitive_data.server_key->rsa)) != 0) {
 			error("%s: rsa_private_decrypt: %s",
 			    __func__, ssh_err(r));
-=======
-		if (rsa_private_decrypt(session_key_int, session_key_int,
-		    sensitive_data.server_key->rsa) != 0)
->>>>>>> 1.427
 			rsafail++;
 		}
 	}

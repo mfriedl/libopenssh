@@ -37,7 +37,7 @@
 
 #include "xmalloc.h"
 #include "log.h"
-#include "key.h"
+#include "sshkey.h"
 #include "ssh.h"
 #include "ssh2.h"
 #include "misc.h"

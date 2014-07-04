@@ -88,7 +88,7 @@
 #include "compat.h"
 #include "channels.h"
 #include "dispatch.h"
-#include "key.h"
+#include "sshkey.h"
 #include "cipher.h"
 #include "kex.h"
 #include "log.h"
@@ -1935,11 +1935,7 @@ client_request_forwarded_tcpip(struct ssh *ssh, const char *request_type, int rc
 	    "originator %s port %d", listen_address, listen_port,
 	    originator_address, originator_port);
 
-<<<<<<< clientloop.c
-	c = channel_connect_by_listen_address(ssh, listen_port,
-=======
-	c = channel_connect_by_listen_address(listen_address, listen_port,
->>>>>>> 1.260
+	c = channel_connect_by_listen_address(ssh, listen_address, listen_port,
 	    "forwarded-tcpip", originator_address);
 
 	free(originator_address);

@@ -30,7 +30,7 @@
 
 #include "sshbuf.h"
 #include "ssherr.h"
-#include "key.h"
+#include "sshkey.h"
 #include "authfile.h"
 #include "misc.h"
 #include "log.h"
@@ -352,33 +352,30 @@ ssh_krl_revoke_cert_by_key_id(struct ssh_krl *krl, const struct sshkey *ca_key,
 	return 0;
 }
 
-<<<<<<< krl.c
-=======
 /* Convert "key" to a public key blob without any certificate information */
 static int
-plain_key_blob(const Key *key, u_char **blob, u_int *blen)
+plain_key_blob(const struct sshkey *key, u_char **blob, size_t *blen)
 {
-	Key *kcopy;
+	struct sshkey *kcopy;
 	int r;
 
-	if ((kcopy = key_from_private(key)) == NULL)
-		return -1;
-	if (key_is_cert(kcopy)) {
-		if (key_drop_cert(kcopy) != 0) {
+	if ((r = sshkey_from_private(key, &kcopy)) != 0)
+		return r;
+	if (sshkey_is_cert(kcopy)) {
+		if ((r = sshkey_drop_cert(kcopy)) != 0) {
 			error("%s: key_drop_cert", __func__);
-			key_free(kcopy);
-			return -1;
+			sshkey_free(kcopy);
+			return r;
 		}
 	}
-	r = key_to_blob(kcopy, blob, blen);
-	free(kcopy);
+	r = sshkey_to_blob(kcopy, blob, blen);
+	sshkey_free(kcopy);
 	return r;
 }
 
->>>>>>> 1.17
 /* Revoke a key blob. Ownership of blob is transferred to the tree */
 static int
-revoke_blob(struct revoked_blob_tree *rbt, u_char *blob, u_int len)
+revoke_blob(struct revoked_blob_tree *rbt, u_char *blob, size_t len)
 {
 	struct revoked_blob *rb, *erb;
 
@@ -401,15 +398,9 @@ ssh_krl_revoke_key_explicit(struct ssh_krl *krl, const struct sshkey *key)
 	size_t len;
 	int r;
 
-<<<<<<< krl.c
 	debug3("%s: revoke type %s", __func__, sshkey_type(key));
-	if ((r = sshkey_plain_to_blob(key, &blob, &len)) != 0)
+	if ((r = plain_key_blob(key, &blob, &len)) != 0)
 		return r;
-=======
-	debug3("%s: revoke type %s", __func__, key_type(key));
-	if (plain_key_blob(key, &blob, &len) < 0)
-		return -1;
->>>>>>> 1.17
 	return revoke_blob(&krl->revoked_keys, blob, len);
 }
 
@@ -418,10 +409,11 @@ ssh_krl_revoke_key_sha1(struct ssh_krl *krl, const struct sshkey *key)
 {
 	u_char *blob;
 	size_t len;
+	int r;
 
 	debug3("%s: revoke type %s by sha1", __func__, sshkey_type(key));
-	if ((blob = sshkey_fingerprint_raw(key, SSH_FP_SHA1, &len)) == NULL)
-		return SSH_ERR_ALLOC_FAIL;
+	if ((r = sshkey_fingerprint_raw(key, SSH_FP_SHA1, &blob, &len)) != 0)
+		return r;
 	return revoke_blob(&krl->revoked_sha1s, blob, len);
 }
 
@@ -587,16 +579,10 @@ revoked_certs_generate(struct revoked_certs *rc, struct sshbuf *buf)
 				bitmap = NULL;
 				break;
 			}
-<<<<<<< krl.c
 			if ((r = sshbuf_put_u8(buf, state)) != 0 ||
 			    (r = sshbuf_put_stringb(buf, sect)) != 0)
 				goto out;
-=======
-			buffer_put_char(buf, state);
-			buffer_put_string(buf,
-			    buffer_ptr(&sect), buffer_len(&sect));
-			buffer_clear(&sect);
->>>>>>> 1.17
+			sshbuf_reset(sect);
 		}
 
 		/* If we are starting a new section then prepare it now */
@@ -1118,8 +1104,9 @@ is_key_revoked(struct ssh_krl *krl, const struct sshkey *key)
 
 	/* Check explicitly revoked hashes first */
 	memset(&rb, 0, sizeof(rb));
-	if ((rb.blob = sshkey_fingerprint_raw(key, SSH_FP_SHA1, &rb.len)) == NULL)
-		return SSH_ERR_ALLOC_FAIL;
+	if ((r = sshkey_fingerprint_raw(key, SSH_FP_SHA1, &rb.blob,
+	    &rb.len)) != 0)
+		return r;
 	erb = RB_FIND(revoked_blob_tree, &krl->revoked_sha1s, &rb);
 	free(rb.blob);
 	if (erb != NULL) {
@@ -1129,13 +1116,8 @@ is_key_revoked(struct ssh_krl *krl, const struct sshkey *key)
 
 	/* Next, explicit keys */
 	memset(&rb, 0, sizeof(rb));
-<<<<<<< krl.c
-	if ((r = sshkey_plain_to_blob(key, &rb.blob, &rb.len)) != 0)
+	if ((r = plain_key_blob(key, &rb.blob, &rb.len)) != 0)
 		return r;
-=======
-	if (plain_key_blob(key, &rb.blob, &rb.len) < 0)
-		return -1;
->>>>>>> 1.17
 	erb = RB_FIND(revoked_blob_tree, &krl->revoked_keys, &rb);
 	free(rb.blob);
 	if (erb != NULL) {

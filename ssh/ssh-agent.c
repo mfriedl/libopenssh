@@ -62,7 +62,7 @@
 #include "rsa.h"
 #include "sshbuf.h"
 #include "sshbuf.h"
-#include "key.h"
+#include "sshkey.h"
 #include "authfd.h"
 #include "compat.h"
 #include "log.h"
@@ -301,17 +301,12 @@ process_authentication_challenge1(SocketEntry *e)
 	if (id != NULL && (!id->confirm || confirm_key(id) == 0)) {
 		struct sshkey *private = id->key;
 		/* Decrypt the challenge using the private key. */
-<<<<<<< ssh-agent.c
 		if ((r = rsa_private_decrypt(challenge, challenge,
 		    private->rsa) != 0)) {
 			fatal("%s: rsa_public_encrypt: %s", __func__,
 			    ssh_err(r));
 			goto failure;	/* XXX ? */
 		}
-=======
-		if (rsa_private_decrypt(challenge, challenge, private->rsa) != 0)
-			goto failure;
->>>>>>> 1.187
 
 		/* The response is MD5 of decrypted challenge plus session id */
 		len = BN_num_bytes(challenge);
@@ -400,16 +395,9 @@ process_sign_request2(SocketEntry *e)
 static void
 process_remove_identity(SocketEntry *e, int version)
 {
-<<<<<<< ssh-agent.c
 	size_t blen;
-	u_int bits;
 	int r, success = 0;
 	struct sshkey *key = NULL;
-=======
-	u_int blen;
-	int success = 0;
-	Key *key = NULL;
->>>>>>> 1.187
 	u_char *blob;
 #ifdef WITH_SSH1
 	u_int bits;
@@ -576,39 +564,13 @@ process_add_identity(SocketEntry *e, int version)
 	switch (version) {
 #ifdef WITH_SSH1
 	case 1:
-<<<<<<< ssh-agent.c
 		r = agent_decode_rsa1(e->request, &k);
-=======
-		k = key_new_private(KEY_RSA1);
-		(void) buffer_get_int(&e->request);		/* ignored */
-		buffer_get_bignum(&e->request, k->rsa->n);
-		buffer_get_bignum(&e->request, k->rsa->e);
-		buffer_get_bignum(&e->request, k->rsa->d);
-		buffer_get_bignum(&e->request, k->rsa->iqmp);
-
-		/* SSH and SSL have p and q swapped */
-		buffer_get_bignum(&e->request, k->rsa->q);	/* p */
-		buffer_get_bignum(&e->request, k->rsa->p);	/* q */
-
-		/* Generate additional parameters */
-		if (rsa_generate_additional_parameters(k->rsa) != 0)
-			fatal("%s: rsa_generate_additional_parameters "
-			    "error", __func__);
-
-		/* enable blinding */
-		if (RSA_blinding_on(k->rsa, NULL) != 1) {
-			error("process_add_identity: RSA_blinding_on failed");
-			key_free(k);
-			goto send;
-		}
->>>>>>> 1.187
 		break;
 #endif /* WITH_SSH1 */
 	case 2:
 		r = sshkey_private_deserialize(e->request, &k);
 		break;
 	}
-<<<<<<< ssh-agent.c
 	if (r != 0 || k == NULL ||
 	    (r = sshbuf_get_cstring(e->request, &comment, NULL)) != 0) {
 		error("%s: decode private key: %s", __func__, ssh_err(r));
@@ -621,14 +583,6 @@ process_add_identity(SocketEntry *e, int version)
 			goto err;
 		}
 		switch (ctype) {
-=======
-	if (k == NULL)
-		goto send;
-	comment = buffer_get_string(&e->request, NULL);
-
-	while (buffer_len(&e->request)) {
-		switch ((type = buffer_get_char(&e->request))) {
->>>>>>> 1.187
 		case SSH_AGENT_CONSTRAIN_LIFETIME:
 			if ((r = sshbuf_get_u32(e->request, &seconds)) != 0) {
 				error("%s: bad lifetime constraint: %s",

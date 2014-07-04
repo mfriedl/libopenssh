@@ -51,7 +51,7 @@
 #include "ssh.h"
 #include "rsa.h"
 #include "sshbuf.h"
-#include "key.h"
+#include "sshkey.h"
 #include "authfd.h"
 #include "cipher.h"
 #include "compat.h"

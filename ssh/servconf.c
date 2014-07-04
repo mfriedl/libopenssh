@@ -40,7 +40,7 @@
 #include "pathnames.h"
 #include "misc.h"
 #include "cipher.h"
-#include "key.h"
+#include "sshkey.h"
 #include "kex.h"
 #include "mac.h"
 #include "match.h"

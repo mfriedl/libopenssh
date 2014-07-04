@@ -40,7 +40,7 @@
 #include "packet.h"
 #include "uidswap.h"
 #include "compat.h"
-#include "key.h"
+#include "sshkey.h"
 #include "sshconnect.h"
 #include "hostfile.h"
 #include "log.h"
@@ -702,11 +702,7 @@ check_host_cert(const char *host, const struct sshkey *host_key)
 		error("%s", reason);
 		return 0;
 	}
-<<<<<<< sshconnect.c
 	if (sshbuf_len(host_key->cert->critical) != 0) {
-=======
-	if (buffer_len(host_key->cert->critical) != 0) {
->>>>>>> 1.249
 		error("Certificate for %s contains unsupported "
 		    "critical options(s)", host);
 		return 0;

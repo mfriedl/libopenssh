@@ -71,7 +71,7 @@
 #include "channels.h"
 #include "compat.h"
 #include "canohost.h"
-#include "key.h"
+#include "sshkey.h"
 #include "authfd.h"
 #include "pathnames.h"
 
@@ -3202,8 +3202,8 @@ open_match(ForwardPermission *allowed_open, const char *requestedhost,
  * and what we've sent to the remote server (channel_rfwd_bind_host)
  */
 static int
-open_listen_match(ForwardPermission *allowed_open, const char *requestedhost,
-    u_short requestedport, int translate)
+open_listen_match(struct ssh *ssh, ForwardPermission *allowed_open,
+    const char *requestedhost, u_short requestedport, int translate)
 {
 	const char *allowed_host;
 
@@ -3212,7 +3212,7 @@ open_listen_match(ForwardPermission *allowed_open, const char *requestedhost,
 	if (allowed_open->listen_port != requestedport)
 		return 0;
 	allowed_host = translate ?
-	    channel_rfwd_bind_host(allowed_open->listen_host) :
+	    channel_rfwd_bind_host(ssh, allowed_open->listen_host) :
 	    allowed_open->listen_host;
 	if (allowed_host == NULL ||
 	    strcmp(allowed_host, requestedhost) != 0)
@@ -3233,7 +3233,7 @@ channel_request_rforward_cancel(struct ssh *ssh, const char *host, u_short port)
 		return -1;
 
 	for (i = 0; i < num_permitted_opens; i++) {
-		if (open_listen_match(&permitted_opens[i], host, port, 0))
+		if (open_listen_match(ssh, &permitted_opens[i], host, port, 0))
 			break;
 	}
 	if (i >= num_permitted_opens) {
@@ -3536,26 +3536,15 @@ connect_to(struct ssh *ssh, const char *host, u_short port, char *ctype,
 }
 
 Channel *
-<<<<<<< channels.c
-channel_connect_by_listen_address(struct ssh *ssh, u_short listen_port,
-    char *ctype, char *rname)
-=======
-channel_connect_by_listen_address(const char *listen_host,
+channel_connect_by_listen_address(struct ssh *ssh, const char *listen_host,
     u_short listen_port, char *ctype, char *rname)
->>>>>>> 1.333
 {
 	int i;
 
 	for (i = 0; i < num_permitted_opens; i++) {
-<<<<<<< channels.c
-		if (permitted_opens[i].host_to_connect != NULL &&
-		    port_match(permitted_opens[i].listen_port, listen_port)) {
-			return connect_to(ssh,
-=======
-		if (open_listen_match(&permitted_opens[i], listen_host,
+		if (open_listen_match(ssh, &permitted_opens[i], listen_host,
 		    listen_port, 1)) {
-			return connect_to(
->>>>>>> 1.333
+			return connect_to(ssh,
 			    permitted_opens[i].host_to_connect,
 			    permitted_opens[i].port_to_connect, ctype, rname);
 		}

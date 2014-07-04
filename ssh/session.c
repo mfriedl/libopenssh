@@ -64,7 +64,7 @@
 #include "uidswap.h"
 #include "compat.h"
 #include "channels.h"
-#include "key.h"
+#include "sshkey.h"
 #include "cipher.h"
 #include "kex.h"
 #include "hostfile.h"

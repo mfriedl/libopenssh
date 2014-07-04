@@ -28,7 +28,7 @@
 #include "ssh.h"
 #include "ssh1.h"
 #include "sshbuf.h"
-#include "key.h"
+#include "sshkey.h"
 #include "cipher.h"
 #include "kex.h"
 #include "compat.h"

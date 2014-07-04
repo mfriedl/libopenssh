@@ -49,7 +49,7 @@
 #include "ssherr.h"
 #include "log.h"
 #include "servconf.h"
-#include "key.h"
+#include "sshkey.h"
 #include "hostfile.h"
 #include "auth.h"
 #include "auth-options.h"

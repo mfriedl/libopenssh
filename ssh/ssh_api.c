@@ -20,7 +20,7 @@
 #include "compat.h"
 #include "log.h"
 #include "authfile.h"
-#include "key.h"
+#include "sshkey.h"
 #include "misc.h"
 #include "ssh1.h"
 #include "ssh2.h"

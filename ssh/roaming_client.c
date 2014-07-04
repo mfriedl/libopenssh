@@ -36,7 +36,7 @@
 #include "misc.h"
 #include "packet.h"
 #include "ssh.h"
-#include "key.h"
+#include "sshkey.h"
 #include "kex.h"
 #include "readconf.h"
 #include "roaming.h"

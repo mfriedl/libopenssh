@@ -39,7 +39,7 @@
 #include "cipher.h"
 #include "pathnames.h"
 #include "log.h"
-#include "key.h"
+#include "sshkey.h"
 #include "readconf.h"
 #include "match.h"
 #include "misc.h"

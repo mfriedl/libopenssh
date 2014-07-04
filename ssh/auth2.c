@@ -42,7 +42,7 @@
 #include "sshbuf.h"
 #include "servconf.h"
 #include "compat.h"
-#include "key.h"
+#include "sshkey.h"
 #include "hostfile.h"
 #include "auth.h"
 #include "dispatch.h"
@@ -333,12 +333,7 @@ userauth_finish(struct ssh *ssh, int authenticated, const char *method,
 		    (authctxt->attempt > 1 || strcmp(method, "none") != 0))
 			authctxt->failures++;
 		if (authctxt->failures >= options.max_authtries)
-<<<<<<< auth2.c
-			ssh_packet_disconnect(ssh, AUTH_FAIL_MSG,
-			    authctxt->user);
-=======
-			auth_maxtries_exceeded(authctxt);
->>>>>>> 1.131
+			auth_maxtries_exceeded(ssh, authctxt);
 		methods = authmethods_get(authctxt);
 		debug3("%s: failure partial=%d next methods=\"%s\"", __func__,
 		    partial, methods);

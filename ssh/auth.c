@@ -44,7 +44,7 @@
 #include "log.h"
 #include "sshbuf.h"
 #include "servconf.h"
-#include "key.h"
+#include "sshkey.h"
 #include "hostfile.h"
 #include "auth.h"
 #include "auth-options.h"
@@ -238,14 +238,15 @@ auth_log(struct authctxt *authctxt, int authenticated, int partial,
 }
 
 void
-auth_maxtries_exceeded(Authctxt *authctxt)
+auth_maxtries_exceeded(struct ssh *ssh, struct authctxt *authctxt)
 {
-	packet_disconnect("Too many authentication failures for "
+	sshpkt_disconnect(ssh, "Too many authentication failures");
+	fatal("Too many authentication failures for "
 	    "%s%.100s from %.200s port %d %s",
 	    authctxt->valid ? "" : "invalid user ",
 	    authctxt->user,
-	    get_remote_ipaddr(),
-	    get_remote_port(),
+	    ssh_remote_ipaddr(ssh),
+	    ssh_get_remote_port(ssh),
 	    compat20 ? "ssh2" : "ssh1");
 	/* NOTREACHED */
 }

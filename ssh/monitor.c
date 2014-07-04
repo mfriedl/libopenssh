@@ -50,7 +50,7 @@
 #include "atomicio.h"
 #include "xmalloc.h"
 #include "ssh.h"
-#include "key.h"
+#include "sshkey.h"
 #include "sshbuf.h"
 #include "hostfile.h"
 #include "auth.h"

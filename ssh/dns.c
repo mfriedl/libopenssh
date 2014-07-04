@@ -35,7 +35,8 @@
 #include <stdlib.h>
 
 #include "xmalloc.h"
-#include "key.h"
+#include "sshkey.h"
+#include "ssherr.h"
 #include "dns.h"
 #include "log.h"
 
@@ -76,8 +77,8 @@ static int
 dns_read_key(u_int8_t *algorithm, u_int8_t *digest_type,
     u_char **digest, size_t *digest_len, struct sshkey *key)
 {
-	int success = 0;
-	enum fp_type fp_type = 0;
+	int r, success = 0;
+	enum sshkey_fp_type fp_type = 0;
 
 	switch (key->type) {
 	case KEY_RSA:
@@ -117,9 +118,10 @@ dns_read_key(u_int8_t *algorithm, u_int8_t *digest_type,
 	}
 
 	if (*algorithm && *digest_type) {
-		*digest = sshkey_fingerprint_raw(key, fp_type, digest_len);
-		if (*digest == NULL)
-			fatal("%s: null from sshkey_fingerprint_raw", __func__);
+		if ((r = sshkey_fingerprint_raw(key, fp_type, digest,
+		    digest_len)) != 0)
+			fatal("%s: sshkey_fingerprint_raw: %s", __func__,
+			   ssh_err(r));
 		success = 1;
 	} else {
 		*digest = NULL;

@@ -26,14 +26,9 @@
 #include <sha1.h>
 #include <sha2.h>
 
-<<<<<<< digest-libc.c
-#include "sshbuf.h"
-=======
 #include "ssherr.h"
 #include "sshbuf.h"
->>>>>>> 1.3
 #include "digest.h"
-#include "ssherr.h"
 
 typedef void md_init_fn(void *mdctx);
 typedef void md_update_fn(void *mdctx, const u_int8_t *m, size_t mlen);
@@ -185,11 +180,7 @@ ssh_digest_update(struct ssh_digest_ctx *ctx, const void *m, size_t mlen)
 }
 
 int
-<<<<<<< digest-libc.c
-ssh_digest_update_buffer(struct ssh_digest_ctx *ctx, const sshbuf *b)
-=======
 ssh_digest_update_buffer(struct ssh_digest_ctx *ctx, const struct sshbuf *b)
->>>>>>> 1.3
 {
 	return ssh_digest_update(ctx, sshbuf_ptr(b), sshbuf_len(b));
 }
@@ -240,11 +231,7 @@ ssh_digest_memory(int alg, const void *m, size_t mlen, u_char *d, size_t dlen)
 }
 
 int
-<<<<<<< digest-libc.c
-ssh_digest_buffer(int alg, const sshbuf *b, u_char *d, size_t dlen)
-=======
 ssh_digest_buffer(int alg, const struct sshbuf *b, u_char *d, size_t dlen)
->>>>>>> 1.3
 {
 	return ssh_digest_memory(alg, sshbuf_ptr(b), sshbuf_len(b), d, dlen);
 }
