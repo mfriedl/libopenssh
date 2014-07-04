@@ -11,247 +11,248 @@ D/ssh-keysign////
 D/ssh-pkcs11-helper////
 D/sshd////
 D/moduli-gen////
-/LICENCE/1.19/Mon Mar 19 16:04:54 2012//D2014.07.04.08.02.22
-/Makefile/1.15/Tue Feb  9 08:55:31 2010//D2014.07.04.08.02.22
-/Makefile.inc/1.46/Result of merge//D2014.07.04.08.02.22
-/OVERVIEW/1.11/Thu Aug  3 03:34:41 2006//D2014.07.04.08.02.22
-/PROTOCOL/1.23/Tue Jul  1 15:07:22 2014//D2014.07.04.08.02.22
-/PROTOCOL.agent/1.7/Sat Jan 12 14:23:07 2013//D2014.07.04.08.02.22
-/PROTOCOL.certkeys/1.9/Thu Aug  9 18:41:57 2012//D2014.07.04.08.02.22
-/PROTOCOL.chacha20poly1305/1.2/Tue Jul  1 15:07:22 2014//D2014.07.04.08.02.22
-/PROTOCOL.key/1.1/Fri Dec  6 13:34:54 2013//D2014.07.04.08.02.22
-/PROTOCOL.krl/1.2/Tue Jun 11 07:25:11 2013//D2014.07.04.08.02.22
-/PROTOCOL.mux/1.9/Thu Aug  9 18:41:57 2012//D2014.07.04.08.02.22
-/README/1.7/Mon Mar 19 16:04:54 2012//D2014.07.04.08.02.22
-/addrmatch.c/1.9/Result of merge//D2014.07.04.08.02.22
-/atomicio.c/1.26/Wed Jul  2 15:59:40 2014//D2014.07.04.08.02.22
-/atomicio.h/1.11/Wed Jul  2 15:59:40 2014//D2014.07.04.08.02.22
-/auth-bsdauth.c/1.13/Result of merge//D2014.07.04.08.02.22
-/auth-chall.c/1.14/Result of merge//D2014.07.04.08.02.22
-/auth-krb5.c/1.20/Result of merge//D2014.07.04.08.02.22
-/auth-options.c/1.63/Result of merge+Fri Jul  4 08:02:22 2014//D2014.07.04.08.02.22
-/auth-options.h/1.20/Fri Jan  6 10:00:44 2012//D2014.07.04.08.02.22
-/auth-passwd.c/1.43/Mon Mar 19 16:04:54 2012//D2014.07.04.08.02.22
-/auth-rh-rsa.c/1.43/Fri Jan  6 10:00:44 2012//D2014.07.04.08.02.22
-/auth-rhosts.c/1.44/Mon Mar 19 16:04:54 2012//D2014.07.04.08.02.22
-/auth-rsa.c/1.87/Result of merge+Fri Jul  4 08:02:24 2014//D2014.07.04.08.02.22
-/auth.c/1.105/Result of merge//D2014.07.04.08.02.22
-/auth.h/1.78/Result of merge+Fri Jul  4 08:02:25 2014//D2014.07.04.08.02.22
-/auth1.c/1.81/Result of merge+Fri Jul  4 08:02:25 2014//D2014.07.04.08.02.22
-/auth2-chall.c/1.41/Result of merge//D2014.07.04.08.02.22
-/auth2-gss.c/1.21/Result of merge//D2014.07.04.08.02.22
-/auth2-hostbased.c/1.17/Result of merge//D2014.07.04.08.02.22
-/auth2-kbdint.c/1.6/Result of merge//D2014.07.04.08.02.22
-/auth2-none.c/1.17/Result of merge//D2014.07.04.08.02.22
-/auth2-passwd.c/1.11/Result of merge//D2014.07.04.08.02.22
-/auth2-pubkey.c/1.40/Result of merge//D2014.07.04.08.02.22
-/auth2.c/1.131/Result of merge+Fri Jul  4 08:02:26 2014//D2014.07.04.08.02.22
-/authfd.c/1.93/Result of merge//D2014.07.04.08.02.22
-/authfd.h/1.37/Fri Jan  6 10:00:45 2012//D2014.07.04.08.02.22
-/authfile.c/1.107/Result of merge+Fri Jul  4 08:02:27 2014//D2014.07.04.08.02.22
-/authfile.h/1.18/Result of merge+Fri Jul  4 08:02:27 2014//D2014.07.04.08.02.22
-/blocks.c/1.3/Wed Jul  2 15:59:41 2014//D2014.07.04.08.02.22
-/bufaux.c/1.60/Thu Jul  3 22:19:15 2014//D2014.07.04.08.02.22
-/bufbn.c/1.12/Thu Jul  3 22:19:16 2014//D2014.07.04.08.02.22
-/bufec.c/1.4/Thu Jul  3 22:19:16 2014//D2014.07.04.08.02.22
-/buffer.c/1.36/Thu Jul  3 22:19:16 2014//D2014.07.04.08.02.22
-/buffer.h/1.25/Thu Jul  3 22:19:16 2014//D2014.07.04.08.02.22
-/canohost.c/1.70/Result of merge//D2014.07.04.08.02.22
-/canohost.h/1.11/Fri Jan  6 10:00:45 2012//D2014.07.04.08.02.22
-/chacha.c/1.1/Wed Jul  2 15:59:42 2014//D2014.07.04.08.02.22
-/chacha.h/1.3/Thu Jul  3 13:47:57 2014//D2014.07.04.08.02.22
-/channels.c/1.333/Result of merge+Fri Jul  4 08:02:28 2014//D2014.07.04.08.02.22
-/channels.h/1.114/Result of merge+Fri Jul  4 08:02:28 2014//D2014.07.04.08.02.22
-/cipher-3des1.c/1.11/Result of merge+Fri Jul  4 08:02:29 2014//D2014.07.04.08.02.22
-/cipher-aesctr.c/1.1/Wed Jul  2 15:59:43 2014//D2014.07.04.08.02.22
-/cipher-aesctr.h/1.1/Wed Jul  2 15:59:44 2014//D2014.07.04.08.02.22
-/cipher-bf1.c/1.6/Fri Jan  6 10:00:45 2012//D2014.07.04.08.02.22
-/cipher-chachapoly.c/1.6/Result of merge+Fri Jul  4 08:02:29 2014//D2014.07.04.08.02.22
-/cipher-chachapoly.h/1.4/Result of merge//D2014.07.04.08.02.22
-/cipher.c/1.99/Result of merge+Fri Jul  4 08:02:29 2014//D2014.07.04.08.02.22
-/cipher.h/1.46/Result of merge+Fri Jul  4 08:02:29 2014//D2014.07.04.08.02.22
-/cleanup.c/1.5/Wed Jul  2 15:59:49 2014//D2014.07.04.08.02.22
-/clientloop.c/1.260/Result of merge+Fri Jul  4 08:02:29 2014//D2014.07.04.08.02.22
-/clientloop.h/1.31/Result of merge//D2014.07.04.08.02.22
-/compat.c/1.85/Result of merge//D2014.07.04.08.02.22
-/compat.h/1.45/Result of merge//D2014.07.04.08.02.22
-/compress.c/1.26/Wed Jul  2 15:59:53 2014//D2014.07.04.08.02.22
-/compress.h/1.12/Wed Jul  2 15:59:54 2014//D2014.07.04.08.02.22
-/crc32.c/1.11/Wed Jul  2 15:59:54 2014//D2014.07.04.08.02.22
-/crc32.h/1.15/Wed Jul  2 15:59:55 2014//D2014.07.04.08.02.22
-/crypto_api.h/1.3/Wed Jul  2 15:59:56 2014//D2014.07.04.08.02.22
-/deattack.c/1.30/Fri Jan  6 10:00:46 2012//D2014.07.04.08.02.22
-/deattack.h/1.10/Fri Jan  6 10:00:46 2012//D2014.07.04.08.02.22
-/dh.c/1.53/Result of merge//D2014.07.04.08.02.22
-/dh.h/1.11/Result of merge//D2014.07.04.08.02.22
-/digest-libc.c/1.3/Result of merge+Fri Jul  4 08:02:29 2014//D2014.07.04.08.02.22
-/digest-openssl.c/1.4/Result of merge//D2014.07.04.08.02.22
-/digest.h/1.6/Result of merge+Fri Jul  4 08:02:29 2014//D2014.07.04.08.02.22
-/dispatch.c/1.22/Fri Oct 31 15:05:34 2008//D2014.07.04.08.02.22
-/dispatch.h/1.11/Thu Apr 20 09:27:09 2006//D2014.07.04.08.02.22
-/dns.c/1.31/Result of merge//D2014.07.04.08.02.22
-/dns.h/1.13/Result of merge//D2014.07.04.08.02.22
-/ed25519.c/1.3/Wed Jul  2 16:00:05 2014//D2014.07.04.08.02.22
-/fatal.c/1.7/Wed Jul  2 16:00:05 2014//D2014.07.04.08.02.22
-/fe25519.c/1.3/Wed Jul  2 16:00:05 2014//D2014.07.04.08.02.22
-/fe25519.h/1.3/Wed Jul  2 16:00:05 2014//D2014.07.04.08.02.22
-/ge25519.c/1.3/Wed Jul  2 16:00:06 2014//D2014.07.04.08.02.22
-/ge25519.h/1.3/Wed Jul  2 16:00:07 2014//D2014.07.04.08.02.22
-/ge25519_base.data/1.3/Wed Jul  2 12:28:09 2014//D2014.07.04.08.02.22
-/groupaccess.c/1.14/Wed Jul  2 16:00:09 2014//D2014.07.04.08.02.22
-/groupaccess.h/1.8/Wed Jul  2 16:00:10 2014//D2014.07.04.08.02.22
-/gss-genr.c/1.22/Result of merge//D2014.07.04.08.02.22
-/gss-serv-krb5.c/1.8/Result of merge//D2014.07.04.08.02.22
-/gss-serv.c/1.27/Result of merge//D2014.07.04.08.02.22
-/hash.c/1.3/Wed Jul  2 16:00:10 2014//D2014.07.04.08.02.22
-/hmac.c/1.10/Fri Jan 31 16:39:19 2014//D2014.07.04.08.02.22
-/hmac.h/1.9/Result of merge//D2014.07.04.08.02.22
-/hostfile.c/1.57/Result of merge//D2014.07.04.08.02.22
-/hostfile.h/1.20/Result of merge//D2014.07.04.08.02.22
-/kex.c/1.99/Result of merge//D2014.07.04.08.02.22
-/kex.h/1.64/Result of merge//D2014.07.04.08.02.22
-/kexc25519.c/1.7/Result of merge//D2014.07.04.08.02.22
-/kexc25519c.c/1.4/Sun Jan 12 08:13:13 2014//D2014.07.04.08.02.22
-/kexc25519s.c/1.4/Sun Jan 12 08:13:13 2014//D2014.07.04.08.02.22
-/kexdh.c/1.24/Result of merge//D2014.07.04.08.02.22
-/kexdhc.c/1.15/Result of merge//D2014.07.04.08.02.22
-/kexdhs.c/1.18/Result of merge//D2014.07.04.08.02.22
-/kexecdh.c/1.5/Result of merge//D2014.07.04.08.02.22
-/kexecdhc.c/1.7/Result of merge//D2014.07.04.08.02.22
-/kexecdhs.c/1.10/Result of merge//D2014.07.04.08.02.22
-/kexgex.c/1.28/Result of merge//D2014.07.04.08.02.22
-/kexgexc.c/1.17/Result of merge//D2014.07.04.08.02.22
-/kexgexs.c/1.19/Result of merge//D2014.07.04.08.02.22
-/key.c/1.119/Result of merge+Fri Jul  4 08:02:30 2014//D2014.07.04.08.02.22
-/key.h/1.42/Result of merge+Fri Jul  4 08:02:30 2014//D2014.07.04.08.02.22
-/krl.c/1.17/Result of merge+Fri Jul  4 08:02:30 2014//D2014.07.04.08.02.22
-/krl.h/1.2/Fri Jan 18 00:24:58 2013//D2014.07.04.08.02.22
-/log.c/1.45/Result of merge//D2014.07.04.08.02.22
-/log.h/1.20/Wed Jul  2 16:00:12 2014//D2014.07.04.08.02.22
-/mac.c/1.30/Result of merge//D2014.07.04.08.02.22
-/mac.h/1.8/Result of merge//D2014.07.04.08.02.22
-/match.c/1.29/Result of merge//D2014.07.04.08.02.22
-/match.h/1.15/Wed Jul  2 16:00:12 2014//D2014.07.04.08.02.22
-/misc.c/1.93/Result of merge//D2014.07.04.08.02.22
-/misc.h/1.53/Result of merge//D2014.07.04.08.02.22
-/moduli.c/1.28/Wed Jul  2 16:00:14 2014//D2014.07.04.08.02.22
-/monitor.c/1.134/Result of merge//D2014.07.04.08.02.22
-/monitor.h/1.18/Result of merge//D2014.07.04.08.02.22
-/monitor_fdpass.c/1.19/Wed Jul  2 16:00:20 2014//D2014.07.04.08.02.22
-/monitor_fdpass.h/1.4/Wed Jul  2 16:00:21 2014//D2014.07.04.08.02.22
-/monitor_mm.c/1.19/Wed Jul  2 16:00:22 2014//D2014.07.04.08.02.22
-/monitor_mm.h/1.6/Wed Jul  2 16:00:23 2014//D2014.07.04.08.02.22
-/monitor_wrap.c/1.80/Result of merge//D2014.07.04.08.02.22
-/monitor_wrap.h/1.24/Result of merge//D2014.07.04.08.02.22
-/msg.c/1.15/Mon Mar 19 16:04:54 2012//D2014.07.04.08.02.22
-/msg.h/1.4/Mon Mar 19 16:04:54 2012//D2014.07.04.08.02.22
-/mux.c/1.45/Result of merge//D2014.07.04.08.02.22
-/myproposal.h/1.40/Thu Jul  3 13:47:57 2014//D2014.07.04.08.02.22
-/nchan.c/1.63/Fri Jan  6 10:00:48 2012//D2014.07.04.08.02.22
-/nchan.ms/1.8/Mon Mar 19 16:04:54 2012//D2014.07.04.08.02.22
-/nchan2.ms/1.4/Mon Mar 19 16:04:54 2012//D2014.07.04.08.02.22
-/packet.c/1.197/Result of merge+Fri Jul  4 08:02:30 2014//D2014.07.04.08.02.22
-/packet.h/1.61/Result of merge//D2014.07.04.08.02.22
-/pathnames.h/1.24/Wed Jul  2 16:00:39 2014//D2014.07.04.08.02.22
-/pkcs11.h/1.3/Wed Jul  2 16:00:40 2014//D2014.07.04.08.02.22
-/poly1305.c/1.3/Wed Jul  2 16:00:41 2014//D2014.07.04.08.02.22
-/poly1305.h/1.4/Thu Jul  3 13:47:57 2014//D2014.07.04.08.02.22
-/progressmeter.c/1.40/Result of merge//D2014.07.04.08.02.22
-/progressmeter.h/1.2/Wed Jan 11 09:23:58 2012//D2014.07.04.08.02.22
-/readconf.c/1.219/Result of merge//D2014.07.04.08.02.22
-/readconf.h/1.101/Result of merge//D2014.07.04.08.02.22
-/readpass.c/1.50/Wed Jul  2 16:00:46 2014//D2014.07.04.08.02.22
-/rijndael.c/1.18/Wed Jul  2 16:00:48 2014//D2014.07.04.08.02.22
-/rijndael.h/1.14/Wed Jul  2 16:00:50 2014//D2014.07.04.08.02.22
-/roaming.h/1.6/Mon Mar 19 16:04:54 2012//D2014.07.04.08.02.22
-/roaming_client.c/1.8/Result of merge//D2014.07.04.08.02.22
-/roaming_common.c/1.12/Result of merge//D2014.07.04.08.02.22
-/roaming_dummy.c/1.3/Fri Jan  6 10:00:48 2012//D2014.07.04.08.02.22
-/roaming_serv.c/1.1/Wed Jul  2 16:00:54 2014//D2014.07.04.08.02.22
-/rsa.c/1.32/Result of merge//D2014.07.04.08.02.22
-/rsa.h/1.17/Result of merge//D2014.07.04.08.02.22
-/sandbox-rlimit.c/1.3/Wed Jul  2 16:00:57 2014//D2014.07.04.08.02.22
-/sandbox-systrace.c/1.11/Fri Jul  4 08:02:30 2014//D2014.07.04.08.02.22
-/sc25519.c/1.3/Wed Jul  2 16:01:00 2014//D2014.07.04.08.02.22
-/sc25519.h/1.3/Wed Jul  2 16:01:02 2014//D2014.07.04.08.02.22
-/scp.1/1.62/Wed Jul  2 15:38:10 2014//D2014.07.04.08.02.22
-/scp.c/1.180/Fri Jul  4 08:02:30 2014//D2014.07.04.08.02.22
-/servconf.c/1.249/Result of merge//D2014.07.04.08.02.22
-/servconf.h/1.112/Result of merge//D2014.07.04.08.02.22
-/serverloop.c/1.171/Result of merge//D2014.07.04.08.02.22
-/serverloop.h/1.6/Mon Mar 19 16:04:54 2012//D2014.07.04.08.02.22
-/session.c/1.272/Result of merge//D2014.07.04.08.02.22
-/session.h/1.31/Result of merge//D2014.07.04.08.02.22
-/sftp-client.c/1.115/Result of merge//D2014.07.04.08.02.22
-/sftp-client.h/1.25/Result of merge//D2014.07.04.08.02.22
-/sftp-common.c/1.26/Result of merge//D2014.07.04.08.02.22
-/sftp-common.h/1.11/Mon Mar 19 16:04:54 2012//D2014.07.04.08.02.22
-/sftp-glob.c/1.26/Result of merge//D2014.07.04.08.02.22
-/sftp-server-main.c/1.4/Wed Jul  2 16:01:22 2014//D2014.07.04.08.02.22
-/sftp-server.8/1.25/Mon Jun 30 15:47:43 2014//D2014.07.04.08.02.22
-/sftp-server.c/1.103/Result of merge//D2014.07.04.08.02.22
-/sftp.1/1.99/Wed Jul  2 15:38:10 2014//D2014.07.04.08.02.22
-/sftp.c/1.163/Result of merge//D2014.07.04.08.02.22
-/sftp.h/1.9/Wed Jul  2 16:01:22 2014//D2014.07.04.08.02.22
-/smult_curve25519_ref.c/1.2/Wed Jul  2 16:01:23 2014//D2014.07.04.08.02.22
-/ssh-add.1/1.59/Wed Jul  2 12:28:09 2014//D2014.07.04.08.02.22
-/ssh-add.c/1.112/Result of merge+Fri Jul  4 08:02:31 2014//D2014.07.04.08.02.22
-/ssh-agent.1/1.55/Wed Jul  2 15:38:10 2014//D2014.07.04.08.02.22
-/ssh-agent.c/1.187/Result of merge+Fri Jul  4 08:02:31 2014//D2014.07.04.08.02.22
-/ssh-dss.c/1.32/Result of merge+Fri Jul  4 08:02:31 2014//D2014.07.04.08.02.22
-/ssh-ecdsa.c/1.11/Result of merge+Fri Jul  4 08:02:31 2014//D2014.07.04.08.02.22
-/ssh-ed25519.c/1.4/Result of merge+Fri Jul  4 08:02:31 2014//D2014.07.04.08.02.22
-/ssh-gss.h/1.11/Result of merge//D2014.07.04.08.02.22
-/ssh-keygen.1/1.122/Wed Jul  2 15:38:10 2014//D2014.07.04.08.02.22
-/ssh-keygen.c/1.249/Result of merge+Fri Jul  4 08:02:31 2014//D2014.07.04.08.02.22
-/ssh-keyscan.1/1.35/Wed Jul  2 15:38:10 2014//D2014.07.04.08.02.22
-/ssh-keyscan.c/1.92/Result of merge//D2014.07.04.08.02.22
-/ssh-keysign.8/1.14/Wed Jul  2 12:28:09 2014//D2014.07.04.08.02.22
-/ssh-keysign.c/1.42/Result of merge//D2014.07.04.08.02.22
-/ssh-pkcs11-client.c/1.5/Result of merge//D2014.07.04.08.02.22
-/ssh-pkcs11-helper.8/1.4/Mon Jun 30 15:47:43 2014//D2014.07.04.08.02.22
-/ssh-pkcs11-helper.c/1.8/Result of merge+Fri Jul  4 08:02:31 2014//D2014.07.04.08.02.22
-/ssh-pkcs11.c/1.14/Result of merge//D2014.07.04.08.02.22
-/ssh-pkcs11.h/1.3/Result of merge//D2014.07.04.08.02.22
-/ssh-rsa.c/1.52/Result of merge+Fri Jul  4 08:02:31 2014//D2014.07.04.08.02.22
-/ssh-sandbox.h/1.1/Wed Jul  2 16:01:45 2014//D2014.07.04.08.02.22
-/ssh.1/1.346/Fri Jul  4 08:02:31 2014//D2014.07.04.08.02.22
-/ssh.c/1.405/Result of merge//D2014.07.04.08.02.22
-/ssh.h/1.79/Wed Jul  2 16:01:47 2014//D2014.07.04.08.02.22
-/ssh1.h/1.6/Wed Jul  2 16:01:48 2014//D2014.07.04.08.02.22
-/ssh2.h/1.15/Wed Jul  2 16:01:50 2014//D2014.07.04.08.02.22
-/ssh_config/1.28/Mon Jun 30 15:47:43 2014//D2014.07.04.08.02.22
-/ssh_config.5/1.189/Fri Jul  4 08:02:32 2014//D2014.07.04.08.02.22
-/sshbuf-getput-basic.c/1.1/Thu Jul  3 13:47:57 2014//D2014.07.04.08.02.22
-/sshbuf-getput-crypto.c/1.2/Fri Jul  4 08:02:32 2014//D2014.07.04.08.02.22
-/sshbuf-misc.c/1.2/Fri Jul  4 08:02:32 2014//D2014.07.04.08.02.22
-/sshbuf.c/1.2/Result of merge//D2014.07.04.08.02.22
-/sshbuf.h/1.3/Result of merge//D2014.07.04.08.02.22
-/sshconnect.c/1.249/Result of merge+Fri Jul  4 08:02:32 2014//D2014.07.04.08.02.22
-/sshconnect.h/1.28/Result of merge//D2014.07.04.08.02.22
-/sshconnect1.c/1.75/Result of merge+Fri Jul  4 08:02:32 2014//D2014.07.04.08.02.22
-/sshconnect2.c/1.209/Result of merge+Fri Jul  4 08:02:32 2014//D2014.07.04.08.02.22
-/sshd.8/1.275/Wed Jul  2 15:38:10 2014//D2014.07.04.08.02.22
-/sshd.c/1.427/Result of merge+Fri Jul  4 08:02:32 2014//D2014.07.04.08.02.22
-/sshd_config/1.93/Wed Jul  2 12:28:09 2014//D2014.07.04.08.02.22
-/sshd_config.5/1.173/Wed Jul  2 15:38:10 2014//D2014.07.04.08.02.22
-/ssherr.c/1.1/Thu Jul  3 13:47:57 2014//D2014.07.04.08.02.22
-/ssherr.h/1.1/Thu Jul  3 13:47:57 2014//D2014.07.04.08.02.22
-/sshkey.h/1.1/Tue Jun 24 01:16:58 2014//D2014.07.04.08.02.22
-/sshlogin.c/1.28/Result of merge//D2014.07.04.08.02.22
-/sshlogin.h/1.8/Wed Jul  2 16:02:13 2014//D2014.07.04.08.02.22
-/sshpty.c/1.28/Wed Jul  2 16:02:15 2014//D2014.07.04.08.02.22
-/sshpty.h/1.12/Wed Jul  2 16:02:16 2014//D2014.07.04.08.02.22
-/sshtty.c/1.14/Wed Jul  2 16:02:17 2014//D2014.07.04.08.02.22
-/ttymodes.c/1.29/Mon Mar 19 16:04:54 2012//D2014.07.04.08.02.22
-/ttymodes.h/1.14/Wed Jul  2 16:02:17 2014//D2014.07.04.08.02.22
-/uidswap.c/1.36/Wed Jul  2 16:02:18 2014//D2014.07.04.08.02.22
-/uidswap.h/1.13/Wed Jul  2 16:02:19 2014//D2014.07.04.08.02.22
-/umac.c/1.10/Result of merge//D2014.07.04.08.02.22
-/umac.h/1.3/Wed Jul  2 16:02:21 2014//D2014.07.04.08.02.22
-/uuencode.c/1.27/Wed Jul  2 16:02:22 2014//D2014.07.04.08.02.22
-/uuencode.h/1.14/Wed Jul  2 16:02:24 2014//D2014.07.04.08.02.22
-/verify.c/1.3/Wed Jul  2 16:02:25 2014//D2014.07.04.08.02.22
-/version.h/1.71/Wed Jul  2 16:02:27 2014//D2014.07.04.08.02.22
-/xmalloc.c/1.29/Wed Jul  2 16:02:30 2014//D2014.07.04.08.02.22
-/xmalloc.h/1.14/Wed Jul  2 16:02:31 2014//D2014.07.04.08.02.22
+/krl.h/1.2/Fri Jan 18 00:24:58 2013//
+/log.c/1.45/Result of merge//
+/log.h/1.20/Fri Jul  4 08:03:41 2014//
+/mac.c/1.30/Result of merge//
+/mac.h/1.8/Result of merge//
+/match.c/1.29/Result of merge//
+/match.h/1.15/Fri Jul  4 08:03:41 2014//
+/misc.c/1.93/Result of merge//
+/misc.h/1.53/Result of merge//
+/moduli.c/1.28/Fri Jul  4 08:47:27 2014//
+/monitor.c/1.134/Result of merge//
+/monitor.h/1.18/Result of merge//
+/monitor_fdpass.c/1.19/Fri Jul  4 08:47:27 2014//
+/monitor_fdpass.h/1.4/Fri Jul  4 08:03:41 2014//
+/monitor_mm.c/1.19/Fri Jul  4 09:56:31 2014//
+/monitor_mm.h/1.6/Fri Jul  4 09:56:31 2014//
+/monitor_wrap.c/1.80/Result of merge//
+/monitor_wrap.h/1.24/Result of merge//
+/msg.c/1.15/Mon Mar 19 16:04:54 2012//
+/msg.h/1.4/Mon Mar 19 16:04:54 2012//
+/mux.c/1.45/Result of merge//
+/myproposal.h/1.40/Fri Jul  4 09:56:32 2014//
+/nchan.c/1.63/Fri Jan  6 10:00:48 2012//
+/nchan.ms/1.8/Mon Mar 19 16:04:54 2012//
+/nchan2.ms/1.4/Mon Mar 19 16:04:54 2012//
+/packet.c/1.197/Result of merge//
+/packet.h/1.61/Result of merge//
+/pathnames.h/1.24/Fri Jul  4 08:03:41 2014//
+/pkcs11.h/1.3/Fri Jul  4 09:56:32 2014//
+/poly1305.c/1.3/Fri Jul  4 09:56:32 2014//
+/poly1305.h/1.4/Fri Jul  4 09:56:32 2014//
+/progressmeter.c/1.40/Result of merge//
+/progressmeter.h/1.2/Wed Jan 11 09:23:58 2012//
+/readconf.c/1.219/Result of merge//
+/readconf.h/1.101/Result of merge//
+/readpass.c/1.50/Fri Jul  4 09:56:33 2014//
+/rijndael.c/1.18/Fri Jul  4 08:47:27 2014//
+/rijndael.h/1.14/Fri Jul  4 08:03:41 2014//
+/roaming.h/1.6/Mon Mar 19 16:04:54 2012//
+/roaming_client.c/1.8/Result of merge//
+/roaming_common.c/1.12/Result of merge//
+/roaming_dummy.c/1.3/Fri Jan  6 10:00:48 2012//
+/roaming_serv.c/1.1/Fri Jul  4 08:47:27 2014//
+/rsa.c/1.32/Fri Jul  4 09:56:33 2014//
+/rsa.h/1.17/Fri Jul  4 09:56:33 2014//
+/sandbox-rlimit.c/1.3/Fri Jul  4 08:47:27 2014//
+/sandbox-systrace.c/1.11/Fri Jul  4 09:56:33 2014//
+/sc25519.c/1.3/Fri Jul  4 09:56:33 2014//
+/sc25519.h/1.3/Fri Jul  4 09:56:33 2014//
+/scp.1/1.62/Fri Jul  4 09:56:33 2014//
+/scp.c/1.180/Fri Jul  4 09:56:33 2014//
+/servconf.c/1.250/Result of merge//
+/servconf.h/1.113/Result of merge//
+/serverloop.c/1.171/Result of merge//
+/serverloop.h/1.6/Mon Mar 19 16:04:54 2012//
+/session.c/1.273/Result of merge//
+/session.h/1.31/Result of merge//
+/sftp-client.c/1.115/Result of merge//
+/sftp-client.h/1.25/Result of merge//
+/sftp-common.c/1.26/Result of merge//
+/sftp-common.h/1.11/Mon Mar 19 16:04:54 2012//
+/sftp-glob.c/1.26/Result of merge//
+/sftp-server-main.c/1.4/Fri Jul  4 08:47:27 2014//
+/sftp-server.8/1.25/Mon Jun 30 15:47:43 2014//
+/sftp-server.c/1.103/Result of merge//
+/sftp.1/1.99/Fri Jul  4 09:56:35 2014//
+/sftp.c/1.163/Result of merge//
+/sftp.h/1.9/Fri Jul  4 08:03:42 2014//
+/smult_curve25519_ref.c/1.2/Fri Jul  4 08:47:27 2014//
+/ssh-add.1/1.59/Fri Jul  4 09:56:35 2014//
+/ssh-add.c/1.112/Result of merge//
+/ssh-agent.1/1.55/Fri Jul  4 09:56:35 2014//
+/ssh-agent.c/1.187/Result of merge//
+/ssh-dss.c/1.32/Fri Jul  4 09:56:35 2014//
+/ssh-ecdsa.c/1.11/Fri Jul  4 09:56:35 2014//
+/ssh-ed25519.c/1.4/Result of merge//
+/ssh-gss.h/1.11/Result of merge//
+/ssh-keygen.1/1.122/Fri Jul  4 09:56:35 2014//
+/ssh-keygen.c/1.249/Result of merge//
+/ssh-keyscan.1/1.35/Fri Jul  4 09:56:36 2014//
+/ssh-keyscan.c/1.92/Result of merge//
+/ssh-keysign.8/1.14/Fri Jul  4 09:56:36 2014//
+/ssh-keysign.c/1.42/Result of merge//
+/ssh-pkcs11-client.c/1.5/Result of merge//
+/ssh-pkcs11-helper.8/1.4/Mon Jun 30 15:47:43 2014//
+/ssh-pkcs11-helper.c/1.8/Result of merge//
+/ssh-pkcs11.c/1.14/Result of merge//
+/ssh-pkcs11.h/1.3/Result of merge//
+/ssh-rsa.c/1.52/Result of merge//
+/ssh-sandbox.h/1.1/Fri Jul  4 08:03:42 2014//
+/ssh.1/1.346/Fri Jul  4 09:56:37 2014//
+/ssh.c/1.405/Result of merge//
+/ssh.h/1.79/Fri Jul  4 08:03:42 2014//
+/ssh1.h/1.6/Fri Jul  4 08:03:42 2014//
+/ssh2.h/1.15/Fri Jul  4 09:56:38 2014//
+/ssh_config/1.28/Mon Jun 30 15:47:43 2014//
+/ssh_config.5/1.189/Fri Jul  4 09:56:38 2014//
+/sshbuf-getput-basic.c/1.1/Fri Jul  4 09:56:38 2014//
+/sshbuf-getput-crypto.c/1.2/Fri Jul  4 10:15:29 2014//
+/sshbuf-misc.c/1.2/Fri Jul  4 09:56:38 2014//
+/sshbuf.c/1.2/Result of merge//
+/sshbuf.h/1.3/Result of merge//
+/sshconnect.c/1.250/Result of merge+Fri Jul  4 10:20:48 2014//
+/sshconnect.h/1.28/Result of merge//
+/sshconnect1.c/1.75/Result of merge//
+/sshconnect2.c/1.209/Result of merge//
+/sshd.8/1.276/Fri Jul  4 10:20:48 2014//
+/sshd.c/1.427/Result of merge//
+/sshd_config/1.93/Fri Jul  4 09:56:39 2014//
+/sshd_config.5/1.174/Fri Jul  4 10:20:48 2014//
+/ssherr.c/1.1/Fri Jul  4 09:56:39 2014//
+/ssherr.h/1.1/Fri Jul  4 09:56:39 2014//
+/sshkey.h/1.1/Fri Jul  4 09:56:39 2014//
+/sshlogin.c/1.28/Result of merge//
+/sshlogin.h/1.8/Fri Jul  4 08:03:42 2014//
+/sshpty.c/1.28/Fri Jul  4 08:47:28 2014//
+/sshpty.h/1.12/Fri Jul  4 08:03:42 2014//
+/sshtty.c/1.14/Fri Jul  4 08:47:28 2014//
+/ttymodes.c/1.29/Mon Mar 19 16:04:54 2012//
+/ttymodes.h/1.14/Fri Jul  4 08:03:42 2014//
+/uidswap.c/1.36/Fri Jul  4 09:56:39 2014//
+/uidswap.h/1.13/Fri Jul  4 08:03:42 2014//
+/umac.c/1.10/Result of merge//
+/umac.h/1.3/Fri Jul  4 08:03:42 2014//
+/uuencode.c/1.27/Fri Jul  4 08:47:28 2014//
+/uuencode.h/1.14/Fri Jul  4 08:03:42 2014//
+/verify.c/1.3/Fri Jul  4 09:56:39 2014//
+/version.h/1.71/Fri Jul  4 09:56:39 2014//
+/xmalloc.c/1.29/Fri Jul  4 09:56:39 2014//
+/xmalloc.h/1.14/Fri Jul  4 08:03:42 2014//
+/LICENCE/1.19/Mon Mar 19 16:04:54 2012//
+/Makefile/1.15/Tue Feb  9 08:55:31 2010//
+/Makefile.inc/1.46/Result of merge//
+/OVERVIEW/1.11/Thu Aug  3 03:34:41 2006//
+/PROTOCOL/1.23/Fri Jul  4 09:56:26 2014//
+/PROTOCOL.agent/1.7/Sat Jan 12 14:23:07 2013//
+/PROTOCOL.certkeys/1.9/Thu Aug  9 18:41:57 2012//
+/PROTOCOL.chacha20poly1305/1.2/Fri Jul  4 09:56:26 2014//
+/PROTOCOL.key/1.1/Fri Dec  6 13:34:54 2013//
+/PROTOCOL.krl/1.2/Tue Jun 11 07:25:11 2013//
+/PROTOCOL.mux/1.9/Thu Aug  9 18:41:57 2012//
+/README/1.7/Mon Mar 19 16:04:54 2012//
+/addrmatch.c/1.9/Result of merge//
+/atomicio.c/1.26/Fri Jul  4 08:47:26 2014//
+/atomicio.h/1.11/Fri Jul  4 08:03:40 2014//
+/auth-bsdauth.c/1.13/Result of merge//
+/auth-chall.c/1.14/Result of merge//
+/auth-krb5.c/1.20/Result of merge//
+/auth-options.c/1.63/Result of merge//
+/auth-options.h/1.20/Fri Jan  6 10:00:44 2012//
+/auth-passwd.c/1.43/Mon Mar 19 16:04:54 2012//
+/auth-rh-rsa.c/1.43/Fri Jan  6 10:00:44 2012//
+/auth-rhosts.c/1.44/Mon Mar 19 16:04:54 2012//
+/auth-rsa.c/1.87/Result of merge//
+/auth.c/1.105/Result of merge//
+/auth.h/1.78/Result of merge//
+/auth1.c/1.81/Result of merge//
+/auth2-chall.c/1.41/Result of merge//
+/auth2-gss.c/1.21/Result of merge//
+/auth2-hostbased.c/1.17/Result of merge//
+/auth2-kbdint.c/1.6/Result of merge//
+/auth2-none.c/1.17/Result of merge//
+/auth2-passwd.c/1.11/Result of merge//
+/auth2-pubkey.c/1.40/Result of merge//
+/auth2.c/1.131/Result of merge//
+/authfd.c/1.93/Result of merge//
+/authfd.h/1.37/Fri Jan  6 10:00:45 2012//
+/authfile.c/1.107/Result of merge//
+/authfile.h/1.19/Fri Jul  4 10:20:44 2014//
+/blocks.c/1.3/Fri Jul  4 09:56:26 2014//
+/bufaux.c/1.60/Fri Jul  4 08:47:26 2014//
+/bufbn.c/1.12/Fri Jul  4 08:47:26 2014//
+/bufec.c/1.4/Fri Jul  4 08:47:26 2014//
+/buffer.c/1.36/Fri Jul  4 08:47:26 2014//
+/buffer.h/1.25/Fri Jul  4 08:03:40 2014//
+/canohost.c/1.70/Result of merge//
+/canohost.h/1.11/Fri Jan  6 10:00:45 2012//
+/chacha.c/1.1/Fri Jul  4 08:47:26 2014//
+/chacha.h/1.3/Fri Jul  4 09:56:26 2014//
+/channels.c/1.334/Result of merge//
+/channels.h/1.114/Result of merge//
+/cipher-3des1.c/1.11/Result of merge//
+/cipher-aesctr.c/1.1/Fri Jul  4 08:47:26 2014//
+/cipher-aesctr.h/1.1/Fri Jul  4 08:03:40 2014//
+/cipher-bf1.c/1.6/Fri Jan  6 10:00:45 2012//
+/cipher-chachapoly.c/1.6/Result of merge//
+/cipher-chachapoly.h/1.4/Fri Jul  4 09:56:26 2014//
+/cipher.c/1.99/Fri Jul  4 09:56:26 2014//
+/cipher.h/1.46/Result of merge//
+/cleanup.c/1.5/Fri Jul  4 08:47:26 2014//
+/clientloop.c/1.260/Result of merge//
+/clientloop.h/1.31/Result of merge//
+/compat.c/1.85/Result of merge//
+/compat.h/1.45/Result of merge//
+/compress.c/1.26/Fri Jul  4 09:56:29 2014//
+/compress.h/1.12/Fri Jul  4 09:56:29 2014//
+/crc32.c/1.11/Fri Jul  4 08:47:26 2014//
+/crc32.h/1.15/Fri Jul  4 08:03:40 2014//
+/crypto_api.h/1.3/Fri Jul  4 09:56:29 2014//
+/deattack.c/1.30/Fri Jan  6 10:00:46 2012//
+/deattack.h/1.10/Fri Jan  6 10:00:46 2012//
+/dh.c/1.53/Result of merge//
+/dh.h/1.11/Result of merge//
+/digest-libc.c/1.3/Fri Jul  4 09:56:29 2014//
+/digest-openssl.c/1.4/Fri Jul  4 09:56:29 2014//
+/digest.h/1.6/Result of merge//
+/dispatch.c/1.22/Fri Oct 31 15:05:34 2008//
+/dispatch.h/1.11/Thu Apr 20 09:27:09 2006//
+/dns.c/1.31/Result of merge//
+/dns.h/1.13/Result of merge//
+/ed25519.c/1.3/Fri Jul  4 09:56:29 2014//
+/fatal.c/1.7/Fri Jul  4 08:47:27 2014//
+/fe25519.c/1.3/Fri Jul  4 09:56:29 2014//
+/fe25519.h/1.3/Fri Jul  4 09:56:29 2014//
+/ge25519.c/1.3/Fri Jul  4 09:56:29 2014//
+/ge25519.h/1.3/Fri Jul  4 09:56:29 2014//
+/ge25519_base.data/1.3/Fri Jul  4 09:56:29 2014//
+/groupaccess.c/1.14/Fri Jul  4 08:47:27 2014//
+/groupaccess.h/1.8/Fri Jul  4 08:03:40 2014//
+/gss-genr.c/1.22/Result of merge//
+/gss-serv-krb5.c/1.8/Result of merge//
+/gss-serv.c/1.27/Result of merge//
+/hash.c/1.3/Fri Jul  4 09:56:29 2014//
+/hmac.c/1.10/Fri Jan 31 16:39:19 2014//
+/hmac.h/1.9/Fri Jul  4 09:56:30 2014//
+/hostfile.c/1.57/Result of merge//
+/hostfile.h/1.20/Result of merge//
+/kex.c/1.99/Result of merge//
+/kex.h/1.64/Result of merge//
+/kexc25519.c/1.7/Result of merge//
+/kexc25519c.c/1.4/Sun Jan 12 08:13:13 2014//
+/kexc25519s.c/1.4/Sun Jan 12 08:13:13 2014//
+/kexdh.c/1.24/Result of merge//
+/kexdhc.c/1.15/Result of merge//
+/kexdhs.c/1.18/Result of merge//
+/kexecdh.c/1.5/Result of merge//
+/kexecdhc.c/1.7/Result of merge//
+/kexecdhs.c/1.10/Result of merge//
+/kexgex.c/1.28/Result of merge//
+/kexgexc.c/1.17/Result of merge//
+/kexgexs.c/1.19/Result of merge//
+/key.c/1.119/Fri Jul  4 10:20:45 2014//
+/key.h/1.42/Fri Jul  4 10:20:45 2014//
+/krl.c/1.17/Result of merge//
+/sshkey.c/1.3/Thu Jul  3 01:45:38 2014//
