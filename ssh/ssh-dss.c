@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-dss.c,v 1.31 2014/02/02 03:44:31 djm Exp $ */
+/* $OpenBSD: ssh-dss.c,v 1.32 2014/06/24 01:13:21 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -32,10 +32,16 @@
 
 #include "sshbuf.h"
 #include "compat.h"
+<<<<<<< ssh-dss.c
 #include "ssherr.h"
 #define SSHKEY_INTERNAL
 #include "key.h"
+=======
+#include "ssherr.h"
+>>>>>>> 1.32
 #include "digest.h"
+#define SSHKEY_INTERNAL
+#include "sshkey.h"
 
 #define INTBLOB_LEN	20
 #define SIGBLOB_LEN	(2*INTBLOB_LEN)
@@ -46,6 +52,7 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 {
 	DSA_SIG *sig = NULL;
 	u_char digest[SSH_DIGEST_MAX_LENGTH], sigblob[SIGBLOB_LEN];
+<<<<<<< ssh-dss.c
 	size_t rlen, slen, len;
 	u_int dlen = ssh_digest_bytes(SSH_DIGEST_SHA1);
 	struct sshbuf *b = NULL;
@@ -64,6 +71,30 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	if ((sig = DSA_do_sign(digest, dlen, key->dsa)) == NULL) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
+=======
+	size_t rlen, slen, len, dlen = ssh_digest_bytes(SSH_DIGEST_SHA1);
+	struct sshbuf *b = NULL;
+	int ret = SSH_ERR_INVALID_ARGUMENT;
+
+	if (lenp != NULL)
+		*lenp = 0;
+	if (sigp != NULL)
+		*sigp = NULL;
+
+	if (key == NULL || key->dsa == NULL ||
+	    sshkey_type_plain(key->type) != KEY_DSA)
+		return SSH_ERR_INVALID_ARGUMENT;
+	if (dlen == 0)
+		return SSH_ERR_INTERNAL_ERROR;
+
+	if ((ret = ssh_digest_memory(SSH_DIGEST_SHA1, data, datalen,
+	    digest, sizeof(digest))) != 0)
+		goto out;
+
+	if ((sig = DSA_do_sign(digest, dlen, key->dsa)) == NULL) {
+		ret = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+>>>>>>> 1.32
 	}
 
 	rlen = BN_num_bytes(sig->r);
@@ -76,9 +107,13 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	BN_bn2bin(sig->r, sigblob + SIGBLOB_LEN - INTBLOB_LEN - rlen);
 	BN_bn2bin(sig->s, sigblob + SIGBLOB_LEN - slen);
 
+<<<<<<< ssh-dss.c
 	if (compat & SSH_BUG_SIGBLOB) {
 		if (lenp != NULL)
 			*lenp = SIGBLOB_LEN;
+=======
+	if (compat & SSH_BUG_SIGBLOB) {
+>>>>>>> 1.32
 		if (sigp != NULL) {
 			if ((*sigp = malloc(SIGBLOB_LEN)) == NULL) {
 				ret = SSH_ERR_ALLOC_FAIL;
@@ -86,9 +121,16 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 			}
 			memcpy(*sigp, sigblob, SIGBLOB_LEN);
 		}
+<<<<<<< ssh-dss.c
 		ret = 0;
+=======
+		if (lenp != NULL)
+			*lenp = SIGBLOB_LEN;
+		ret = 0;
+>>>>>>> 1.32
 	} else {
 		/* ietf-drafts */
+<<<<<<< ssh-dss.c
 		if ((b = sshbuf_new()) == NULL) {
 			ret = SSH_ERR_ALLOC_FAIL;
 			goto out;
@@ -97,8 +139,26 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 		    (ret = sshbuf_put_string(b, sigblob, SIGBLOB_LEN)) != 0)
 			goto out;
 		len = sshbuf_len(b);
+=======
+		if ((b = sshbuf_new()) == NULL) {
+			ret = SSH_ERR_ALLOC_FAIL;
+			goto out;
+		}
+		if ((ret = sshbuf_put_cstring(b, "ssh-dss")) != 0 ||
+		    (ret = sshbuf_put_string(b, sigblob, SIGBLOB_LEN)) != 0)
+			goto out;
+		len = sshbuf_len(b);
+		if (sigp != NULL) {
+			if ((*sigp = malloc(len)) == NULL) {
+				ret = SSH_ERR_ALLOC_FAIL;
+				goto out;
+			}
+			memcpy(*sigp, sshbuf_ptr(b), len);
+		}
+>>>>>>> 1.32
 		if (lenp != NULL)
 			*lenp = len;
+<<<<<<< ssh-dss.c
 		if (sigp != NULL) {
 			if ((*sigp = malloc(len)) == NULL) {
 				ret = SSH_ERR_ALLOC_FAIL;
@@ -107,6 +167,9 @@ ssh_dss_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 			memcpy(*sigp, sshbuf_ptr(b), len);
 		}
 		ret = 0;
+=======
+		ret = 0;
+>>>>>>> 1.32
 	}
  out:
 	explicit_bzero(digest, sizeof(digest));
@@ -122,6 +185,7 @@ ssh_dss_verify(const struct sshkey *key,
     const u_char *signature, size_t signaturelen,
     const u_char *data, size_t datalen, u_int compat)
 {
+<<<<<<< ssh-dss.c
 	DSA_SIG *sig = NULL;
 	u_char digest[SSH_DIGEST_MAX_LENGTH], *sigblob = NULL;
 	size_t len;
@@ -134,6 +198,20 @@ ssh_dss_verify(const struct sshkey *key,
 	    key->dsa == NULL) {
 		return SSH_ERR_INVALID_ARGUMENT;
 	}
+=======
+	DSA_SIG *sig = NULL;
+	u_char digest[SSH_DIGEST_MAX_LENGTH], *sigblob = NULL;
+	size_t len, dlen = ssh_digest_bytes(SSH_DIGEST_SHA1);
+	int ret = SSH_ERR_INTERNAL_ERROR;
+	struct sshbuf *b = NULL;
+	char *ktype = NULL;
+
+	if (key == NULL || key->dsa == NULL ||
+	    sshkey_type_plain(key->type) != KEY_DSA)
+		return SSH_ERR_INVALID_ARGUMENT;
+	if (dlen == 0)
+		return SSH_ERR_INTERNAL_ERROR;
+>>>>>>> 1.32
 
 	/* fetch signature */
 	if (compat & SSH_BUG_SIGBLOB) {
@@ -179,6 +257,7 @@ ssh_dss_verify(const struct sshkey *key,
 	}
 
 	/* sha1 the data */
+<<<<<<< ssh-dss.c
 	if (ssh_digest_memory(SSH_DIGEST_SHA1, data, datalen,
 	    digest, sizeof(digest)) != 0) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
@@ -195,6 +274,22 @@ ssh_dss_verify(const struct sshkey *key,
 	default:
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
+=======
+	if ((ret = ssh_digest_memory(SSH_DIGEST_SHA1, data, datalen,
+	    digest, sizeof(digest))) != 0)
+		goto out;
+
+	switch (DSA_do_verify(digest, dlen, sig, key->dsa)) {
+	case 1:
+		ret = 0;
+		break;
+	case 0:
+		ret = SSH_ERR_SIGNATURE_INVALID;
+		goto out;
+	default:
+		ret = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+>>>>>>> 1.32
 	}
 
  out:

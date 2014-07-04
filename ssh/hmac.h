@@ -1,4 +1,4 @@
-/* $OpenBSD: hmac.h,v 1.8 2014/05/02 03:27:54 djm Exp $ */
+/* $OpenBSD: hmac.h,v 1.9 2014/06/24 01:13:21 djm Exp $ */
 /*
  * Copyright (c) 2014 Markus Friedl.  All rights reserved.
  *
@@ -21,6 +21,7 @@
 /* Returns the algorithm's digest length in bytes or 0 for invalid algorithm */
 size_t ssh_hmac_bytes(int alg);
 
+struct sshbuf;
 struct ssh_hmac_ctx;
 struct ssh_hmac_ctx *ssh_hmac_start(int alg);
 

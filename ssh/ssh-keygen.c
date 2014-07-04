@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keygen.c,v 1.246 2014/04/29 18:01:49 markus Exp $ */
+/* $OpenBSD: ssh-keygen.c,v 1.249 2014/07/03 03:47:27 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1994 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -22,6 +22,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <netdb.h>
 #include <pwd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -161,7 +162,7 @@ int rounds = 0;
 /* argv0 */
 extern char *__progname;
 
-char hostname[MAXHOSTNAMELEN];
+char hostname[NI_MAXHOST];
 
 /* moduli.c */
 int gen_candidates(FILE *, u_int32_t, u_int32_t, BIGNUM *);
@@ -483,6 +484,7 @@ do_convert_private_ssh2_from_blob(u_char *blob, u_int blen)
 			sshkey_free(key);
 			return NULL;
 		}
+<<<<<<< ssh-keygen.c
 		buffer_get_bignum_bits(b, key->rsa->d);
 		buffer_get_bignum_bits(b, key->rsa->n);
 		buffer_get_bignum_bits(b, key->rsa->iqmp);
@@ -490,6 +492,16 @@ do_convert_private_ssh2_from_blob(u_char *blob, u_int blen)
 		buffer_get_bignum_bits(b, key->rsa->p);
 		if ((r = rsa_generate_additional_parameters(key->rsa)) != 0)
 			fatal("generate RSA parameters failed: %s", ssh_err(r));
+=======
+		buffer_get_bignum_bits(&b, key->rsa->d);
+		buffer_get_bignum_bits(&b, key->rsa->n);
+		buffer_get_bignum_bits(&b, key->rsa->iqmp);
+		buffer_get_bignum_bits(&b, key->rsa->q);
+		buffer_get_bignum_bits(&b, key->rsa->p);
+		if (rsa_generate_additional_parameters(key->rsa) != 0)
+			fatal("%s: rsa_generate_additional_parameters "
+			    "error", __func__);
+>>>>>>> 1.249
 		break;
 	}
 	rlen = sshbuf_len(b);
@@ -997,7 +1009,11 @@ do_gen_all_hostkeys(struct passwd *pw)
 }
 
 static void
+<<<<<<< ssh-keygen.c
 printhost(FILE *f, const char *name, struct sshkey *public, int ca, int hash)
+=======
+printhost(FILE *f, const char *name, Key *public, int ca, int revoked, int hash)
+>>>>>>> 1.249
 {
 	if (print_fingerprint) {
 		enum sshkey_fp_rep rep;
@@ -1019,9 +1035,16 @@ printhost(FILE *f, const char *name, struct sshkey *public, int ca, int hash)
 
 		if (hash && (name = host_hash(name, NULL, 0)) == NULL)
 			fatal("hash_host failed");
+<<<<<<< ssh-keygen.c
 		fprintf(f, "%s%s%s ", ca ? CA_MARKER : "", ca ? " " : "", name);
 		if ((r = sshkey_write(public, f)) != 0)
 			fatal("key_write failed: %s", ssh_err(r));
+=======
+		fprintf(f, "%s%s%s ", ca ? CA_MARKER " " : "",
+		    revoked ? REVOKE_MARKER " " : "" , name);
+		if (!key_write(public, f))
+			fatal("key_write failed");
+>>>>>>> 1.249
 		fprintf(f, "\n");
 	}
 }
@@ -1034,7 +1057,11 @@ do_known_hosts(struct passwd *pw, const char *name)
 	char *cp, *cp2, *kp, *kp2;
 	char line[16*1024], tmp[MAXPATHLEN], old[MAXPATHLEN];
 	int c, skip = 0, inplace = 0, num = 0, invalid = 0, has_unhashed = 0;
+<<<<<<< ssh-keygen.c
 	int ca, r;
+=======
+	int ca, revoked;
+>>>>>>> 1.249
 	int found_key = 0;
 
 	if (!have_identity) {
@@ -1048,6 +1075,7 @@ do_known_hosts(struct passwd *pw, const char *name)
 	if ((in = fopen(identity_file, "r")) == NULL)
 		fatal("%s: %s: %s", __progname, identity_file, strerror(errno));
 
+	/* XXX this code is a mess; refactor -djm */
 	/*
 	 * Find hosts goes to stdout, hash and deletions happen in-place
 	 * A corner case is ssh-keygen -HF foo, which should go to stdout
@@ -1091,7 +1119,7 @@ do_known_hosts(struct passwd *pw, const char *name)
 				fprintf(out, "%s\n", cp);
 			continue;
 		}
-		/* Check whether this is a CA key */
+		/* Check whether this is a CA key or revocation marker */
 		if (strncasecmp(cp, CA_MARKER, sizeof(CA_MARKER) - 1) == 0 &&
 		    (cp[sizeof(CA_MARKER) - 1] == ' ' ||
 		    cp[sizeof(CA_MARKER) - 1] == '\t')) {
@@ -1099,6 +1127,14 @@ do_known_hosts(struct passwd *pw, const char *name)
 			cp += sizeof(CA_MARKER);
 		} else
 			ca = 0;
+		if (strncasecmp(cp, REVOKE_MARKER,
+		    sizeof(REVOKE_MARKER) - 1) == 0 &&
+		    (cp[sizeof(REVOKE_MARKER) - 1] == ' ' ||
+		    cp[sizeof(REVOKE_MARKER) - 1] == '\t')) {
+ 			revoked = 1;
+			cp += sizeof(REVOKE_MARKER);
+		} else
+			revoked = 0;
 
 		/* Find the end of the host name portion. */
 		for (kp = cp; *kp && *kp != ' ' && *kp != '\t'; kp++)
@@ -1143,21 +1179,34 @@ do_known_hosts(struct passwd *pw, const char *name)
 					if (!quiet)
 						printf("# Host %s found: "
 						    "line %d type %s%s\n", name,
+<<<<<<< ssh-keygen.c
 						    num, sshkey_type(pub),
 						    ca ? " (CA key)" : "");
 					printhost(out, cp, pub, ca, 0);
+=======
+						    num, key_type(pub),
+						    ca ? " (CA key)" :
+						    revoked? " (revoked)" : "");
+					printhost(out, cp, pub, ca, revoked, 0);
+>>>>>>> 1.249
 					found_key = 1;
 				}
 				if (delete_host) {
-					if (!c && !ca)
-						printhost(out, cp, pub, ca, 0);
-					else
+					if (!c || ca || revoked) {
+						printhost(out, cp, pub,
+						    ca, revoked, 0);
+					} else {
 						printf("# Host %s found: "
 						    "line %d type %s\n", name,
+<<<<<<< ssh-keygen.c
 						    num, sshkey_type(pub));
+=======
+						    num, key_type(pub));
+					}
+>>>>>>> 1.249
 				}
 			} else if (hash_hosts)
-				printhost(out, cp, pub, ca, 0);
+				printhost(out, cp, pub, ca, revoked, 0);
 		} else {
 			if (find_host || delete_host) {
 				c = (match_hostname(name, cp,
@@ -1168,38 +1217,47 @@ do_known_hosts(struct passwd *pw, const char *name)
 						    "line %d type %s%s\n", name,
 						    num, sshkey_type(pub),
 						    ca ? " (CA key)" : "");
-					printhost(out, name, pub,
-					    ca, hash_hosts && !ca);
+					printhost(out, name, pub, ca, revoked,
+					    hash_hosts && !(ca || revoked));
 					found_key = 1;
 				}
 				if (delete_host) {
-					if (!c && !ca)
-						printhost(out, cp, pub, ca, 0);
-					else
+					if (!c || ca || revoked) {
+						printhost(out, cp, pub,
+						    ca, revoked, 0);
+					} else {
 						printf("# Host %s found: "
 						    "line %d type %s\n", name,
+<<<<<<< ssh-keygen.c
 						    num, sshkey_type(pub));
+=======
+						    num, key_type(pub));
+					}
+>>>>>>> 1.249
 				}
+			} else if (hash_hosts && (ca || revoked)) {
+				/* Don't hash CA and revoked keys' hostnames */
+				printhost(out, cp, pub, ca, revoked, 0);
+				has_unhashed = 1;
 			} else if (hash_hosts) {
+				/* Hash each hostname separately */
 				for (cp2 = strsep(&cp, ",");
 				    cp2 != NULL && *cp2 != '\0';
 				    cp2 = strsep(&cp, ",")) {
-					if (ca) {
-						fprintf(stderr, "Warning: "
-						    "ignoring CA key for host: "
-						    "%.64s\n", cp2);
-						printhost(out, cp2, pub, ca, 0);
-					} else if (strcspn(cp2, "*?!") !=
+					if (strcspn(cp2, "*?!") !=
 					    strlen(cp2)) {
 						fprintf(stderr, "Warning: "
 						    "ignoring host name with "
 						    "metacharacters: %.64s\n",
 						    cp2);
-						printhost(out, cp2, pub, ca, 0);
-					} else
-						printhost(out, cp2, pub, ca, 1);
+						printhost(out, cp2, pub, ca,
+						    revoked, 0);
+						has_unhashed = 1;
+					} else {
+						printhost(out, cp2, pub, ca,
+						    revoked, 1);
+					}
 				}
-				has_unhashed = 1;
 			}
 		}
 		sshkey_free(pub);
@@ -1953,7 +2011,11 @@ do_show_cert(struct passwd *pw)
 		printf("\n");
 	}
 	printf("        Critical Options: ");
+<<<<<<< ssh-keygen.c
 	if (sshbuf_len(key->cert->critical) == 0)
+=======
+	if (buffer_len(key->cert->critical) == 0)
+>>>>>>> 1.249
 		printf("(none)\n");
 	else {
 		printf("\n");
@@ -1961,7 +2023,11 @@ do_show_cert(struct passwd *pw)
 	}
 	if (!v00) {
 		printf("        Extensions: ");
+<<<<<<< ssh-keygen.c
 		if (sshbuf_len(key->cert->extensions) == 0)
+=======
+		if (buffer_len(key->cert->extensions) == 0)
+>>>>>>> 1.249
 			printf("(none)\n");
 		else {
 			printf("\n");

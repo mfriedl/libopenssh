@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-pkcs11-helper.c,v 1.7 2013/12/02 02:56:17 djm Exp $ */
+/* $OpenBSD: ssh-pkcs11-helper.c,v 1.8 2014/06/24 01:13:21 djm Exp $ */
 /*
  * Copyright (c) 2010 Markus Friedl.  All rights reserved.
  *
@@ -169,6 +169,7 @@ static void
 process_sign(void)
 {
 	u_char *blob, *data, *signature = NULL;
+<<<<<<< ssh-pkcs11-helper.c
 	size_t blen, dlen, slen = 0;
 	int r, ok = -1, ret;
 	struct sshkey *key, *found;
@@ -182,7 +183,22 @@ process_sign(void)
 	if ((r = sshkey_from_blob(blob, blen, &key)) != 0)
 		error("%s: sshkey_from_blob: %s", __func__, ssh_err(r));
 	else {
+=======
+	u_int blen, dlen, slen = 0;
+	int ok = -1;
+	Key *key, *found;
+	Buffer msg;
+
+	blob = get_string(&blen);
+	data = get_string(&dlen);
+	(void)get_int(); /* XXX ignore flags */
+
+	if ((key = key_from_blob(blob, blen)) != NULL) {
+>>>>>>> 1.8
 		if ((found = lookup_key(key)) != NULL) {
+#ifdef WITH_OPENSSL
+			int ret;
+
 			slen = RSA_size(key->rsa);
 			signature = xmalloc(slen);
 			if ((ret = RSA_private_encrypt(dlen, data, signature,
@@ -190,6 +206,7 @@ process_sign(void)
 				slen = ret;
 				ok = 0;
 			}
+#endif /* WITH_OPENSSL */
 		}
 		sshkey_free(key);
 	}

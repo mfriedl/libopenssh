@@ -14,7 +14,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+<<<<<<< cipher-chachapoly.c
 /* $OpenBSD: cipher-chachapoly.c,v 1.5 2014/06/24 01:13:21 djm Exp $ */
+=======
+/* $OpenBSD: cipher-chachapoly.c,v 1.6 2014/07/03 12:42:16 jsing Exp $ */
+>>>>>>> 1.6
 
 #include <sys/types.h>
 #include <stdarg.h> /* needed for log.h */
@@ -63,8 +67,6 @@ chachapoly_crypt(struct chachapoly_ctx *ctx, u_int seqnr, u_char *dest,
 	chacha_ivsetup(&ctx->main_ctx, seqbuf, NULL);
 	chacha_encrypt_bytes(&ctx->main_ctx,
 	    poly_key, poly_key, sizeof(poly_key));
-	/* Set Chacha's block counter to 1 */
-	chacha_ivsetup(&ctx->main_ctx, seqbuf, one);
 
 	/* If decrypting, check tag before anything else */
 	if (!do_encrypt) {
@@ -76,11 +78,15 @@ chachapoly_crypt(struct chachapoly_ctx *ctx, u_int seqnr, u_char *dest,
 			goto out;
 		}
 	}
+
 	/* Crypt additional data */
 	if (aadlen) {
 		chacha_ivsetup(&ctx->header_ctx, seqbuf, NULL);
 		chacha_encrypt_bytes(&ctx->header_ctx, src, dest, aadlen);
 	}
+
+	/* Set Chacha's block counter to 1 */
+	chacha_ivsetup(&ctx->main_ctx, seqbuf, one);
 	chacha_encrypt_bytes(&ctx->main_ctx, src + aadlen,
 	    dest + aadlen, len);
 

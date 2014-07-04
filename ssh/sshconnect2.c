@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.207 2014/04/29 18:01:49 markus Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.209 2014/06/24 01:13:21 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -1062,9 +1062,14 @@ identity_sign(struct identity *id, u_char **sigp, size_t *lenp,
 	 * we have already loaded the private key or
 	 * the private key is stored in external hardware
 	 */
+<<<<<<< sshconnect2.c
 	if (id->isprivate || (id->key->flags & SSHKEY_FLAG_EXT))
 		return (sshkey_sign(id->key, sigp, lenp, data, datalen,
 		    compat));
+=======
+	if (id->isprivate || (id->key->flags & SSHKEY_FLAG_EXT))
+		return (key_sign(id->key, sigp, lenp, data, datalen));
+>>>>>>> 1.209
 	/* load the private key from the file */
 	if ((prv = load_identity_file(id->filename, id->userprovided)) == NULL)
 		return (-1); /* XXX return decent error code */
@@ -1314,7 +1319,11 @@ pubkey_prepare(struct ssh *ssh)
 		found = 0;
 		TAILQ_FOREACH(id2, &files, next) {
 			if (id2->key == NULL ||
+<<<<<<< sshconnect2.c
 			    (id2->key->flags & SSHKEY_FLAG_EXT) != 0)
+=======
+			    (id2->key->flags & SSHKEY_FLAG_EXT) == 0)
+>>>>>>> 1.209
 				continue;
 			if (sshkey_equal(id->key, id2->key)) {
 				TAILQ_REMOVE(&files, id, next);

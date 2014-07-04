@@ -1,4 +1,4 @@
-/* $OpenBSD: digest.h,v 1.4 2014/05/02 03:27:54 djm Exp $ */
+/* $OpenBSD: digest.h,v 1.6 2014/07/03 04:36:45 djm Exp $ */
 /*
  * Copyright (c) 2013 Damien Miller <djm@mindrot.org>
  *
@@ -30,6 +30,7 @@
 #define SSH_DIGEST_SHA512	5
 #define SSH_DIGEST_MAX		6
 
+struct sshbuf;
 struct ssh_digest_ctx;
 
 /* Returns the algorithm's digest length in bytes or 0 for invalid algorithm */
@@ -54,7 +55,12 @@ int ssh_digest_buffer(int alg, const struct sshbuf *b, u_char *d, size_t dlen)
 struct ssh_digest_ctx *ssh_digest_start(int alg);
 int ssh_digest_update(struct ssh_digest_ctx *ctx, const void *m, size_t mlen)
 	__attribute__((__bounded__(__buffer__, 2, 3)));
+<<<<<<< digest.h
 int ssh_digest_update_buffer(struct ssh_digest_ctx *ctx, const struct sshbuf *);
+=======
+int ssh_digest_update_buffer(struct ssh_digest_ctx *ctx,
+    const struct sshbuf *b);
+>>>>>>> 1.6
 int ssh_digest_final(struct ssh_digest_ctx *ctx, u_char *d, size_t dlen)
 	__attribute__((__bounded__(__buffer__, 2, 3)));
 void ssh_digest_free(struct ssh_digest_ctx *ctx);

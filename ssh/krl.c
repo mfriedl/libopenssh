@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $OpenBSD: krl.c,v 1.15 2014/04/28 03:09:18 djm Exp $ */
+/* $OpenBSD: krl.c,v 1.17 2014/06/24 01:13:21 djm Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -352,6 +352,30 @@ ssh_krl_revoke_cert_by_key_id(struct ssh_krl *krl, const struct sshkey *ca_key,
 	return 0;
 }
 
+<<<<<<< krl.c
+=======
+/* Convert "key" to a public key blob without any certificate information */
+static int
+plain_key_blob(const Key *key, u_char **blob, u_int *blen)
+{
+	Key *kcopy;
+	int r;
+
+	if ((kcopy = key_from_private(key)) == NULL)
+		return -1;
+	if (key_is_cert(kcopy)) {
+		if (key_drop_cert(kcopy) != 0) {
+			error("%s: key_drop_cert", __func__);
+			key_free(kcopy);
+			return -1;
+		}
+	}
+	r = key_to_blob(kcopy, blob, blen);
+	free(kcopy);
+	return r;
+}
+
+>>>>>>> 1.17
 /* Revoke a key blob. Ownership of blob is transferred to the tree */
 static int
 revoke_blob(struct revoked_blob_tree *rbt, u_char *blob, u_int len)
@@ -377,9 +401,15 @@ ssh_krl_revoke_key_explicit(struct ssh_krl *krl, const struct sshkey *key)
 	size_t len;
 	int r;
 
+<<<<<<< krl.c
 	debug3("%s: revoke type %s", __func__, sshkey_type(key));
 	if ((r = sshkey_plain_to_blob(key, &blob, &len)) != 0)
 		return r;
+=======
+	debug3("%s: revoke type %s", __func__, key_type(key));
+	if (plain_key_blob(key, &blob, &len) < 0)
+		return -1;
+>>>>>>> 1.17
 	return revoke_blob(&krl->revoked_keys, blob, len);
 }
 
@@ -557,9 +587,16 @@ revoked_certs_generate(struct revoked_certs *rc, struct sshbuf *buf)
 				bitmap = NULL;
 				break;
 			}
+<<<<<<< krl.c
 			if ((r = sshbuf_put_u8(buf, state)) != 0 ||
 			    (r = sshbuf_put_stringb(buf, sect)) != 0)
 				goto out;
+=======
+			buffer_put_char(buf, state);
+			buffer_put_string(buf,
+			    buffer_ptr(&sect), buffer_len(&sect));
+			buffer_clear(&sect);
+>>>>>>> 1.17
 		}
 
 		/* If we are starting a new section then prepare it now */
@@ -1092,8 +1129,13 @@ is_key_revoked(struct ssh_krl *krl, const struct sshkey *key)
 
 	/* Next, explicit keys */
 	memset(&rb, 0, sizeof(rb));
+<<<<<<< krl.c
 	if ((r = sshkey_plain_to_blob(key, &rb.blob, &rb.len)) != 0)
 		return r;
+=======
+	if (plain_key_blob(key, &rb.blob, &rb.len) < 0)
+		return -1;
+>>>>>>> 1.17
 	erb = RB_FIND(revoked_blob_tree, &krl->revoked_keys, &rb);
 	free(rb.blob);
 	if (erb != NULL) {

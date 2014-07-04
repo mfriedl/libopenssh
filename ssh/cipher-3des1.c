@@ -1,4 +1,4 @@
-/* $OpenBSD: cipher-3des1.c,v 1.10 2014/02/02 03:44:31 djm Exp $ */
+/* $OpenBSD: cipher-3des1.c,v 1.11 2014/07/02 04:59:06 djm Exp $ */
 /*
  * Copyright (c) 2003 Markus Friedl.  All rights reserved.
  *
@@ -27,7 +27,15 @@
 #include <string.h>
 #include <openssl/evp.h>
 
+<<<<<<< cipher-3des1.c
 #include "ssherr.h"
+=======
+#include <string.h>
+
+#include "xmalloc.h"
+#include "log.h"
+#include "ssherr.h"
+>>>>>>> 1.11
 
 /*
  * This is used by SSH1:

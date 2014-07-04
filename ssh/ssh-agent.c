@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-agent.c,v 1.185 2014/04/29 18:01:49 markus Exp $ */
+/* $OpenBSD: ssh-agent.c,v 1.187 2014/07/03 03:11:03 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -113,6 +113,9 @@ int max_fd = 0;
 /* pid of shell == parent of agent */
 pid_t parent_pid = -1;
 time_t parent_alive_interval = 0;
+
+/* pid of process for which cleanup_socket is applicable */
+pid_t cleanup_pid = 0;
 
 /* pathname and directory for AUTH_SOCKET */
 char socket_name[MAXPATHLEN];
@@ -298,12 +301,17 @@ process_authentication_challenge1(SocketEntry *e)
 	if (id != NULL && (!id->confirm || confirm_key(id) == 0)) {
 		struct sshkey *private = id->key;
 		/* Decrypt the challenge using the private key. */
+<<<<<<< ssh-agent.c
 		if ((r = rsa_private_decrypt(challenge, challenge,
 		    private->rsa) != 0)) {
 			fatal("%s: rsa_public_encrypt: %s", __func__,
 			    ssh_err(r));
 			goto failure;	/* XXX ? */
 		}
+=======
+		if (rsa_private_decrypt(challenge, challenge, private->rsa) != 0)
+			goto failure;
+>>>>>>> 1.187
 
 		/* The response is MD5 of decrypted challenge plus session id */
 		len = BN_num_bytes(challenge);
@@ -392,13 +400,23 @@ process_sign_request2(SocketEntry *e)
 static void
 process_remove_identity(SocketEntry *e, int version)
 {
+<<<<<<< ssh-agent.c
 	size_t blen;
 	u_int bits;
 	int r, success = 0;
 	struct sshkey *key = NULL;
+=======
+	u_int blen;
+	int success = 0;
+	Key *key = NULL;
+>>>>>>> 1.187
 	u_char *blob;
+#ifdef WITH_SSH1
+	u_int bits;
+#endif /* WITH_SSH1 */
 
 	switch (version) {
+#ifdef WITH_SSH1
 	case 1:
 		if ((key = sshkey_new(KEY_RSA1)) == NULL) {
 			error("%s: sshkey_new failed", __func__);
@@ -414,6 +432,7 @@ process_remove_identity(SocketEntry *e, int version)
 			    "actual %u, announced %u",
 			    sshkey_size(key), bits);
 		break;
+#endif /* WITH_SSH1 */
 	case 2:
 		if ((r = sshbuf_get_string(e->request, &blob, &blen)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
@@ -555,13 +574,41 @@ process_add_identity(SocketEntry *e, int version)
 	int r = SSH_ERR_INTERNAL_ERROR;
 
 	switch (version) {
+#ifdef WITH_SSH1
 	case 1:
+<<<<<<< ssh-agent.c
 		r = agent_decode_rsa1(e->request, &k);
+=======
+		k = key_new_private(KEY_RSA1);
+		(void) buffer_get_int(&e->request);		/* ignored */
+		buffer_get_bignum(&e->request, k->rsa->n);
+		buffer_get_bignum(&e->request, k->rsa->e);
+		buffer_get_bignum(&e->request, k->rsa->d);
+		buffer_get_bignum(&e->request, k->rsa->iqmp);
+
+		/* SSH and SSL have p and q swapped */
+		buffer_get_bignum(&e->request, k->rsa->q);	/* p */
+		buffer_get_bignum(&e->request, k->rsa->p);	/* q */
+
+		/* Generate additional parameters */
+		if (rsa_generate_additional_parameters(k->rsa) != 0)
+			fatal("%s: rsa_generate_additional_parameters "
+			    "error", __func__);
+
+		/* enable blinding */
+		if (RSA_blinding_on(k->rsa, NULL) != 1) {
+			error("process_add_identity: RSA_blinding_on failed");
+			key_free(k);
+			goto send;
+		}
+>>>>>>> 1.187
 		break;
+#endif /* WITH_SSH1 */
 	case 2:
 		r = sshkey_private_deserialize(e->request, &k);
 		break;
 	}
+<<<<<<< ssh-agent.c
 	if (r != 0 || k == NULL ||
 	    (r = sshbuf_get_cstring(e->request, &comment, NULL)) != 0) {
 		error("%s: decode private key: %s", __func__, ssh_err(r));
@@ -574,6 +621,14 @@ process_add_identity(SocketEntry *e, int version)
 			goto err;
 		}
 		switch (ctype) {
+=======
+	if (k == NULL)
+		goto send;
+	comment = buffer_get_string(&e->request, NULL);
+
+	while (buffer_len(&e->request)) {
+		switch ((type = buffer_get_char(&e->request))) {
+>>>>>>> 1.187
 		case SSH_AGENT_CONSTRAIN_LIFETIME:
 			if ((r = sshbuf_get_u32(e->request, &seconds)) != 0) {
 				error("%s: bad lifetime constraint: %s",
@@ -1048,6 +1103,9 @@ after_select(fd_set *readset, fd_set *writeset)
 static void
 cleanup_socket(void)
 {
+	if (cleanup_pid != 0 && getpid() != cleanup_pid)
+		return;
+	debug("%s: cleanup", __func__);
 	if (socket_name[0])
 		unlink(socket_name);
 	if (socket_dir[0])
@@ -1299,6 +1357,8 @@ main(int ac, char **av)
 	}
 
 skip:
+
+	cleanup_pid = getpid();
 
 #ifdef ENABLE_PKCS11
 	pkcs11_init(0);

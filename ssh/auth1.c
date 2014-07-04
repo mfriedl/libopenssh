@@ -1,4 +1,4 @@
-/* $OpenBSD: auth1.c,v 1.80 2014/02/02 03:44:31 djm Exp $ */
+/* $OpenBSD: auth1.c,v 1.81 2014/07/03 11:16:55 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -312,7 +312,11 @@ do_authloop(struct ssh *ssh)
 			return;
 
 		if (++authctxt->failures >= options.max_authtries)
+<<<<<<< auth1.c
 			ssh_packet_disconnect(ssh, AUTH_FAIL_MSG, authctxt->user);
+=======
+			auth_maxtries_exceeded(authctxt);
+>>>>>>> 1.81
 
 		if ((r = sshpkt_start(ssh, SSH_SMSG_FAILURE)) != 0 ||
 		    (r = sshpkt_send(ssh)) != 0)

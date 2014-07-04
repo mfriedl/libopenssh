@@ -1,4 +1,4 @@
-/*	$OpenBSD: sshbuf.h,v 1.1 2014/04/30 05:29:56 djm Exp $	*/
+/*	$OpenBSD: sshbuf.h,v 1.3 2014/06/24 01:13:21 djm Exp $	*/
 /*
  * Copyright (c) 2011 Damien Miller
  *
@@ -186,16 +186,19 @@ int	sshbuf_peek_string_direct(const struct sshbuf *buf, const u_char **valp,
  */
 int	sshbuf_get_bignum2(struct sshbuf *buf, BIGNUM *v);
 int	sshbuf_get_bignum1(struct sshbuf *buf, BIGNUM *v);
-int	sshbuf_get_ec(struct sshbuf *buf, EC_POINT *v, const EC_GROUP *g);
-int	sshbuf_get_eckey(struct sshbuf *buf, EC_KEY *v);
 int	sshbuf_put_bignum2(struct sshbuf *buf, const BIGNUM *v);
 int	sshbuf_put_bignum1(struct sshbuf *buf, const BIGNUM *v);
+int	sshbuf_put_bignum2_bytes(struct sshbuf *buf, const void *v, size_t len);
+int	sshbuf_get_ec(struct sshbuf *buf, EC_POINT *v, const EC_GROUP *g);
+int	sshbuf_get_eckey(struct sshbuf *buf, EC_KEY *v);
 int	sshbuf_put_ec(struct sshbuf *buf, const EC_POINT *v, const EC_GROUP *g);
 int	sshbuf_put_eckey(struct sshbuf *buf, const EC_KEY *v);
-int	sshbuf_put_bignum2_bytes(struct sshbuf *buf, const void *v, size_t len);
 
-/* Dump the contents of the buffer to stderr in a human-readable format */
+/* Dump the contents of the buffer in a human-readable format */
 void	sshbuf_dump(struct sshbuf *buf, FILE *f);
+
+/* Dump specified memory in a human-readable format */
+void	sshbuf_dump_data(const void *s, size_t len, FILE *f);
 
 /* Return the hexadecimal representation of the contents of the buffer */
 char	*sshbuf_dtob16(struct sshbuf *buf);

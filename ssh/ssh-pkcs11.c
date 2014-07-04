@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-pkcs11.c,v 1.13 2014/05/02 03:27:54 djm Exp $ */
+/* $OpenBSD: ssh-pkcs11.c,v 1.14 2014/06/24 01:13:21 djm Exp $ */
 /*
  * Copyright (c) 2010 Markus Friedl.  All rights reserved.
  *

@@ -1,5 +1,6 @@
-/* $OpenBSD: key.c,v 1.117 2014/04/29 18:01:49 markus Exp $ */
+/* $OpenBSD: key.c,v 1.119 2014/06/30 12:54:39 djm Exp $ */
 /*
+<<<<<<< key.c
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Alexander von Gernler.  All rights reserved.
  * Copyright (c) 2010,2011 Damien Miller.  All rights reserved.
@@ -23,24 +24,41 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+=======
+ * placed in the public domain
+>>>>>>> 1.119
  */
 
 #include <sys/param.h>
 #include <sys/types.h>
+<<<<<<< key.c
 
 #include <openssl/evp.h>
 #include "crypto_api.h"
 
 #include <errno.h>
+=======
+#include <errno.h>
+#include <stdarg.h>
+>>>>>>> 1.119
 #include <stdio.h>
-#include <string.h>
 
+<<<<<<< key.c
 #include "ssh2.h"
 #include "ssherr.h"
 #include "misc.h"
 #include "sshbuf.h"
 #include "rsa.h"
+=======
+#define SSH_KEY_NO_DEFINE
+#include "key.h"
+
+#include "compat.h"
+#include "sshkey.h"
+#include "ssherr.h"
+>>>>>>> 1.119
 #include "log.h"
+<<<<<<< key.c
 #include "digest.h"
 #define SSHKEY_INTERNAL
 #include "key.h"
@@ -412,10 +430,14 @@ sshkey_new(int type)
 
 	return k;
 }
+=======
+#include "authfile.h"
+>>>>>>> 1.119
 
 int
 sshkey_add_private(struct sshkey *k)
 {
+<<<<<<< key.c
 	switch (k->type) {
 #ifdef WITH_OPENSSL
 	case KEY_RSA1:
@@ -453,13 +475,24 @@ sshkey_add_private(struct sshkey *k)
 		return SSH_ERR_INVALID_ARGUMENT;
 	}
 	return 0;
+=======
+	int r;
+
+	if ((r = sshkey_add_private(k)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+>>>>>>> 1.119
 }
 
 struct sshkey *
 sshkey_new_private(int type)
 {
+<<<<<<< key.c
 	struct sshkey *k = sshkey_new(type);
+=======
+	Key *ret = NULL;
+>>>>>>> 1.119
 
+<<<<<<< key.c
 	if (k == NULL)
 		return NULL;
 	if (sshkey_add_private(k) != 0) {
@@ -728,12 +761,18 @@ int
 sshkey_plain_to_blob(const struct sshkey *key, u_char **blobp, size_t *lenp)
 {
 	return to_blob(key, blobp, lenp, 1);
+=======
+	if ((ret = sshkey_new_private(type)) == NULL)
+		fatal("%s: failed", __func__);
+	return ret;
+>>>>>>> 1.119
 }
 
 u_char*
 sshkey_fingerprint_raw(const struct sshkey *k, enum sshkey_fp_type dgst_type,
     size_t *dgst_raw_length)
 {
+<<<<<<< key.c
 	u_char *blob = NULL;
 	u_char *retval = NULL;
 	size_t len = 0;
@@ -1056,9 +1095,26 @@ read_decimal_bignum(char **cpp, BIGNUM *v)
 #endif
 
 /* returns 0 ok, and < 0 error */
+=======
+	u_char *ret = NULL;
+	size_t dlen;
+	int r;
+
+	if (dgst_raw_length != NULL)
+		*dgst_raw_length = 0;
+	if ((r = sshkey_fingerprint_raw(k, dgst_type, &ret, &dlen)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	if (dlen > INT_MAX)
+		fatal("%s: giant len %zu", __func__, dlen);
+	*dgst_raw_length = dlen;
+	return ret;
+}
+
+>>>>>>> 1.119
 int
 sshkey_read(struct sshkey *ret, char **cpp)
 {
+<<<<<<< key.c
 	struct sshkey *k;
 	int retval = SSH_ERR_INVALID_FORMAT;
 	char *cp, *ep, *space;
@@ -1210,11 +1266,15 @@ sshkey_read(struct sshkey *ret, char **cpp)
 		return SSH_ERR_INVALID_ARGUMENT;
 	}
 	return retval;
+=======
+	return sshkey_read(ret, cpp) == 0 ? 1 : -1;
+>>>>>>> 1.119
 }
 
 int
 sshkey_write(const struct sshkey *key, FILE *f)
 {
+<<<<<<< key.c
 	int ret = SSH_ERR_INTERNAL_ERROR;
 	char *uu = NULL;
 	struct sshbuf *b = NULL, *bb = NULL;
@@ -1305,8 +1365,12 @@ sshkey_write(const struct sshkey *key, FILE *f)
 		OPENSSL_free(dec_n);
 #endif
 	return ret;
+=======
+	return sshkey_write(key, f) == 0 ? 1 : 0;
+>>>>>>> 1.119
 }
 
+<<<<<<< key.c
 const char *
 sshkey_cert_type(const struct sshkey *k)
 {
@@ -1378,9 +1442,20 @@ dsa_generate_private_key(u_int bits, DSA **dsap)
  out:
 	if (private != NULL)
 		DSA_free(private);
+=======
+Key *
+key_generate(int type, u_int bits)
+{
+	int r;
+	Key *ret = NULL;
+
+	if ((r = sshkey_generate(type, bits, &ret)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+>>>>>>> 1.119
 	return ret;
 }
 
+<<<<<<< key.c
 int
 sshkey_ecdsa_bits_to_nid(int bits)
 {
@@ -1520,7 +1595,12 @@ sshkey_generate(int type, u_int bits, struct sshkey **keyp)
 
 int
 sshkey_cert_copy(const struct sshkey *from_key, struct sshkey *to_key)
+=======
+void
+key_cert_copy(const Key *from_key, Key *to_key)
+>>>>>>> 1.119
 {
+<<<<<<< key.c
 	u_int i;
 	const struct sshkey_cert *from;
 	struct sshkey_cert *to;
@@ -1533,7 +1613,11 @@ sshkey_cert_copy(const struct sshkey *from_key, struct sshkey *to_key)
 
 	if ((from = from_key->cert) == NULL)
 		return SSH_ERR_INVALID_ARGUMENT;
+=======
+	int r;
+>>>>>>> 1.119
 
+<<<<<<< key.c
 	if ((to = to_key->cert = cert_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 
@@ -1572,11 +1656,16 @@ sshkey_cert_copy(const struct sshkey *from_key, struct sshkey *to_key)
 	}
 	to->nprincipals = from->nprincipals;
 	return 0;
+=======
+	if ((r = sshkey_cert_copy(from_key, to_key)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+>>>>>>> 1.119
 }
 
 int
 sshkey_from_private(const struct sshkey *k, struct sshkey **pkp)
 {
+<<<<<<< key.c
 	struct sshkey *n = NULL;
 	int ret = SSH_ERR_INTERNAL_ERROR;
 
@@ -1656,7 +1745,12 @@ int
 sshkey_names_valid2(const char *names)
 {
 	char *s, *cp, *p;
+=======
+	int r;
+	Key *ret = NULL;
+>>>>>>> 1.119
 
+<<<<<<< key.c
 	if (names == NULL || strcmp(names, "") == 0)
 		return 0;
 	if ((s = cp = strdup(names)) == NULL)
@@ -1803,13 +1897,23 @@ cert_parse(struct sshbuf *b, struct sshkey *key, const u_char *blob,
 	free(exts);
 	free(sig_key);
 	free(sig);
+=======
+	if ((r = sshkey_from_private(k, &ret)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+>>>>>>> 1.119
 	return ret;
 }
 
+<<<<<<< key.c
 static int
 sshkey_from_blob_internal(const u_char *blob, size_t blen,
     struct sshkey **keyp, int allow_cert)
+=======
+static void
+fatal_on_fatal_errors(int r, const char *func, int extra_fatal)
+>>>>>>> 1.119
 {
+<<<<<<< key.c
 	struct sshbuf *b = NULL;
 	int type, nid = -1, ret = SSH_ERR_INTERNAL_ERROR;
 	char *ktype = NULL, *curve = NULL;
@@ -1988,23 +2092,56 @@ sshkey_from_blob_internal(const u_char *blob, size_t blen,
 		EC_POINT_free(q);
 #endif
 	return ret;
+=======
+	if (r == SSH_ERR_INTERNAL_ERROR ||
+	    r == SSH_ERR_ALLOC_FAIL ||
+	    (extra_fatal != 0 && r == extra_fatal))
+		fatal("%s: %s", func, ssh_err(r));
+>>>>>>> 1.119
 }
 
 int
 sshkey_from_blob(const u_char *blob, size_t blen, struct sshkey **keyp)
 {
+<<<<<<< key.c
 	return sshkey_from_blob_internal(blob, blen, keyp, 1);
+=======
+	int r;
+	Key *ret = NULL;
+
+	if ((r = sshkey_from_blob(blob, blen, &ret)) != 0) {
+		fatal_on_fatal_errors(r, __func__, 0);
+		error("%s: %s", __func__, ssh_err(r));
+		return NULL;
+	}
+	return ret;
+>>>>>>> 1.119
 }
 
+<<<<<<< key.c
 int
 sshkey_sign(const struct sshkey *key,
     u_char **sigp, size_t *lenp,
     const u_char *data, size_t datalen, u_int compat)
+=======
+int
+key_to_blob(const Key *key, u_char **blobp, u_int *lenp)
+>>>>>>> 1.119
 {
+<<<<<<< key.c
 	if (sigp != NULL)
 		*sigp = NULL;
+=======
+	u_char *blob;
+	size_t blen;
+	int r;
+
+	if (blobp != NULL)
+		*blobp = NULL;
+>>>>>>> 1.119
 	if (lenp != NULL)
 		*lenp = 0;
+<<<<<<< key.c
 	if (datalen > SSH_KEY_MAX_SIGN_DATA_SIZE)
 		return SSH_ERR_INVALID_ARGUMENT;
 	switch (key->type) {
@@ -2032,14 +2169,67 @@ sshkey_sign(const struct sshkey *key,
 /*
  * ssh_key_verify returns 0 for a correct signature  and < 0 on error.
  */
+=======
+	if ((r = sshkey_to_blob(key, &blob, &blen)) != 0) {
+		fatal_on_fatal_errors(r, __func__, 0);
+		error("%s: %s", __func__, ssh_err(r));
+		return 0;
+	}
+	if (blen > INT_MAX)
+		fatal("%s: giant len %zu", __func__, blen);
+	if (blobp != NULL)
+		*blobp = blob;
+	if (lenp != NULL)
+		*lenp = blen;
+	return blen;
+}
+
 int
+key_sign(const Key *key, u_char **sigp, u_int *lenp,
+    const u_char *data, u_int datalen)
+{
+	int r;
+	u_char *sig;
+	size_t siglen;
+
+	if (sigp != NULL)
+		*sigp = NULL;
+	if (lenp != NULL)
+		*lenp = 0;
+	if ((r = sshkey_sign(key, &sig, &siglen,
+	    data, datalen, datafellows)) != 0) {
+		fatal_on_fatal_errors(r, __func__, 0);
+		error("%s: %s", __func__, ssh_err(r));
+		return -1;
+	}
+	if (siglen > INT_MAX)
+		fatal("%s: giant len %zu", __func__, siglen);
+	if (sigp != NULL)
+		*sigp = sig;
+	if (lenp != NULL)
+		*lenp = siglen;
+	return 0;
+}
+
+>>>>>>> 1.119
+int
+<<<<<<< key.c
 sshkey_verify(const struct sshkey *key,
     const u_char *sig, size_t siglen,
     const u_char *data, size_t dlen, u_int compat)
+=======
+key_verify(const Key *key, const u_char *signature, u_int signaturelen,
+    const u_char *data, u_int datalen)
+>>>>>>> 1.119
 {
+<<<<<<< key.c
 	if (siglen == 0)
 		return -1;
+=======
+	int r;
+>>>>>>> 1.119
 
+<<<<<<< key.c
 	if (dlen > SSH_KEY_MAX_SIGN_DATA_SIZE)
 		return SSH_ERR_INVALID_ARGUMENT;
 	switch (key->type) {
@@ -2061,19 +2251,38 @@ sshkey_verify(const struct sshkey *key,
 		return ssh_ed25519_verify(key, sig, siglen, data, dlen, compat);
 	default:
 		return SSH_ERR_KEY_TYPE_UNKNOWN;
+=======
+	if ((r = sshkey_verify(key, signature, signaturelen,
+	    data, datalen, datafellows)) != 0) {
+		fatal_on_fatal_errors(r, __func__, 0);
+		error("%s: %s", __func__, ssh_err(r));
+		return r == SSH_ERR_SIGNATURE_INVALID ? 0 : -1;
+>>>>>>> 1.119
 	}
+	return 1;
 }
 
+<<<<<<< key.c
 /* Converts a private to a public key */
 int
 sshkey_demote(const struct sshkey *k, struct sshkey **dkp)
+=======
+Key *
+key_demote(const Key *k)
+>>>>>>> 1.119
 {
+<<<<<<< key.c
 	struct sshkey *pk;
 	int ret = SSH_ERR_INTERNAL_ERROR;
 
 	if (dkp != NULL)
 		*dkp = NULL;
+=======
+	int r;
+	Key *ret = NULL;
+>>>>>>> 1.119
 
+<<<<<<< key.c
 	if ((pk = calloc(1, sizeof(*pk))) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	pk->type = k->type;
@@ -2154,16 +2363,30 @@ sshkey_demote(const struct sshkey *k, struct sshkey **dkp)
 	}
 	*dkp = pk;
 	return 0;
+=======
+	if ((r = sshkey_demote(k, &ret)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+	return ret;
+>>>>>>> 1.119
 }
 
 int
+<<<<<<< key.c
 sshkey_is_cert(const struct sshkey *k)
+=======
+key_to_certified(Key *k, int legacy)
+>>>>>>> 1.119
 {
+<<<<<<< key.c
 	if (k == NULL)
 		return 0;
 	return sshkey_type_is_cert(k->type);
 }
+=======
+	int r;
+>>>>>>> 1.119
 
+<<<<<<< key.c
 /* Return the cert-less equivalent to a certified key type */
 int
 sshkey_type_plain(int type)
@@ -2193,24 +2416,41 @@ sshkey_to_certified(struct sshkey *k, int legacy)
 	cert_free(k->cert);
 	k->type = sshkey_type_plain(k->type);
 	return 0;
+=======
+	if ((r = sshkey_to_certified(k, legacy)) != 0) {
+		fatal_on_fatal_errors(r, __func__, 0);
+		error("%s: %s", __func__, ssh_err(r));
+		return -1;
+	}
+	return 0;
+>>>>>>> 1.119
 }
 
-/* Convert a certificate to its raw key equivalent */
 int
 sshkey_drop_cert(struct sshkey *k)
 {
+<<<<<<< key.c
 	if (!sshkey_type_is_cert(k->type))
 		return SSH_ERR_KEY_TYPE_UNKNOWN;
 	cert_free(k->cert);
 	k->cert = NULL;
 	k->type = sshkey_type_plain(k->type);
+=======
+	int r;
+
+	if ((r = sshkey_drop_cert(k)) != 0) {
+		fatal_on_fatal_errors(r, __func__, 0);
+		error("%s: %s", __func__, ssh_err(r));
+		return -1;
+	}
+>>>>>>> 1.119
 	return 0;
 }
 
-/* Sign a certified key, (re-)generating the signed certblob. */
 int
 sshkey_certify(struct sshkey *k, struct sshkey *ca)
 {
+<<<<<<< key.c
 	struct sshbuf *principals = NULL;
 	u_char *ca_blob = NULL, *sig_blob = NULL, nonce[32];
 	size_t i, ca_len, sig_len;
@@ -2242,7 +2482,35 @@ sshkey_certify(struct sshkey *k, struct sshkey *ca)
 
 	/* XXX this substantially duplicates to_blob(); refactor */
 	switch (k->type) {
+=======
+	int r;
+
+	if ((r = sshkey_certify(k, ca)) != 0) {
+		fatal_on_fatal_errors(r, __func__, 0);
+		error("%s: %s", __func__, ssh_err(r));
+		return -1;
+	}
+	return 0;
+}
+
+int
+key_cert_check_authority(const Key *k, int want_host, int require_principal,
+    const char *name, const char **reason)
+{
+	int r;
+
+	if ((r = sshkey_cert_check_authority(k, want_host, require_principal,
+	    name, reason)) != 0) {
+		fatal_on_fatal_errors(r, __func__, 0);
+		error("%s: %s", __func__, ssh_err(r));
+		return -1;
+	}
+	return 0;
+}
+
+>>>>>>> 1.119
 #ifdef WITH_OPENSSL
+<<<<<<< key.c
 	case KEY_DSA_CERT_V00:
 	case KEY_DSA_CERT:
 		if ((ret = sshbuf_put_bignum2(cert, k->dsa->p)) != 0 ||
@@ -2305,7 +2573,14 @@ sshkey_certify(struct sshkey *k, struct sshkey *ca)
 		if ((ret = sshbuf_put_stringb(cert, k->cert->extensions)) != 0)
 			goto out;
 	}
+=======
+int
+key_ec_validate_public(const EC_GROUP *group, const EC_POINT *public)
+{
+	int r;
+>>>>>>> 1.119
 
+<<<<<<< key.c
 	/* -v00 certs put the nonce at the end */
 	if (sshkey_cert_is_legacy(k)) {
 		if ((ret = sshbuf_put_string(cert, nonce, sizeof(nonce))) != 0)
@@ -2335,16 +2610,28 @@ sshkey_certify(struct sshkey *k, struct sshkey *ca)
 	if (principals != NULL)
 		sshbuf_free(principals);
 	return ret;
+=======
+	if ((r = sshkey_ec_validate_public(group, public)) != 0) {
+		fatal_on_fatal_errors(r, __func__, SSH_ERR_LIBCRYPTO_ERROR);
+		error("%s: %s", __func__, ssh_err(r));
+		return -1;
+	}
+	return 0;
+>>>>>>> 1.119
 }
 
 int
+<<<<<<< key.c
 sshkey_cert_check_authority(const struct sshkey *k,
     int want_host, int require_principal,
     const char *name, const char **reason)
+=======
+key_ec_validate_private(const EC_KEY *key)
+>>>>>>> 1.119
 {
-	u_int i, principal_matches;
-	time_t now = time(NULL);
+	int r;
 
+<<<<<<< key.c
 	if (reason != NULL)
 		*reason = NULL;
 
@@ -2367,7 +2654,14 @@ sshkey_cert_check_authority(const struct sshkey *k,
 	if ((u_int64_t)now < k->cert->valid_after) {
 		*reason = "Certificate invalid: not yet valid";
 		return SSH_ERR_KEY_CERT_INVALID;
+=======
+	if ((r = sshkey_ec_validate_private(key)) != 0) {
+		fatal_on_fatal_errors(r, __func__, SSH_ERR_LIBCRYPTO_ERROR);
+		error("%s: %s", __func__, ssh_err(r));
+		return -1;
+>>>>>>> 1.119
 	}
+<<<<<<< key.c
 	if ((u_int64_t)now >= k->cert->valid_before) {
 		*reason = "Certificate invalid: expired";
 		return SSH_ERR_KEY_CERT_INVALID;
@@ -2391,12 +2685,30 @@ sshkey_cert_check_authority(const struct sshkey *k,
 			return SSH_ERR_KEY_CERT_INVALID;
 		}
 	}
+=======
+>>>>>>> 1.119
 	return 0;
 }
+#endif /* WITH_OPENSSL */
 
+<<<<<<< key.c
 int
 sshkey_private_serialize(const struct sshkey *key, struct sshbuf *b)
+=======
+void
+key_private_serialize(const Key *key, struct sshbuf *b)
 {
+	int r;
+
+	if ((r = sshkey_private_serialize(key, b)) != 0)
+		fatal("%s: %s", __func__, ssh_err(r));
+}
+
+Key *
+key_private_deserialize(struct sshbuf *blob)
+>>>>>>> 1.119
+{
+<<<<<<< key.c
 	int r = SSH_ERR_INTERNAL_ERROR;
 
 	if ((r = sshbuf_put_cstring(b, sshkey_ssh_name(key))) != 0)
@@ -2484,16 +2796,41 @@ sshkey_private_serialize(const struct sshkey *key, struct sshbuf *b)
 	default:
 		r = SSH_ERR_INVALID_ARGUMENT;
 		goto out;
+=======
+	int r;
+	Key *ret = NULL;
+
+	if ((r = sshkey_private_deserialize(blob, &ret)) != 0) {
+		fatal_on_fatal_errors(r, __func__, SSH_ERR_LIBCRYPTO_ERROR);
+		error("%s: %s", __func__, ssh_err(r));
+		return NULL;
+>>>>>>> 1.119
 	}
+<<<<<<< key.c
 	/* success */
 	r = 0;
  out:
 	return r;
+=======
+	return ret;
+>>>>>>> 1.119
 }
 
+<<<<<<< key.c
+=======
+/* authfile.c */
+
+>>>>>>> 1.119
 int
+<<<<<<< key.c
 sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
+=======
+key_save_private(Key *key, const char *filename, const char *passphrase,
+    const char *comment, int force_new_format, const char *new_format_cipher,
+    int new_format_rounds)
+>>>>>>> 1.119
 {
+<<<<<<< key.c
 	char *tname = NULL, *curve = NULL;
 	struct sshkey *k = NULL;
 	const u_char *cert;
@@ -2636,8 +2973,23 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 	default:
 		r = SSH_ERR_KEY_TYPE_UNKNOWN;
 		goto out;
-	}
+=======
+	int r;
 
+	if ((r = sshkey_save_private(key, filename, passphrase, comment,
+	    force_new_format, new_format_cipher, new_format_rounds)) != 0) {
+		fatal_on_fatal_errors(r, __func__, SSH_ERR_LIBCRYPTO_ERROR);
+		error("%s: %s", __func__, ssh_err(r));
+		return 0;
+>>>>>>> 1.119
+	}
+<<<<<<< key.c
+=======
+	return 1;
+}
+>>>>>>> 1.119
+
+<<<<<<< key.c
 #ifdef WITH_OPENSSL
 	/* enable blinding */
 	switch (k->type) {
@@ -2667,12 +3019,49 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 #endif
 	sshkey_free(k);
 	return r;
+=======
+int
+key_load_file(int fd, const char *filename, struct sshbuf *blob)
+{
+	int r;
+
+	if ((r = sshkey_load_file(fd, filename, blob)) != 0) {
+		fatal_on_fatal_errors(r, __func__, SSH_ERR_LIBCRYPTO_ERROR);
+		error("%s: %s", __func__, ssh_err(r));
+		return 0;
+	}
+	return 1;
+>>>>>>> 1.119
 }
 
+<<<<<<< key.c
 #ifdef WITH_OPENSSL
 int
 sshkey_ec_validate_public(const EC_GROUP *group, const EC_POINT *public)
+=======
+Key *
+key_load_cert(const char *filename)
 {
+	int r;
+	Key *ret = NULL;
+
+	if ((r = sshkey_load_cert(filename, &ret)) != 0) {
+		fatal_on_fatal_errors(r, __func__, SSH_ERR_LIBCRYPTO_ERROR);
+		if (r == SSH_ERR_SYSTEM_ERROR && errno == ENOENT)
+			debug("%s: %s", __func__, ssh_err(r));
+		else
+			error("%s: %s", __func__, ssh_err(r));
+		return NULL;
+	}
+	return ret;
+
+}
+
+Key *
+key_load_public(const char *filename, char **commentp)
+>>>>>>> 1.119
+{
+<<<<<<< key.c
 	BN_CTX *bnctx;
 	EC_POINT *nq = NULL;
 	BIGNUM *order, *x, *y, *tmp;
@@ -2689,11 +3078,29 @@ sshkey_ec_validate_public(const EC_GROUP *group, const EC_POINT *public)
 	if (EC_METHOD_get_field_type(EC_GROUP_method_of(group)) !=
 	    NID_X9_62_prime_field)
 		goto out;
+=======
+	int r;
+	Key *ret = NULL;
+>>>>>>> 1.119
 
+<<<<<<< key.c
 	/* Q != infinity */
 	if (EC_POINT_is_at_infinity(group, public))
 		goto out;
+=======
+	if ((r = sshkey_load_public(filename, &ret, commentp)) != 0) {
+		fatal_on_fatal_errors(r, __func__, SSH_ERR_LIBCRYPTO_ERROR);
+		if (r == SSH_ERR_SYSTEM_ERROR && errno == ENOENT)
+			debug("%s: %s", __func__, ssh_err(r));
+		else
+			error("%s: %s", __func__, ssh_err(r));
+		return NULL;
+	}
+	return ret;
+}
+>>>>>>> 1.119
 
+<<<<<<< key.c
 	if ((x = BN_CTX_get(bnctx)) == NULL ||
 	    (y = BN_CTX_get(bnctx)) == NULL ||
 	    (order = BN_CTX_get(bnctx)) == NULL ||
@@ -2712,7 +3119,16 @@ sshkey_ec_validate_public(const EC_GROUP *group, const EC_POINT *public)
 	if (BN_num_bits(x) <= BN_num_bits(order) / 2 ||
 	    BN_num_bits(y) <= BN_num_bits(order) / 2)
 		goto out;
+=======
+Key *
+key_load_private(const char *path, const char *passphrase,
+    char **commentp)
+{
+	int r;
+	Key *ret = NULL;
+>>>>>>> 1.119
 
+<<<<<<< key.c
 	/* nQ == infinity (n == order of subgroup) */
 	if ((nq = EC_POINT_new(group)) == NULL) {
 		ret = SSH_ERR_ALLOC_FAIL;
@@ -2721,7 +3137,17 @@ sshkey_ec_validate_public(const EC_GROUP *group, const EC_POINT *public)
 	if (EC_POINT_mul(group, nq, NULL, public, order, bnctx) != 1) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
+=======
+	if ((r = sshkey_load_private(path, passphrase, &ret, commentp)) != 0) {
+		fatal_on_fatal_errors(r, __func__, SSH_ERR_LIBCRYPTO_ERROR);
+		if (r == SSH_ERR_SYSTEM_ERROR && errno == ENOENT)
+			debug("%s: %s", __func__, ssh_err(r));
+		else
+			error("%s: %s", __func__, ssh_err(r));
+		return NULL;
+>>>>>>> 1.119
 	}
+<<<<<<< key.c
 	if (EC_POINT_is_at_infinity(group, nq) != 1)
 		goto out;
 
@@ -2737,12 +3163,21 @@ sshkey_ec_validate_public(const EC_GROUP *group, const EC_POINT *public)
 	BN_CTX_free(bnctx);
 	if (nq != NULL)
 		EC_POINT_free(nq);
+=======
+>>>>>>> 1.119
 	return ret;
 }
 
+<<<<<<< key.c
 int
 sshkey_ec_validate_private(const EC_KEY *key)
+=======
+Key *
+key_load_private_cert(int type, const char *filename, const char *passphrase,
+    int *perm_ok)
+>>>>>>> 1.119
 {
+<<<<<<< key.c
 	BN_CTX *bnctx;
 	BIGNUM *order, *tmp;
 	int ret = SSH_ERR_KEY_INVALID_EC_VALUE;
@@ -2765,30 +3200,61 @@ sshkey_ec_validate_private(const EC_KEY *key)
 	if (BN_num_bits(EC_KEY_get0_private_key(key)) <=
 	    BN_num_bits(order) / 2)
 		goto out;
+=======
+	int r;
+	Key *ret = NULL;
+>>>>>>> 1.119
 
+<<<<<<< key.c
 	/* private < order - 1 */
 	if (!BN_sub(tmp, order, BN_value_one())) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
+=======
+	if ((r = sshkey_load_private_cert(type, filename, passphrase,
+	    &ret, perm_ok)) != 0) {
+		fatal_on_fatal_errors(r, __func__, SSH_ERR_LIBCRYPTO_ERROR);
+		if (r == SSH_ERR_SYSTEM_ERROR && errno == ENOENT)
+			debug("%s: %s", __func__, ssh_err(r));
+		else
+			error("%s: %s", __func__, ssh_err(r));
+		return NULL;
+>>>>>>> 1.119
 	}
+<<<<<<< key.c
 	if (BN_cmp(EC_KEY_get0_private_key(key), tmp) >= 0)
 		goto out;
 	ret = 0;
  out:
 	BN_CTX_free(bnctx);
+=======
+>>>>>>> 1.119
 	return ret;
 }
 
+<<<<<<< key.c
 void
 sshkey_dump_ec_point(const EC_GROUP *group, const EC_POINT *point)
+=======
+Key *
+key_load_private_type(int type, const char *filename, const char *passphrase,
+    char **commentp, int *perm_ok)
+>>>>>>> 1.119
 {
-	BIGNUM *x, *y;
-	BN_CTX *bnctx;
+	int r;
+	Key *ret = NULL;
 
-	if (point == NULL) {
-		fputs("point=(NULL)\n", stderr);
-		return;
+	if ((r = sshkey_load_private_type(type, filename, passphrase,
+	    &ret, commentp, perm_ok)) != 0) {
+		fatal_on_fatal_errors(r, __func__, SSH_ERR_LIBCRYPTO_ERROR);
+		if ((r == SSH_ERR_SYSTEM_ERROR && errno == ENOENT) ||
+		    (r == SSH_ERR_KEY_WRONG_PASSPHRASE))
+			debug("%s: %s", __func__, ssh_err(r));
+		else
+			error("%s: %s", __func__, ssh_err(r));
+		return NULL;
 	}
+<<<<<<< key.c
 	if ((bnctx = BN_CTX_new()) == NULL) {
 		fprintf(stderr, "%s: BN_CTX_new failed\n", __func__);
 		return;
@@ -2816,13 +3282,25 @@ sshkey_dump_ec_point(const EC_GROUP *group, const EC_POINT *point)
 	BN_print_fp(stderr, y);
 	fputs("\n", stderr);
 	BN_CTX_free(bnctx);
+=======
+	return ret;
+>>>>>>> 1.119
 }
 
+<<<<<<< key.c
 void
 sshkey_dump_ec_key(const EC_KEY *key)
+=======
+#ifdef WITH_OPENSSL
+Key *
+key_load_private_pem(int fd, int type, const char *passphrase,
+    char **commentp)
+>>>>>>> 1.119
 {
-	const BIGNUM *exponent;
+	int r;
+	Key *ret = NULL;
 
+<<<<<<< key.c
 	sshkey_dump_ec_point(EC_KEY_get0_group(key),
 	    EC_KEY_get0_public_key(key));
 	fputs("exponent=", stderr);
@@ -2831,5 +3309,39 @@ sshkey_dump_ec_key(const EC_KEY *key)
 	else
 		BN_print_fp(stderr, EC_KEY_get0_private_key(key));
 	fputs("\n", stderr);
+=======
+	if ((r = sshkey_load_private_pem(fd, type, passphrase,
+	     &ret, commentp)) != 0) {
+		fatal_on_fatal_errors(r, __func__, SSH_ERR_LIBCRYPTO_ERROR);
+		error("%s: %s", __func__, ssh_err(r));
+		return NULL;
+	}
+	return ret;
+>>>>>>> 1.119
 }
+<<<<<<< key.c
 #endif
+=======
+#endif /* WITH_OPENSSL */
+
+int
+key_perm_ok(int fd, const char *filename)
+{
+	return sshkey_perm_ok(fd, filename) == 0 ? 1 : 0;
+}
+
+int
+key_in_file(Key *key, const char *filename, int strict_type)
+{
+	int r;
+
+	if ((r = sshkey_in_file(key, filename, strict_type)) != 0) {
+		fatal_on_fatal_errors(r, __func__, SSH_ERR_LIBCRYPTO_ERROR);
+		if (r == SSH_ERR_SYSTEM_ERROR && errno == ENOENT)
+			return 0;
+		error("%s: %s", __func__, ssh_err(r));
+		return r == SSH_ERR_KEY_NOT_FOUND ? 0 : -1;
+	}
+	return 1;
+}
+>>>>>>> 1.119

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-rsa.c,v 1.51 2014/02/02 03:44:31 djm Exp $ */
+/* $OpenBSD: ssh-rsa.c,v 1.52 2014/06/24 01:13:21 djm Exp $ */
 /*
  * Copyright (c) 2000, 2003 Markus Friedl <markus@openbsd.org>
  *
@@ -22,14 +22,19 @@
 
 #include <string.h>
 
+<<<<<<< ssh-rsa.c
 #include "sshbuf.h"
 #include "compat.h"
 #include "ssherr.h"
 #define SSHKEY_INTERNAL
 #include "key.h"
+=======
+#include "sshbuf.h"
+>>>>>>> 1.52
 #include "compat.h"
-#include "misc.h"
-#include "ssh.h"
+#include "ssherr.h"
+#define SSHKEY_INTERNAL
+#include "sshkey.h"
 #include "digest.h"
 
 static int openssh_RSA_verify(int, u_char *, size_t, u_char *, size_t, RSA *);
@@ -40,6 +45,7 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
     const u_char *data, size_t datalen, u_int compat)
 {
 	int hash_alg;
+<<<<<<< ssh-rsa.c
 	u_char digest[SSH_DIGEST_MAX_LENGTH], *sig = NULL;
 	size_t slen;
 	u_int dlen, len;
@@ -53,10 +59,30 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	slen = RSA_size(key->rsa);
 	if (slen <= 0 || slen > SSHBUF_MAX_BIGNUM)
 		return SSH_ERR_INVALID_ARGUMENT;
+=======
+	u_char digest[SSH_DIGEST_MAX_LENGTH], *sig = NULL;
+	size_t slen;
+	u_int dlen, len;
+	int nid, ret = SSH_ERR_INTERNAL_ERROR;
+	struct sshbuf *b = NULL;
+
+	if (lenp != NULL)
+		*lenp = 0;
+	if (sigp != NULL)
+		*sigp = NULL;
+
+	if (key == NULL || key->rsa == NULL ||
+	    sshkey_type_plain(key->type) != KEY_RSA)
+		return SSH_ERR_INVALID_ARGUMENT;
+	slen = RSA_size(key->rsa);
+	if (slen <= 0 || slen > SSHBUF_MAX_BIGNUM)
+		return SSH_ERR_INVALID_ARGUMENT;
+>>>>>>> 1.52
 
 	/* hash the data */
 	hash_alg = SSH_DIGEST_SHA1;
 	nid = NID_sha1;
+<<<<<<< ssh-rsa.c
 	if ((dlen = ssh_digest_bytes(hash_alg)) == 0)
 		return SSH_ERR_LIBCRYPTO_ERROR;
 
@@ -72,6 +98,22 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	if (RSA_sign(nid, digest, dlen, sig, &len, key->rsa) != 1) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
+=======
+	if ((dlen = ssh_digest_bytes(hash_alg)) == 0)
+		return SSH_ERR_INTERNAL_ERROR;
+	if ((ret = ssh_digest_memory(hash_alg, data, datalen,
+	    digest, sizeof(digest))) != 0)
+		goto out;
+
+	if ((sig = malloc(slen)) == NULL) {
+		ret = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
+
+	if (RSA_sign(nid, digest, dlen, sig, &len, key->rsa) != 1) {
+		ret = SSH_ERR_LIBCRYPTO_ERROR;
+		goto out;
+>>>>>>> 1.52
 	}
 	if (len < slen) {
 		size_t diff = slen - len;
@@ -82,6 +124,7 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 		goto out;
 	}
 	/* encode signature */
+<<<<<<< ssh-rsa.c
 	if ((b = sshbuf_new()) == NULL) {
 		ret = SSH_ERR_ALLOC_FAIL;
 		goto out;
@@ -90,8 +133,26 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	    (ret = sshbuf_put_string(b, sig, slen)) != 0)
 		goto out;
 	len = sshbuf_len(b);
+=======
+	if ((b = sshbuf_new()) == NULL) {
+		ret = SSH_ERR_ALLOC_FAIL;
+		goto out;
+	}
+	if ((ret = sshbuf_put_cstring(b, "ssh-rsa")) != 0 ||
+	    (ret = sshbuf_put_string(b, sig, slen)) != 0)
+		goto out;
+	len = sshbuf_len(b);
+	if (sigp != NULL) {
+		if ((*sigp = malloc(len)) == NULL) {
+			ret = SSH_ERR_ALLOC_FAIL;
+			goto out;
+		}
+		memcpy(*sigp, sshbuf_ptr(b), len);
+	}
+>>>>>>> 1.52
 	if (lenp != NULL)
 		*lenp = len;
+<<<<<<< ssh-rsa.c
 	if (sigp != NULL) {
 		if ((*sigp = malloc(len)) == NULL) {
 			ret = SSH_ERR_ALLOC_FAIL;
@@ -105,6 +166,14 @@ ssh_rsa_sign(const struct sshkey *key, u_char **sigp, size_t *lenp,
 	if (sig != NULL) {
 		memset(sig, 's', slen);
 		free(sig);
+=======
+	ret = 0;
+ out:
+	explicit_bzero(digest, sizeof(digest));
+	if (sig != NULL) {
+		explicit_bzero(sig, slen);
+		free(sig);
+>>>>>>> 1.52
 	}
 	if (b != NULL)
 		sshbuf_free(b);
@@ -116,6 +185,7 @@ ssh_rsa_verify(const struct sshkey *key,
     const u_char *signature, size_t signaturelen,
     const u_char *data, size_t datalen, u_int compat)
 {
+<<<<<<< ssh-rsa.c
 	struct sshbuf *b = NULL;
 	char *ktype = NULL;
 	u_char digest[SSH_DIGEST_MAX_LENGTH], *osigblob, *sigblob = NULL;
@@ -136,6 +206,25 @@ ssh_rsa_verify(const struct sshkey *key,
 		ret = SSH_ERR_INVALID_FORMAT;
 		goto out;
 	}
+=======
+	char *ktype = NULL;
+	int hash_alg, ret = SSH_ERR_INTERNAL_ERROR;
+	size_t len, diff, modlen, dlen;
+	struct sshbuf *b = NULL;
+	u_char digest[SSH_DIGEST_MAX_LENGTH], *osigblob, *sigblob = NULL;
+
+	if (key == NULL || key->rsa == NULL ||
+	    sshkey_type_plain(key->type) != KEY_RSA ||
+	    BN_num_bits(key->rsa->n) < SSH_RSA_MINIMUM_MODULUS_SIZE)
+		return SSH_ERR_INVALID_ARGUMENT;
+
+	if ((b = sshbuf_from(signature, signaturelen)) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if (sshbuf_get_cstring(b, &ktype, NULL) != 0) {
+		ret = SSH_ERR_INVALID_FORMAT;
+		goto out;
+	}
+>>>>>>> 1.52
 	if (strcmp("ssh-rsa", ktype) != 0) {
 		ret = SSH_ERR_KEY_TYPE_MISMATCH;
 		goto out;
@@ -155,6 +244,7 @@ ssh_rsa_verify(const struct sshkey *key,
 		ret = SSH_ERR_KEY_BITS_MISMATCH;
 		goto out;
 	} else if (len < modlen) {
+<<<<<<< ssh-rsa.c
 		diff = modlen - len;
 		osigblob = sigblob;
 		if ((sigblob = realloc(sigblob, modlen)) == NULL) {
@@ -163,14 +253,27 @@ ssh_rsa_verify(const struct sshkey *key,
 			ret = SSH_ERR_ALLOC_FAIL;
 			goto out;
 		}
+=======
+		diff = modlen - len;
+		osigblob = sigblob;
+		if ((sigblob = realloc(sigblob, modlen)) == NULL) {
+			sigblob = osigblob; /* put it back for clear/free */
+			ret = SSH_ERR_ALLOC_FAIL;
+			goto out;
+		}
+>>>>>>> 1.52
 		memmove(sigblob + diff, sigblob, len);
 		explicit_bzero(sigblob, diff);
 		len = modlen;
 	}
+<<<<<<< ssh-rsa.c
 
 	/* hash the data */
+=======
+>>>>>>> 1.52
 	hash_alg = SSH_DIGEST_SHA1;
 	if ((dlen = ssh_digest_bytes(hash_alg)) == 0) {
+<<<<<<< ssh-rsa.c
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
 	}
@@ -178,8 +281,16 @@ ssh_rsa_verify(const struct sshkey *key,
 	    digest, sizeof(digest)) != 0) {
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
+=======
+		ret = SSH_ERR_INTERNAL_ERROR;
+		goto out;
+>>>>>>> 1.52
 	}
+	if ((ret = ssh_digest_memory(hash_alg, data, datalen,
+	    digest, sizeof(digest))) != 0)
+		goto out;
 
+<<<<<<< ssh-rsa.c
 	ret = openssh_RSA_verify(hash_alg, digest, dlen, sigblob, len, key->rsa);
  out:
 	if (sigblob != NULL) {
@@ -190,6 +301,19 @@ ssh_rsa_verify(const struct sshkey *key,
 		free(ktype);
 	if (b != NULL)
 		sshbuf_free(b);
+=======
+	ret = openssh_RSA_verify(hash_alg, digest, dlen, sigblob, len,
+	    key->rsa);
+ out:
+	if (sigblob != NULL) {
+		explicit_bzero(sigblob, len);
+		free(sigblob);
+	}
+	if (ktype != NULL)
+		free(ktype);
+	if (b != NULL)
+		sshbuf_free(b);
+>>>>>>> 1.52
 	explicit_bzero(digest, sizeof(digest));
 	return ret;
 }
@@ -260,11 +384,19 @@ openssh_RSA_verify(int hash_alg, u_char *hash, size_t hashlen,
 		ret = SSH_ERR_SIGNATURE_INVALID;
 		goto done;
 	}
+<<<<<<< ssh-rsa.c
 	ret = 0;
 done:
 	if (decrypted) {
 		bzero(decrypted, rsasize);
 		free(decrypted);
+=======
+	ret = 0;
+done:
+	if (decrypted) {
+		explicit_bzero(decrypted, rsasize);
+		free(decrypted);
+>>>>>>> 1.52
 	}
 	return ret;
 }

@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.h,v 1.113 2013/06/07 15:37:52 dtucker Exp $ */
+/* $OpenBSD: channels.h,v 1.114 2014/06/27 16:41:56 markus Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
@@ -270,6 +270,7 @@ void	 channel_update_permitted_opens(struct ssh *, int, int);
 void	 channel_clear_permitted_opens(void);
 void	 channel_clear_adm_permitted_opens(void);
 void 	 channel_print_adm_permitted_opens(void);
+<<<<<<< channels.h
 int      channel_input_port_forward_request(struct ssh *, int, int);
 Channel	*channel_connect_to(struct ssh *, const char *, u_short, char *, char *);
 Channel	*channel_connect_stdio_fwd(struct ssh *, const char*, u_short,
@@ -277,6 +278,14 @@ Channel	*channel_connect_stdio_fwd(struct ssh *, const char*, u_short,
 Channel	*channel_connect_by_listen_address(struct ssh *, u_short, char *,
     char *);
 int	 channel_request_remote_forwarding(struct ssh *, const char *, u_short,
+=======
+int      channel_input_port_forward_request(int, int);
+Channel	*channel_connect_to(const char *, u_short, char *, char *);
+Channel	*channel_connect_stdio_fwd(const char*, u_short, int, int);
+Channel	*channel_connect_by_listen_address(const char *, u_short,
+	     char *, char *);
+int	 channel_request_remote_forwarding(const char *, u_short,
+>>>>>>> 1.114
 	     const char *, u_short);
 int	 channel_setup_local_fwd_listener(struct ssh *, const char *, u_short,
 	     const char *, u_short, int);

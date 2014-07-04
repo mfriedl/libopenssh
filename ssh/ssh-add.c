@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-add.c,v 1.109 2014/02/02 03:44:31 djm Exp $ */
+/* $OpenBSD: ssh-add.c,v 1.112 2014/07/03 03:15:01 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -167,8 +167,13 @@ add_file(int agent_fd, const char *filename, int key_only)
 	struct sshkey *private, *cert;
 	char *comment = NULL;
 	char msg[1024], *certpath = NULL;
+<<<<<<< ssh-add.c
 	int r, fd, perms_ok, ret = -1;
 	struct sshbuf *keyblob;
+=======
+	int r, fd, perms_ok, ret = -1;
+	Buffer keyblob;
+>>>>>>> 1.112
 
 	if (strcmp(filename, "-") == 0) {
 		fd = STDIN_FILENO;
@@ -201,15 +206,22 @@ add_file(int agent_fd, const char *filename, int key_only)
 	close(fd);
 
 	/* At first, try empty passphrase */
+<<<<<<< ssh-add.c
 	r = sshkey_parse_private(keyblob, "", filename, &private, &comment);
 	if (r != 0 && r != SSH_ERR_KEY_WRONG_PASSPHRASE) {
 		fprintf(stderr, "Error loading key \"%s\": %s\n",
 		    filename, ssh_err(r));
 		goto fail_load;
 	}
+=======
+	if ((r = sshkey_parse_private_fileblob(&keyblob, "", filename,
+	    &private, &comment)) != 0 && r != SSH_ERR_KEY_WRONG_PASSPHRASE)
+		fatal("Cannot parse %s: %s", filename, ssh_err(r));
+>>>>>>> 1.112
 	if (comment == NULL)
 		comment = xstrdup(filename);
 	/* try last */
+<<<<<<< ssh-add.c
 	if (private == NULL && pass != NULL) {
 		r = sshkey_parse_private(keyblob, pass, filename,
 		    &private, NULL);
@@ -219,6 +231,14 @@ add_file(int agent_fd, const char *filename, int key_only)
 			goto fail_load;
 		}
 	}
+=======
+	if (private == NULL && pass != NULL) {
+		if ((r = sshkey_parse_private_fileblob(&keyblob, pass, filename,
+		    &private, &comment)) != 0 &&
+		    r != SSH_ERR_KEY_WRONG_PASSPHRASE)
+			fatal("Cannot parse %s: %s", filename, ssh_err(r));
+	}
+>>>>>>> 1.112
 	if (private == NULL) {
 		/* clear passphrase since it did not work */
 		clear_pass();
@@ -241,6 +261,16 @@ add_file(int agent_fd, const char *filename, int key_only)
 				sshbuf_free(keyblob);
 				return -1;
 			}
+<<<<<<< ssh-add.c
+=======
+			if ((r = sshkey_parse_private_fileblob(&keyblob,
+			     pass, filename, &private, NULL)) != 0 &&
+			    r != SSH_ERR_KEY_WRONG_PASSPHRASE)
+				fatal("Cannot parse %s: %s",
+					    filename, ssh_err(r));
+			if (private != NULL)
+				break;
+>>>>>>> 1.112
 			clear_pass();
 			snprintf(msg, sizeof msg,
 			    "Bad passphrase, try again for %.200s: ", comment);
@@ -465,6 +495,7 @@ main(int argc, char **argv)
 
 	OpenSSL_add_all_algorithms();
 
+<<<<<<< ssh-add.c
 	/* First, get a connection to the authentication agent. */
 	switch (r = ssh_get_authentication_socket(&agent_fd)) {
 	case 0:
@@ -475,6 +506,15 @@ main(int argc, char **argv)
 		exit(2);
 	default:
 		fprintf(stderr, "Error connecting to agent: %s\n", ssh_err(r));
+=======
+	setlinebuf(stdout);
+
+	/* At first, get a connection to the authentication agent. */
+	ac = ssh_get_authentication_connection();
+	if (ac == NULL) {
+		fprintf(stderr,
+		    "Could not open a connection to your authentication agent.\n");
+>>>>>>> 1.112
 		exit(2);
 	}
 
