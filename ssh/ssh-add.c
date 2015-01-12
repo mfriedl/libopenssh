@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-add.c,v 1.112 2014/07/03 03:15:01 djm Exp $ */
+/* $OpenBSD: ssh-add.c,v 1.115 2014/12/21 22:27:56 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -60,6 +60,7 @@
 #include "pathnames.h"
 #include "misc.h"
 #include "ssherr.h"
+#include "digest.h"
 
 /* argv0 */
 extern char *__progname;
@@ -73,6 +74,8 @@ static char *default_files[] = {
 	_PATH_SSH_CLIENT_IDENTITY,
 	NULL
 };
+
+static int fingerprint_hash = SSH_FP_HASH_DEFAULT;
 
 /* Default lifetime (0 == forever) */
 static int lifetime = 0;
@@ -191,7 +194,7 @@ add_file(int agent_fd, const char *filename, int key_only)
 	}
 	if ((keyblob = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
-	if ((r = sshkey_load_file(fd, filename, keyblob)) != 0) {
+	if ((r = sshkey_load_file(fd, keyblob)) != 0) {
 		fprintf(stderr, "Error loading key \"%s\": %s\n",
 		    filename, ssh_err(r));
 		sshbuf_free(keyblob);
@@ -207,8 +210,6 @@ add_file(int agent_fd, const char *filename, int key_only)
 		    filename, ssh_err(r));
 		goto fail_load;
 	}
-	if (comment == NULL)
-		comment = xstrdup(filename);
 	/* try last */
 	if (private == NULL && pass != NULL) {
 		if ((r = sshkey_parse_private_fileblob(keyblob, pass, filename,
@@ -219,6 +220,8 @@ add_file(int agent_fd, const char *filename, int key_only)
 			goto fail_load;
 		}
 	}
+	if (comment == NULL)
+		comment = xstrdup(filename);
 	if (private == NULL) {
 		/* clear passphrase since it did not work */
 		clear_pass();
@@ -363,7 +366,7 @@ list_identities(int agent_fd, int do_fp)
 			had_identities = 1;
 			if (do_fp) {
 				fp = sshkey_fingerprint(idlist->keys[i],
-				    SSH_FP_MD5, SSH_FP_HEX);
+				    fingerprint_hash, SSH_FP_DEFAULT);
 				printf("%d %s %s (%s)\n",
 				    sshkey_size(idlist->keys[i]), fp,
 				    idlist->comments[i],
@@ -439,6 +442,7 @@ usage(void)
 	fprintf(stderr, "usage: %s [options] [file ...]\n", __progname);
 	fprintf(stderr, "Options:\n");
 	fprintf(stderr, "  -l          List fingerprints of all identities.\n");
+	fprintf(stderr, "  -E hash     Specify hash algorithm used for fingerprints.\n");
 	fprintf(stderr, "  -L          List public key parameters of all identities.\n");
 	fprintf(stderr, "  -k          Load only keys and not certificates.\n");
 	fprintf(stderr, "  -c          Require confirmation to sign using identities\n");
@@ -459,11 +463,14 @@ main(int argc, char **argv)
 	int agent_fd;
 	char *pkcs11provider = NULL;
 	int r, i, ch, deleting = 0, ret = 0, key_only = 0;
+	int xflag = 0, lflag = 0, Dflag = 0;
 
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
 
 	OpenSSL_add_all_algorithms();
+
+	setvbuf(stdout, NULL, _IOLBF, 0);
 
 	/* First, get a connection to the authentication agent. */
 	switch (r = ssh_get_authentication_socket(&agent_fd)) {
@@ -478,21 +485,28 @@ main(int argc, char **argv)
 		exit(2);
 	}
 
-	while ((ch = getopt(argc, argv, "klLcdDxXe:s:t:")) != -1) {
+	while ((ch = getopt(argc, argv, "klLcdDxXE:e:s:t:")) != -1) {
 		switch (ch) {
+		case 'E':
+			fingerprint_hash = ssh_digest_alg_by_name(optarg);
+			if (fingerprint_hash == -1)
+				fatal("Invalid hash algorithm \"%s\"", optarg);
+			break;
 		case 'k':
 			key_only = 1;
 			break;
 		case 'l':
 		case 'L':
-			if (list_identities(agent_fd, ch == 'l' ? 1 : 0) == -1)
-				ret = 1;
-			goto done;
+			if (lflag != 0)
+				fatal("-%c flag already specified", lflag);
+			lflag = ch;
+			break;
 		case 'x':
 		case 'X':
-			if (lock_agent(agent_fd, ch == 'x' ? 1 : 0) == -1)
-				ret = 1;
-			goto done;
+			if (xflag != 0)
+				fatal("-%c flag already specified", xflag);
+			xflag = ch;
+			break;
 		case 'c':
 			confirm = 1;
 			break;
@@ -500,9 +514,8 @@ main(int argc, char **argv)
 			deleting = 1;
 			break;
 		case 'D':
-			if (delete_all(agent_fd) == -1)
-				ret = 1;
-			goto done;
+			Dflag = 1;
+			break;
 		case 's':
 			pkcs11provider = optarg;
 			break;
@@ -523,6 +536,23 @@ main(int argc, char **argv)
 			goto done;
 		}
 	}
+
+	if ((xflag != 0) + (lflag != 0) + (Dflag != 0) > 1)
+		fatal("Invalid combination of actions");
+	else if (xflag) {
+		if (lock_agent(agent_fd, xflag == 'x' ? 1 : 0) == -1)
+			ret = 1;
+		goto done;
+	} else if (lflag) {
+		if (list_identities(agent_fd, lflag == 'l' ? 1 : 0) == -1)
+			ret = 1;
+		goto done;
+	} else if (Dflag) {
+		if (delete_all(agent_fd) == -1)
+			ret = 1;
+		goto done;
+	}
+
 	argc -= optind;
 	argv += optind;
 	if (pkcs11provider != NULL) {

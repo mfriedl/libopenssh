@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.134 2014/06/24 01:13:21 djm Exp $ */
+/* $OpenBSD: monitor.c,v 1.136 2014/12/22 07:51:30 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -66,6 +66,7 @@
 #include "sshlogin.h"
 #include "canohost.h"
 #include "log.h"
+#include "misc.h"
 #include "servconf.h"
 #include "monitor.h"
 #include "monitor_mm.h"
@@ -74,7 +75,6 @@
 #endif
 #include "monitor_wrap.h"
 #include "monitor_fdpass.h"
-#include "misc.h"
 #include "compat.h"
 #include "ssh2.h"
 #include "roaming.h"
@@ -910,6 +910,7 @@ mm_answer_keyallowed(int sock, struct sshbuf *m)
 		switch (type) {
 		case MM_USERKEY:
 			allowed = options.pubkey_authentication &&
+			    !auth2_userkey_already_used(authctxt, key) &&
 			    user_key_allowed(authctxt->pw, key);
 			pubkey_auth_info(authctxt, key, NULL);
 			auth_method = "publickey";
@@ -1162,7 +1163,12 @@ mm_answer_keyverify(int sock, struct sshbuf *m)
 	debug3("%s: key %p signature %s",
 	    __func__, key, (r == 0) ? "verified" : "unverified");
 
-	sshkey_free(key);
+	/* If auth was successful then record key to ensure it isn't reused */
+	if (ret == 0)
+		auth2_record_userkey(authctxt, key);
+	else
+		sshkey_free(key);
+
 	free(blob);
 	free(signature);
 	free(data);

@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect.c,v 1.250 2014/07/03 22:23:46 djm Exp $ */
+/* $OpenBSD: sshconnect.c,v 1.254 2014/12/21 22:27:56 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -14,6 +14,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -44,14 +45,15 @@
 #include "sshconnect.h"
 #include "hostfile.h"
 #include "log.h"
+#include "misc.h"
 #include "readconf.h"
 #include "atomicio.h"
-#include "misc.h"
 #include "dns.h"
 #include "roaming.h"
 #include "monitor_fdpass.h"
 #include "ssh2.h"
 #include "version.h"
+#include "authfile.h"
 #include "ssherr.h"
 
 char *client_version_string = NULL;
@@ -892,10 +894,10 @@ check_host_key(char *hostname, struct sockaddr *hostaddr, u_short port,
 				    "key for IP address '%.128s' to the list "
 				    "of known hosts.", type, ip);
 		} else if (options.visual_host_key) {
-			fp = sshkey_fingerprint(host_key, SSH_FP_MD5,
-			    SSH_FP_HEX);
-			ra = sshkey_fingerprint(host_key, SSH_FP_MD5,
-			    SSH_FP_RANDOMART);
+			fp = sshkey_fingerprint(host_key,
+			    options.fingerprint_hash, SSH_FP_DEFAULT);
+			ra = sshkey_fingerprint(host_key,
+			    options.fingerprint_hash, SSH_FP_RANDOMART);
 			logit("Host key fingerprint is %s\n%s\n", fp, ra);
 			free(ra);
 			free(fp);
@@ -934,10 +936,10 @@ check_host_key(char *hostname, struct sockaddr *hostaddr, u_short port,
 			else
 				snprintf(msg1, sizeof(msg1), ".");
 			/* The default */
-			fp = sshkey_fingerprint(host_key, SSH_FP_MD5,
-			    SSH_FP_HEX);
-			ra = sshkey_fingerprint(host_key, SSH_FP_MD5,
-			    SSH_FP_RANDOMART);
+			fp = sshkey_fingerprint(host_key,
+			    options.fingerprint_hash, SSH_FP_DEFAULT);
+			ra = sshkey_fingerprint(host_key,
+			    options.fingerprint_hash, SSH_FP_RANDOMART);
 			msg2[0] = '\0';
 			if (options.verify_host_key_dns) {
 				if (matching_host_key_dns)
@@ -1201,16 +1203,44 @@ int
 verify_host_key(char *host, struct sockaddr *hostaddr, struct sshkey *host_key)
 {
 	int r = -1, flags = 0;
-	char *fp;
+	char *fp = NULL;
 	struct sshkey *plain = NULL;
 
-	fp = sshkey_fingerprint(host_key, SSH_FP_MD5, SSH_FP_HEX);
+	if ((fp = sshkey_fingerprint(host_key,
+	    options.fingerprint_hash, SSH_FP_DEFAULT)) == NULL) {
+		error("%s: fingerprint host key: %s", __func__, ssh_err(r));
+		r = -1;
+		goto out;
+	}
+
 	debug("Server host key: %s %s", sshkey_type(host_key), fp);
-	free(fp);
 
 	if (sshkey_equal(previous_host_key, host_key)) {
-		debug("%s: server host key matches cached key", __func__);
-		return 0;
+		debug2("%s: server host key %s %s matches cached key",
+		    __func__, sshkey_type(host_key), fp);
+		r = 0;
+		goto out;
+	}
+
+	/* Check in RevokedHostKeys file if specified */
+	if (options.revoked_host_keys != NULL) {
+		r = sshkey_check_revoked(host_key, options.revoked_host_keys);
+		switch (r) {
+		case 0:
+			break; /* not revoked */
+		case SSH_ERR_KEY_REVOKED:
+			error("Host key %s %s revoked by file %s",
+			    sshkey_type(host_key), fp,
+			    options.revoked_host_keys);
+			r = -1;
+			goto out;
+		default:
+			error("Error checking host key %s %s in "
+			    "revoked keys file %s: %s", sshkey_type(host_key),
+			    fp, options.revoked_host_keys, ssh_err(r));
+			r = -1;
+			goto out;
+		}
 	}
 
 	if (options.verify_host_key_dns) {
@@ -1218,10 +1248,8 @@ verify_host_key(char *host, struct sockaddr *hostaddr, struct sshkey *host_key)
 		 * XXX certs are not yet supported for DNS, so downgrade
 		 * them and try the plain key.
 		 */
-		if (sshkey_from_private(host_key, &plain) < 0) {
-			error("%s: cannot copy key", __func__);
-			return -1;
-		}
+		if ((r = sshkey_from_private(host_key, &plain)) != 0)
+			goto out;
 		if (sshkey_is_cert(plain))
 			sshkey_drop_cert(plain);
 		if (verify_host_key_dns(host, hostaddr, plain, &flags) == 0) {
@@ -1229,9 +1257,8 @@ verify_host_key(char *host, struct sockaddr *hostaddr, struct sshkey *host_key)
 				if (options.verify_host_key_dns == 1 &&
 				    flags & DNS_VERIFY_MATCH &&
 				    flags & DNS_VERIFY_SECURE) {
-					sshkey_free(plain);
 					r = 0;
-					goto done;
+					goto out;
 				}
 				if (flags & DNS_VERIFY_MATCH) {
 					matching_host_key_dns = 1;
@@ -1243,14 +1270,14 @@ verify_host_key(char *host, struct sockaddr *hostaddr, struct sshkey *host_key)
 				}
 			}
 		}
-		sshkey_free(plain);
 	}
-
 	r = check_host_key(host, hostaddr, options.port, host_key, RDRW,
 	    options.user_hostfiles, options.num_user_hostfiles,
 	    options.system_hostfiles, options.num_system_hostfiles);
 
-done:
+out:
+	sshkey_free(plain);
+	free(fp);
 	if (r == 0 && host_key != NULL) {
 		sshkey_free(previous_host_key);
 		r = sshkey_from_private(host_key, &previous_host_key);
@@ -1344,9 +1371,10 @@ show_other_keys(struct hostkeys *hostkeys, struct sshkey *key)
 			continue;
 		if (!lookup_key_in_hostkeys_by_type(hostkeys, type[i], &found))
 			continue;
-		fp = sshkey_fingerprint(found->key, SSH_FP_MD5, SSH_FP_HEX);
-		ra = sshkey_fingerprint(found->key, SSH_FP_MD5,
-		    SSH_FP_RANDOMART);
+		fp = sshkey_fingerprint(found->key,
+		    options.fingerprint_hash, SSH_FP_DEFAULT);
+		ra = sshkey_fingerprint(found->key,
+		    options.fingerprint_hash, SSH_FP_RANDOMART);
 		logit("WARNING: %s key found for host %s\n"
 		    "in %s:%lu\n"
 		    "%s key fingerprint %s.",
@@ -1367,7 +1395,8 @@ warn_changed_key(struct sshkey *host_key)
 {
 	char *fp;
 
-	fp = sshkey_fingerprint(host_key, SSH_FP_MD5, SSH_FP_HEX);
+	fp = sshkey_fingerprint(host_key, options.fingerprint_hash,
+	    SSH_FP_DEFAULT);
 
 	error("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 	error("@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @");

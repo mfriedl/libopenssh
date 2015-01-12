@@ -1,4 +1,4 @@
-/* $OpenBSD: dns.c,v 1.31 2014/06/24 01:13:21 djm Exp $ */
+/* $OpenBSD: dns.c,v 1.32 2014/12/21 22:27:56 djm Exp $ */
 
 /*
  * Copyright (c) 2003 Wesley Griffin. All rights reserved.
@@ -39,6 +39,7 @@
 #include "ssherr.h"
 #include "dns.h"
 #include "log.h"
+#include "digest.h"
 
 static const char *errset_text[] = {
 	"success",		/* 0 ERRSET_SUCCESS */
@@ -78,7 +79,7 @@ dns_read_key(u_int8_t *algorithm, u_int8_t *digest_type,
     u_char **digest, size_t *digest_len, struct sshkey *key)
 {
 	int r, success = 0;
-	enum sshkey_fp_type fp_type = 0;
+	int fp_alg = -1;
 
 	switch (key->type) {
 	case KEY_RSA:
@@ -108,17 +109,17 @@ dns_read_key(u_int8_t *algorithm, u_int8_t *digest_type,
 
 	switch (*digest_type) {
 	case SSHFP_HASH_SHA1:
-		fp_type = SSH_FP_SHA1;
+		fp_alg = SSH_DIGEST_SHA1;
 		break;
 	case SSHFP_HASH_SHA256:
-		fp_type = SSH_FP_SHA256;
+		fp_alg = SSH_DIGEST_SHA256;
 		break;
 	default:
 		*digest_type = SSHFP_HASH_RESERVED; /* 0 */
 	}
 
 	if (*algorithm && *digest_type) {
-		if ((r = sshkey_fingerprint_raw(key, fp_type, digest,
+		if ((r = sshkey_fingerprint_raw(key, fp_alg, digest,
 		    digest_len)) != 0)
 			fatal("%s: sshkey_fingerprint_raw: %s", __func__,
 			   ssh_err(r));

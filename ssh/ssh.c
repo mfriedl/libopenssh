@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh.c,v 1.405 2014/07/03 06:39:19 djm Exp $ */
+/* $OpenBSD: ssh.c,v 1.411 2015/01/08 10:15:45 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -47,7 +47,6 @@
 #include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 
@@ -87,9 +86,9 @@
 #include "dispatch.h"
 #include "clientloop.h"
 #include "log.h"
+#include "misc.h"
 #include "readconf.h"
 #include "sshconnect.h"
-#include "misc.h"
 #include "kex.h"
 #include "mac.h"
 #include "sshpty.h"
@@ -186,7 +185,7 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-"usage: ssh [-1246AaCfgKkMNnqsTtVvXxYy] [-b bind_address] [-c cipher_spec]\n"
+"usage: ssh [-1246AaCfGgKkMNnqsTtVvXxYy] [-b bind_address] [-c cipher_spec]\n"
 "           [-D [bind_address:]port] [-E log_file] [-e escape_char]\n"
 "           [-F configfile] [-I pkcs11] [-i identity_file]\n"
 "           [-L [bind_address:]port:host:hostport] [-l login_name] [-m mac_spec]\n"
@@ -391,27 +390,49 @@ check_load(int r, const char *path, const char *message)
  * file if the user specifies a config file on the command line.
  */
 static void
-process_config_files(struct passwd *pw)
+process_config_files(const char *host_arg, struct passwd *pw, int post_canon)
 {
 	char buf[MAXPATHLEN];
 	int r;
 
 	if (config != NULL) {
 		if (strcasecmp(config, "none") != 0 &&
-		    !read_config_file(config, pw, host, &options,
-		    SSHCONF_USERCONF))
+		    !read_config_file(config, pw, host, host_arg, &options,
+		    SSHCONF_USERCONF | (post_canon ? SSHCONF_POSTCANON : 0)))
 			fatal("Can't open user config file %.100s: "
 			    "%.100s", config, strerror(errno));
 	} else {
 		r = snprintf(buf, sizeof buf, "%s/%s", pw->pw_dir,
 		    _PATH_SSH_USER_CONFFILE);
 		if (r > 0 && (size_t)r < sizeof(buf))
-			(void)read_config_file(buf, pw, host, &options,
-			     SSHCONF_CHECKPERM|SSHCONF_USERCONF);
+			(void)read_config_file(buf, pw, host, host_arg,
+			    &options, SSHCONF_CHECKPERM | SSHCONF_USERCONF |
+			    (post_canon ? SSHCONF_POSTCANON : 0));
 
 		/* Read systemwide configuration file after user config. */
-		(void)read_config_file(_PATH_HOST_CONFIG_FILE, pw, host,
-		    &options, 0);
+		(void)read_config_file(_PATH_HOST_CONFIG_FILE, pw,
+		    host, host_arg, &options,
+		    post_canon ? SSHCONF_POSTCANON : 0);
+	}
+}
+
+/* Rewrite the port number in an addrinfo list of addresses */
+static void
+set_addrinfo_port(struct addrinfo *addrs, int port)
+{
+	struct addrinfo *addr;
+
+	for (addr = addrs; addr != NULL; addr = addr->ai_next) {
+		switch (addr->ai_family) {
+		case AF_INET:
+			((struct sockaddr_in *)addr->ai_addr)->
+			    sin_port = htons(port);
+			break;
+		case AF_INET6:
+			((struct sockaddr_in6 *)addr->ai_addr)->
+			    sin6_port = htons(port);
+			break;
+		}
 	}
 }
 
@@ -422,7 +443,7 @@ int
 main(int ac, char **av)
 {
 	struct ssh *ssh;
-	int i, r, opt, exit_status, use_syslog;
+	int i, r, opt, exit_status, use_syslog, config_test = 0;
 	char *p, *cp, *line, *argv0, buf[MAXPATHLEN], *host_arg, *logfile;
 	char thishost[NI_MAXHOST], shorthost[NI_MAXHOST], portstr[NI_MAXSERV];
 	char cname[NI_MAXHOST];
@@ -431,7 +452,7 @@ main(int ac, char **av)
 	int timeout_ms;
 	extern int optind, optreset;
 	extern char *optarg;
-	Forward fwd;
+	struct Forward fwd;
 	struct addrinfo *addrs = NULL;
 	struct ssh_digest_ctx *md;
 	u_char conn_hash[SSH_DIGEST_MAX_LENGTH];
@@ -500,7 +521,7 @@ main(int ac, char **av)
 
  again:
 	while ((opt = getopt(ac, av, "1246ab:c:e:fgi:kl:m:no:p:qstvx"
-	    "ACD:E:F:I:KL:MNO:PQ:R:S:TVw:W:XYy")) != -1) {
+	    "ACD:E:F:GI:KL:MNO:PQ:R:S:TVw:W:XYy")) != -1) {
 		switch (opt) {
 		case '1':
 			options.protocol = SSH_PROTO_1;
@@ -533,12 +554,15 @@ main(int ac, char **av)
 		case 'E':
 			logfile = xstrdup(optarg);
 			break;
+		case 'G':
+			config_test = 1;
+			break;
 		case 'Y':
 			options.forward_x11 = 1;
 			options.forward_x11_trusted = 1;
 			break;
 		case 'g':
-			options.gateway_ports = 1;
+			options.fwd_opts.gateway_ports = 1;
 			break;
 		case 'O':
 			if (stdio_forward_host != NULL)
@@ -781,9 +805,9 @@ main(int ac, char **av)
 			break;
 		case 'o':
 			line = xstrdup(optarg);
-			if (process_config_line(&options, pw, host ? host : "",
-			    line, "command-line", 0, NULL, SSHCONF_USERCONF)
-			    != 0)
+			if (process_config_line(&options, pw,
+			    host ? host : "", host ? host : "", line,
+			    "command-line", 0, NULL, SSHCONF_USERCONF) != 0)
 				exit(255);
 			free(line);
 			break;
@@ -894,7 +918,7 @@ main(int ac, char **av)
 		);
 
 	/* Parse the configuration files */
-	process_config_files(pw);
+	process_config_files(host_arg, pw, 0);
 
 	/* Hostname canonicalisation needs a few options filled. */
 	fill_default_options_for_canonicalization(&options);
@@ -906,6 +930,8 @@ main(int ac, char **av)
 		    "h", host, (char *)NULL);
 		free(host);
 		host = cp;
+		free(options.hostname);
+		options.hostname = xstrdup(host);
 	}
 
 	/* If canonicalization requested then try to apply it */
@@ -940,12 +966,22 @@ main(int ac, char **av)
 	}
 
 	/*
-	 * If the target hostname has changed as a result of canonicalisation
-	 * then re-parse the configuration files as new stanzas may match.
+	 * If canonicalisation is enabled then re-parse the configuration
+	 * files as new stanzas may match.
 	 */
-	if (strcasecmp(host_arg, host) != 0) {
-		debug("Hostname has changed; re-reading configuration");
-		process_config_files(pw);
+	if (options.canonicalize_hostname != 0) {
+		debug("Re-reading configuration after hostname "
+		    "canonicalisation");
+		free(options.hostname);
+		options.hostname = xstrdup(host);
+		process_config_files(host_arg, pw, 1);
+		/*
+		 * Address resolution happens early with canonicalisation
+		 * enabled and the port number may have changed since, so
+		 * reset it in address list
+		 */
+		if (addrs != NULL && options.port > 0)
+			set_addrinfo_port(addrs, options.port);
 	}
 
 	/* Fill configuration defaults. */
@@ -1043,6 +1079,11 @@ main(int ac, char **av)
 	}
 	free(conn_hash_hex);
 
+	if (config_test) {
+		dump_client_config(&options, host);
+		exit(0);
+	}
+
 	if (muxclient_command != 0 && options.control_path == NULL)
 		fatal("No ControlPath specified for \"-O\" command");
 	if (options.control_path != NULL)
@@ -1094,6 +1135,7 @@ main(int ac, char **av)
 		    sizeof(struct sshkey));
 
 		PRIV_START;
+
 		/* XXX check errors? */
 #define L_KEY(t,p,o) \
 	check_load(sshkey_load_private_type(t, p, "", \
@@ -1108,14 +1150,14 @@ main(int ac, char **av)
 	check_load(sshkey_load_cert(p, &(sensitive_data.keys[o])), p, "cert")
 
 		L_KEY(KEY_RSA1, _PATH_HOST_KEY_FILE, 0);
-		L_KEYCERT(KEY_DSA, _PATH_HOST_DSA_KEY_FILE, 1);
-		L_KEYCERT(KEY_ECDSA, _PATH_HOST_ECDSA_KEY_FILE, 2);
+		L_KEYCERT(KEY_ECDSA, _PATH_HOST_ECDSA_KEY_FILE, 1);
+		L_KEYCERT(KEY_ED25519, _PATH_HOST_ED25519_KEY_FILE, 2);
 		L_KEYCERT(KEY_RSA, _PATH_HOST_RSA_KEY_FILE, 3);
-		L_KEYCERT(KEY_ED25519, _PATH_HOST_ED25519_KEY_FILE, 4);
-		L_KEY(KEY_DSA, _PATH_HOST_DSA_KEY_FILE, 5);
-		L_KEY(KEY_ECDSA, _PATH_HOST_ECDSA_KEY_FILE, 6);
+		L_KEYCERT(KEY_DSA, _PATH_HOST_DSA_KEY_FILE, 4);
+		L_KEY(KEY_ECDSA, _PATH_HOST_ECDSA_KEY_FILE, 5);
+		L_KEY(KEY_ED25519, _PATH_HOST_ED25519_KEY_FILE, 6);
 		L_KEY(KEY_RSA, _PATH_HOST_RSA_KEY_FILE, 7);
-		L_KEY(KEY_ED25519, _PATH_HOST_ED25519_KEY_FILE, 8);
+		L_KEY(KEY_DSA, _PATH_HOST_DSA_KEY_FILE, 8);
 		PRIV_END;
 
 		if (options.hostbased_authentication == 1 &&
@@ -1124,14 +1166,14 @@ main(int ac, char **av)
 		    sensitive_data.keys[6] == NULL &&
 		    sensitive_data.keys[7] == NULL &&
 		    sensitive_data.keys[8] == NULL) {
-			L_CERT(_PATH_HOST_DSA_KEY_FILE, 1);
-			L_CERT(_PATH_HOST_ECDSA_KEY_FILE, 2);
+			L_CERT(_PATH_HOST_ECDSA_KEY_FILE, 1);
+			L_CERT(_PATH_HOST_ED25519_KEY_FILE, 2);
 			L_CERT(_PATH_HOST_RSA_KEY_FILE, 3);
-			L_CERT(_PATH_HOST_ED25519_KEY_FILE, 4);
-			L_PUBKEY(_PATH_HOST_DSA_KEY_FILE, 5);
-			L_PUBKEY(_PATH_HOST_ECDSA_KEY_FILE, 6);
+			L_CERT(_PATH_HOST_DSA_KEY_FILE, 4);
+			L_PUBKEY(_PATH_HOST_ECDSA_KEY_FILE, 5);
+			L_PUBKEY(_PATH_HOST_ED25519_KEY_FILE, 6);
 			L_PUBKEY(_PATH_HOST_RSA_KEY_FILE, 7);
-			L_PUBKEY(_PATH_HOST_ED25519_KEY_FILE, 8);
+			L_PUBKEY(_PATH_HOST_DSA_KEY_FILE, 8);
 			sensitive_data.external_keysign = 1;
 		}
 	}
@@ -1276,17 +1318,19 @@ fork_postauth(void)
 static void
 ssh_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 {
-	Forward *rfwd = (Forward *)ctxt;
+	struct Forward *rfwd = (struct Forward *)ctxt;
 	u_int port;
 	int r;
 
 	/* XXX verbose() on failure? */
 	debug("remote forward %s for: listen %s%s%d, connect %s:%d",
 	    type == SSH2_MSG_REQUEST_SUCCESS ? "success" : "failure",
-	    rfwd->listen_host == NULL ? "" : rfwd->listen_host,
-	    rfwd->listen_host == NULL ? "" : ":",
-	    rfwd->listen_port, rfwd->connect_host, rfwd->connect_port);
-	if (rfwd->listen_port == 0) {
+	    rfwd->listen_path ? rfwd->listen_path :
+	    rfwd->listen_host ? rfwd->listen_host : "",
+	    (rfwd->listen_path || rfwd->listen_host) ? ":" : "",
+	    rfwd->listen_port, rfwd->connect_path ? rfwd->connect_path :
+	    rfwd->connect_host, rfwd->connect_port);
+	if (rfwd->listen_path == NULL && rfwd->listen_port == 0) {
 		if (type == SSH2_MSG_REQUEST_SUCCESS) {
 			if ((r = sshpkt_get_u32(ssh, &port)) != 0)
 				fatal("%s: %s", __func__, ssh_err(r));
@@ -1310,12 +1354,21 @@ ssh_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 	}
 	
 	if (type == SSH2_MSG_REQUEST_FAILURE) {
-		if (options.exit_on_forward_failure)
-			fatal("Error: remote port forwarding failed for "
-			    "listen port %d", rfwd->listen_port);
-		else
-			logit("Warning: remote port forwarding failed for "
-			    "listen port %d", rfwd->listen_port);
+		if (options.exit_on_forward_failure) {
+			if (rfwd->listen_path != NULL)
+				fatal("Error: remote port forwarding failed "
+				    "for listen path %s", rfwd->listen_path);
+			else
+				fatal("Error: remote port forwarding failed "
+				    "for listen port %d", rfwd->listen_port);
+		} else {
+			if (rfwd->listen_path != NULL)
+				logit("Warning: remote port forwarding failed "
+				    "for listen path %s", rfwd->listen_path);
+			else
+				logit("Warning: remote port forwarding failed "
+				    "for listen port %d", rfwd->listen_port);
+		}
 	}
 	if (++remote_forward_confirms_received == options.num_remote_forwards) {
 		debug("All remote forwarding requests processed");
@@ -1329,6 +1382,13 @@ client_cleanup_stdio_fwd(u_int id, void *arg)
 {
 	debug("stdio forwarding: done");
 	cleanup_exit(0);
+}
+
+static void
+ssh_stdio_confirm(int id, int success, void *arg)
+{
+	if (!success)
+		fatal("stdio forwarding failed");
 }
 
 static void
@@ -1351,6 +1411,7 @@ ssh_init_stdio_forwarding(struct ssh *ssh)
 	    stdio_forward_port, in, out)) == NULL)
 		fatal("%s: channel_connect_stdio_fwd failed", __func__);
 	channel_register_cleanup(c->self, client_cleanup_stdio_fwd, 0);
+	channel_register_open_confirm(c->self, ssh_stdio_confirm, NULL);
 }
 
 static void
@@ -1363,18 +1424,18 @@ ssh_init_forwarding(struct ssh *ssh)
 	for (i = 0; i < options.num_local_forwards; i++) {
 		debug("Local connections to %.200s:%d forwarded to remote "
 		    "address %.200s:%d",
+		    (options.local_forwards[i].listen_path != NULL) ?
+		    options.local_forwards[i].listen_path :
 		    (options.local_forwards[i].listen_host == NULL) ?
-		    (options.gateway_ports ? "*" : "LOCALHOST") :
+		    (options.fwd_opts.gateway_ports ? "*" : "LOCALHOST") :
 		    options.local_forwards[i].listen_host,
 		    options.local_forwards[i].listen_port,
+		    (options.local_forwards[i].connect_path != NULL) ?
+		    options.local_forwards[i].connect_path :
 		    options.local_forwards[i].connect_host,
 		    options.local_forwards[i].connect_port);
 		success += channel_setup_local_fwd_listener(ssh,
-		    options.local_forwards[i].listen_host,
-		    options.local_forwards[i].listen_port,
-		    options.local_forwards[i].connect_host,
-		    options.local_forwards[i].connect_port,
-		    options.gateway_ports);
+		    &options.local_forwards[i], &options.fwd_opts);
 	}
 	if (i > 0 && success != i && options.exit_on_forward_failure)
 		fatal("Could not request local forwarding.");
@@ -1385,17 +1446,18 @@ ssh_init_forwarding(struct ssh *ssh)
 	for (i = 0; i < options.num_remote_forwards; i++) {
 		debug("Remote connections from %.200s:%d forwarded to "
 		    "local address %.200s:%d",
+		    (options.remote_forwards[i].listen_path != NULL) ?
+		    options.remote_forwards[i].listen_path :
 		    (options.remote_forwards[i].listen_host == NULL) ?
 		    "LOCALHOST" : options.remote_forwards[i].listen_host,
 		    options.remote_forwards[i].listen_port,
+		    (options.remote_forwards[i].connect_path != NULL) ?
+		    options.remote_forwards[i].connect_path :
 		    options.remote_forwards[i].connect_host,
 		    options.remote_forwards[i].connect_port);
 		options.remote_forwards[i].handle =
 		    channel_request_remote_forwarding(ssh,
-		    options.remote_forwards[i].listen_host,
-		    options.remote_forwards[i].listen_port,
-		    options.remote_forwards[i].connect_host,
-		    options.remote_forwards[i].connect_port);
+		    &options.remote_forwards[i]);
 		if (options.remote_forwards[i].handle < 0) {
 			if (options.exit_on_forward_failure)
 				fatal("Could not request remote forwarding.");

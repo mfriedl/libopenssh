@@ -1,5 +1,5 @@
 
-/* $OpenBSD: servconf.c,v 1.250 2014/07/03 22:40:43 djm Exp $ */
+/* $OpenBSD: servconf.c,v 1.257 2014/12/22 07:55:51 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -16,7 +16,6 @@
 #include <sys/queue.h>
 
 #include <netinet/in.h>
-#include <netinet/in_systm.h>
 #include <netinet/ip.h>
 
 #include <ctype.h>
@@ -35,10 +34,10 @@
 #include "ssh.h"
 #include "log.h"
 #include "sshbuf.h"
+#include "misc.h"
 #include "servconf.h"
 #include "compat.h"
 #include "pathnames.h"
-#include "misc.h"
 #include "cipher.h"
 #include "sshkey.h"
 #include "kex.h"
@@ -51,6 +50,8 @@
 #include "ssherr.h"
 #include "hostfile.h"
 #include "auth.h"
+#include "myproposal.h"
+#include "digest.h"
 
 static void add_listen_addr(ServerOptions *, char *, int);
 static void add_one_listen_addr(ServerOptions *, char *, int);
@@ -112,6 +113,7 @@ initialize_server_options(ServerOptions *options)
 	options->rekey_limit = -1;
 	options->rekey_interval = -1;
 	options->allow_tcp_forwarding = -1;
+	options->allow_streamlocal_forwarding = -1;
 	options->allow_agent_forwarding = -1;
 	options->num_allow_users = 0;
 	options->num_deny_users = 0;
@@ -121,7 +123,9 @@ initialize_server_options(ServerOptions *options)
 	options->macs = NULL;
 	options->kex_algorithms = NULL;
 	options->protocol = SSH_PROTO_UNKNOWN;
-	options->gateway_ports = -1;
+	options->fwd_opts.gateway_ports = -1;
+	options->fwd_opts.streamlocal_bind_mask = (mode_t)-1;
+	options->fwd_opts.streamlocal_bind_unlink = -1;
 	options->num_subsystems = 0;
 	options->max_startups_begin = -1;
 	options->max_startups_rate = -1;
@@ -146,11 +150,21 @@ initialize_server_options(ServerOptions *options)
 	options->ip_qos_interactive = -1;
 	options->ip_qos_bulk = -1;
 	options->version_addendum = NULL;
+	options->fingerprint_hash = -1;
+}
+
+/* Returns 1 if a string option is unset or set to "none" or 0 otherwise. */
+static int
+option_clear_or_none(const char *o)
+{
+	return o == NULL || strcasecmp(o, "none") == 0;
 }
 
 void
 fill_default_server_options(ServerOptions *options)
 {
+	int i;
+
 	if (options->protocol == SSH_PROTO_UNKNOWN)
 		options->protocol = SSH_PROTO_2;
 	if (options->num_host_key_files == 0) {
@@ -175,7 +189,7 @@ fill_default_server_options(ServerOptions *options)
 	if (options->listen_addrs == NULL)
 		add_listen_addr(options, NULL, 0);
 	if (options->pid_file == NULL)
-		options->pid_file = _PATH_SSH_DAEMON_PID_FILE;
+		options->pid_file = xstrdup(_PATH_SSH_DAEMON_PID_FILE);
 	if (options->server_key_bits == -1)
 		options->server_key_bits = 1024;
 	if (options->login_grace_time == -1)
@@ -199,7 +213,7 @@ fill_default_server_options(ServerOptions *options)
 	if (options->x11_use_localhost == -1)
 		options->x11_use_localhost = 1;
 	if (options->xauth_location == NULL)
-		options->xauth_location = _PATH_XAUTH;
+		options->xauth_location = xstrdup(_PATH_XAUTH);
 	if (options->permit_tty == -1)
 		options->permit_tty = 1;
 	if (options->permit_user_rc == -1)
@@ -254,10 +268,12 @@ fill_default_server_options(ServerOptions *options)
 		options->rekey_interval = 0;
 	if (options->allow_tcp_forwarding == -1)
 		options->allow_tcp_forwarding = FORWARD_ALLOW;
+	if (options->allow_streamlocal_forwarding == -1)
+		options->allow_streamlocal_forwarding = FORWARD_ALLOW;
 	if (options->allow_agent_forwarding == -1)
 		options->allow_agent_forwarding = 1;
-	if (options->gateway_ports == -1)
-		options->gateway_ports = 0;
+	if (options->fwd_opts.gateway_ports == -1)
+		options->fwd_opts.gateway_ports = 0;
 	if (options->max_startups == -1)
 		options->max_startups = 100;
 	if (options->max_startups_rate == -1)
@@ -288,9 +304,33 @@ fill_default_server_options(ServerOptions *options)
 		options->ip_qos_bulk = IPTOS_THROUGHPUT;
 	if (options->version_addendum == NULL)
 		options->version_addendum = xstrdup("");
+	if (options->fwd_opts.streamlocal_bind_mask == (mode_t)-1)
+		options->fwd_opts.streamlocal_bind_mask = 0177;
+	if (options->fwd_opts.streamlocal_bind_unlink == -1)
+		options->fwd_opts.streamlocal_bind_unlink = 0;
+	if (options->fingerprint_hash == -1)
+		options->fingerprint_hash = SSH_FP_HASH_DEFAULT;
 	/* Turn privilege separation on by default */
 	if (use_privsep == -1)
 		use_privsep = PRIVSEP_NOSANDBOX;
+
+#define CLEAR_ON_NONE(v) \
+	do { \
+		if (option_clear_or_none(v)) { \
+			free(v); \
+			v = NULL; \
+		} \
+	} while(0)
+	CLEAR_ON_NONE(options->pid_file);
+	CLEAR_ON_NONE(options->xauth_location);
+	CLEAR_ON_NONE(options->banner);
+	CLEAR_ON_NONE(options->trusted_user_ca_keys);
+	CLEAR_ON_NONE(options->revoked_keys_file);
+	for (i = 0; i < options->num_host_key_files; i++)
+		CLEAR_ON_NONE(options->host_key_files[i]);
+	for (i = 0; i < options->num_host_cert_files; i++)
+		CLEAR_ON_NONE(options->host_cert_files[i]);
+#undef CLEAR_ON_NONE
 }
 
 /* Keyword tokens. */
@@ -323,6 +363,8 @@ typedef enum {
 	sKexAlgorithms, sIPQoS, sVersionAddendum,
 	sAuthorizedKeysCommand, sAuthorizedKeysCommandUser,
 	sAuthenticationMethods, sHostKeyAgent, sPermitUserRC,
+	sStreamLocalBindMask, sStreamLocalBindUnlink,
+	sAllowStreamLocalForwarding, sFingerprintHash,
 	sDeprecated, sUnsupported
 } ServerOpCodes;
 
@@ -438,6 +480,10 @@ static struct {
 	{ "authorizedkeyscommanduser", sAuthorizedKeysCommandUser, SSHCFG_ALL },
 	{ "versionaddendum", sVersionAddendum, SSHCFG_GLOBAL },
 	{ "authenticationmethods", sAuthenticationMethods, SSHCFG_ALL },
+	{ "streamlocalbindmask", sStreamLocalBindMask, SSHCFG_ALL },
+	{ "streamlocalbindunlink", sStreamLocalBindUnlink, SSHCFG_ALL },
+	{ "allowstreamlocalforwarding", sAllowStreamLocalForwarding, SSHCFG_ALL },
+	{ "fingerprinthash", sFingerprintHash, SSHCFG_GLOBAL },
 	{ NULL, sBadOption, 0 }
 };
 
@@ -478,6 +524,8 @@ derelativise_path(const char *path)
 {
 	char *expanded, *ret, cwd[MAXPATHLEN];
 
+	if (strcasecmp(path, "none") == 0)
+		return xstrdup("none");
 	expanded = tilde_expand_filename(path, getuid());
 	if (*expanded == '/')
 		return expanded;
@@ -1150,7 +1198,7 @@ process_server_config_line(ServerOptions *options, char *line,
 		break;
 
 	case sGatewayPorts:
-		intptr = &options->gateway_ports;
+		intptr = &options->fwd_opts.gateway_ports;
 		multistate_ptr = multistate_gatewayports;
 		goto parse_multistate;
 
@@ -1182,6 +1230,11 @@ process_server_config_line(ServerOptions *options, char *line,
 
 	case sAllowTcpForwarding:
 		intptr = &options->allow_tcp_forwarding;
+		multistate_ptr = multistate_tcpfwd;
+		goto parse_multistate;
+
+	case sAllowStreamLocalForwarding:
+		intptr = &options->allow_streamlocal_forwarding;
 		multistate_ptr = multistate_tcpfwd;
 		goto parse_multistate;
 
@@ -1547,6 +1600,9 @@ process_server_config_line(ServerOptions *options, char *line,
 		return 0;
 
 	case sAuthorizedKeysCommand:
+		if (cp == NULL)
+			fatal("%.200s line %d: Missing argument.", filename,
+			    linenum);
 		len = strspn(cp, WHITESPACE);
 		if (*activep && options->authorized_keys_command == NULL) {
 			if (cp[len] != '/' && strcasecmp(cp + len, "none") != 0)
@@ -1561,6 +1617,9 @@ process_server_config_line(ServerOptions *options, char *line,
 		charptr = &options->authorized_keys_command_user;
 
 		arg = strdelim(&cp);
+		if (!arg || *arg == '\0')
+			fatal("%s line %d: missing AuthorizedKeysCommandUser "
+			    "argument.", filename, linenum);
 		if (*activep && *charptr == NULL)
 			*charptr = xstrdup(arg);
 		break;
@@ -1582,6 +1641,34 @@ process_server_config_line(ServerOptions *options, char *line,
 			}
 		}
 		return 0;
+
+	case sStreamLocalBindMask:
+		arg = strdelim(&cp);
+		if (!arg || *arg == '\0')
+			fatal("%s line %d: missing StreamLocalBindMask argument.",
+			    filename, linenum);
+		/* Parse mode in octal format */
+		value = strtol(arg, &p, 8);
+		if (arg == p || value < 0 || value > 0777)
+			fatal("%s line %d: Bad mask.", filename, linenum);
+		options->fwd_opts.streamlocal_bind_mask = (mode_t)value;
+		break;
+
+	case sStreamLocalBindUnlink:
+		intptr = &options->fwd_opts.streamlocal_bind_unlink;
+		goto parse_flag;
+
+	case sFingerprintHash:
+		arg = strdelim(&cp);
+		if (!arg || *arg == '\0')
+			fatal("%.200s line %d: Missing argument.",
+			    filename, linenum);
+		if ((value = ssh_digest_alg_by_name(arg)) == -1)
+			fatal("%.200s line %d: Invalid hash algorithm \"%s\".",
+			    filename, linenum, arg);
+		if (*activep)
+			options->fingerprint_hash = value;
+		break;
 
 	case sDeprecated:
 		logit("%s line %d: Deprecated option %s",
@@ -1723,9 +1810,10 @@ copy_set_server_options(ServerOptions *dst, ServerOptions *src, int preauth)
 	M_CP_INTOPT(permit_empty_passwd);
 
 	M_CP_INTOPT(allow_tcp_forwarding);
+	M_CP_INTOPT(allow_streamlocal_forwarding);
 	M_CP_INTOPT(allow_agent_forwarding);
 	M_CP_INTOPT(permit_tun);
-	M_CP_INTOPT(gateway_ports);
+	M_CP_INTOPT(fwd_opts.gateway_ports);
 	M_CP_INTOPT(x11_display_offset);
 	M_CP_INTOPT(x11_forwarding);
 	M_CP_INTOPT(x11_use_localhost);
@@ -1823,6 +1911,10 @@ fmt_intarg(ServerOpCodes code, int val)
 		return fmt_multistate_int(val, multistate_privsep);
 	case sAllowTcpForwarding:
 		return fmt_multistate_int(val, multistate_tcpfwd);
+	case sAllowStreamLocalForwarding:
+		return fmt_multistate_int(val, multistate_tcpfwd);
+	case sFingerprintHash:
+		return ssh_digest_alg_name(val);
 	case sProtocol:
 		switch (val) {
 		case SSH_PROTO_1:
@@ -1874,7 +1966,8 @@ dump_cfg_string(ServerOpCodes code, const char *val)
 {
 	if (val == NULL)
 		return;
-	printf("%s %s\n", lookup_opcode_name(code), val);
+	printf("%s %s\n", lookup_opcode_name(code),
+	    val == NULL ? "none" : val);
 }
 
 static void
@@ -1974,17 +2067,18 @@ dump_config(ServerOptions *o)
 	dump_cfg_fmtint(sPermitUserEnvironment, o->permit_user_env);
 	dump_cfg_fmtint(sUseLogin, o->use_login);
 	dump_cfg_fmtint(sCompression, o->compression);
-	dump_cfg_fmtint(sGatewayPorts, o->gateway_ports);
+	dump_cfg_fmtint(sGatewayPorts, o->fwd_opts.gateway_ports);
 	dump_cfg_fmtint(sUseDNS, o->use_dns);
 	dump_cfg_fmtint(sAllowTcpForwarding, o->allow_tcp_forwarding);
+	dump_cfg_fmtint(sAllowStreamLocalForwarding, o->allow_streamlocal_forwarding);
 	dump_cfg_fmtint(sUsePrivilegeSeparation, use_privsep);
+	dump_cfg_fmtint(sFingerprintHash, o->fingerprint_hash);
 
 	/* string arguments */
 	dump_cfg_string(sPidFile, o->pid_file);
 	dump_cfg_string(sXAuthLocation, o->xauth_location);
-	dump_cfg_string(sCiphers, o->ciphers ? o->ciphers :
-	    cipher_alg_list(',', 0));
-	dump_cfg_string(sMacs, o->macs ? o->macs : mac_alg_list(','));
+	dump_cfg_string(sCiphers, o->ciphers ? o->ciphers : KEX_SERVER_ENCRYPT);
+	dump_cfg_string(sMacs, o->macs ? o->macs : KEX_SERVER_MAC);
 	dump_cfg_string(sBanner, o->banner);
 	dump_cfg_string(sForceCommand, o->adm_forced_command);
 	dump_cfg_string(sChrootDirectory, o->chroot_directory);
@@ -1996,8 +2090,8 @@ dump_config(ServerOptions *o)
 	dump_cfg_string(sAuthorizedKeysCommand, o->authorized_keys_command);
 	dump_cfg_string(sAuthorizedKeysCommandUser, o->authorized_keys_command_user);
 	dump_cfg_string(sHostKeyAgent, o->host_key_agent);
-	dump_cfg_string(sKexAlgorithms, o->kex_algorithms ? o->kex_algorithms :
-	    kex_alg_list(','));
+	dump_cfg_string(sKexAlgorithms,
+	    o->kex_algorithms ? o->kex_algorithms : KEX_SERVER_KEX);
 
 	/* string arguments requiring a lookup */
 	dump_cfg_string(sLogLevel, log_level_name(o->log_level));

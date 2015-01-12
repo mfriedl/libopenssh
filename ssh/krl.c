@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $OpenBSD: krl.c,v 1.17 2014/06/24 01:13:21 djm Exp $ */
+/* $OpenBSD: krl.c,v 1.22 2015/01/08 10:14:08 djm Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -34,7 +34,8 @@
 #include "authfile.h"
 #include "misc.h"
 #include "log.h"
-#include "xmalloc.h"
+#include "ssherr.h"
+#include "digest.h"
 
 #include "krl.h"
 
@@ -363,7 +364,6 @@ plain_key_blob(const struct sshkey *key, u_char **blob, size_t *blen)
 		return r;
 	if (sshkey_is_cert(kcopy)) {
 		if ((r = sshkey_drop_cert(kcopy)) != 0) {
-			error("%s: key_drop_cert", __func__);
 			sshkey_free(kcopy);
 			return r;
 		}
@@ -412,7 +412,8 @@ ssh_krl_revoke_key_sha1(struct ssh_krl *krl, const struct sshkey *key)
 	int r;
 
 	debug3("%s: revoke type %s by sha1", __func__, sshkey_type(key));
-	if ((r = sshkey_fingerprint_raw(key, SSH_FP_SHA1, &blob, &len)) != 0)
+	if ((r = sshkey_fingerprint_raw(key, SSH_DIGEST_SHA1,
+	    &blob, &len)) != 0)
 		return r;
 	return revoke_blob(&krl->revoked_sha1s, blob, len);
 }
@@ -435,8 +436,8 @@ ssh_krl_revoke_key(struct ssh_krl *krl, const struct sshkey *key)
 }
 
 /*
- * Select a copact next section type to emit in a KRL based on the
- * current section type, the run length of contiguous revoked serial
+ * Select the most compact section type to emit next in a KRL based on
+ * the current section type, the run length of contiguous revoked serial
  * numbers and the gaps from the last and to the next revoked serial.
  * Applies a mostly-accurate bit cost model to select the section type
  * that will minimise the size of the resultant KRL.
@@ -522,26 +523,23 @@ static int
 revoked_certs_generate(struct revoked_certs *rc, struct sshbuf *buf)
 {
 	int final, force_new_sect, r = SSH_ERR_INTERNAL_ERROR;
-	u_int64_t i, contig, gap, last = 0, bitmap_off = 0;
+	u_int64_t i, contig, gap, last = 0, bitmap_start = 0;
 	struct revoked_serial *rs, *nrs;
 	struct revoked_key_id *rki;
 	int next_state, state = 0;
-	struct sshbuf *sect = NULL;
-	u_char *kblob = NULL;
-	size_t klen;
+	struct sshbuf *sect;
 	BIGNUM *bitmap = NULL;
-
-	/* Prepare CA scope key blob if we have one supplied */
-	if ((r = sshkey_to_blob(rc->ca_key, &kblob, &klen)) != 0)
-		return r;
 
 	if ((sect = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 
-	/* Store the header */
-	if ((r = sshbuf_put_string(buf, kblob, klen)) != 0 ||
+	/* Store the header: CA scope key, reserved */
+	if ((r = sshkey_to_blob_buf(rc->ca_key, sect)) != 0 ||
+	    (r = sshbuf_put_stringb(buf, sect)) != 0 ||
 	    (r = sshbuf_put_string(buf, NULL, 0)) != 0)
 		goto out;
+
+	sshbuf_reset(sect);
 
 	/* Store the revoked serials.  */
 	for (rs = RB_MIN(revoked_serial_tree, &rc->revoked_serials);
@@ -600,8 +598,9 @@ revoked_certs_generate(struct revoked_certs *rc, struct sshbuf *buf)
 					r = SSH_ERR_ALLOC_FAIL;
 					goto out;
 				}
-				bitmap_off = rs->lo;
-				if ((r = sshbuf_put_u64(sect, bitmap_off)) != 0)
+				bitmap_start = rs->lo;
+				if ((r = sshbuf_put_u64(sect,
+				    bitmap_start)) != 0)
 					goto out;
 				break;
 			}
@@ -621,14 +620,14 @@ revoked_certs_generate(struct revoked_certs *rc, struct sshbuf *buf)
 				goto out;
 			break;
 		case KRL_SECTION_CERT_SERIAL_BITMAP:
-			if (rs->lo - bitmap_off > INT_MAX) {
+			if (rs->lo - bitmap_start > INT_MAX) {
 				error("%s: insane bitmap gap", __func__);
 				goto out;
 			}
 			for (i = 0; i < contig; i++) {
 				if (BN_set_bit(bitmap,
-				    rs->lo + i - bitmap_off) != 1) {
-					r = SSH_ERR_LIBCRYPTO_ERROR;
+				    rs->lo + i - bitmap_start) != 1) {
+					r = SSH_ERR_ALLOC_FAIL;
 					goto out;
 				}
 			}
@@ -647,6 +646,8 @@ revoked_certs_generate(struct revoked_certs *rc, struct sshbuf *buf)
 		case KRL_SECTION_CERT_SERIAL_BITMAP:
 			if ((r = sshbuf_put_bignum2(sect, bitmap)) != 0)
 				goto out;
+			BN_free(bitmap);
+			bitmap = NULL;
 			break;
 		}
 		if ((r = sshbuf_put_u8(buf, state)) != 0 ||
@@ -669,7 +670,6 @@ revoked_certs_generate(struct revoked_certs *rc, struct sshbuf *buf)
 	}
 	r = 0;
  out:
-	free(kblob);
 	if (bitmap != NULL)
 		BN_free(bitmap);
 	sshbuf_free(sect);
@@ -683,9 +683,9 @@ ssh_krl_to_blob(struct ssh_krl *krl, struct sshbuf *buf,
 	int r = SSH_ERR_INTERNAL_ERROR;
 	struct revoked_certs *rc;
 	struct revoked_blob *rb;
-	struct sshbuf *sect = NULL;
-	u_char *kblob = NULL, *sblob = NULL;
-	size_t klen, slen, i;
+	struct sshbuf *sect;
+	u_char *sblob = NULL;
+	size_t slen, i;
 
 	if (krl->generated_date == 0)
 		krl->generated_date = time(NULL);
@@ -697,16 +697,15 @@ ssh_krl_to_blob(struct ssh_krl *krl, struct sshbuf *buf,
 	if ((r = sshbuf_put(buf, KRL_MAGIC, sizeof(KRL_MAGIC) - 1)) != 0 ||
 	    (r = sshbuf_put_u32(buf, KRL_FORMAT_VERSION)) != 0 ||
 	    (r = sshbuf_put_u64(buf, krl->krl_version)) != 0 ||
-	    (r = sshbuf_put_u64(buf, krl->generated_date)) != 0 ||
+	    (r = sshbuf_put_u64(buf, krl->generated_date) != 0) ||
 	    (r = sshbuf_put_u64(buf, krl->flags)) != 0 ||
 	    (r = sshbuf_put_string(buf, NULL, 0)) != 0 ||
-	    (r = sshbuf_put_cstring(buf,
-	    krl->comment != NULL ? krl->comment : "")) != 0)
+	    (r = sshbuf_put_cstring(buf, krl->comment)) != 0)
 		goto out;
-
 
 	/* Store sections for revoked certificates */
 	TAILQ_FOREACH(rc, &krl->revoked_certs, entry) {
+		sshbuf_reset(sect);
 		if ((r = revoked_certs_generate(rc, sect)) != 0)
 			goto out;
 		if ((r = sshbuf_put_u8(buf, KRL_SECTION_CERTIFICATES)) != 0 ||
@@ -719,6 +718,8 @@ ssh_krl_to_blob(struct ssh_krl *krl, struct sshbuf *buf,
 	RB_FOREACH(rb, revoked_blob_tree, &krl->revoked_keys) {
 		KRL_DBG(("%s: key len %u ", __func__, rb->len));
 		if ((r = sshbuf_put_string(sect, rb->blob, rb->len)) != 0)
+			goto out;
+		if ((sshbuf_put_string(sect, rb->blob, rb->len)) != 0)
 			goto out;
 	}
 	if (sshbuf_len(sect) != 0) {
@@ -740,16 +741,18 @@ ssh_krl_to_blob(struct ssh_krl *krl, struct sshbuf *buf,
 	}
 
 	for (i = 0; i < nsign_keys; i++) {
-		if ((r = sshkey_to_blob(sign_keys[i], &kblob, &klen)) == 0)
+		sshbuf_reset(sect);
+		if ((r = sshkey_to_blob_buf(sign_keys[i], sect)) != 0)
 			goto out;
 
-		KRL_DBG(("%s: signature key len %u", __func__, klen));
+		KRL_DBG(("%s: signature key len %zu", __func__,
+		    sshbuf_len(sect)));
 		if ((r = sshbuf_put_u8(buf, KRL_SECTION_SIGNATURE)) != 0 ||
-		    (r = sshbuf_put_string(buf, kblob, klen)) != 0)
+		    (r = sshbuf_put_stringb(buf, sect)) != 0)
 			goto out;
 
 		if ((r = sshkey_sign(sign_keys[i], &sblob, &slen,
-		    sshbuf_ptr(buf), sshbuf_len(buf), 0)) != 0)
+		    sshbuf_ptr(buf), sshbuf_len(buf), 0)) == -1)
 			goto out;
 		KRL_DBG(("%s: signature sig len %u", __func__, slen));
 		if ((r = sshbuf_put_string(buf, sblob, slen)) != 0)
@@ -758,7 +761,6 @@ ssh_krl_to_blob(struct ssh_krl *krl, struct sshbuf *buf,
 
 	r = 0;
  out:
-	free(kblob);
 	free(sblob);
 	sshbuf_free(sect);
 	return r;
@@ -772,8 +774,12 @@ format_timestamp(u_int64_t timestamp, char *ts, size_t nts)
 
 	t = timestamp;
 	tm = localtime(&t);
-	*ts = '\0';
-	strftime(ts, nts, "%Y%m%dT%H%M%S", tm);
+	if (tm == NULL)
+		strlcpy(ts, "<INVALID>", sizeof(nts));
+	else {
+		*ts = '\0';
+		strftime(ts, nts, "%Y%m%dT%H%M%S", tm);
+	}
 }
 
 static int
@@ -789,13 +795,21 @@ parse_revoked_certs(struct sshbuf *buf, struct ssh_krl *krl)
 	char *key_id = NULL;
 	struct sshkey *ca_key = NULL;
 
+	if ((subsect = sshbuf_new()) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+
+	/* Header: key, reserved */
 	if ((r = sshbuf_get_string_direct(buf, &blob, &blen)) != 0 ||
-	    (r = sshbuf_skip_string(buf)) != 0) /* reserved */
+	    (r = sshbuf_skip_string(buf)) != 0)
 		goto out;
 	if ((r = sshkey_from_blob(blob, blen, &ca_key)) != 0)
 		goto out;
 
 	while (sshbuf_len(buf) > 0) {
+		if (subsect != NULL) {
+			sshbuf_free(subsect);
+			subsect = NULL;
+		}
 		if ((r = sshbuf_get_u8(buf, &type)) != 0 ||
 		    (r = sshbuf_froms(buf, &subsect)) != 0)
 			goto out;
@@ -850,8 +864,8 @@ parse_revoked_certs(struct sshbuf *buf, struct ssh_krl *krl)
 			break;
 		case KRL_SECTION_CERT_KEY_ID:
 			while (sshbuf_len(subsect) > 0) {
-				if ((r = sshbuf_get_cstring(subsect, &key_id,
-				    NULL)) != 0)
+				if ((r = sshbuf_get_cstring(subsect,
+				    &key_id, NULL)) != 0)
 					goto out;
 				if ((r = ssh_krl_revoke_cert_by_key_id(krl,
 				    ca_key, key_id)) != 0)
@@ -874,10 +888,10 @@ parse_revoked_certs(struct sshbuf *buf, struct ssh_krl *krl)
 
 	r = 0;
  out:
-	sshkey_free(ca_key);
 	if (bitmap != NULL)
 		BN_free(bitmap);
 	free(key_id);
+	sshkey_free(ca_key);
 	sshbuf_free(subsect);
 	return r;
 }
@@ -892,36 +906,43 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 	struct ssh_krl *krl = NULL;
 	char timestamp[64];
 	int r = SSH_ERR_INTERNAL_ERROR, sig_seen;
-	struct sshkey *key = NULL, **ca_used = NULL;
+	struct sshkey *key = NULL, **ca_used = NULL, **tmp_ca_used;
 	u_char type, *rdata = NULL;
 	const u_char *blob;
-	size_t i, j, sig_off, sects_off, blen, rlen, nca_used = 0;
+	size_t i, j, sig_off, sects_off, rlen, blen, nca_used;
 	u_int format_version;
 
-	*krlp = krl = NULL;
+	nca_used = 0;
+	*krlp = NULL;
 	if (sshbuf_len(buf) < sizeof(KRL_MAGIC) - 1 ||
-	    memcmp(sshbuf_ptr(buf), KRL_MAGIC, sizeof(KRL_MAGIC) - 1) != 0)
+	    memcmp(sshbuf_ptr(buf), KRL_MAGIC, sizeof(KRL_MAGIC) - 1) != 0) {
+		debug3("%s: not a KRL", __func__);
 		return SSH_ERR_KRL_BAD_MAGIC;
+	}
 
 	/* Take a copy of the KRL buffer so we can verify its signature later */
-	if ((copy = sshbuf_fromb(buf)) == NULL ||
-	    (krl = ssh_krl_init()) == NULL) {
+	if ((copy = sshbuf_fromb(buf)) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-	if ((r = sshbuf_consume(copy, sizeof(KRL_MAGIC) - 1)) != 0 ||
-	    (r = sshbuf_get_u32(copy, &format_version)) != 0)
+	if ((r = sshbuf_consume(copy, sizeof(KRL_MAGIC) - 1)) != 0)
+		goto out;
+
+	if ((krl = ssh_krl_init()) == NULL) {
+		error("%s: alloc failed", __func__);
+		goto out;
+	}
+
+	if ((r = sshbuf_get_u32(copy, &format_version)) != 0)
 		goto out;
 	if (format_version != KRL_FORMAT_VERSION) {
-		error("%s: KRL unsupported format version %u",
-		    __func__, format_version);
 		r = SSH_ERR_INVALID_FORMAT;
 		goto out;
 	}
-	if ((r = sshbuf_get_u64(copy, &krl->krl_version) != 0) ||
-	    (r = sshbuf_get_u64(copy, &krl->generated_date) != 0) ||
-	    (r = sshbuf_get_u64(copy, &krl->flags) != 0) ||
-	    (r = sshbuf_skip_string(copy)) != 0 || /* reserved */
+	if ((r = sshbuf_get_u64(copy, &krl->krl_version)) != 0 ||
+	    (r = sshbuf_get_u64(copy, &krl->generated_date)) != 0 ||
+	    (r = sshbuf_get_u64(copy, &krl->flags)) != 0 ||
+	    (r = sshbuf_skip_string(copy)) != 0 ||
 	    (r = sshbuf_get_cstring(copy, &krl->comment, NULL)) != 0)
 		goto out;
 
@@ -935,6 +956,11 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 	 * detailed parsing of data whose provenance is unverified.
 	 */
 	sig_seen = 0;
+	if (sshbuf_len(buf) < sshbuf_len(copy)) {
+		/* Shouldn't happen */
+		r = SSH_ERR_INTERNAL_ERROR;
+		goto out;
+	}
 	sects_off = sshbuf_len(buf) - sshbuf_len(copy);
 	while (sshbuf_len(copy) > 0) {
 		if ((r = sshbuf_get_u8(copy, &type)) != 0 ||
@@ -943,6 +969,7 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 		KRL_DBG(("%s: first pass, section 0x%02x", __func__, type));
 		if (type != KRL_SECTION_SIGNATURE) {
 			if (sig_seen) {
+				r = SSH_ERR_INVALID_FORMAT;
 				error("KRL contains non-signature section "
 				    "after signature");
 				r = SSH_ERR_INVALID_FORMAT;
@@ -953,12 +980,21 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 		}
 		sig_seen = 1;
 		/* First string component is the signing key */
-		if ((r = sshkey_from_blob(blob, blen, &key)) != 0)
+		if ((r = sshkey_from_blob(blob, blen, &key)) != 0) {
+			r = SSH_ERR_INVALID_FORMAT;
 			goto out;
+		}
+		if (sshbuf_len(buf) < sshbuf_len(copy)) {
+			/* Shouldn't happen */
+			r = SSH_ERR_INTERNAL_ERROR;
+			goto out;
+		}
 		sig_off = sshbuf_len(buf) - sshbuf_len(copy);
 		/* Second string component is the signature itself */
-		if ((r = sshbuf_get_string_direct(copy, &blob, &blen)) != 0)
+		if ((r = sshbuf_get_string_direct(copy, &blob, &blen)) != 0) {
+			r = SSH_ERR_INVALID_FORMAT;
 			goto out;
+		}
 		/* Check signature over entire KRL up to this point */
 		if ((r = sshkey_verify(key, blob, blen,
 		    sshbuf_ptr(buf), sshbuf_len(buf) - sig_off, 0)) != 0)
@@ -973,23 +1009,42 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 			}
 		}
 		/* Record keys used to sign the KRL */
-		if ((r = reallocn((void **)&ca_used, nca_used + 1,
-		    sizeof(*ca_used))) != 0)
+		tmp_ca_used = reallocarray(ca_used, nca_used + 1,
+		    sizeof(*ca_used));
+		if (tmp_ca_used == NULL) {
+			r = SSH_ERR_ALLOC_FAIL;
 			goto out;
+		}
+		ca_used = tmp_ca_used;
 		ca_used[nca_used++] = key;
 		key = NULL;
 		break;
+	}
+
+	if (sshbuf_len(copy) != 0) {
+		/* Shouldn't happen */
+		r = SSH_ERR_INTERNAL_ERROR;
+		goto out;
 	}
 
 	/*
 	 * 2nd pass: parse and load the KRL, skipping the header to the point
 	 * where the section start.
 	 */
-	if ((r = sshbuf_consume(buf, sects_off)) != 0)
+	sshbuf_free(copy);
+	if ((copy = sshbuf_fromb(buf)) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
-	while (sshbuf_len(buf) > 0) {
-		if ((r = sshbuf_get_u8(buf, &type)) != 0 ||
-		    (r = sshbuf_froms(buf, &sect)) != 0)
+	}
+	if ((r = sshbuf_consume(copy, sects_off)) != 0)
+		goto out;
+	while (sshbuf_len(copy) > 0) {
+		if (sect != NULL) {
+			sshbuf_free(sect);
+			sect = NULL;
+		}
+		if ((r = sshbuf_get_u8(copy, &type)) != 0 ||
+		    (r = sshbuf_froms(copy, &sect)) != 0)
 			goto out;
 		KRL_DBG(("%s: second pass, section 0x%02x", __func__, type));
 
@@ -1001,13 +1056,14 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 		case KRL_SECTION_EXPLICIT_KEY:
 		case KRL_SECTION_FINGERPRINT_SHA1:
 			while (sshbuf_len(sect) > 0) {
-				if ((r = sshbuf_get_string(sect, &rdata,
-				    &rlen)) != 0)
+				if ((r = sshbuf_get_string(sect,
+				    &rdata, &rlen)) != 0)
 					goto out;
 				if (type == KRL_SECTION_FINGERPRINT_SHA1 &&
 				    rlen != 20) {
 					r = SSH_ERR_INVALID_FORMAT;
 					error("%s: bad SHA1 length", __func__);
+					r = SSH_ERR_INVALID_FORMAT;
 					goto out;
 				}
 				if ((r = revoke_blob(
@@ -1020,11 +1076,11 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 			break;
 		case KRL_SECTION_SIGNATURE:
 			/* Handled above, but still need to stay in synch */
+			sshbuf_reset(sect);
+			sect = NULL;
 			if ((r = sshbuf_skip_string(copy)) != 0)
 				goto out;
-			sshbuf_free(sect);
-			sect = NULL;
-			break;	/* XXX was continue -markus */
+			break;
 		default:
 			error("Unsupported KRL section %u", type);
 			r = SSH_ERR_INVALID_FORMAT;
@@ -1053,6 +1109,7 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 
 	}
 	if (nca_used && !sig_seen) {
+		r = SSH_ERR_SIGNATURE_INVALID;
 		error("All keys used to sign KRL were revoked");
 		r = SSH_ERR_KEY_REVOKED;
 		goto out;
@@ -1072,6 +1129,7 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 			}
 		}
 		if (!sig_seen) {
+			r = SSH_ERR_SIGNATURE_INVALID;
 			error("KRL not signed with any trusted key");
 			goto out;
 		}
@@ -1104,8 +1162,8 @@ is_key_revoked(struct ssh_krl *krl, const struct sshkey *key)
 
 	/* Check explicitly revoked hashes first */
 	memset(&rb, 0, sizeof(rb));
-	if ((r = sshkey_fingerprint_raw(key, SSH_FP_SHA1, &rb.blob,
-	    &rb.len)) != 0)
+	if ((r = sshkey_fingerprint_raw(key, SSH_DIGEST_SHA1,
+	    &rb.blob, &rb.len)) != 0)
 		return r;
 	erb = RB_FIND(revoked_blob_tree, &krl->revoked_sha1s, &rb);
 	free(rb.blob);
@@ -1180,48 +1238,36 @@ ssh_krl_check_key(struct ssh_krl *krl, const struct sshkey *key)
 	return 0;
 }
 
-/* Returns 0 on success, -1 on error or key revoked, -2 if path is not a KRL */
 int
 ssh_krl_file_contains_key(const char *path, const struct sshkey *key)
 {
 	struct sshbuf *krlbuf = NULL;
-	struct ssh_krl *krl;
-	int r, revoked, fd;
+	struct ssh_krl *krl = NULL;
+	int oerrno = 0, r, fd;
 
 	if (path == NULL)
 		return 0;
 
-	if ((fd = open(path, O_RDONLY)) == -1) {
-		error("open %s: %s", path, strerror(errno));
-		error("Revoked keys file not accessible - refusing public key "
-		    "authentication");
-		return SSH_ERR_SYSTEM_ERROR;
-	}
-	if ((krlbuf = sshbuf_new()) == NULL) {
-		close(fd);
+	if ((krlbuf = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
+	if ((fd = open(path, O_RDONLY)) == -1) {
+		r = SSH_ERR_SYSTEM_ERROR;
+		oerrno = errno;
+		goto out;
 	}
-	if ((r = sshkey_load_file(fd, path, krlbuf)) != 0) {
-		close(fd);
-		sshbuf_free(krlbuf);
-		error("Revoked keys file not readable - refusing public key "
-		    "authentication");
-		return r;
+	if ((r = sshkey_load_file(fd, krlbuf)) != 0) {
+		oerrno = errno;
+		goto out;
 	}
-	close(fd);
-	if (ssh_krl_from_blob(krlbuf, &krl, NULL, 0) != 0) {
-		sshbuf_free(krlbuf);
-		error("Invalid KRL, refusing public key "
-		    "authentication");
-		return -1;
-	}
-	sshbuf_free(krlbuf);
-	if (krl == NULL) {
-		debug3("%s: %s is not a KRL file", __func__, path);
-		return -2;
-	}
+	if ((r = ssh_krl_from_blob(krlbuf, &krl, NULL, 0)) != 0)
+		goto out;
 	debug2("%s: checking KRL %s", __func__, path);
-	revoked = ssh_krl_check_key(krl, key) != 0;
+	r = ssh_krl_check_key(krl, key);
+ out:
+	close(fd);
+	sshbuf_free(krlbuf);
 	ssh_krl_free(krl);
-	return revoked ? -1 : 0;
+	if (r != 0)
+		errno = oerrno;
+	return r;
 }

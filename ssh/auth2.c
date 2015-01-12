@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2.c,v 1.131 2014/07/03 11:16:55 djm Exp $ */
+/* $OpenBSD: auth2.c,v 1.134 2014/12/22 07:55:51 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -40,6 +40,7 @@
 #include "packet.h"
 #include "log.h"
 #include "sshbuf.h"
+#include "misc.h"
 #include "servconf.h"
 #include "compat.h"
 #include "sshkey.h"
@@ -135,9 +136,7 @@ userauth_banner(struct ssh *ssh)
 	char *banner = NULL;
 	int r;
 
-	if (options.banner == NULL ||
-	    strcasecmp(options.banner, "none") == 0 ||
-	    (ssh->compat & SSH_BUG_BANNER) != 0)
+	if (options.banner == NULL || (ssh->compat & SSH_BUG_BANNER) != 0)
 		return;
 
 	if ((banner = PRIVSEP(auth2_read_banner())) == NULL)
@@ -329,7 +328,7 @@ userauth_finish(struct ssh *ssh, int authenticated, const char *method,
 		authctxt->success = 1;
 	} else {
 		/* Allow initial try of "none" auth without failure penalty */
-		if (!authctxt->server_caused_failure &&
+		if (!partial && !authctxt->server_caused_failure &&
 		    (authctxt->attempt > 1 || strcmp(method, "none") != 0))
 			authctxt->failures++;
 		if (authctxt->failures >= options.max_authtries)

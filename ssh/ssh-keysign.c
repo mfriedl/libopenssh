@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keysign.c,v 1.42 2014/04/29 18:01:49 markus Exp $ */
+/* $OpenBSD: ssh-keysign.c,v 1.45 2015/01/08 10:14:08 djm Exp $ */
 /*
  * Copyright (c) 2002 Markus Friedl.  All rights reserved.
  *
@@ -48,6 +48,7 @@
 #include "pathnames.h"
 #include "readconf.h"
 #include "uidswap.h"
+#include "sshkey.h"
 #include "ssherr.h"
 
 /* XXX readconf.c needs these */
@@ -65,6 +66,8 @@ valid_request(struct passwd *pw, char *host, struct sshkey **ret,
 	char *pkalg, *luser;
 	int r, pktype, fail;
 
+	if (ret != NULL)
+		*ret = NULL;
 	fail = 0;
 
 	if ((b = sshbuf_from(data, datalen)) == NULL)
@@ -190,7 +193,7 @@ main(int argc, char **argv)
 
 	/* verify that ssh-keysign is enabled by the admin */
 	initialize_options(&options);
-	(void)read_config_file(_PATH_HOST_CONFIG_FILE, pw, "", &options, 0);
+	(void)read_config_file(_PATH_HOST_CONFIG_FILE, pw, "", "", &options, 0);
 	fill_default_options(&options);
 	if (options.enable_ssh_keysign != 1)
 		fatal("ssh-keysign not enabled in %s",
@@ -210,16 +213,15 @@ main(int argc, char **argv)
 		keys[i] = NULL;
 		if (key_fd[i] == -1)
 			continue;
-#ifdef WITH_OPENSSL
-/* XXX wrong api */
-		r = sshkey_load_private_pem(key_fd[i], KEY_UNSPEC,
-		    NULL, &(keys[i]), NULL);
-		if (r != 0)
-			error("Load private: %s", ssh_err(r));
-#endif
+		r = sshkey_load_private_type_fd(key_fd[i], KEY_UNSPEC,
+		    NULL, &key, NULL);
 		close(key_fd[i]);
-		if (keys[i] != NULL)
+		if (r != 0)
+			debug("parse key %d: %s", i, ssh_err(r));
+		else if (key != NULL) {
+			keys[i] = key;
 			found = 1;
+		}
 	}
 	if (!found)
 		fatal("no hostkey found");
@@ -254,7 +256,8 @@ main(int argc, char **argv)
 		}
 	}
 	if (!found) {
-		fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
+		fp = sshkey_fingerprint(key, options.fingerprint_hash,
+		    SSH_FP_DEFAULT);
 		fatal("no matching hostkey found for key %s %s",
 		    sshkey_type(key), fp ? fp : "");
 	}

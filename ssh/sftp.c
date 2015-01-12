@@ -1,4 +1,4 @@
-/* $OpenBSD: sftp.c,v 1.163 2014/05/05 07:02:30 logan Exp $ */
+/* $OpenBSD: sftp.c,v 1.168 2014/11/26 18:34:51 millert Exp $ */
 /*
  * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
  *
@@ -182,7 +182,7 @@ static const struct CMD cmds[] = {
 	{ "quit",	I_QUIT,		NOARGS	},
 	{ "reget",	I_REGET,	REMOTE	},
 	{ "rename",	I_RENAME,	REMOTE	},
-	{ "reput",      I_REPUT,        LOCAL   },
+	{ "reput",	I_REPUT,	LOCAL	},
 	{ "rm",		I_RM,		REMOTE	},
 	{ "rmdir",	I_RMDIR,	REMOTE	},
 	{ "symlink",	I_SYMLINK,	REMOTE	},
@@ -230,9 +230,9 @@ help(void)
 	    "df [-hi] [path]                    Display statistics for current directory or\n"
 	    "                                   filesystem containing 'path'\n"
 	    "exit                               Quit sftp\n"
-	    "get [-Ppr] remote [local]          Download file\n"
-	    "reget remote [local]		Resume download file\n"
-	    "reput [local] remote               Resume upload file\n"
+	    "get [-afPpRr] remote [local]       Download file\n"
+	    "reget [-fPpRr] remote [local]      Resume download file\n"
+	    "reput [-fPpRr] [local] remote      Resume upload file\n"
 	    "help                               Display this help text\n"
 	    "lcd path                           Change local directory to 'path'\n"
 	    "lls [ls-options [path]]            Display local directory listing\n"
@@ -243,7 +243,7 @@ help(void)
 	    "lumask umask                       Set local umask to 'umask'\n"
 	    "mkdir path                         Create remote directory\n"
 	    "progress                           Toggle display of progress meter\n"
-	    "put [-Ppr] local [remote]          Upload file\n"
+	    "put [-afPpRr] local [remote]       Upload file\n"
 	    "pwd                                Display remote working directory\n"
 	    "quit                               Quit sftp\n"
 	    "rename oldpath newpath             Rename remote file\n"
@@ -569,15 +569,19 @@ process_get(struct sftp_conn *conn, char *src, char *dst, char *pwd,
 	char *abs_dst = NULL;
 	glob_t g;
 	char *filename, *tmp=NULL;
-	int i, err = 0;
+	int i, r, err = 0;
 
 	abs_src = xstrdup(src);
 	abs_src = make_absolute(abs_src, pwd);
 	memset(&g, 0, sizeof(g));
 
 	debug3("Looking up %s", abs_src);
-	if (remote_glob(conn, abs_src, GLOB_MARK, NULL, &g)) {
-		error("File \"%s\" not found.", abs_src);
+	if ((r = remote_glob(conn, abs_src, GLOB_MARK, NULL, &g)) != 0) {
+		if (r == GLOB_NOSPACE) {
+			error("Too many matches for \"%s\".", abs_src);
+		} else {
+			error("File \"%s\" not found.", abs_src);
+		}
 		err = -1;
 		goto out;
 	}
@@ -842,19 +846,23 @@ do_globbed_ls(struct sftp_conn *conn, char *path, char *strip_path,
 {
 	char *fname, *lname;
 	glob_t g;
-	int err;
+	int err, r;
 	struct winsize ws;
 	u_int i, c = 1, colspace = 0, columns = 1, m = 0, width = 80;
 
 	memset(&g, 0, sizeof(g));
 
-	if (remote_glob(conn, path,
+	if ((r = remote_glob(conn, path,
 	    GLOB_MARK|GLOB_NOCHECK|GLOB_BRACE|GLOB_KEEPSTAT|GLOB_NOSORT,
-	    NULL, &g) ||
+	    NULL, &g)) != 0 ||
 	    (g.gl_pathc && !g.gl_matchc)) {
 		if (g.gl_pathc)
 			globfree(&g);
-		error("Can't ls: \"%s\" not found", path);
+		if (r == GLOB_NOSPACE) {
+			error("Can't ls: Too many matches for \"%s\"", path);
+		} else {
+			error("Can't ls: \"%s\" not found", path);
+		}
 		return -1;
 	}
 
@@ -1491,6 +1499,9 @@ parse_dispatch_command(struct sftp_conn *conn, const char *cmd, char **pwd,
 		err = do_df(conn, path1, hflag, iflag);
 		break;
 	case I_LCHDIR:
+		tmp = tilde_expand_filename(path1, getuid());
+		free(path1);
+		path1 = tmp;
 		if (chdir(path1) == -1) {
 			error("Couldn't change local directory to "
 			    "\"%s\": %s", path1, strerror(errno));
@@ -2049,8 +2060,8 @@ interactive_loop(struct sftp_conn *conn, char *file1, char *file2)
 		free(dir);
 	}
 
-	setlinebuf(stdout);
-	setlinebuf(infile);
+	setvbuf(stdout, NULL, _IOLBF, 0);
+	setvbuf(infile, NULL, _IOLBF, 0);
 
 	interactive = !batchmode && isatty(STDIN_FILENO);
 	err = 0;

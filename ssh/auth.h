@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.h,v 1.78 2014/07/03 11:16:55 djm Exp $ */
+/* $OpenBSD: auth.h,v 1.79 2014/12/22 07:51:30 djm Exp $ */
 
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
@@ -38,6 +38,7 @@
 #endif
 
 struct ssh;
+struct sshkey;
 
 struct authctxt {
 	sig_atomic_t	 success;
@@ -64,6 +65,9 @@ struct authctxt {
 	char		*krb5_ticket_file;
 #endif
 	void		*methoddata;
+
+	struct sshkey	**prev_userkeys;
+	u_int		 nprev_userkeys;
 };
 /*
  * Every authentication method has to handle authentication requests for
@@ -114,6 +118,8 @@ int	 user_key_allowed(struct passwd *, struct sshkey *);
 void	 pubkey_auth_info(struct authctxt *, const struct sshkey *,
     const char *, ...)
 	    __attribute__((__format__ (printf, 3, 4)));
+void	 auth2_record_userkey(struct authctxt *, struct sshkey *);
+int	 auth2_userkey_already_used(struct authctxt *, struct sshkey *);
 
 struct stat;
 int	 auth_secure_path(const char *, struct stat *, const char *, uid_t,

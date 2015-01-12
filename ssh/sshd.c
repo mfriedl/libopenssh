@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.427 2014/06/24 01:13:21 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.431 2015/01/07 18:15:07 tedu Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -43,6 +43,7 @@
  */
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <sys/tree.h>
@@ -75,6 +76,7 @@
 #include "packet.h"
 #include "log.h"
 #include "sshbuf.h"
+#include "misc.h"
 #include "servconf.h"
 #include "uidswap.h"
 #include "compat.h"
@@ -90,7 +92,6 @@
 #include "hostfile.h"
 #include "auth.h"
 #include "authfd.h"
-#include "misc.h"
 #include "msg.h"
 #include "dispatch.h"
 #include "channels.h"
@@ -1205,7 +1206,8 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			logit("Received signal %d; terminating.",
 			    (int) received_sigterm);
 			close_listen_socks();
-			unlink(options.pid_file);
+			if (options.pid_file != NULL)
+				unlink(options.pid_file);
 			exit(received_sigterm == SIGTERM ? 0 : 255);
 		}
 		if (key_used && key_do_regen) {
@@ -1631,10 +1633,6 @@ main(int ac, char **av)
 	    sizeof(struct sshkey *));
 	sensitive_data.host_pubkeys = xcalloc(options.num_host_key_files,
 	    sizeof(struct sshkey *));
-	for (i = 0; i < options.num_host_key_files; i++) {
-		sensitive_data.host_keys[i] = NULL;
-		sensitive_data.host_pubkeys[i] = NULL;
-	}
 
 	if (options.host_key_agent) {
 		if (strcmp(options.host_key_agent, SSH_AUTHSOCKET_ENV_NAME))
@@ -1644,6 +1642,8 @@ main(int ac, char **av)
 	}
 
 	for (i = 0; i < options.num_host_key_files; i++) {
+		if (options.host_key_files[i] == NULL)
+			continue;
 		if ((r = sshkey_load_private(options.host_key_files[i], "",
 		    &key, NULL)) != 0 && r != SSH_ERR_SYSTEM_ERROR)
 			error("Error loading host key \"%s\": %s",
@@ -1707,6 +1707,8 @@ main(int ac, char **av)
 		sensitive_data.host_certificates[i] = NULL;
 
 	for (i = 0; i < options.num_host_cert_files; i++) {
+		if (options.host_cert_files[i] == NULL)
+			continue;
 		if ((r = sshkey_load_public(options.host_cert_files[i],
 		    &key, NULL)) != 0) {
 			error("Could not load host certificate \"%s\": %s",
@@ -1856,7 +1858,7 @@ main(int ac, char **av)
 		 * Write out the pid file after the sigterm handler
 		 * is setup and the listen sockets are bound
 		 */
-		if (!debug_flag) {
+		if (options.pid_file != NULL && !debug_flag) {
 			FILE *f = fopen(options.pid_file, "w");
 
 			if (f == NULL) {
@@ -2153,10 +2155,12 @@ static void
 do_ssh1_kex(struct ssh *ssh)
 {
 	int i, len, r, rsafail = 0;
-	BIGNUM *session_key_int;
-	u_char session_key[SSH_SESSION_KEY_LENGTH], cookie[8], check[8];
+	BIGNUM *session_key_int, *fake_key_int, *real_key_int;
+	u_char session_key[SSH_SESSION_KEY_LENGTH];
+	u_char fake_key_bytes[4096 / 8];
+	size_t fake_key_len;
+	u_char cookie[8], check[8], cipher_type;
 	u_int auth_mask, protocol_flags;
-	u_char cipher_type;
 
 	/*
 	 * Generate check bytes that the client must send back in the user
@@ -2236,76 +2240,61 @@ do_ssh1_kex(struct ssh *ssh)
 	debug("Encryption type: %.200s", cipher_name(cipher_type));
 
 	/* Get the encrypted integer. */
-	if ((session_key_int = BN_new()) == NULL)
+	if ((real_key_int = BN_new()) == NULL)
 		fatal("do_ssh1_kex: BN_new failed");
-	if ((r = sshpkt_get_bignum1(ssh, session_key_int)) != 0 ||
+	if ((r = sshpkt_get_bignum1(ssh, real_key_int)) != 0 ||
 	    (r = sshpkt_get_u32(ssh, &protocol_flags)) != 0 ||
 	    (r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
 	ssh_packet_set_protocol_flags(ssh, protocol_flags);
 
-	/* Decrypt session_key_int using host/server keys */
-	rsafail = PRIVSEP(ssh1_session_key(session_key_int));
+	/* Setup a fake key in case RSA decryption fails */
+	if ((fake_key_int = BN_new()) == NULL)
+		fatal("do_ssh1_kex: BN_new failed");
+	fake_key_len = BN_num_bytes(real_key_int);
+	if (fake_key_len > sizeof(fake_key_bytes))
+		fake_key_len = sizeof(fake_key_bytes);
+	arc4random_buf(fake_key_bytes, fake_key_len);
+	if (BN_bin2bn(fake_key_bytes, fake_key_len, fake_key_int) == NULL)
+		fatal("do_ssh1_kex: BN_bin2bn failed");
+
+	/* Decrypt real_key_int using host/server keys */
+	rsafail = PRIVSEP(ssh1_session_key(real_key_int));
+	/* If decryption failed, use the fake key. Else, the real key. */
+	if (rsafail)
+		session_key_int = fake_key_int;
+	else
+		session_key_int = real_key_int;
 
 	/*
 	 * Extract session key from the decrypted integer.  The key is in the
 	 * least significant 256 bits of the integer; the first byte of the
 	 * key is in the highest bits.
 	 */
-	if (!rsafail) {
-		(void) BN_mask_bits(session_key_int, sizeof(session_key) * 8);
-		len = BN_num_bytes(session_key_int);
-		if (len < 0 || (u_int)len > sizeof(session_key)) {
-			error("do_ssh1_kex: bad session key len from %s: "
-			    "session_key_int %d > sizeof(session_key) %lu",
-			    ssh_remote_ipaddr(ssh), len,
-			    (u_long)sizeof(session_key));
-			rsafail++;
-		} else {
-			explicit_bzero(session_key, sizeof(session_key));
-			BN_bn2bin(session_key_int,
-			    session_key + sizeof(session_key) - len);
+	(void) BN_mask_bits(session_key_int, sizeof(session_key) * 8);
+	len = BN_num_bytes(session_key_int);
+	if (len < 0 || (u_int)len > sizeof(session_key)) {
+		error("do_ssh1_kex: bad session key len from %s: "
+		    "session_key_int %d > sizeof(session_key) %lu",
+		    ssh_remote_ipaddr(ssh), len, (u_long)sizeof(session_key));
+		rsafail++;
+	} else {
+		explicit_bzero(session_key, sizeof(session_key));
+		BN_bn2bin(session_key_int,
+		    session_key + sizeof(session_key) - len);
 
-			if ((r = derive_ssh1_session_id(
-			    sensitive_data.ssh1_host_key->rsa->n,
-			    sensitive_data.server_key->rsa->n,
-			    cookie, session_id)) != 0)
-				fatal("derive_ssh1_session_id: %s", ssh_err(r));
-			/*
-			 * Xor the first 16 bytes of the session key with the
-			 * session id.
-			 */
-			for (i = 0; i < 16; i++)
-				session_key[i] ^= session_id[i];
-		}
-	}
-	if (rsafail) {
-		int bytes = BN_num_bytes(session_key_int);
-		u_char *buf = xmalloc(bytes);
-		struct ssh_digest_ctx *md;
-
-		logit("do_connection: generating a fake encryption key");
-		BN_bn2bin(session_key_int, buf);
-		if ((md = ssh_digest_start(SSH_DIGEST_MD5)) == NULL ||
-		    ssh_digest_update(md, buf, bytes) < 0 ||
-		    ssh_digest_update(md, sensitive_data.ssh1_cookie,
-		    SSH_SESSION_KEY_LENGTH) < 0 ||
-		    ssh_digest_final(md, session_key, sizeof(session_key)) < 0)
-			fatal("%s: md5 failed", __func__);
-		ssh_digest_free(md);
-		if ((md = ssh_digest_start(SSH_DIGEST_MD5)) == NULL ||
-		    ssh_digest_update(md, session_key, 16) < 0 ||
-		    ssh_digest_update(md, sensitive_data.ssh1_cookie,
-		    SSH_SESSION_KEY_LENGTH) < 0 ||
-		    ssh_digest_final(md, session_key + 16,
-		    sizeof(session_key) - 16) < 0)
-			fatal("%s: md5 failed", __func__);
-		ssh_digest_free(md);
-		explicit_bzero(buf, bytes);
-		free(buf);
+		derive_ssh1_session_id(
+		    sensitive_data.ssh1_host_key->rsa->n,
+		    sensitive_data.server_key->rsa->n,
+		    cookie, session_id);
+		/*
+		 * Xor the first 16 bytes of the session key with the
+		 * session id.
+		 */
 		for (i = 0; i < 16; i++)
-			session_id[i] = session_key[i] ^ session_key[i + 16];
+			session_key[i] ^= session_id[i];
 	}
+
 	/* Destroy the private and public keys. No longer. */
 	destroy_sensitive_data();
 
@@ -2313,7 +2302,8 @@ do_ssh1_kex(struct ssh *ssh)
 		mm_ssh1_session_id(session_id);
 
 	/* Destroy the decrypted integer.  It is no longer needed. */
-	BN_clear_free(session_key_int);
+	BN_clear_free(real_key_int);
+	BN_clear_free(fake_key_int);
 
 	/* Set the session key.  From this on all communications will be encrypted. */
 	ssh_packet_set_encryption_key(ssh, session_key, SSH_SESSION_KEY_LENGTH,

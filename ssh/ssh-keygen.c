@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keygen.c,v 1.249 2014/07/03 03:47:27 djm Exp $ */
+/* $OpenBSD: ssh-keygen.c,v 1.251 2014/12/21 22:27:56 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1994 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -46,6 +46,7 @@
 #include "ssherr.h"
 #include "atomicio.h"
 #include "krl.h"
+#include "digest.h"
 
 #ifdef ENABLE_PKCS11
 #include "ssh-pkcs11.h"
@@ -86,6 +87,9 @@ int show_cert = 0;
 /* Flag indicating that we just want to see the key fingerprint */
 int print_fingerprint = 0;
 int print_bubblebabble = 0;
+
+/* Hash algorithm to use for fingerprints. */
+int fingerprint_hash = SSH_FP_HASH_DEFAULT;
 
 /* The identity file name, given on the command line or entered by the user. */
 char identity_file[1024];
@@ -756,11 +760,11 @@ do_download(struct passwd *pw)
 	struct sshkey **keys = NULL;
 	int i, nkeys;
 	enum sshkey_fp_rep rep;
-	enum sshkey_fp_type fptype;
+	int fptype;
 	char *fp, *ra;
 
-	fptype = print_bubblebabble ? SSH_FP_SHA1 : SSH_FP_MD5;
-	rep =    print_bubblebabble ? SSH_FP_BUBBLEBABBLE : SSH_FP_HEX;
+	fptype = print_bubblebabble ? SSH_DIGEST_SHA1 : fingerprint_hash;
+	rep =    print_bubblebabble ? SSH_FP_BUBBLEBABBLE : SSH_FP_DEFAULT;
 
 	pkcs11_init(0);
 	nkeys = pkcs11_add_provider(pkcs11provider, NULL, &keys);
@@ -769,7 +773,7 @@ do_download(struct passwd *pw)
 	for (i = 0; i < nkeys; i++) {
 		if (print_fingerprint) {
 			fp = sshkey_fingerprint(keys[i], fptype, rep);
-			ra = sshkey_fingerprint(keys[i], SSH_FP_MD5,
+			ra = sshkey_fingerprint(keys[i], fingerprint_hash,
 			    SSH_FP_RANDOMART);
 			printf("%u %s %s (PKCS11 key)\n", sshkey_size(keys[i]),
 			    fp, sshkey_type(keys[i]));
@@ -799,12 +803,11 @@ do_fingerprint(struct passwd *pw)
 	char *comment = NULL, *cp, *ep, line[16*1024], *fp, *ra;
 	int r, i, skip = 0, num = 0, invalid = 1;
 	enum sshkey_fp_rep rep;
-	enum sshkey_fp_type fptype;
+	int fptype;
 	struct stat st;
 
-	fptype = print_bubblebabble ? SSH_FP_SHA1 : SSH_FP_MD5;
-	rep =    print_bubblebabble ? SSH_FP_BUBBLEBABBLE : SSH_FP_HEX;
-
+	fptype = print_bubblebabble ? SSH_DIGEST_SHA1 : fingerprint_hash;
+	rep =    print_bubblebabble ? SSH_FP_BUBBLEBABBLE : SSH_FP_DEFAULT;
 	if (!have_identity)
 		ask_filename(pw, "Enter file in which the key is");
 	if (stat(identity_file, &st) < 0) {
@@ -816,7 +819,8 @@ do_fingerprint(struct passwd *pw)
 		    identity_file, ssh_err(r));
 	else {
 		fp = sshkey_fingerprint(public, fptype, rep);
-		ra = sshkey_fingerprint(public, SSH_FP_MD5, SSH_FP_RANDOMART);
+		ra = sshkey_fingerprint(public, fingerprint_hash,
+		    SSH_FP_RANDOMART);
 		printf("%u %s %s (%s)\n", sshkey_size(public), fp, comment,
 		    sshkey_type(public));
 		if (log_level >= SYSLOG_LEVEL_VERBOSE)
@@ -884,7 +888,8 @@ do_fingerprint(struct passwd *pw)
 		}
 		comment = *cp ? cp : comment;
 		fp = sshkey_fingerprint(public, fptype, rep);
-		ra = sshkey_fingerprint(public, SSH_FP_MD5, SSH_FP_RANDOMART);
+		ra = sshkey_fingerprint(public, fingerprint_hash,
+		    SSH_FP_RANDOMART);
 		printf("%u %s %s (%s)\n", sshkey_size(public), fp,
 		    comment ? comment : "no comment", sshkey_type(public));
 		if (log_level >= SYSLOG_LEVEL_VERBOSE)
@@ -978,12 +983,14 @@ do_gen_all_hostkeys(struct passwd *pw)
 		f = fdopen(fd, "w");
 		if (f == NULL) {
 			printf("fdopen %s failed\n", identity_file);
+			close(fd);
 			sshkey_free(public);
 			first = 0;
 			continue;
 		}
 		if (!sshkey_write(public, f)) {
 			fprintf(stderr, "write key failed\n");
+			fclose(f);
 			sshkey_free(public);
 			first = 0;
 			continue;
@@ -1003,13 +1010,15 @@ printhost(FILE *f, const char *name, struct sshkey *public, int ca, int revoked,
 {
 	if (print_fingerprint) {
 		enum sshkey_fp_rep rep;
-		enum sshkey_fp_type fptype;
+		int fptype;
 		char *fp, *ra;
 
-		fptype = print_bubblebabble ? SSH_FP_SHA1 : SSH_FP_MD5;
-		rep =    print_bubblebabble ? SSH_FP_BUBBLEBABBLE : SSH_FP_HEX;
+		fptype = print_bubblebabble ?
+		    SSH_DIGEST_SHA1 : fingerprint_hash;
+		rep = print_bubblebabble ? SSH_FP_BUBBLEBABBLE : SSH_FP_DEFAULT;
 		fp = sshkey_fingerprint(public, fptype, rep);
-		ra = sshkey_fingerprint(public, SSH_FP_MD5, SSH_FP_RANDOMART);
+		ra = sshkey_fingerprint(public, fingerprint_hash,
+		    SSH_FP_RANDOMART);
 		printf("%u %s %s (%s)\n", sshkey_size(public), fp, name,
 		    sshkey_type(public));
 		if (log_level >= SYSLOG_LEVEL_VERBOSE)
@@ -1946,9 +1955,9 @@ do_show_cert(struct passwd *pw)
 		fatal("%s is not a certificate", identity_file);
 	v00 = key->type == KEY_RSA_CERT_V00 || key->type == KEY_DSA_CERT_V00;
 
-	key_fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
+	key_fp = sshkey_fingerprint(key, fingerprint_hash, SSH_FP_DEFAULT);
 	ca_fp = sshkey_fingerprint(key->cert->signature_key,
-	    SSH_FP_MD5, SSH_FP_HEX);
+	    fingerprint_hash, SSH_FP_DEFAULT);
 
 	printf("%s:\n", identity_file);
 	printf("        Type: %s %s certificate\n", sshkey_ssh_name(key),
@@ -2002,7 +2011,7 @@ load_krl(const char *path, struct ssh_krl **krlp)
 		fatal("sshbuf_new failed");
 	if ((fd = open(path, O_RDONLY)) == -1)
 		fatal("open %s: %s", path, strerror(errno));
-	if ((r = sshkey_load_file(fd, path, krlbuf)) != 0)
+	if ((r = sshkey_load_file(fd, krlbuf)) != 0)
 		fatal("Unable to load KRL: %s", ssh_err(r));
 	close(fd);
 	/* XXX check sigs */
@@ -2233,7 +2242,7 @@ usage(void)
 	    "       ssh-keygen -e [-m key_format] [-f input_keyfile]\n"
 	    "       ssh-keygen -y [-f input_keyfile]\n"
 	    "       ssh-keygen -c [-P passphrase] [-C comment] [-f keyfile]\n"
-	    "       ssh-keygen -l [-f input_keyfile]\n"
+	    "       ssh-keygen -l [-E fingerprint_hash] [-f input_keyfile]\n"
 	    "       ssh-keygen -B [-f input_keyfile]\n");
 #ifdef ENABLE_PKCS11
 	fprintf(stderr,
@@ -2298,9 +2307,10 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	/* Remaining characters: EUYdw */
+	/* Remaining characters: UYdw */
 	while ((opt = getopt(argc, argv, "ABHLQXceghiklopquvxy"
-	    "C:D:F:G:I:J:K:M:N:O:P:R:S:T:V:W:Z:a:b:f:g:j:m:n:r:s:t:z:")) != -1) {
+	    "C:D:E:F:G:I:J:K:M:N:O:P:R:S:T:V:W:Z:"
+	    "a:b:f:g:j:m:n:r:s:t:z:")) != -1) {
 		switch (opt) {
 		case 'A':
 			gen_all_hostkeys = 1;
@@ -2310,6 +2320,11 @@ main(int argc, char **argv)
 			if (errstr)
 				fatal("Bits has bad value %s (%s)",
 					optarg, errstr);
+			break;
+		case 'E':
+			fingerprint_hash = ssh_digest_alg_by_name(optarg);
+			if (fingerprint_hash == -1)
+				fatal("Invalid hash algorithm \"%s\"", optarg);
 			break;
 		case 'F':
 			find_host = 1;
@@ -2746,8 +2761,9 @@ passphrase_again:
 	fclose(f);
 
 	if (!quiet) {
-		char *fp = sshkey_fingerprint(public, SSH_FP_MD5, SSH_FP_HEX);
-		char *ra = sshkey_fingerprint(public, SSH_FP_MD5,
+		char *fp = sshkey_fingerprint(public, fingerprint_hash,
+		    SSH_FP_DEFAULT);
+		char *ra = sshkey_fingerprint(public, fingerprint_hash,
 		    SSH_FP_RANDOMART);
 		printf("Your public key has been saved in %s.\n",
 		    identity_file);

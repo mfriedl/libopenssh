@@ -1,4 +1,4 @@
-/* $OpenBSD: auth-rsa.c,v 1.87 2014/06/24 01:13:21 djm Exp $ */
+/* $OpenBSD: auth-rsa.c,v 1.89 2014/12/21 22:27:56 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -32,6 +32,7 @@
 #include "match.h"
 #include "pathnames.h"
 #include "log.h"
+#include "misc.h"
 #include "servconf.h"
 #include "sshkey.h"
 #include "auth-options.h"
@@ -42,7 +43,6 @@
 #endif
 #include "monitor_wrap.h"
 #include "ssh.h"
-#include "misc.h"
 
 #include "digest.h"
 
@@ -239,7 +239,8 @@ rsa_key_allowed_in_file(struct passwd *pw, char *file,
 			    "actual %d vs. announced %u.",
 			    file, linenum, BN_num_bits(key->rsa->n), bits);
 
-		fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
+		fp = sshkey_fingerprint(key, options.fingerprint_hash,
+		    SSH_FP_DEFAULT);
 		debug("matching key found: file %s, line %lu %s %s",
 		    file, linenum, sshkey_type(key), fp);
 		free(fp);

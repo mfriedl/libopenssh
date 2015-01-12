@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.260 2014/06/27 16:41:56 markus Exp $ */
+/* $OpenBSD: clientloop.c,v 1.261 2014/07/15 15:54:14 millert Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -92,13 +92,13 @@
 #include "cipher.h"
 #include "kex.h"
 #include "log.h"
+#include "misc.h"
 #include "readconf.h"
 #include "clientloop.h"
 #include "sshconnect.h"
 #include "authfd.h"
 #include "atomicio.h"
 #include "sshpty.h"
-#include "misc.h"
 #include "match.h"
 #include "msg.h"
 #include "roaming.h"
@@ -882,13 +882,11 @@ static void
 process_cmdline(struct ssh *ssh)
 {
 	void (*handler)(int);
-	char *s, *cmd, *cancel_host;
-	int delete = 0, local = 0, remote = 0, dynamic = 0;
-	int cancel_port, ok;
-	Forward fwd;
+	char *s, *cmd;
+	int ok, delete = 0, local = 0, remote = 0, dynamic = 0;
+	struct Forward fwd;
 
 	memset(&fwd, 0, sizeof(fwd));
-	fwd.listen_host = fwd.connect_host = NULL;
 
 	leave_raw_mode(options.request_tty == REQUEST_TTY_FORCE);
 	handler = signal(SIGINT, SIG_IGN);
@@ -954,29 +952,20 @@ process_cmdline(struct ssh *ssh)
 
 	/* XXX update list of forwards in options */
 	if (delete) {
-		cancel_port = 0;
-		cancel_host = hpdelim(&s);	/* may be NULL */
-		if (s != NULL) {
-			cancel_port = a2port(s);
-			cancel_host = cleanhostname(cancel_host);
-		} else {
-			cancel_port = a2port(cancel_host);
-			cancel_host = NULL;
-		}
-		if (cancel_port <= 0) {
-			logit("Bad forwarding close port");
+		/* We pass 1 for dynamicfwd to restrict to 1 or 2 fields. */
+		if (!parse_forward(&fwd, s, 1, 0)) {
+			logit("Bad forwarding close specification.");
 			goto out;
 		}
 		if (remote)
-			ok = channel_request_rforward_cancel(ssh, cancel_host,
-			    cancel_port) == 0;
+			ok = channel_request_rforward_cancel(ssh, &fwd) == 0;
 		else if (dynamic)
-			ok = channel_cancel_lport_listener(ssh, cancel_host,
-			    cancel_port, 0, options.gateway_ports) > 0;
+			ok = channel_cancel_lport_listener(ssh, &fwd,
+			    0, &options.fwd_opts) > 0;
 		else
-			ok = channel_cancel_lport_listener(ssh, cancel_host,
-			    cancel_port, CHANNEL_CANCEL_PORT_STATIC,
-			    options.gateway_ports) > 0;
+			ok = channel_cancel_lport_listener(ssh, &fwd,
+			    CHANNEL_CANCEL_PORT_STATIC,
+			    &options.fwd_opts) > 0;
 		if (!ok) {
 			logit("Unkown port forwarding.");
 			goto out;
@@ -988,16 +977,13 @@ process_cmdline(struct ssh *ssh)
 			goto out;
 		}
 		if (local || dynamic) {
-			if (!channel_setup_local_fwd_listener(ssh,
-			    fwd.listen_host, fwd.listen_port, fwd.connect_host,
-			    fwd.connect_port, options.gateway_ports)) {
+			if (!channel_setup_local_fwd_listener(ssh, &fwd,
+			    &options.fwd_opts)) {
 				logit("Port forwarding failed.");
 				goto out;
 			}
 		} else {
-			if (channel_request_remote_forwarding(ssh,
-			    fwd.listen_host, fwd.listen_port, fwd.connect_host,
-			    fwd.connect_port) < 0) {
+			if (channel_request_remote_forwarding(ssh, &fwd) < 0) {
 				logit("Port forwarding failed.");
 				goto out;
 			}
@@ -1010,7 +996,9 @@ process_cmdline(struct ssh *ssh)
 	enter_raw_mode(options.request_tty == REQUEST_TTY_FORCE);
 	free(cmd);
 	free(fwd.listen_host);
+	free(fwd.listen_path);
 	free(fwd.connect_host);
+	free(fwd.connect_path);
 }
 
 /* reasons to suppress output of an escape command in help output */
@@ -1931,15 +1919,36 @@ client_request_forwarded_tcpip(struct ssh *ssh, const char *request_type, int rc
 	    (r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
 
-	debug("client_request_forwarded_tcpip: listen %s port %d, "
-	    "originator %s port %d", listen_address, listen_port,
-	    originator_address, originator_port);
+	debug("%s: listen %s port %d, originator %s port %d", __func__,
+	    listen_address, listen_port, originator_address, originator_port);
 
 	c = channel_connect_by_listen_address(ssh, listen_address, listen_port,
 	    "forwarded-tcpip", originator_address);
 
 	free(originator_address);
 	free(listen_address);
+	return c;
+}
+
+static Channel *
+client_request_forwarded_streamlocal(struct ssh *ssh, const char *request_type,
+    int rchan)
+{
+	Channel *c = NULL;
+	char *listen_path;
+	int r;
+
+	/* Get the remote path. */
+	/* XXX: Skip reserved field for now. */
+	if ((r = sshpkt_get_cstring(ssh, &listen_path, NULL)) != 0 ||
+	    (r = sshpkt_get_string(ssh, NULL, NULL)) != 0 ||
+	    (r = sshpkt_get_end(ssh)) != 0)
+
+	debug("%s: %s", __func__, listen_path);
+
+	c = channel_connect_by_listen_path(ssh, listen_path,
+	    "forwarded-streamlocal@openssh.com", "forwarded-streamlocal");
+	free(listen_path);
 	return c;
 }
 
@@ -2073,6 +2082,8 @@ client_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 
 	if (strcmp(ctype, "forwarded-tcpip") == 0) {
 		c = client_request_forwarded_tcpip(ssh, ctype, rchan);
+	} else if (strcmp(ctype, "forwarded-streamlocal@openssh.com") == 0) {
+		c = client_request_forwarded_streamlocal(ssh, ctype, rchan);
 	} else if (strcmp(ctype, "x11") == 0) {
 		c = client_request_x11(ssh, ctype, rchan);
 	} else if (strcmp(ctype, "auth-agent@openssh.com") == 0) {

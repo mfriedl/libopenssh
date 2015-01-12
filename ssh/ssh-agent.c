@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-agent.c,v 1.187 2014/07/03 03:11:03 djm Exp $ */
+/* $OpenBSD: ssh-agent.c,v 1.193 2014/12/21 23:35:14 jmc Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -38,8 +38,8 @@
 #include <sys/time.h>
 #include <sys/queue.h>
 #include <sys/resource.h>
-#include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 #include <sys/param.h>
 
@@ -130,6 +130,8 @@ extern char *__progname;
 /* Default lifetime in seconds (0 == forever) */
 static long lifetime = 0;
 
+static int fingerprint_hash = SSH_FP_HASH_DEFAULT;
+
 static void
 close_socket(SocketEntry *e)
 {
@@ -191,7 +193,7 @@ confirm_key(Identity *id)
 	char *p;
 	int ret = -1;
 
-	p = sshkey_fingerprint(id->key, SSH_FP_MD5, SSH_FP_HEX);
+	p = sshkey_fingerprint(id->key, fingerprint_hash, SSH_FP_DEFAULT);
 	if (ask_permission("Allow use of key %s?\nKey fingerprint %s.",
 	    id->comment, p))
 		ret = 0;
@@ -1046,6 +1048,7 @@ after_select(fd_set *readset, fd_set *writeset)
 				    buf, len)) != 0)
 					fatal("%s: buffer error: %s",
 					    __func__, ssh_err(r));
+				explicit_bzero(buf, sizeof(buf));
 				process_message(&sockets[i]);
 			}
 			break;
@@ -1102,8 +1105,8 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: ssh-agent [-c | -s] [-d] [-a bind_address] [-t life]\n"
-	    "                 [command [arg ...]]\n"
+	    "usage: ssh-agent [-c | -s] [-d] [-a bind_address] [-E fingerprint_hash]\n"
+	    "                 [-t life] [command [arg ...]]\n"
 	    "       ssh-agent [-c | -s] -k\n");
 	exit(1);
 }
@@ -1116,7 +1119,6 @@ main(int ac, char **av)
 	u_int nalloc;
 	char *shell, *format, *pidstr, *agentsocket = NULL;
 	fd_set *readsetp = NULL, *writesetp = NULL;
-	struct sockaddr_un sunaddr;
 	struct rlimit rlim;
 	extern int optind;
 	extern char *optarg;
@@ -1124,6 +1126,7 @@ main(int ac, char **av)
 	char pidstrbuf[1 + 3 * sizeof pid];
 	struct timeval *tvp = NULL;
 	size_t len;
+	mode_t prev_mask;
 
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
@@ -1136,8 +1139,13 @@ main(int ac, char **av)
 	OpenSSL_add_all_algorithms();
 #endif
 
-	while ((ch = getopt(ac, av, "cdksa:t:")) != -1) {
+	while ((ch = getopt(ac, av, "cdksE:a:t:")) != -1) {
 		switch (ch) {
+		case 'E':
+			fingerprint_hash = ssh_digest_alg_by_name(optarg);
+			if (fingerprint_hash == -1)
+				fatal("Invalid hash algorithm \"%s\"", optarg);
+			break;
 		case 'c':
 			if (s_flag)
 				usage();
@@ -1228,24 +1236,14 @@ main(int ac, char **av)
 	 * Create socket early so it will exist before command gets run from
 	 * the parent.
 	 */
-	sock = socket(AF_UNIX, SOCK_STREAM, 0);
+	prev_mask = umask(0177);
+	sock = unix_listener(socket_name, SSH_LISTEN_BACKLOG, 0);
 	if (sock < 0) {
-		perror("socket");
+		/* XXX - unix_listener() calls error() not perror() */
 		*socket_name = '\0'; /* Don't unlink any existing file */
 		cleanup_exit(1);
 	}
-	memset(&sunaddr, 0, sizeof(sunaddr));
-	sunaddr.sun_family = AF_UNIX;
-	strlcpy(sunaddr.sun_path, socket_name, sizeof(sunaddr.sun_path));
-	if (bind(sock, (struct sockaddr *)&sunaddr, sizeof(sunaddr)) < 0) {
-		perror("bind");
-		*socket_name = '\0'; /* Don't unlink any existing file */
-		cleanup_exit(1);
-	}
-	if (listen(sock, SSH_LISTEN_BACKLOG) < 0) {
-		perror("listen");
-		cleanup_exit(1);
-	}
+	umask(prev_mask);
 
 	/*
 	 * Fork, and have the parent execute the command, if any, or present

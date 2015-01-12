@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.209 2014/06/24 01:13:21 djm Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.213 2015/01/08 10:14:08 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -55,8 +55,8 @@
 #include "dh.h"
 #include "authfd.h"
 #include "log.h"
-#include "readconf.h"
 #include "misc.h"
+#include "readconf.h"
 #include "match.h"
 #include "dispatch.h"
 #include "canohost.h"
@@ -625,7 +625,7 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 		    key->type, pktype);
 		goto done;
 	}
-	fp = sshkey_fingerprint(key, SSH_FP_MD5, SSH_FP_HEX);
+	fp = sshkey_fingerprint(key, options.fingerprint_hash, SSH_FP_DEFAULT);
 	debug2("input_userauth_pk_ok: fp %s", fp);
 	free(fp);
 
@@ -1084,7 +1084,8 @@ sign_and_send_pubkey(struct ssh *ssh, struct identity *id)
 	int have_sig = 1;
 	char *fp;
 
-	fp = sshkey_fingerprint(id->key, SSH_FP_MD5, SSH_FP_HEX);
+	fp = sshkey_fingerprint(id->key, options.fingerprint_hash,
+	    SSH_FP_DEFAULT);
 	debug3("%s: %s %s", __func__, sshkey_type(id->key), fp);
 	free(fp);
 
@@ -1660,6 +1661,8 @@ userauth_hostbased(struct ssh *ssh)
 	size_t blen, slen;
 	int ok, i, r, found = 0;
 
+	/* XXX provide some way to allow user to specify key types attempted */
+
 	/* check for a useful key */
 	for (i = 0; i < sensitive->nkeys; i++) {
 		private = sensitive->keys[i];
@@ -1674,11 +1677,15 @@ userauth_hostbased(struct ssh *ssh)
 		debug("No more client hostkeys for hostbased authentication.");
 		return 0;
 	}
-	if ((ok = sshkey_to_blob(private, &blob, &blen)) != 0) {
-		error("%s: sshkey_to_blob failed: %s", __func__, ssh_err(ok));
+
+	debug("%s: trying hostkey type %s", __func__, sshkey_type(private));
+
+	if ((r = sshkey_to_blob(private, &blob, &blen)) != 0) {
+		error("%s: sshkey_to_blob failed: %s", __func__, ssh_err(r));
 		sshkey_free(private);
 		return 0;
 	}
+
 	/* figure out a name for the client host */
 	p = get_local_name(ssh_packet_get_connection_in(ssh));
 	if (p == NULL) {

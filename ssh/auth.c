@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.c,v 1.105 2014/07/03 11:16:55 djm Exp $ */
+/* $OpenBSD: auth.c,v 1.108 2014/12/21 22:27:56 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -43,6 +43,7 @@
 #include "groupaccess.h"
 #include "log.h"
 #include "sshbuf.h"
+#include "misc.h"
 #include "servconf.h"
 #include "sshkey.h"
 #include "hostfile.h"
@@ -50,7 +51,6 @@
 #include "auth-options.h"
 #include "canohost.h"
 #include "uidswap.h"
-#include "misc.h"
 #include "packet.h"
 #ifdef GSSAPI
 #include "ssh-gss.h"
@@ -59,6 +59,7 @@
 #include "monitor_wrap.h"
 #include "ssherr.h"
 #include "krl.h"
+#include "authfile.h"
 #include "compat.h"
 
 /* import */
@@ -549,54 +550,41 @@ getpwnamallow(const char *user)
 
 /* Returns 1 if key is revoked by revoked_keys_file, 0 otherwise */
 int
-auth_key_is_revoked(struct sshkey *k)
+auth_key_is_revoked(struct sshkey *key)
 {
-	char *key_fp;
+	char *fp = NULL;
 	int r;
 
 	if (options.revoked_keys_file == NULL)
 		return 0;
-#ifdef WITH_OPENSSL
-	switch ((r = ssh_krl_file_contains_key(options.revoked_keys_file, k))) {
+	if ((fp = sshkey_fingerprint(key, options.fingerprint_hash,
+	    SSH_FP_DEFAULT)) == NULL) {
+		r = SSH_ERR_ALLOC_FAIL;
+		error("%s: fingerprint key: %s", __func__, ssh_err(r));
+		goto out;
+	}
+
+	r = sshkey_check_revoked(key, options.revoked_keys_file);
+	switch (r) {
 	case 0:
-		/* Not revoked */
-		return 0;
-	case SSH_ERR_KRL_BAD_MAGIC:
-		/* Not a KRL */
-		break;
+		break; /* not revoked */
 	case SSH_ERR_KEY_REVOKED:
-		goto revoked;	
+		error("Authentication key %s %s revoked by file %s",
+		    sshkey_type(key), fp, options.revoked_keys_file);
+		goto out;
 	default:
-		error("KRL error in file %s: %s, refusing key",
+		error("Error checking authentication key %s %s in "
+		    "revoked keys file %s: %s", sshkey_type(key), fp,
 		    options.revoked_keys_file, ssh_err(r));
-		return 1;
+		goto out;
 	}
-#endif /* WITH_OPENSSL */
 
-	/* Fall back to treating the file as a list of keys */
-	debug3("%s: treating %s as a key list", __func__,
-	    options.revoked_keys_file);
+	/* Success */
+	r = 0;
 
-	switch ((r = sshkey_in_file(k, options.revoked_keys_file, 0))) {
-	case SSH_ERR_KEY_NOT_FOUND:
-		/* key not revoked */
-		return 0;
-	case 0:
-		/* found: key revoked */
-#ifdef WITH_OPENSSL
- revoked:
-#endif /* WITH_OPENSSL */
-		key_fp = sshkey_fingerprint(k, SSH_FP_MD5, SSH_FP_HEX);
-		error("WARNING: authentication attempt with a revoked "
-		    "%s key %s ", sshkey_type(k), key_fp);
-		free(key_fp);
-		return 1;
-	default:
-		error("Error in revoked keys file %s: %s, refusing key",
-		    options.revoked_keys_file, ssh_err(r));
-		return 1;
-	}
-	/* NOTREACHED */
+ out:
+	free(fp);
+	return r == 0 ? 0 : 1;
 }
 
 void

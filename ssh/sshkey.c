@@ -1,4 +1,4 @@
-/* $OpenBSD: sshkey.c,v 1.3 2014/07/03 01:45:38 djm Exp $ */
+/* $OpenBSD: sshkey.c,v 1.9 2015/01/12 13:29:27 markus Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Alexander von Gernler.  All rights reserved.
@@ -27,6 +27,7 @@
 
 #include <sys/param.h>
 #include <sys/types.h>
+#include <netinet/in.h>
 
 #include <openssl/evp.h>
 #include <openssl/err.h>
@@ -38,6 +39,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <util.h>
+#include <resolv.h>
 
 #include "ssh2.h"
 #include "ssherr.h"
@@ -169,12 +171,12 @@ sshkey_ecdsa_nid_from_name(const char *name)
 {
 	const struct keytype *kt;
 
-        for (kt = keytypes; kt->type != -1; kt++) {
-                if (kt->type != KEY_ECDSA && kt->type != KEY_ECDSA_CERT)
-                        continue;
-                if (kt->name != NULL && strcmp(name, kt->name) == 0)
-                        return kt->nid;
-        }
+	for (kt = keytypes; kt->type != -1; kt++) {
+		if (kt->type != KEY_ECDSA && kt->type != KEY_ECDSA_CERT)
+			continue;
+		if (kt->name != NULL && strcmp(name, kt->name) == 0)
+			return kt->nid;
+	}
 	return -1;
 }
 
@@ -826,29 +828,18 @@ sshkey_plain_to_blob(const struct sshkey *key, u_char **blobp, size_t *lenp)
 }
 
 int
-sshkey_fingerprint_raw(const struct sshkey *k, enum sshkey_fp_type dgst_type,
+sshkey_fingerprint_raw(const struct sshkey *k, int dgst_alg,
     u_char **retp, size_t *lenp)
 {
 	u_char *blob = NULL, *ret = NULL;
 	size_t blob_len = 0;
-	int hash_alg = -1, r = SSH_ERR_INTERNAL_ERROR;
+	int r = SSH_ERR_INTERNAL_ERROR;
 
 	if (retp != NULL)
 		*retp = NULL;
 	if (lenp != NULL)
 		*lenp = 0;
-
-	switch (dgst_type) {
-	case SSH_FP_MD5:
-		hash_alg = SSH_DIGEST_MD5;
-		break;
-	case SSH_FP_SHA1:
-		hash_alg = SSH_DIGEST_SHA1;
-		break;
-	case SSH_FP_SHA256:
-		hash_alg = SSH_DIGEST_SHA256;
-		break;
-	default:
+	if (ssh_digest_bytes(dgst_alg) == 0) {
 		r = SSH_ERR_INVALID_ARGUMENT;
 		goto out;
 	}
@@ -874,7 +865,7 @@ sshkey_fingerprint_raw(const struct sshkey *k, enum sshkey_fp_type dgst_type,
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-	if ((r = ssh_digest_memory(hash_alg, blob, blob_len,
+	if ((r = ssh_digest_memory(dgst_alg, blob, blob_len,
 	    ret, SSH_DIGEST_MAX_LENGTH)) != 0)
 		goto out;
 	/* success */
@@ -883,7 +874,7 @@ sshkey_fingerprint_raw(const struct sshkey *k, enum sshkey_fp_type dgst_type,
 		ret = NULL;
 	}
 	if (lenp != NULL)
-		*lenp = ssh_digest_bytes(hash_alg);
+		*lenp = ssh_digest_bytes(dgst_alg);
 	r = 0;
  out:
 	free(ret);
@@ -895,21 +886,45 @@ sshkey_fingerprint_raw(const struct sshkey *k, enum sshkey_fp_type dgst_type,
 }
 
 static char *
-fingerprint_hex(u_char *dgst_raw, size_t dgst_raw_len)
+fingerprint_b64(const char *alg, u_char *dgst_raw, size_t dgst_raw_len)
 {
-	char *retval;
-	size_t i;
+	char *ret;
+	size_t plen = strlen(alg) + 1;
+	size_t rlen = ((dgst_raw_len + 2) / 3) * 4 + plen + 1;
+	int r;
 
-	if ((retval = calloc(1, dgst_raw_len * 3 + 1)) == NULL)
+	if (dgst_raw_len > 65536 || (ret = calloc(1, rlen)) == NULL)
 		return NULL;
-	for (i = 0; i < dgst_raw_len; i++) {
-		char hex[4];
-		snprintf(hex, sizeof(hex), "%02x:", dgst_raw[i]);
-		strlcat(retval, hex, dgst_raw_len * 3 + 1);
+	strlcpy(ret, alg, rlen);
+	strlcat(ret, ":", rlen);
+	if (dgst_raw_len == 0)
+		return ret;
+	if ((r = b64_ntop(dgst_raw, dgst_raw_len,
+	    ret + plen, rlen - plen)) == -1) {
+		explicit_bzero(ret, rlen);
+		free(ret);
+		return NULL;
 	}
+	/* Trim padding characters from end */
+	ret[strcspn(ret, "=")] = '\0';
+	return ret;
+}
 
-	/* Remove the trailing ':' character */
-	retval[(dgst_raw_len * 3) - 1] = '\0';
+static char *
+fingerprint_hex(const char *alg, u_char *dgst_raw, size_t dgst_raw_len)
+{
+	char *retval, hex[5];
+	size_t i, rlen = dgst_raw_len * 3 + strlen(alg) + 2;
+
+	if (dgst_raw_len > 65536 || (retval = calloc(1, rlen)) == NULL)
+		return NULL;
+	strlcpy(retval, alg, rlen);
+	strlcat(retval, ":", rlen);
+	for (i = 0; i < dgst_raw_len; i++) {
+		snprintf(hex, sizeof(hex), "%s%02x",
+		    i > 0 ? ":" : "", dgst_raw[i]);
+		strlcat(retval, hex, rlen);
+	}
 	return retval;
 }
 
@@ -995,7 +1010,7 @@ fingerprint_bubblebabble(u_char *dgst_raw, size_t dgst_raw_len)
 #define	FLDSIZE_Y	(FLDBASE + 1)
 #define	FLDSIZE_X	(FLDBASE * 2 + 1)
 static char *
-fingerprint_randomart(u_char *dgst_raw, size_t dgst_raw_len,
+fingerprint_randomart(const char *alg, u_char *dgst_raw, size_t dgst_raw_len,
     const struct sshkey *k)
 {
 	/*
@@ -1003,9 +1018,9 @@ fingerprint_randomart(u_char *dgst_raw, size_t dgst_raw_len,
 	 * intersects with itself.  Matter of taste.
 	 */
 	char	*augmentation_string = " .o+=*BOX@%&#/^SE";
-	char	*retval, *p, title[FLDSIZE_X];
+	char	*retval, *p, title[FLDSIZE_X], hash[FLDSIZE_X];
 	u_char	 field[FLDSIZE_X][FLDSIZE_Y];
-	size_t	 i, tlen;
+	size_t	 i, tlen, hlen;
 	u_int	 b;
 	int	 x, y, r;
 	size_t	 len = strlen(augmentation_string) - 1;
@@ -1050,8 +1065,12 @@ fingerprint_randomart(u_char *dgst_raw, size_t dgst_raw_len,
 		sshkey_type(k), sshkey_size(k));
 	/* If [type size] won't fit, then try [type]; fits "[ED25519-CERT]" */
 	if (r < 0 || r > (int)sizeof(title))
-		snprintf(title, sizeof(title), "[%s]", sshkey_type(k));
-	tlen = strlen(title);
+		r = snprintf(title, sizeof(title), "[%s]", sshkey_type(k));
+	tlen = (r <= 0) ? 0 : strlen(title);
+
+	/* assemble hash ID. */
+	r = snprintf(hash, sizeof(hash), "[%s]", alg);
+	hlen = (r <= 0) ? 0 : strlen(hash);
 
 	/* output upper border */
 	p = retval;
@@ -1060,7 +1079,7 @@ fingerprint_randomart(u_char *dgst_raw, size_t dgst_raw_len,
 		*p++ = '-';
 	memcpy(p, title, tlen);
 	p += tlen;
-	for (i = p - retval - 1; i < FLDSIZE_X; i++)
+	for (i += tlen; i < FLDSIZE_X; i++)
 		*p++ = '-';
 	*p++ = '+';
 	*p++ = '\n';
@@ -1076,7 +1095,11 @@ fingerprint_randomart(u_char *dgst_raw, size_t dgst_raw_len,
 
 	/* output lower border */
 	*p++ = '+';
-	for (i = 0; i < FLDSIZE_X; i++)
+	for (i = 0; i < (FLDSIZE_X - hlen) / 2; i++)
+		*p++ = '-';
+	memcpy(p, hash, hlen);
+	p += hlen;
+	for (i += hlen; i < FLDSIZE_X; i++)
 		*p++ = '-';
 	*p++ = '+';
 
@@ -1084,24 +1107,39 @@ fingerprint_randomart(u_char *dgst_raw, size_t dgst_raw_len,
 }
 
 char *
-sshkey_fingerprint(const struct sshkey *k, enum sshkey_fp_type dgst_type,
+sshkey_fingerprint(const struct sshkey *k, int dgst_alg,
     enum sshkey_fp_rep dgst_rep)
 {
 	char *retval = NULL;
 	u_char *dgst_raw;
 	size_t dgst_raw_len;
 
-	if (sshkey_fingerprint_raw(k, dgst_type, &dgst_raw, &dgst_raw_len) != 0)
+	if (sshkey_fingerprint_raw(k, dgst_alg, &dgst_raw, &dgst_raw_len) != 0)
 		return NULL;
 	switch (dgst_rep) {
+	case SSH_FP_DEFAULT:
+		if (dgst_alg == SSH_DIGEST_MD5) {
+			retval = fingerprint_hex(ssh_digest_alg_name(dgst_alg),
+			    dgst_raw, dgst_raw_len);
+		} else {
+			retval = fingerprint_b64(ssh_digest_alg_name(dgst_alg),
+			    dgst_raw, dgst_raw_len);
+		}
+		break;
 	case SSH_FP_HEX:
-		retval = fingerprint_hex(dgst_raw, dgst_raw_len);
+		retval = fingerprint_hex(ssh_digest_alg_name(dgst_alg),
+		    dgst_raw, dgst_raw_len);
+		break;
+	case SSH_FP_BASE64:
+		retval = fingerprint_b64(ssh_digest_alg_name(dgst_alg),
+		    dgst_raw, dgst_raw_len);
 		break;
 	case SSH_FP_BUBBLEBABBLE:
 		retval = fingerprint_bubblebabble(dgst_raw, dgst_raw_len);
 		break;
 	case SSH_FP_RANDOMART:
-		retval = fingerprint_randomart(dgst_raw, dgst_raw_len, k);
+		retval = fingerprint_randomart(ssh_digest_alg_name(dgst_alg),
+		    dgst_raw, dgst_raw_len, k);
 		break;
 	default:
 		explicit_bzero(dgst_raw, dgst_raw_len);
@@ -1208,9 +1246,7 @@ sshkey_read(struct sshkey *ret, char **cpp)
 		cp = space+1;
 		if (*cp == '\0')
 			return SSH_ERR_INVALID_FORMAT;
-		if (ret->type == KEY_UNSPEC) {
-			ret->type = type;
-		} else if (ret->type != type)
+		if (ret->type != KEY_UNSPEC && ret->type != type)
 			return SSH_ERR_KEY_TYPE_MISMATCH;
 		if ((blob = sshbuf_new()) == NULL)
 			return SSH_ERR_ALLOC_FAIL;
@@ -1237,7 +1273,7 @@ sshkey_read(struct sshkey *ret, char **cpp)
 			sshkey_free(k);
 			return SSH_ERR_EC_CURVE_MISMATCH;
 		}
-/*XXXX*/
+		ret->type = type;
 		if (sshkey_is_cert(ret)) {
 			if (!sshkey_is_cert(k)) {
 				sshkey_free(k);
@@ -1734,32 +1770,24 @@ static int
 cert_parse(struct sshbuf *b, struct sshkey *key, const u_char *blob,
     size_t blen)
 {
-	u_char *principals = NULL, *critical = NULL, *exts = NULL;
+	struct sshbuf *principals = NULL, *crit = NULL, *exts = NULL;
 	u_char *sig_key = NULL, *sig = NULL;
-	size_t signed_len, plen, clen, sklen, slen, kidlen, elen;
-	struct sshbuf *tmp;
-	char *principal;
+	size_t signed_len = 0, sklen = 0, slen = 0, kidlen = 0;
 	int ret = SSH_ERR_INTERNAL_ERROR;
 	int v00 = sshkey_cert_is_legacy(key);
-	char **oprincipals;
-
-	if ((tmp = sshbuf_new()) == NULL)
-		return SSH_ERR_ALLOC_FAIL;
 
 	/* Copy the entire key blob for verification and later serialisation */
 	if ((ret = sshbuf_put(key->cert->certblob, blob, blen)) != 0)
 		return ret;
 
-	elen = 0; /* Not touched for v00 certs */
-	principals = exts = critical = sig_key = sig = NULL;
 	if ((!v00 && (ret = sshbuf_get_u64(b, &key->cert->serial)) != 0) ||
 	    (ret = sshbuf_get_u32(b, &key->cert->type)) != 0 ||
 	    (ret = sshbuf_get_cstring(b, &key->cert->key_id, &kidlen)) != 0 ||
-	    (ret = sshbuf_get_string(b, &principals, &plen)) != 0 ||
+	    (ret = sshbuf_froms(b, &principals)) != 0 ||
 	    (ret = sshbuf_get_u64(b, &key->cert->valid_after)) != 0 ||
 	    (ret = sshbuf_get_u64(b, &key->cert->valid_before)) != 0 ||
-	    (ret = sshbuf_get_string(b, &critical, &clen)) != 0 ||
-	    (!v00 && (ret = sshbuf_get_string(b, &exts, &elen)) != 0) ||
+	    (ret = sshbuf_froms(b, &crit)) != 0 ||
+	    (!v00 && (ret = sshbuf_froms(b, &exts)) != 0) ||
 	    (v00 && (ret = sshbuf_get_string_direct(b, NULL, NULL)) != 0) ||
 	    (ret = sshbuf_get_string_direct(b, NULL, NULL)) != 0 ||
 	    (ret = sshbuf_get_string(b, &sig_key, &sklen)) != 0) {
@@ -1782,14 +1810,17 @@ cert_parse(struct sshbuf *b, struct sshkey *key, const u_char *blob,
 		goto out;
 	}
 
-	if ((ret = sshbuf_put(tmp, principals, plen)) != 0)
-		goto out;
-	while (sshbuf_len(tmp) > 0) {
+	/* Parse principals section */
+	while (sshbuf_len(principals) > 0) {
+		char *principal = NULL;
+		char **oprincipals = NULL;
+
 		if (key->cert->nprincipals >= SSHKEY_CERT_MAX_PRINCIPALS) {
 			ret = SSH_ERR_INVALID_FORMAT;
 			goto out;
 		}
-		if ((ret = sshbuf_get_cstring(tmp, &principal, &plen)) != 0) {
+		if ((ret = sshbuf_get_cstring(principals, &principal,
+		    NULL)) != 0) {
 			ret = SSH_ERR_INVALID_FORMAT;
 			goto out;
 		}
@@ -1806,36 +1837,37 @@ cert_parse(struct sshbuf *b, struct sshkey *key, const u_char *blob,
 		key->cert->principals[key->cert->nprincipals++] = principal;
 	}
 
-	sshbuf_reset(tmp);
-
-	if ((ret = sshbuf_put(key->cert->critical, critical, clen)) != 0 ||
-	    (ret = sshbuf_put(tmp, critical, clen)) != 0)
+	/*
+	 * Stash a copies of the critical options and extensions sections
+	 * for later use.
+	 */
+	if ((ret = sshbuf_putb(key->cert->critical, crit)) != 0 ||
+	    (exts != NULL &&
+	    (ret = sshbuf_putb(key->cert->extensions, exts)) != 0))
 		goto out;
 
-	/* validate structure */
-	while (sshbuf_len(tmp) != 0) {
-		if ((ret = sshbuf_get_string_direct(tmp, NULL, NULL)) != 0 ||
-		    (ret = sshbuf_get_string_direct(tmp, NULL, NULL)) != 0) {
+	/*
+	 * Validate critical options and extensions sections format.
+	 * NB. extensions are not present in v00 certs.
+	 */
+	while (sshbuf_len(crit) != 0) {
+		if ((ret = sshbuf_get_string_direct(crit, NULL, NULL)) != 0 ||
+		    (ret = sshbuf_get_string_direct(crit, NULL, NULL)) != 0) {
+			sshbuf_reset(key->cert->critical);
 			ret = SSH_ERR_INVALID_FORMAT;
 			goto out;
 		}
 	}
-	sshbuf_reset(tmp);
-
-	if ((ret = sshbuf_put(key->cert->extensions, exts, elen)) != 0 ||
-	    (ret = sshbuf_put(tmp, exts, elen)) != 0)
-		goto out;
-
-	/* validate structure */
-	while (sshbuf_len(tmp) != 0) {
-		if ((ret = sshbuf_get_string_direct(tmp, NULL, NULL)) != 0 ||
-		    (ret = sshbuf_get_string_direct(tmp, NULL, NULL)) != 0) {
+	while (exts != NULL && sshbuf_len(exts) != 0) {
+		if ((ret = sshbuf_get_string_direct(exts, NULL, NULL)) != 0 ||
+		    (ret = sshbuf_get_string_direct(exts, NULL, NULL)) != 0) {
+			sshbuf_reset(key->cert->extensions);
 			ret = SSH_ERR_INVALID_FORMAT;
 			goto out;
 		}
 	}
-	sshbuf_reset(tmp);
 
+	/* Parse CA key and check signature */
 	if (sshkey_from_blob_internal(sig_key, sklen,
 	    &key->cert->signature_key, 0) != 0) {
 		ret = SSH_ERR_KEY_CERT_INVALID_SIGN_KEY;
@@ -1845,17 +1877,16 @@ cert_parse(struct sshbuf *b, struct sshkey *key, const u_char *blob,
 		ret = SSH_ERR_KEY_CERT_INVALID_SIGN_KEY;
 		goto out;
 	}
-
 	if ((ret = sshkey_verify(key->cert->signature_key, sig, slen,
 	    sshbuf_ptr(key->cert->certblob), signed_len, 0)) != 0)
 		goto out;
-	ret = 0;
 
+	/* Success */
+	ret = 0;
  out:
-	sshbuf_free(tmp);
-	free(principals);
-	free(critical);
-	free(exts);
+	sshbuf_free(crit);
+	sshbuf_free(exts);
+	sshbuf_free(principals);
 	free(sig_key);
 	free(sig);
 	return ret;
@@ -2092,10 +2123,7 @@ sshkey_verify(const struct sshkey *key,
     const u_char *sig, size_t siglen,
     const u_char *data, size_t dlen, u_int compat)
 {
-	if (siglen == 0)
-		return -1;
-
-	if (dlen > SSH_KEY_MAX_SIGN_DATA_SIZE)
+	if (siglen == 0 || dlen > SSH_KEY_MAX_SIGN_DATA_SIZE)
 		return SSH_ERR_INVALID_ARGUMENT;
 	switch (key->type) {
 #ifdef WITH_OPENSSL
@@ -2903,8 +2931,9 @@ sshkey_private_to_blob2(const struct sshkey *prv, struct sshbuf *blob,
     const char *passphrase, const char *comment, const char *ciphername,
     int rounds)
 {
-	u_char *cp, *b64 = NULL, *key = NULL, *pubkeyblob = NULL;
+	u_char *cp, *key = NULL, *pubkeyblob = NULL;
 	u_char salt[SALT_LEN];
+	char *b64 = NULL;
 	size_t i, pubkeylen, keylen, ivlen, blocksize, authlen;
 	u_int check;
 	int r = SSH_ERR_INTERNAL_ERROR;
@@ -3116,7 +3145,7 @@ sshkey_parse_private2(struct sshbuf *blob, int type, const char *passphrase,
 	}
 
 	/* decode base64 */
-	if ((r = sshbuf_b64tod(decoded, sshbuf_ptr(encoded))) != 0)
+	if ((r = sshbuf_b64tod(decoded, (char *)sshbuf_ptr(encoded))) != 0)
 		goto out;
 
 	/* check magic */
@@ -3426,10 +3455,12 @@ sshkey_private_to_fileblob(struct sshkey *key, struct sshbuf *blob,
     int force_new_format, const char *new_format_cipher, int new_format_rounds)
 {
 	switch (key->type) {
-#ifdef WITH_OPENSSL
+#ifdef WITH_SSH1
 	case KEY_RSA1:
 		return sshkey_private_rsa1_to_blob(key, blob,
 		    passphrase, comment);
+#endif /* WITH_SSH1 */
+#ifdef WITH_OPENSSL
 	case KEY_DSA:
 	case KEY_ECDSA:
 	case KEY_RSA:
@@ -3635,20 +3666,16 @@ sshkey_parse_private_rsa1(struct sshbuf *blob, const char *passphrase,
 #endif /* WITH_SSH1 */
 
 #ifdef WITH_OPENSSL
-/* XXX make private once ssh-keysign.c fixed */
-int
+static int
 sshkey_parse_private_pem_fileblob(struct sshbuf *blob, int type,
-    const char *passphrase, struct sshkey **keyp, char **commentp)
+    const char *passphrase, struct sshkey **keyp)
 {
 	EVP_PKEY *pk = NULL;
 	struct sshkey *prv = NULL;
-	char *name = "<no key>";
 	BIO *bio = NULL;
 	int r;
 
 	*keyp = NULL;
-	if (commentp != NULL)
-		*commentp = NULL;
 
 	if ((bio = BIO_new(BIO_s_mem())) == NULL || sshbuf_len(blob) > INT_MAX)
 		return SSH_ERR_ALLOC_FAIL;
@@ -3671,7 +3698,6 @@ sshkey_parse_private_pem_fileblob(struct sshbuf *blob, int type,
 		}
 		prv->rsa = EVP_PKEY_get1_RSA(pk);
 		prv->type = KEY_RSA;
-		name = "rsa w/o comment";
 #ifdef DEBUG_PK
 		RSA_print_fp(stderr, prv->rsa, 8);
 #endif
@@ -3687,7 +3713,6 @@ sshkey_parse_private_pem_fileblob(struct sshbuf *blob, int type,
 		}
 		prv->dsa = EVP_PKEY_get1_DSA(pk);
 		prv->type = KEY_DSA;
-		name = "dsa w/o comment";
 #ifdef DEBUG_PK
 		DSA_print_fp(stderr, prv->dsa, 8);
 #endif
@@ -3708,18 +3733,12 @@ sshkey_parse_private_pem_fileblob(struct sshbuf *blob, int type,
 			r = SSH_ERR_INVALID_FORMAT;
 			goto out;
 		}
-		name = "ecdsa w/o comment";
 #ifdef DEBUG_PK
 		if (prv != NULL && prv->ecdsa != NULL)
 			sshkey_dump_ec_key(prv->ecdsa);
 #endif
 	} else {
 		r = SSH_ERR_INVALID_FORMAT;
-		goto out;
-	}
-	if (commentp != NULL &&
-	    (*commentp = strdup(name)) == NULL) {
-		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
 	r = 0;
@@ -3746,15 +3765,17 @@ sshkey_parse_private_fileblob_type(struct sshbuf *blob, int type,
 		*commentp = NULL;
 
 	switch (type) {
-#ifdef WITH_OPENSSL
+#ifdef WITH_SSH1
 	case KEY_RSA1:
 		return sshkey_parse_private_rsa1(blob, passphrase,
 		    keyp, commentp);
+#endif /* WITH_SSH1 */
+#ifdef WITH_OPENSSL
 	case KEY_DSA:
 	case KEY_ECDSA:
 	case KEY_RSA:
-		return sshkey_parse_private_pem_fileblob(blob, type, passphrase,
-		    keyp, commentp);
+		return sshkey_parse_private_pem_fileblob(blob, type,
+		    passphrase, keyp);
 #endif /* WITH_OPENSSL */
 	case KEY_ED25519:
 		return sshkey_parse_private2(blob, type, passphrase,
@@ -3764,8 +3785,8 @@ sshkey_parse_private_fileblob_type(struct sshbuf *blob, int type,
 		    commentp)) == 0)
 			return 0;
 #ifdef WITH_OPENSSL
-		return sshkey_parse_private_pem_fileblob(blob, type, passphrase,
-		    keyp, commentp);
+		return sshkey_parse_private_pem_fileblob(blob, type,
+		    passphrase, keyp);
 #else
 		return SSH_ERR_INVALID_FORMAT;
 #endif /* WITH_OPENSSL */

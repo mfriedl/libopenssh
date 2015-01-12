@@ -36,6 +36,7 @@
 #include "authfile.h"
 #include "ssherr.h"
 #include "sshbuf.h"
+#include "misc.h"
 
 struct side {
 	int fd;
@@ -49,7 +50,7 @@ struct session {
 	TAILQ_ENTRY(session) next;
 	int flags;
 };
-Forward fwd;
+struct Forward fwd;
 
 void accept_cb(int, short, void *);
 void connect_cb(int, short, void *);
