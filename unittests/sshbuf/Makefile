@@ -1,4 +1,6 @@
-#	$OpenBSD$
+#	$OpenBSD: Makefile,v 1.3 2014/07/16 20:04:21 okan Exp $
+
+TEST_ENV=      "MALLOC_OPTIONS=AFGJPRX"
 
 PROG=test_sshbuf
 SRCS=tests.c
@@ -10,5 +12,7 @@ SRCS+=test_sshbuf_fuzz.c
 SRCS+=test_sshbuf_getput_fuzz.c
 SRCS+=test_sshbuf_fixed.c
 
-.include <bsd.regress.mk>
+run-regress-${PROG}: ${PROG}
+	env ${TEST_ENV} ./${PROG}
 
+.include <bsd.regress.mk>

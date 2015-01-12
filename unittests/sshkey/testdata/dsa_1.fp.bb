@@ -1,1 +1,1 @@
-xocor-zuryc-zukyn-kubyc-myvun-vuret-rumyf-bumef-habaz-genah-zyxex
+xosat-baneh-gocad-relek-kepur-mibip-motog-bykyb-hisug-mysus-tuxix

@@ -1,4 +1,4 @@
-/*	$OpenBSD	*/
+/*	$OpenBSD: fuzz.c,v 1.4 2014/11/19 13:35:37 krw Exp $	*/
 /*
  * Copyright (c) 2011 Damien Miller <djm@mindrot.org>
  *
@@ -25,7 +25,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
 #include "test_helper.h"
 
@@ -168,7 +167,7 @@ fuzz_dump(struct fuzz *fuzz)
 }
 
 struct fuzz *
-fuzz_begin(u_int strategies, void *p, size_t l)
+fuzz_begin(u_int strategies, const void *p, size_t l)
 {
 	struct fuzz *ret = calloc(sizeof(*ret), 1);
 
