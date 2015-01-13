@@ -3338,6 +3338,16 @@ channel_request_remote_forwarding(struct ssh *ssh, struct Forward *fwd)
 		if (fwd->listen_path != NULL) {
 			if ((r = sshpkt_start(ssh, SSH2_MSG_GLOBAL_REQUEST))
 			    != 0 ||
+			    (r = sshpkt_put_cstring(ssh,
+			    "streamlocal-forward@openssh.com")) != 0 ||
+			    (r = sshpkt_put_u8(ssh, 1)) != 0 ||	/* want reply */
+			    (r = sshpkt_put_cstring(ssh, fwd->listen_path))
+			    != 0 ||
+			    (r = sshpkt_send(ssh)) != 0)
+				fatal("%s: %s", __func__, ssh_err(r));
+		} else {
+			if ((r = sshpkt_start(ssh, SSH2_MSG_GLOBAL_REQUEST))
+			    != 0 ||
 			    (r = sshpkt_put_cstring(ssh, "tcpip-forward"))
 			    != 0 ||
 			    (r = sshpkt_put_u8(ssh, 1)) != 0 ||	/* want reply */
@@ -3345,16 +3355,6 @@ channel_request_remote_forwarding(struct ssh *ssh, struct Forward *fwd)
 			    channel_rfwd_bind_host(ssh, fwd->listen_host)))
 			    != 0 ||
 			    (r = sshpkt_put_u32(ssh, fwd->listen_port)) != 0 ||
-			    (r = sshpkt_send(ssh)) != 0)
-				fatal("%s: %s", __func__, ssh_err(r));
-		} else {
-			if ((r = sshpkt_start(ssh, SSH2_MSG_GLOBAL_REQUEST))
-			    != 0 ||
-			    (r = sshpkt_put_cstring(ssh,
-			    "streamlocal-forward@openssh.com")) != 0 ||
-			    (r = sshpkt_put_u8(ssh, 1)) != 0 ||	/* want reply */
-			    (r = sshpkt_put_cstring(ssh, fwd->listen_path))
-			    != 0 ||
 			    (r = sshpkt_send(ssh)) != 0)
 				fatal("%s: %s", __func__, ssh_err(r));
 		}
