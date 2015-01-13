@@ -170,7 +170,7 @@ add_file(int agent_fd, const char *filename, int key_only)
 	struct sshkey *private, *cert;
 	char *comment = NULL;
 	char msg[1024], *certpath = NULL;
-	int r, fd, perms_ok, ret = -1;
+	int r, fd, ret = -1;
 	struct sshbuf *keyblob;
 
 	if (strcmp(filename, "-") == 0) {
@@ -186,8 +186,7 @@ add_file(int agent_fd, const char *filename, int key_only)
 	 * will occur multiple times, so check perms first and bail if wrong.
 	 */
 	if (fd != STDIN_FILENO) {
-		perms_ok = sshkey_perm_ok(fd, filename);
-		if (!perms_ok) {
+		if (sshkey_perm_ok(fd, filename) != 0) {
 			close(fd);
 			return -1;
 		}
