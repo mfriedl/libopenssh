@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $OpenBSD: krl.c,v 1.24 2015/01/12 19:22:46 markus Exp $ */
+/* $OpenBSD: krl.c,v 1.25 2015/01/13 19:04:35 djm Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -34,7 +34,6 @@
 #include "authfile.h"
 #include "misc.h"
 #include "log.h"
-#include "ssherr.h"
 #include "digest.h"
 
 #include "krl.h"

@@ -1,4 +1,4 @@
-/* $OpenBSD: mac.c,v 1.30 2014/04/30 19:07:48 naddy Exp $ */
+/* $OpenBSD: mac.c,v 1.31 2015/01/13 19:31:40 markus Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
@@ -25,21 +25,16 @@
 
 #include <sys/types.h>
 
-#include <openssl/hmac.h>
-
 #include <string.h>
-#include <signal.h>
-
-#include "cipher.h"
-#include "sshkey.h"
-#include "mac.h"
-#include "misc.h"
-#include "ssherr.h"
-#include "sshbuf.h"
+#include <stdio.h>
 
 #include "digest.h"
 #include "hmac.h"
 #include "umac.h"
+#include "mac.h"
+#include "misc.h"
+#include "ssherr.h"
+#include "sshbuf.h"
 
 #define SSH_DIGEST	1	/* SSH_DIGEST_XXX */
 #define SSH_UMAC	2	/* UMAC (not integrated with OpenSSL) */
@@ -86,7 +81,7 @@ static const struct macalg macs[] = {
 char *
 mac_alg_list(char sep)
 {
-	char *ret = NULL;
+	char *ret = NULL, *tmp;
 	size_t nlen, rlen = 0;
 	const struct macalg *m;
 
@@ -94,8 +89,11 @@ mac_alg_list(char sep)
 		if (ret != NULL)
 			ret[rlen++] = sep;
 		nlen = strlen(m->name);
-		if (reallocn((void **)&ret, 1, rlen + nlen + 2) != 0)
+		if ((tmp = realloc(ret, rlen + nlen + 2)) == NULL) {
+			free(ret);
 			return NULL;
+		}
+		ret = tmp;
 		memcpy(ret + rlen, m->name, nlen + 1);
 		rlen += nlen;
 	}
@@ -108,7 +106,7 @@ mac_setup_by_alg(struct sshmac *mac, const struct macalg *macalg)
 	mac->type = macalg->type;
 	if (mac->type == SSH_DIGEST) {
 		if ((mac->hmac_ctx = ssh_hmac_start(macalg->alg)) == NULL)
-			return SSH_ERR_LIBCRYPTO_ERROR;
+			return SSH_ERR_ALLOC_FAIL;
 		mac->key_len = mac->mac_len = ssh_hmac_bytes(macalg->alg);
 	} else {
 		mac->mac_len = macalg->len / 8;
@@ -164,7 +162,7 @@ mac_compute(struct sshmac *mac, u_int32_t seqno, const u_char *data, int datalen
     u_char *digest, size_t dlen)
 {
 	static union {
-		u_char m[MAC_DIGEST_LEN_MAX];
+		u_char m[SSH_DIGEST_MAX_LENGTH];
 		u_int64_t for_align;
 	} u;
 	u_char b[4];

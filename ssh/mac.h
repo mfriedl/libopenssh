@@ -1,4 +1,4 @@
-/* $OpenBSD: mac.h,v 1.8 2013/11/07 11:58:27 dtucker Exp $ */
+/* $OpenBSD: mac.h,v 1.9 2015/01/13 19:31:40 markus Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
@@ -27,10 +27,6 @@
 #define SSHMAC_H
 
 #include <sys/types.h>
-#include <openssl/evp.h>
-#include <openssl/hmac.h>
-
-#define MAC_DIGEST_LEN_MAX	EVP_MAX_MD_SIZE
 
 struct sshmac {
 	char	*name;

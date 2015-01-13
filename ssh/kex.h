@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.h,v 1.64 2014/05/02 03:27:54 djm Exp $ */
+/* $OpenBSD: kex.h,v 1.65 2015/01/13 19:31:40 markus Exp $ */
 
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
@@ -26,10 +26,8 @@
 #ifndef KEX_H
 #define KEX_H
 
-#include <openssl/evp.h>
-#include <openssl/ec.h>
-
 #include "mac.h"
+
 #ifdef WITH_LEAKMALLOC
 #include "leakmalloc.h"
 #endif

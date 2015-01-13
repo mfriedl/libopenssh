@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.199 2014/10/24 02:01:20 lteo Exp $ */
+/* $OpenBSD: packet.c,v 1.200 2015/01/13 19:31:40 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -66,6 +66,7 @@
 #include "cipher.h"
 #include "sshkey.h"
 #include "kex.h"
+#include "digest.h"
 #include "mac.h"
 #include "log.h"
 #include "canohost.h"
@@ -1041,7 +1042,7 @@ int
 ssh_packet_send2_wrapped(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
-	u_char type, *cp, macbuf[MAC_DIGEST_LEN_MAX];
+	u_char type, *cp, macbuf[SSH_DIGEST_MAX_LENGTH];
 	u_char padlen, pad = 0;
 	u_int authlen = 0, aadlen = 0;
 	u_int len;
@@ -1150,6 +1151,7 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	/* append unencrypted MAC */
 	if (mac && mac->enabled) {
 		if (mac->etm) {
+			/* EtM: compute mac over aadlen + cipher text */
 			if ((r = mac_compute(mac, state->p_send.seqnr,
 			    cp, len, macbuf, sizeof(macbuf))) != 0)
 				goto out;
@@ -1491,7 +1493,7 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 {
 	struct session_state *state = ssh->state;
 	u_int padlen, need;
-	u_char macbuf[MAC_DIGEST_LEN_MAX], *cp;
+	u_char *cp, macbuf[SSH_DIGEST_MAX_LENGTH];
 	u_int maclen, aadlen = 0, authlen = 0, block_size;
 	struct sshenc *enc   = NULL;
 	struct sshmac *mac   = NULL;
