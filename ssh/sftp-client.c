@@ -344,17 +344,17 @@ get_decode_statvfs(struct sftp_conn *conn, struct sftp_statvfs *st,
 	}
 
 	memset(st, 0, sizeof(*st));
-	if ((r = sshbuf_get_u64(msg, &st->f_bsize)) == 0 ||
-	    (r = sshbuf_get_u64(msg, &st->f_frsize)) == 0 ||
-	    (r = sshbuf_get_u64(msg, &st->f_blocks)) == 0 ||
-	    (r = sshbuf_get_u64(msg, &st->f_bfree)) == 0 ||
-	    (r = sshbuf_get_u64(msg, &st->f_bavail)) == 0 ||
-	    (r = sshbuf_get_u64(msg, &st->f_files)) == 0 ||
-	    (r = sshbuf_get_u64(msg, &st->f_ffree)) == 0 ||
-	    (r = sshbuf_get_u64(msg, &st->f_favail)) == 0 ||
-	    (r = sshbuf_get_u64(msg, &st->f_fsid)) == 0 ||
-	    (r = sshbuf_get_u64(msg, &flag)) == 0 ||
-	    (r = sshbuf_get_u64(msg, &st->f_namemax)) == 0)
+	if ((r = sshbuf_get_u64(msg, &st->f_bsize)) != 0 ||
+	    (r = sshbuf_get_u64(msg, &st->f_frsize)) != 0 ||
+	    (r = sshbuf_get_u64(msg, &st->f_blocks)) != 0 ||
+	    (r = sshbuf_get_u64(msg, &st->f_bfree)) != 0 ||
+	    (r = sshbuf_get_u64(msg, &st->f_bavail)) != 0 ||
+	    (r = sshbuf_get_u64(msg, &st->f_files)) != 0 ||
+	    (r = sshbuf_get_u64(msg, &st->f_ffree)) != 0 ||
+	    (r = sshbuf_get_u64(msg, &st->f_favail)) != 0 ||
+	    (r = sshbuf_get_u64(msg, &st->f_fsid)) != 0 ||
+	    (r = sshbuf_get_u64(msg, &flag)) != 0 ||
+	    (r = sshbuf_get_u64(msg, &st->f_namemax)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
 	st->f_flag = (flag & SSH2_FXE_STATVFS_ST_RDONLY) ? ST_RDONLY : 0;
