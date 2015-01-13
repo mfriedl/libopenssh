@@ -1484,7 +1484,6 @@ port_open_helper(Channel *c, char *rtype)
 		    (r = sshpkt_put_u32(ssh, c->local_window_max)) != 0 ||
 		    (r = sshpkt_put_u32(ssh, c->local_maxpacket)) != 0)
 			CHANNEL_PACKET_ERROR(c, r);
-
 		if (strcmp(rtype, "direct-tcpip") == 0) {
 			/* target host, port */
 			if ((r = sshpkt_put_cstring(ssh, c->path)) != 0 ||
@@ -1514,6 +1513,8 @@ port_open_helper(Channel *c, char *rtype)
 			    (r = sshpkt_put_u32(ssh, (u_int)remote_port)) != 0)
 				CHANNEL_PACKET_ERROR(c, r);
 		}
+		if ((r = sshpkt_send(ssh)) != 0)
+			CHANNEL_PACKET_ERROR(c, r);
 	} else {
 		u_int flags = ssh_packet_get_protocol_flags(ssh);
 
