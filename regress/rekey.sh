@@ -1,4 +1,4 @@
-#	$OpenBSD: rekey.sh,v 1.8 2013/05/17 04:29:14 dtucker Exp $
+#	$OpenBSD: rekey.sh,v 1.15 2014/04/21 22:15:37 djm Exp $
 #	Placed in the Public Domain.
 
 tid="rekey"
@@ -6,35 +6,76 @@ tid="rekey"
 LOG=${TEST_SSH_LOGFILE}
 
 rm -f ${LOG}
+cp $OBJ/sshd_proxy $OBJ/sshd_proxy_bak
 
-for s in 16 1k 128k 256k; do
-	verbose "client rekeylimit ${s}"
-	rm -f ${COPY} ${LOG}
-	cat $DATA | \
-		${SSH} -oCompression=no -oRekeyLimit=$s \
-			-v -F $OBJ/ssh_proxy somehost "cat > ${COPY}"
-	if [ $? -ne 0 ]; then
-		fail "ssh failed"
+# Test rekeying based on data volume only.
+# Arguments will be passed to ssh.
+ssh_data_rekeying()
+{
+	_kexopt=$1 ; shift
+	_opts="$@"
+	if ! test -z "$_kexopts" ; then
+		cp $OBJ/sshd_proxy_bak $OBJ/sshd_proxy
+		echo "$_kexopt" >> $OBJ/sshd_proxy
+		_opts="$_opts -o$_kexopt"
 	fi
-	cmp $DATA ${COPY}		|| fail "corrupted copy"
+	rm -f ${COPY} ${LOG}
+	_opts="$_opts -oCompression=no"
+	${SSH} <${DATA} $_opts -v -F $OBJ/ssh_proxy somehost "cat > ${COPY}"
+	if [ $? -ne 0 ]; then
+		fail "ssh failed ($@)"
+	fi
+	cmp ${DATA} ${COPY}		|| fail "corrupted copy ($@)"
 	n=`grep 'NEWKEYS sent' ${LOG} | wc -l`
 	n=`expr $n - 1`
 	trace "$n rekeying(s)"
 	if [ $n -lt 1 ]; then
-		fail "no rekeying occured"
+		fail "no rekeying occured ($@)"
 	fi
+}
+
+increase_datafile_size 300
+
+opts=""
+for i in `${SSH} -Q kex`; do
+	opts="$opts KexAlgorithms=$i"
+done
+for i in `${SSH} -Q cipher`; do
+	opts="$opts Ciphers=$i"
+done
+for i in `${SSH} -Q mac`; do
+	opts="$opts MACs=$i"
+done
+
+for opt in $opts; do
+	verbose "client rekey $opt"
+	ssh_data_rekeying "$opt" -oRekeyLimit=256k
+done
+
+# AEAD ciphers are magical so test with all KexAlgorithms
+if ${SSH} -Q cipher-auth | grep '^.*$' >/dev/null 2>&1 ; then
+  for c in `${SSH} -Q cipher-auth`; do
+    for kex in `${SSH} -Q kex`; do
+	verbose "client rekey $c $kex"
+	ssh_data_rekeying "KexAlgorithms=$kex" -oRekeyLimit=256k -oCiphers=$c
+    done
+  done
+fi
+
+for s in 16 1k 128k 256k; do
+	verbose "client rekeylimit ${s}"
+	ssh_data_rekeying "" -oCompression=no -oRekeyLimit=$s
 done
 
 for s in 5 10; do
 	verbose "client rekeylimit default ${s}"
 	rm -f ${COPY} ${LOG}
-	cat $DATA | \
-		${SSH} -oCompression=no -oRekeyLimit="default $s" -F \
-			$OBJ/ssh_proxy somehost "cat >${COPY};sleep $s;sleep 3"
+	${SSH} < ${DATA} -oCompression=no -oRekeyLimit="default $s" -F \
+		$OBJ/ssh_proxy somehost "cat >${COPY};sleep $s;sleep 3"
 	if [ $? -ne 0 ]; then
 		fail "ssh failed"
 	fi
-	cmp $DATA ${COPY}		|| fail "corrupted copy"
+	cmp ${DATA} ${COPY}		|| fail "corrupted copy"
 	n=`grep 'NEWKEYS sent' ${LOG} | wc -l`
 	n=`expr $n - 1`
 	trace "$n rekeying(s)"
@@ -98,10 +139,10 @@ for size in 16 1k 1K 1m 1M 1g 1G; do
 	    awk '/rekeylimit/{print $3}'`
 
 	if [ "$bytes" != "$b" ]; then
-		fatal "rekeylimit size: expected $bytes got $b"
+		fatal "rekeylimit size: expected $bytes bytes got $b"
 	fi
 	if [ "$seconds" != "$s" ]; then
-		fatal "rekeylimit time: expected $time got $s"
+		fatal "rekeylimit time: expected $time seconds got $s"
 	fi
     done
 done

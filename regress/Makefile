@@ -1,9 +1,11 @@
-#	$OpenBSD: Makefile,v 1.65 2013/04/18 02:46:12 djm Exp $
+#	$OpenBSD: Makefile,v 1.73 2015/01/12 20:13:27 markus Exp $
 
-REGRESS_TARGETS=	t1 t2 t3 t4 t5 t6 t7 t8 t9
+REGRESS_FAIL_EARLY= yes
+REGRESS_TARGETS=	t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12
 
 CLEANFILES+=	t2.out t6.out1 t6.out2 t7.out t7.out.pub copy.1 copy.2 \
-		t8.out t8.out.pub t9.out t9.out.pub
+		t8.out t8.out.pub t9.out t9.out.pub t10.out t10.out.pub \
+		t12.out t12.out.pub
 
 LTESTS= 	connect \
 		proxy-connect \
@@ -15,6 +17,7 @@ LTESTS= 	connect \
 		transfer \
 		banner \
 		rekey \
+		dhgex \
 		stderr-data \
 		stderr-after-eof \
 		broken-pipe \
@@ -35,6 +38,7 @@ LTESTS= 	connect \
 		sftp-badcmds \
 		sftp-batch \
 		sftp-glob \
+		sftp-perm \
 		reconfigure \
 		dynamic-forward \
 		forwarding \
@@ -54,7 +58,8 @@ LTESTS= 	connect \
 		keys-command \
 		forward-control \
 		integrity \
-		krl
+		krl \
+		multipubkey
 
 # works only with s-bits
 #		agent-ptrace \
@@ -76,7 +81,8 @@ CLEANFILES+=	authorized_keys_${USER} known_hosts pidfile \
 		authorized_principals_${USER} expect actual ready \
 		sshd_proxy.* authorized_keys_${USER}.* revoked-* krl-* \
 		ssh.log failed-ssh.log sshd.log failed-sshd.log \
-		regress.log failed-regress.log ssh-log-wrapper.sh
+		regress.log failed-regress.log ssh-log-wrapper.sh \
+		sftp-server.sh sftp-server.log sftp.log
 
 SUDO_CLEAN+=	/var/run/testdata_${USER} /var/run/keycommand_${USER}
 
@@ -100,6 +106,11 @@ TEST_ENV+=	"TEST_SSH_SSHD=${.CURDIR}/../ssh/sshd${ODIR}/sshd"
 TEST_ENV+=	"TEST_SSH_SSHKEYGEN=${.CURDIR}/../ssh/ssh-keygen${ODIR}/ssh-keygen"
 TEST_ENV+=	"TEST_SSH_SSHKEYSCAN=${.CURDIR}/../ssh/ssh-keyscan${ODIR}/ssh-keyscan"
 
+unit:
+	if test -z "${SKIP_UNIT}" ; then \
+		(set -e ; cd ${.CURDIR}/unittests ; make) \
+	fi
+
 t1:
 	ssh-keygen -if ${.CURDIR}/rsa_ssh2.prv | diff - ${.CURDIR}/rsa_openssh.prv
 	tr '\n' '\r' <${.CURDIR}/rsa_ssh2.prv > ${.OBJDIR}/rsa_ssh2_cr.prv
@@ -118,7 +129,7 @@ t3:
 		diff - ${.CURDIR}/rsa_openssh.pub
 
 t4:
-	ssh-keygen -lf ${.CURDIR}/rsa_openssh.pub |\
+	ssh-keygen -E md5 -lf ${.CURDIR}/rsa_openssh.pub |\
 		awk '{print $$2}' | diff - ${.CURDIR}/t4.ok
 
 t5:
@@ -152,6 +163,23 @@ t9: t9.out
 	ssh-keygen -lf t9.out > /dev/null
 	ssh-keygen -Bf t9.out > /dev/null
 
+t10.out:
+	ssh-keygen -q -t ed25519 -N '' -f $@
+
+t10: t10.out
+	ssh-keygen -lf t10.out > /dev/null
+	ssh-keygen -Bf t10.out > /dev/null
+
+t11:
+	ssh-keygen -E sha256 -lf ${.CURDIR}/rsa_openssh.pub |\
+		awk '{print $$2}' | diff - ${.CURDIR}/t11.ok
+
+t12.out:
+	ssh-keygen -q -t ed25519 -N '' -C 'test-comment-1234' -f $@
+
+t12: t12.out
+	ssh-keygen -lf t12.out.pub | grep -q test-comment-1234
+
 modpipe: modpipe.c
 
 t-integrity: modpipe
@@ -177,5 +205,6 @@ clean:
 	rm -f ${CLEANFILES}
 	test -z "${SUDO}" || ${SUDO} rm -f ${SUDO_CLEAN}
 	rm -rf .putty
+	#(set -e ; cd ${.CURDIR}/unittests ; make clean)
 
 .include <bsd.regress.mk>
