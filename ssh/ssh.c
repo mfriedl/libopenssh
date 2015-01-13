@@ -1385,7 +1385,7 @@ client_cleanup_stdio_fwd(u_int id, void *arg)
 }
 
 static void
-ssh_stdio_confirm(int id, int success, void *arg)
+ssh_stdio_confirm(u_int id, int success, void *arg)
 {
 	if (!success)
 		fatal("stdio forwarding failed");
