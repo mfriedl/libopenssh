@@ -885,6 +885,7 @@ mm_answer_bsdauthrespond(int sock, struct sshbuf *m)
 int
 mm_answer_keyallowed(int sock, struct sshbuf *m)
 {
+	struct ssh *ssh = active_state;		/* XXX */
 	struct sshkey *key;
 	char *cuser, *chost;
 	u_char *blob;
@@ -909,8 +910,8 @@ mm_answer_keyallowed(int sock, struct sshbuf *m)
 
 	if (key != NULL && authctxt->valid) {
 		/* These should not make it past the privsep child */
-		if (key_type_plain(key->type) == KEY_RSA &&
-		    (datafellows & SSH_BUG_RSASIGMD5) != 0)
+		if (sshkey_type_plain(key->type) == KEY_RSA &&
+		    (ssh->compat & SSH_BUG_RSASIGMD5) != 0)
 			fatal("%s: passed a SSH_BUG_RSASIGMD5 key", __func__);
 
 		switch (type) {
