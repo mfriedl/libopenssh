@@ -1,4 +1,4 @@
-/* $OpenBSD: sshkey.c,v 1.9 2015/01/12 13:29:27 markus Exp $ */
+/* $OpenBSD: sshkey.c,v 1.11 2015/01/13 07:39:19 djm Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Alexander von Gernler.  All rights reserved.
@@ -50,6 +50,7 @@
 #include "digest.h"
 #define SSHKEY_INTERNAL
 #include "sshkey.h"
+#include "match.h"
 
 /* openssh private key file format */
 #define MARK_BEGIN		"-----BEGIN OPENSSH PRIVATE KEY-----\n"
@@ -207,9 +208,11 @@ key_alg_list(int certs_only, int plain_only)
 }
 
 int
-sshkey_names_valid2(const char *names)
+sshkey_names_valid2(const char *names, int allow_wildcard)
 {
 	char *s, *cp, *p;
+	const struct keytype *kt;
+	int type;
 
 	if (names == NULL || strcmp(names, "") == 0)
 		return 0;
@@ -217,9 +220,28 @@ sshkey_names_valid2(const char *names)
 		return 0;
 	for ((p = strsep(&cp, ",")); p && *p != '\0';
 	    (p = strsep(&cp, ","))) {
-		switch (sshkey_type_from_name(p)) {
-		case KEY_RSA1:
-		case KEY_UNSPEC:
+		type = sshkey_type_from_name(p);
+		if (type == KEY_RSA1) {
+			free(s);
+			return 0;
+		}
+		if (type == KEY_UNSPEC) {
+			if (allow_wildcard) {
+				/*
+				 * Try matching key types against the string.
+				 * If any has a positive or negative match then
+				 * the component is accepted.
+				 */
+				for (kt = keytypes; kt->type != -1; kt++) {
+					if (kt->type == KEY_RSA1)
+						continue;
+					if (match_pattern_list(kt->name,
+					    p, strlen(p), 0) != 0)
+						break;
+				}
+				if (kt->type != -1)
+					continue;
+			}
 			free(s);
 			return 0;
 		}
@@ -1252,8 +1274,14 @@ sshkey_read(struct sshkey *ret, char **cpp)
 			return SSH_ERR_ALLOC_FAIL;
 		/* trim comment */
 		space = strchr(cp, ' ');
-		if (space)
-			*space = '\0';
+		if (space) {
+			/* advance 'space': skip whitespace */
+			*space++ = '\0';
+			while (*space == ' ' || *space == '\t')
+				space++;
+			*cpp = space;
+		} else
+			*cpp = cp + strlen(cp);
 		if ((r = sshbuf_b64tod(blob, cp)) != 0) {
 			sshbuf_free(blob);
 			return r;
@@ -1328,12 +1356,6 @@ sshkey_read(struct sshkey *ret, char **cpp)
 		sshkey_free(k);
 		if (retval != 0)
 			break;
-		/* advance cp: skip whitespace and data */
-		while (*cp == ' ' || *cp == '\t')
-			cp++;
-		while (*cp != '\0' && *cp != ' ' && *cp != '\t')
-			cp++;
-		*cpp = cp;
 		break;
 	default:
 		return SSH_ERR_INVALID_ARGUMENT;

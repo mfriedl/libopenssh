@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $OpenBSD: krl.c,v 1.22 2015/01/08 10:14:08 djm Exp $ */
+/* $OpenBSD: krl.c,v 1.24 2015/01/12 19:22:46 markus Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -719,8 +719,6 @@ ssh_krl_to_blob(struct ssh_krl *krl, struct sshbuf *buf,
 		KRL_DBG(("%s: key len %u ", __func__, rb->len));
 		if ((r = sshbuf_put_string(sect, rb->blob, rb->len)) != 0)
 			goto out;
-		if ((sshbuf_put_string(sect, rb->blob, rb->len)) != 0)
-			goto out;
 	}
 	if (sshbuf_len(sect) != 0) {
 		if ((r = sshbuf_put_u8(buf, KRL_SECTION_EXPLICIT_KEY)) != 0 ||
@@ -1089,22 +1087,17 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 			r = SSH_ERR_INVALID_FORMAT;
 			goto out;
 		}
-		sshbuf_free(sect);
-		sect = NULL;
 	}
 
 	/* Check that the key(s) used to sign the KRL weren't revoked */
 	sig_seen = 0;
 	for (i = 0; i < nca_used; i++) {
-		if ((r = ssh_krl_check_key(krl, ca_used[i])) == 0)
+		if (ssh_krl_check_key(krl, ca_used[i]) == 0)
 			sig_seen = 1;
 		else {
 			sshkey_free(ca_used[i]);
 			ca_used[i] = NULL;
-			if (r != SSH_ERR_KEY_REVOKED)
-				goto out;
 		}
-
 	}
 	if (nca_used && !sig_seen) {
 		error("All keys used to sign KRL were revoked");

@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-hostbased.c,v 1.21 2015/01/08 10:14:08 djm Exp $ */
+/* $OpenBSD: auth2-hostbased.c,v 1.22 2015/01/13 07:39:19 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -48,6 +48,7 @@
 #include "monitor_wrap.h"
 #include "pathnames.h"
 #include "ssherr.h"
+#include "match.h"
 
 /* import */
 extern ServerOptions options;
@@ -112,6 +113,14 @@ userauth_hostbased(struct ssh *ssh)
 		    "signature format");
 		goto done;
 	}
+	if (match_pattern_list(sshkey_ssh_name(key),
+	    options.hostbased_key_types,
+	    strlen(options.hostbased_key_types), 0) != 1) {
+		logit("%s: key type %s not in HostbasedAcceptedKeyTypes",
+		    __func__, sshkey_type(key));
+		goto done;
+	}
+
 	service = ssh->compat & SSH_BUG_HBSERVICE ? "ssh-userauth" :
 	    authctxt->service;
 	if ((b = sshbuf_new()) == NULL)
