@@ -7,3 +7,5 @@
 ID
 obj
 tags
+obj.*
+.#*
