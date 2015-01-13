@@ -969,7 +969,6 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 		KRL_DBG(("%s: first pass, section 0x%02x", __func__, type));
 		if (type != KRL_SECTION_SIGNATURE) {
 			if (sig_seen) {
-				r = SSH_ERR_INVALID_FORMAT;
 				error("KRL contains non-signature section "
 				    "after signature");
 				r = SSH_ERR_INVALID_FORMAT;
@@ -1061,7 +1060,6 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 					goto out;
 				if (type == KRL_SECTION_FINGERPRINT_SHA1 &&
 				    rlen != 20) {
-					r = SSH_ERR_INVALID_FORMAT;
 					error("%s: bad SHA1 length", __func__);
 					r = SSH_ERR_INVALID_FORMAT;
 					goto out;
@@ -1109,7 +1107,6 @@ ssh_krl_from_blob(struct sshbuf *buf, struct ssh_krl **krlp,
 
 	}
 	if (nca_used && !sig_seen) {
-		r = SSH_ERR_SIGNATURE_INVALID;
 		error("All keys used to sign KRL were revoked");
 		r = SSH_ERR_KEY_REVOKED;
 		goto out;
