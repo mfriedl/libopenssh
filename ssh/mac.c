@@ -94,7 +94,7 @@ mac_alg_list(char sep)
 		if (ret != NULL)
 			ret[rlen++] = sep;
 		nlen = strlen(m->name);
-		if (reallocn((void **)&ret, 1, rlen + nlen + 2) == 0)
+		if (reallocn((void **)&ret, 1, rlen + nlen + 2) != 0)
 			return NULL;
 		memcpy(ret + rlen, m->name, nlen + 1);
 		rlen += nlen;
