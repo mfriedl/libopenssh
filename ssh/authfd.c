@@ -1,4 +1,4 @@
-/* $OpenBSD: authfd.c,v 1.93 2014/04/29 18:01:49 markus Exp $ */
+/* $OpenBSD: authfd.c,v 1.94 2015/01/14 20:05:27 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -434,7 +434,7 @@ ssh_agent_sign(int sock, struct sshkey *key,
 	u_char *blob = NULL, type;
 	size_t blen = 0, len = 0;
 	u_int flags = 0;
-	int r;
+	int r = SSH_ERR_INTERNAL_ERROR;
 
 	if (sigp != NULL)
 		*sigp = NULL;
@@ -471,7 +471,7 @@ ssh_agent_sign(int sock, struct sshkey *key,
 	r = 0;
  out:
 	if (blob != NULL) {
-		bzero(blob, blen);
+		explicit_bzero(blob, blen);
 		free(blob);
 	}
 	sshbuf_free(msg);
@@ -636,7 +636,7 @@ ssh_remove_identity(int sock, struct sshkey *key)
 	r = decode_reply(type);
  out:
 	if (blob != NULL) {
-		bzero(blob, blen);
+		explicit_bzero(blob, blen);
 		free(blob);
 	}
 	sshbuf_free(msg);

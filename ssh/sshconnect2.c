@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.213 2015/01/08 10:14:08 djm Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.214 2015/01/14 20:05:27 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -1058,6 +1058,7 @@ identity_sign(struct identity *id, u_char **sigp, size_t *lenp,
 	if (id->agent_fd)
 		return ssh_agent_sign(id->agent_fd, id->key, sigp, lenp,
 		    data, datalen, compat);
+
 	/*
 	 * we have already loaded the private key or
 	 * the private key is stored in external hardware

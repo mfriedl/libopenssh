@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.137 2015/01/13 07:39:19 djm Exp $ */
+/* $OpenBSD: monitor.c,v 1.138 2015/01/14 20:05:27 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -81,6 +81,7 @@
 #include "ssherr.h"
 #include "authfd.h"
 #include "match.h"
+#include "ssherr.h"
 
 #ifdef GSSAPI
 static Gssctxt *gsscontext = NULL;
@@ -636,9 +637,11 @@ mm_answer_sign(int sock, struct sshbuf *m)
 			    __func__, ssh_err(r));
 	} else if ((key = get_hostkey_public_by_index(keyid, ssh)) != NULL &&
 	    auth_sock > 0) {
-		if (ssh_agent_sign(auth_sock, key, &signature, &siglen, p,
-		    datlen, ssh->compat) < 0)
-			fatal("%s: ssh_agent_sign failed", __func__);
+		if ((r = ssh_agent_sign(auth_sock, key, &signature, &siglen,
+		    p, datlen, ssh->compat)) != 0) {
+			fatal("%s: ssh_agent_sign failed: %s",
+			    __func__, ssh_err(r));
+		}
 	} else
 		fatal("%s: no hostkey from index %d", __func__, keyid);
 

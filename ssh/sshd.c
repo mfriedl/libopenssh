@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.431 2015/01/07 18:15:07 tedu Exp $ */
+/* $OpenBSD: sshd.c,v 1.432 2015/01/14 20:05:27 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -641,7 +641,7 @@ privsep_preauth_child(void)
 static int
 privsep_preauth(struct authctxt *authctxt)
 {
-	int r, status;
+	int status, r;
 	pid_t pid;
 	struct ssh_sandbox *box = NULL;
 
@@ -1377,10 +1377,10 @@ main(int ac, char **av)
 	struct ssh *ssh;
 	extern char *optarg;
 	extern int optind;
-	int opt, i, j, on = 1;
+	int r, opt, i, j, on = 1;
 	int sock_in = -1, sock_out = -1, newsock = -1;
 	const char *remote_ip;
-	int r, remote_port;
+	int remote_port;
 	char *line, *logfile = NULL;
 	int config_s[2] = { -1 , -1 };
 	u_int n;

@@ -1,4 +1,4 @@
-/* $OpenBSD: sftp-server.c,v 1.103 2014/01/17 06:23:24 dtucker Exp $ */
+/* $OpenBSD: sftp-server.c,v 1.104 2015/01/14 13:54:13 djm Exp $ */
 /*
  * Copyright (c) 2000-2004 Markus Friedl.  All rights reserved.
  *

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-add.c,v 1.115 2014/12/21 22:27:56 djm Exp $ */
+/* $OpenBSD: ssh-add.c,v 1.116 2015/01/14 20:05:27 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland

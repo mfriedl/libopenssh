@@ -1,4 +1,4 @@
-/* $OpenBSD: sftp.c,v 1.168 2014/11/26 18:34:51 millert Exp $ */
+/* $OpenBSD: sftp.c,v 1.169 2015/01/14 13:54:13 djm Exp $ */
 /*
  * Copyright (c) 2001-2004 Damien Miller <djm@openbsd.org>
  *
