@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keysign.c,v 1.45 2015/01/08 10:14:08 djm Exp $ */
+/* $OpenBSD: ssh-keysign.c,v 1.46 2015/01/15 09:40:00 djm Exp $ */
 /*
  * Copyright (c) 2002 Markus Friedl.  All rights reserved.
  *
@@ -60,7 +60,7 @@ valid_request(struct passwd *pw, char *host, struct sshkey **ret,
 {
 	struct sshbuf *b;
 	struct sshkey *key = NULL;
-	u_char type, *pkblob, *sid;
+	u_char type, *pkblob;
 	char *p;
 	size_t blen, len;
 	char *pkalg, *luser;
@@ -74,11 +74,10 @@ valid_request(struct passwd *pw, char *host, struct sshkey **ret,
 		fatal("%s: sshbuf_from failed", __func__);
 
 	/* session id, currently limited to SHA1 (20 bytes) or SHA256 (32) */
-	if ((r = sshbuf_get_string(b, &sid, &len)) != 0)
+	if ((r = sshbuf_get_string(b, NULL, &len)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (len != 20 && len != 32)
 		fail++;
-	free(sid);
 
 	if ((r = sshbuf_get_u8(b, &type)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
@@ -122,7 +121,7 @@ valid_request(struct passwd *pw, char *host, struct sshkey **ret,
 	/* client host name, handle trailing dot */
 	if ((r = sshbuf_get_cstring(b, &p, &len)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	debug2("valid_request: check expect chost %s got %s", host, p);
+	debug2("%s: check expect chost %s got %s", __func__, host, p);
 	if (strlen(host) != len - 1)
 		fail++;
 	else if (p[len - 1] != '.')
@@ -144,7 +143,7 @@ valid_request(struct passwd *pw, char *host, struct sshkey **ret,
 		fail++;
 	sshbuf_free(b);
 
-	debug3("valid_request: fail %d", fail);
+	debug3("%s: fail %d", __func__, fail);
 
 	if (fail && key != NULL)
 		sshkey_free(key);

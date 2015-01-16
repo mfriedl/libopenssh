@@ -1,4 +1,4 @@
-/* $OpenBSD: hmac.c,v 1.10 2014/01/31 16:39:19 tedu Exp $ */
+/* $OpenBSD: hmac.c,v 1.11 2015/01/15 21:37:14 markus Exp $ */
 /*
  * Copyright (c) 2014 Markus Friedl.  All rights reserved.
  *

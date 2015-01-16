@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-ed25519.c,v 1.5 2014/10/14 03:09:59 daniel Exp $ */
+/* $OpenBSD: ssh-ed25519.c,v 1.6 2015/01/15 21:38:50 markus Exp $ */
 /*
  * Copyright (c) 2013 Markus Friedl <markus@openbsd.org>
  *

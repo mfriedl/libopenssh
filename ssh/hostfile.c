@@ -1,4 +1,4 @@
-/* $OpenBSD: hostfile.c,v 1.58 2014/10/20 03:43:01 djm Exp $ */
+/* $OpenBSD: hostfile.c,v 1.59 2015/01/15 09:40:00 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
