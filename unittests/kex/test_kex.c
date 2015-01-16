@@ -1,4 +1,4 @@
-/* 	$OpenBSD$ */
+/* 	$OpenBSD: test_kex.c,v 1.1 2015/01/15 23:41:29 markus Exp $ */
 /*
  * Regress test KEX
  *
@@ -72,7 +72,7 @@ run_kex(struct ssh *client, struct ssh *server)
 }
 
 static void
-do_kex_with_key(char *kex, int key_type, int bits)
+do_kex_with_key(char *kex, int keytype, int bits)
 {
 	struct ssh *client = NULL, *server = NULL, *server2 = NULL;
 	struct sshkey *private, *public;
@@ -81,7 +81,7 @@ do_kex_with_key(char *kex, int key_type, int bits)
 	char *myproposal[PROPOSAL_MAX] = { KEX_CLIENT };
 
 	TEST_START("sshkey_generate");
-	ASSERT_INT_EQ(sshkey_generate(key_type, bits, &private), 0);
+	ASSERT_INT_EQ(sshkey_generate(keytype, bits, &private), 0);
 	TEST_DONE();
 
 	TEST_START("sshkey_from_private");
