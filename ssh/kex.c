@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.c,v 1.99 2014/04/29 18:01:49 markus Exp $ */
+/* $OpenBSD: kex.c,v 1.102 2015/01/19 20:16:15 markus Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  *
@@ -82,7 +82,7 @@ static const struct kexalg kexalgs[] = {
 char *
 kex_alg_list(char sep)
 {
-	char *ret = NULL;
+	char *ret = NULL, *tmp;
 	size_t nlen, rlen = 0;
 	const struct kexalg *k;
 
@@ -90,8 +90,11 @@ kex_alg_list(char sep)
 		if (ret != NULL)
 			ret[rlen++] = sep;
 		nlen = strlen(k->name);
-		if (reallocn((void **)&ret, 1, rlen + nlen + 2) != 0)
+		if ((tmp = realloc(ret, rlen + nlen + 2)) == NULL) {
+			free(ret);
 			return NULL;
+		}
+		ret = tmp;
 		memcpy(ret + rlen, k->name, nlen + 1);
 		rlen += nlen;
 	}
@@ -170,6 +173,7 @@ kex_buf2prop(struct sshbuf *raw, int *first_kex_follows, char ***propp)
 	char **proposal = NULL;
 	int r;
 
+	*propp = NULL;
 	if ((proposal = calloc(PROPOSAL_MAX, sizeof(char *))) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
 	if ((b = sshbuf_fromb(raw)) == NULL) {
@@ -281,12 +285,9 @@ kex_send_kexinit(struct ssh *ssh)
 		return SSH_ERR_INTERNAL_ERROR;
 	arc4random_buf(cookie, KEX_COOKIE_LEN);
 
-	if ((r = sshpkt_start(ssh, SSH2_MSG_KEXINIT)) != 0)
-		return r;
-	if ((r = sshpkt_put(ssh, sshbuf_ptr(kex->my),
-	    sshbuf_len(kex->my))) != 0)
-		return r;
-	if ((r = sshpkt_send(ssh)) != 0)
+	if ((r = sshpkt_start(ssh, SSH2_MSG_KEXINIT)) != 0 ||
+	    (r = sshpkt_putb(ssh, kex->my)) != 0 ||
+	    (r = sshpkt_send(ssh)) != 0)
 		return r;
 	debug("SSH2_MSG_KEXINIT sent");
 	kex->flags |= KEX_INIT_SENT;
@@ -407,24 +408,21 @@ kex_free(struct kex *kex)
 {
 	u_int mode;
 
-	if (kex->peer != NULL)
-		sshbuf_free(kex->peer);
-	if (kex->my != NULL)
-		sshbuf_free(kex->my);
+#ifdef WITH_OPENSSL
 	if (kex->dh)
 		DH_free(kex->dh);
 	if (kex->ec_client_key)
 		EC_KEY_free(kex->ec_client_key);
+#endif
 	for (mode = 0; mode < MODE_MAX; mode++) {
 		kex_free_newkeys(kex->newkeys[mode]);
 		kex->newkeys[mode] = NULL;
 	}
-	if (kex->session_id)
-		free(kex->session_id);
-	if (kex->client_version_string)
-		free(kex->client_version_string);
-	if (kex->server_version_string)
-		free(kex->server_version_string);
+	sshbuf_free(kex->peer);
+	sshbuf_free(kex->my);
+	free(kex->session_id);
+	free(kex->client_version_string);
+	free(kex->server_version_string);
 	free(kex);
 }
 
@@ -508,7 +506,7 @@ choose_kex(struct kex *k, char *client, char *server)
 	k->name = match_list(client, server, NULL);
 
 	if (k->name == NULL)
-		return SSH_ERR_INTERNAL_ERROR;
+		return SSH_ERR_NO_KEX_ALG_MATCH;
 	if ((kexalg = kex_alg_by_name(k->name)) == NULL)
 		return SSH_ERR_INTERNAL_ERROR;
 	k->kex_type = kexalg->type;
@@ -643,7 +641,7 @@ kex_choose_conf(struct ssh *ssh)
 	/* ignore the next message if the proposals do not match */
 	if (first_kex_follows && !proposals_match(my, peer) &&
 	    !(ssh->compat & SSH_BUG_FIRSTKEX))
-		ssh->skip_packets = 1;
+		ssh->dispatch_skip_packets = 1;
 	r = 0;
  out:
 	kex_prop_free(my);
@@ -653,10 +651,9 @@ kex_choose_conf(struct ssh *ssh)
 
 static int
 derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
-    const u_char *shared_secret, u_int slen, u_char **keyp)
+    const struct sshbuf *shared_secret, u_char **keyp)
 {
 	struct kex *kex = ssh->kex;
-	struct sshbuf *b = NULL;
 	struct ssh_digest_ctx *hashctx = NULL;
 	char c = id;
 	u_int have;
@@ -666,17 +663,14 @@ derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
 
 	if ((mdsz = ssh_digest_bytes(kex->hash_alg)) == 0)
 		return SSH_ERR_INVALID_ARGUMENT;
-	if ((digest = calloc(1, roundup(need, mdsz))) == NULL ||
-	    (b = sshbuf_new()) == NULL) {
+	if ((digest = calloc(1, roundup(need, mdsz))) == NULL) {
 		r = SSH_ERR_ALLOC_FAIL;
 		goto out;
 	}
-	if ((r = sshbuf_put(b, shared_secret, slen)) < 0)
-		goto out;
 
 	/* K1 = HASH(K || H || "A" || session_id) */
 	if ((hashctx = ssh_digest_start(kex->hash_alg)) == NULL ||
-	    ssh_digest_update_buffer(hashctx, b) != 0 ||
+	    ssh_digest_update_buffer(hashctx, shared_secret) != 0 ||
 	    ssh_digest_update(hashctx, hash, hashlen) != 0 ||
 	    ssh_digest_update(hashctx, &c, 1) != 0 ||
 	    ssh_digest_update(hashctx, kex->session_id,
@@ -695,7 +689,7 @@ derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
 	 */
 	for (have = mdsz; need > have; have += mdsz) {
 		if ((hashctx = ssh_digest_start(kex->hash_alg)) == NULL ||
-		    ssh_digest_update_buffer(hashctx, b) != 0 ||
+		    ssh_digest_update_buffer(hashctx, shared_secret) != 0 ||
 		    ssh_digest_update(hashctx, hash, hashlen) != 0 ||
 		    ssh_digest_update(hashctx, digest, have) != 0 ||
 		    ssh_digest_final(hashctx, digest + have, mdsz) != 0) {
@@ -715,8 +709,6 @@ derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
  out:
 	if (digest)
 		free(digest);
-	if (b)
-		sshbuf_free(b);
 	ssh_digest_free(hashctx);
 	return r;
 }
@@ -724,7 +716,7 @@ derive_key(struct ssh *ssh, int id, u_int need, u_char *hash, u_int hashlen,
 #define NKEYS	6
 int
 kex_derive_keys(struct ssh *ssh, u_char *hash, u_int hashlen,
-    const u_char *shared_secret, u_int slen)
+    const struct sshbuf *shared_secret)
 {
 	struct kex *kex = ssh->kex;
 	u_char *keys[NKEYS];
@@ -733,7 +725,7 @@ kex_derive_keys(struct ssh *ssh, u_char *hash, u_int hashlen,
 
 	for (i = 0; i < NKEYS; i++) {
 		if ((r = derive_key(ssh, 'A'+i, kex->we_need, hash, hashlen,
-		    shared_secret, slen, &keys[i])) != 0) {
+		    shared_secret, &keys[i])) != 0) {
 			for (j = 0; j < i; j++)
 				free(keys[j]);
 			return r;
@@ -759,10 +751,8 @@ kex_derive_keys_bn(struct ssh *ssh, u_char *hash, u_int hashlen,
 
 	if ((shared_secret = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
-	if ((r = sshbuf_put_bignum2(shared_secret, secret)) == 0) {
-		r = kex_derive_keys(ssh, hash, hashlen,
-		    sshbuf_ptr(shared_secret), sshbuf_len(shared_secret));
-	}
+	if ((r = sshbuf_put_bignum2(shared_secret, secret)) == 0)
+		r = kex_derive_keys(ssh, hash, hashlen, shared_secret);
 	sshbuf_free(shared_secret);
 	return r;
 }
@@ -803,11 +793,7 @@ derive_ssh1_session_id(BIGNUM *host_modulus, BIGNUM *server_modulus,
 void
 dump_digest(char *msg, u_char *digest, int len)
 {
-	struct sshbuf *b;
-
 	fprintf(stderr, "%s\n", msg);
-	if ((b = sshbuf_from(digest, len)) != NULL)
-		sshbuf_dump(b, stderr);
-	sshbuf_free(b);
+	sshbuf_dump_data(digest, len, stderr);
 }
 #endif

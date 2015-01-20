@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.h,v 1.66 2015/01/15 09:40:00 djm Exp $ */
+/* $OpenBSD: kex.h,v 1.69 2015/01/19 20:16:15 markus Exp $ */
 
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
@@ -27,6 +27,10 @@
 #define KEX_H
 
 #include "mac.h"
+
+#ifdef WITH_LEAKMALLOC
+#include "leakmalloc.h"
+#endif
 
 #ifdef WITH_LEAKMALLOC
 #include "leakmalloc.h"
@@ -154,7 +158,7 @@ void	 kex_prop_free(char **);
 
 int	 kex_send_kexinit(struct ssh *);
 int	 kex_input_kexinit(int, u_int32_t, struct ssh *);
-int	 kex_derive_keys(struct ssh *, u_char *, u_int, const u_char *, u_int);
+int	 kex_derive_keys(struct ssh *, u_char *, u_int, const struct sshbuf *);
 int	 kex_derive_keys_bn(struct ssh *, u_char *, u_int, const BIGNUM *);
 int	 kex_send_newkeys(struct ssh *);
 
@@ -169,22 +173,22 @@ int	 kexc25519_server(struct ssh *);
 
 int	 kex_dh_hash(const char *, const char *,
     const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
-    const BIGNUM *, const BIGNUM *, const BIGNUM *, u_char **, size_t *);
+    const BIGNUM *, const BIGNUM *, const BIGNUM *, u_char *, size_t *);
 
 int	 kexgex_hash(int, const char *, const char *,
     const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
     int, int, int,
     const BIGNUM *, const BIGNUM *, const BIGNUM *,
     const BIGNUM *, const BIGNUM *,
-    u_char **, size_t *);
+    u_char *, size_t *);
 
 int kex_ecdh_hash(int, const EC_GROUP *, const char *, const char *,
     const u_char *, size_t, const u_char *, size_t, const u_char *, size_t,
-    const EC_POINT *, const EC_POINT *, const BIGNUM *, u_char **, size_t *);
+    const EC_POINT *, const EC_POINT *, const BIGNUM *, u_char *, size_t *);
 
 int	 kex_c25519_hash(int, const char *, const char *, const char *, size_t,
     const char *, size_t, const u_char *, size_t, const u_char *, const u_char *,
-    const u_char *, size_t, u_char **, size_t *);
+    const u_char *, size_t, u_char *, size_t *);
 
 void	kexc25519_keygen(u_char key[CURVE25519_SIZE], u_char pub[CURVE25519_SIZE])
 	__attribute__((__bounded__(__minbytes__, 1, CURVE25519_SIZE)))

@@ -1,4 +1,4 @@
-/* $OpenBSD: kexc25519c.c,v 1.4 2014/01/12 08:13:13 djm Exp $ */
+/* $OpenBSD: kexc25519c.c,v 1.6 2015/01/19 20:16:15 markus Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2010 Damien Miller.  All rights reserved.
@@ -53,7 +53,7 @@ kexc25519_client(struct ssh *ssh)
 	kexc25519_keygen(kex->c25519_client_key, kex->c25519_client_pubkey);
 #ifdef DEBUG_KEXECDH
 	dump_digest("client private key:", kex->c25519_client_key,
-	     sizeof(kex->c25519_client_key));
+	    sizeof(kex->c25519_client_key));
 #endif
 	if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_ECDH_INIT)) != 0 ||
 	    (r = sshpkt_put_string(ssh, kex->c25519_client_pubkey,
@@ -74,7 +74,7 @@ input_kex_c25519_reply(int type, u_int32_t seq, struct ssh *ssh)
 	struct sshbuf *shared_secret = NULL;
 	u_char *server_pubkey = NULL;
 	u_char *server_host_key_blob = NULL, *signature = NULL;
-	u_char *hash;
+	u_char hash[SSH_DIGEST_MAX_LENGTH];
 	size_t slen, pklen, sbloblen, hashlen;
 	int r;
 
@@ -122,6 +122,7 @@ input_kex_c25519_reply(int type, u_int32_t seq, struct ssh *ssh)
 		goto out;
 
 	/* calc and verify H */
+	hashlen = sizeof(hash);
 	if ((r = kex_c25519_hash(
 	    kex->hash_alg,
 	    kex->client_version_string,
@@ -132,7 +133,7 @@ input_kex_c25519_reply(int type, u_int32_t seq, struct ssh *ssh)
 	    kex->c25519_client_pubkey,
 	    server_pubkey,
 	    sshbuf_ptr(shared_secret), sshbuf_len(shared_secret),
-	    &hash, &hashlen)) < 0)
+	    hash, &hashlen)) < 0)
 		goto out;
 
 	if ((r = sshkey_verify(server_host_key, signature, slen, hash, hashlen,
@@ -150,12 +151,10 @@ input_kex_c25519_reply(int type, u_int32_t seq, struct ssh *ssh)
 		memcpy(kex->session_id, hash, kex->session_id_len);
 	}
 
-	if ((r = kex_derive_keys(ssh, hash, hashlen, sshbuf_ptr(shared_secret),
-	    sshbuf_len(shared_secret))) == 0)
+	if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) == 0)
 		r = kex_send_newkeys(ssh);
-
-	r = 0;
 out:
+	explicit_bzero(hash, sizeof(hash));
 	explicit_bzero(kex->c25519_client_key, sizeof(kex->c25519_client_key));
 	free(server_host_key_blob);
 	free(server_pubkey);

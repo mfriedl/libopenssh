@@ -1,4 +1,4 @@
-/* $OpenBSD: dispatch.c,v 1.22 2008/10/31 15:05:34 stevesk Exp $ */
+/* $OpenBSD: dispatch.c,v 1.23 2015/01/19 20:07:45 markus Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -106,9 +106,9 @@ ssh_dispatch_run(struct ssh *ssh, int mode, volatile sig_atomic_t *done)
 		}
 		if (type > 0 && type < DISPATCH_MAX &&
 		    ssh->dispatch[type] != NULL) {
-			if (ssh->skip_packets) {
+			if (ssh->dispatch_skip_packets) {
 				debug2("skipped packet (type %u)", type);
-				ssh->skip_packets--;
+				ssh->dispatch_skip_packets--;
 				continue;
 			}
 			r = (*ssh->dispatch[type])(type, seqnr, ssh);

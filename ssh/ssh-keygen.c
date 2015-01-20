@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keygen.c,v 1.253 2015/01/16 06:40:12 deraadt Exp $ */
+/* $OpenBSD: ssh-keygen.c,v 1.258 2015/01/19 00:32:54 deraadt Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1994 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -174,9 +174,9 @@ int prime_test(FILE *, FILE *, u_int32_t, u_int32_t, char *, unsigned long,
     unsigned long);
 
 static void
-type_bits_valid(int type, u_int32_t *bitsp)
+type_bits_valid(int type, const char *name, u_int32_t *bitsp)
 {
-	u_int maxbits;
+	u_int maxbits, nid;
 
 	if (type == KEY_UNSPEC) {
 		fprintf(stderr, "unknown key type %s\n", key_type_name);
@@ -185,8 +185,13 @@ type_bits_valid(int type, u_int32_t *bitsp)
 	if (*bitsp == 0) {
 		if (type == KEY_DSA)
 			*bitsp = DEFAULT_BITS_DSA;
-		else if (type == KEY_ECDSA)
-			*bitsp = DEFAULT_BITS_ECDSA;
+		else if (type == KEY_ECDSA) {
+			if (name != NULL &&
+			    (nid = sshkey_ecdsa_nid_from_name(name)) > 0)
+				*bitsp = sshkey_curve_nid_to_bits(nid);
+			if (*bitsp == 0)
+				*bitsp = DEFAULT_BITS_ECDSA;
+		}
 		else
 			*bitsp = DEFAULT_BITS;
 	}
@@ -953,7 +958,7 @@ do_gen_all_hostkeys(struct passwd *pw)
 		type = sshkey_type_from_name(key_types[i].key_type);
 		strlcpy(identity_file, key_types[i].path, sizeof(identity_file));
 		bits = 0;
-		type_bits_valid(type, &bits);
+		type_bits_valid(type, NULL, &bits);
 		if ((r = sshkey_generate(type, bits, &private)) != 0) {
 			fprintf(stderr, "key_generate failed: %s\n",
 			    ssh_err(r));
@@ -991,8 +996,8 @@ do_gen_all_hostkeys(struct passwd *pw)
 			first = 0;
 			continue;
 		}
-		if (!sshkey_write(public, f)) {
-			fprintf(stderr, "write key failed\n");
+		if ((r = sshkey_write(public, f)) != 0) {
+			fprintf(stderr, "write key failed: %s\n", ssh_err(r));
 			fclose(f);
 			sshkey_free(public);
 			first = 0;
@@ -1007,50 +1012,111 @@ do_gen_all_hostkeys(struct passwd *pw)
 		printf("\n");
 }
 
-static void
-printhost(FILE *f, const char *name, struct sshkey *public,
-    int ca, int revoked, int hash)
+struct known_hosts_ctx {
+	const char *host;	/* Hostname searched for in find/delete case */
+	FILE *out;		/* Output file, stdout for find_hosts case */
+	int has_unhashed;	/* When hashing, original had unhashed hosts */
+	int found_key;		/* For find/delete, host was found */
+	int invalid;		/* File contained invalid items; don't delete */
+};
+
+static int
+known_hosts_hash(struct hostkey_foreach_line *l, void *_ctx)
 {
-	if (print_fingerprint) {
-		enum sshkey_fp_rep rep;
-		int fptype;
-		char *fp, *ra;
+	struct known_hosts_ctx *ctx = (struct known_hosts_ctx *)_ctx;
+	char *hashed, *cp, *hosts, *ohosts;
+	int has_wild = l->hosts && strcspn(l->hosts, "*?!") != strlen(l->hosts);
 
-		fptype = print_bubblebabble ?
-		    SSH_DIGEST_SHA1 : fingerprint_hash;
-		rep = print_bubblebabble ? SSH_FP_BUBBLEBABBLE : SSH_FP_DEFAULT;
-		fp = sshkey_fingerprint(public, fptype, rep);
-		ra = sshkey_fingerprint(public, fingerprint_hash,
-		    SSH_FP_RANDOMART);
-		printf("%u %s %s (%s)\n", sshkey_size(public), fp, name,
-		    sshkey_type(public));
-		if (log_level >= SYSLOG_LEVEL_VERBOSE)
-			printf("%s\n", ra);
-		free(ra);
-		free(fp);
-	} else {
-		int r;
-
-		if (hash && (name = host_hash(name, NULL, 0)) == NULL)
-			fatal("hash_host failed");
-		fprintf(f, "%s%s%s ", ca ? CA_MARKER " " : "",
-		    revoked ? REVOKE_MARKER " " : "" , name);
-		if ((r = sshkey_write(public, f)) != 0)
-			fatal("key_write failed: %s", ssh_err(r));
-		fprintf(f, "\n");
+	/* Retain invalid lines when hashing, but mark file as invalid. */
+	if (l->status == HKF_STATUS_INVALID) {
+		ctx->invalid = 1;
+		fprintf(stderr, "%s:%ld: invalid line\n", l->path, l->linenum);
+		fprintf(ctx->out, "%s\n", l->line);
+		return 0;
 	}
+
+	/*
+	 * Don't hash hosts already already hashed, with wildcard characters
+	 * or a CA/revocation marker.
+	 */
+	if (l->was_hashed || has_wild || l->marker != MRK_NONE) {
+		fprintf(ctx->out, "%s\n", l->line);
+		if (has_wild && !find_host) {
+			fprintf(stderr, "%s:%ld: ignoring host name "
+			    "with wildcard: %.64s\n", l->path,
+			    l->linenum, l->hosts);
+		}
+		return 0;
+	}
+	/*
+	 * Split any comma-separated hostnames from the host list,
+	 * hash and store separately.
+	 */
+	ohosts = hosts = xstrdup(l->hosts);
+	while ((cp = strsep(&hosts, ",")) != NULL && *cp != '\0') {
+		if ((hashed = host_hash(cp, NULL, 0)) == NULL)
+			fatal("hash_host failed");
+		fprintf(ctx->out, "%s %s\n", hashed, l->rawkey);
+		ctx->has_unhashed = 1;
+	}
+	free(ohosts);
+	return 0;
+}
+
+static int
+known_hosts_find_delete(struct hostkey_foreach_line *l, void *_ctx)
+{
+	struct known_hosts_ctx *ctx = (struct known_hosts_ctx *)_ctx;
+
+	if (l->status == HKF_STATUS_HOST_MATCHED) {
+		if (delete_host) {
+			if (l->marker != MRK_NONE) {
+				/* Don't remove CA and revocation lines */
+				fprintf(ctx->out, "%s\n", l->line);
+			} else {
+				/*
+				 * Hostname matches and has no CA/revoke
+				 * marker, delete it by *not* writing the
+				 * line to ctx->out.
+				 */
+				ctx->found_key = 1;
+				if (!quiet)
+					printf("# Host %s found: line %ld\n",
+					    ctx->host, l->linenum);
+			}
+			return 0;
+		} else if (find_host) {
+			ctx->found_key = 1;
+			if (!quiet) {
+				printf("# Host %s found: line %ld %s\n",
+				    ctx->host,
+				    l->linenum, l->marker == MRK_CA ? "CA" :
+				    (l->marker == MRK_REVOKE ? "REVOKED" : ""));
+			}
+			if (hash_hosts)
+				known_hosts_hash(l, ctx);
+			else
+				fprintf(ctx->out, "%s\n", l->line);
+			return 0;
+		}
+	} else if (delete_host) {
+		/* Retain non-matching hosts when deleting */
+		if (l->status == HKF_STATUS_INVALID) {
+			ctx->invalid = 1;
+			fprintf(stderr, "%s:%ld: invalid line\n",
+			    l->path, l->linenum);
+		}
+		fprintf(ctx->out, "%s\n", l->line);
+	}
+	return 0;
 }
 
 static void
 do_known_hosts(struct passwd *pw, const char *name)
 {
-	FILE *in, *out = stdout;
-	struct sshkey *pub;
-	char *cp, *cp2, *kp, *kp2;
-	char line[16*1024], tmp[PATH_MAX], old[PATH_MAX];
-	int c, skip = 0, inplace = 0, num = 0, invalid = 0, has_unhashed = 0;
-	int r, ca, revoked;
-	int found_key = 0;
+	char *cp, tmp[PATH_MAX], old[PATH_MAX];
+	int r, fd, oerrno, inplace = 0;
+	struct known_hosts_ctx ctx;
 
 	if (!have_identity) {
 		cp = tilde_expand_filename(_PATH_SSH_USER_HOSTFILE, pw->pw_uid);
@@ -1060,10 +1126,11 @@ do_known_hosts(struct passwd *pw, const char *name)
 		free(cp);
 		have_identity = 1;
 	}
-	if ((in = fopen(identity_file, "r")) == NULL)
-		fatal("%s: %s: %s", __progname, identity_file, strerror(errno));
 
-	/* XXX this code is a mess; refactor -djm */
+	memset(&ctx, 0, sizeof(ctx));
+	ctx.out = stdout;
+	ctx.host = name;
+
 	/*
 	 * Find hosts goes to stdout, hash and deletions happen in-place
 	 * A corner case is ssh-keygen -HF foo, which should go to stdout
@@ -1075,184 +1142,39 @@ do_known_hosts(struct passwd *pw, const char *name)
 		    strlcat(old, ".old", sizeof(old)) >= sizeof(old))
 			fatal("known_hosts path too long");
 		umask(077);
-		if ((c = mkstemp(tmp)) == -1)
+		if ((fd = mkstemp(tmp)) == -1)
 			fatal("mkstemp: %s", strerror(errno));
-		if ((out = fdopen(c, "w")) == NULL) {
-			c = errno;
+		if ((ctx.out = fdopen(fd, "w")) == NULL) {
+			oerrno = errno;
 			unlink(tmp);
-			fatal("fdopen: %s", strerror(c));
+			fatal("fdopen: %s", strerror(oerrno));
 		}
 		inplace = 1;
 	}
 
-	while (fgets(line, sizeof(line), in)) {
-		if ((cp = strchr(line, '\n')) == NULL) {
-			error("line %d too long: %.40s...", num + 1, line);
-			skip = 1;
-			invalid = 1;
-			continue;
-		}
-		num++;
-		if (skip) {
-			skip = 0;
-			continue;
-		}
-		*cp = '\0';
+	/* XXX support identity_file == "-" for stdin */
+	if ((r = hostkeys_foreach(identity_file,
+	    hash_hosts ? known_hosts_hash : known_hosts_find_delete, &ctx,
+	    name, find_host ? HKF_WANT_MATCH_HOST : 0)) != 0)
+		fatal("%s: hostkeys_foreach failed: %s", __func__, ssh_err(r));
 
-		/* Skip leading whitespace, empty and comment lines. */
-		for (cp = line; *cp == ' ' || *cp == '\t'; cp++)
-			;
-		if (!*cp || *cp == '\n' || *cp == '#') {
-			if (inplace)
-				fprintf(out, "%s\n", cp);
-			continue;
-		}
-		/* Check whether this is a CA key or revocation marker */
-		if (strncasecmp(cp, CA_MARKER, sizeof(CA_MARKER) - 1) == 0 &&
-		    (cp[sizeof(CA_MARKER) - 1] == ' ' ||
-		    cp[sizeof(CA_MARKER) - 1] == '\t')) {
-			ca = 1;
-			cp += sizeof(CA_MARKER);
-		} else
-			ca = 0;
-		if (strncasecmp(cp, REVOKE_MARKER,
-		    sizeof(REVOKE_MARKER) - 1) == 0 &&
-		    (cp[sizeof(REVOKE_MARKER) - 1] == ' ' ||
-		    cp[sizeof(REVOKE_MARKER) - 1] == '\t')) {
-			revoked = 1;
-			cp += sizeof(REVOKE_MARKER);
-		} else
-			revoked = 0;
+	if (inplace)
+		fclose(ctx.out);
 
-		/* Find the end of the host name portion. */
-		for (kp = cp; *kp && *kp != ' ' && *kp != '\t'; kp++)
-			;
-
-		if (*kp == '\0' || *(kp + 1) == '\0') {
-			error("line %d missing key: %.40s...",
-			    num, line);
-			invalid = 1;
-			continue;
-		}
-		*kp++ = '\0';
-		kp2 = kp;
-
-		if ((pub = sshkey_new(KEY_RSA1)) == NULL)
-			fatal("sshkey_new failed");
-		if ((r = sshkey_read(pub, &kp)) != 0) {
-			kp = kp2;
-			sshkey_free(pub);
-			if ((pub = sshkey_new(KEY_UNSPEC)) == NULL)
-				fatal("sshkey_new failed");
-			if ((r = sshkey_read(pub, &kp)) != 0) {
-				error("line %d invalid key: %.40s...",
-				    num, line);
-				sshkey_free(pub);
-				invalid = 1;
-				continue;
-			}
-		}
-
-		if (*cp == HASH_DELIM) {
-			if (find_host || delete_host) {
-				cp2 = host_hash(name, cp, strlen(cp));
-				if (cp2 == NULL) {
-					error("line %d: invalid hashed "
-					    "name: %.64s...", num, line);
-					invalid = 1;
-					continue;
-				}
-				c = (strcmp(cp2, cp) == 0);
-				if (find_host && c) {
-					if (!quiet)
-						printf("# Host %s found: "
-						    "line %d type %s%s\n", name,
-						    num, sshkey_type(pub),
-						    ca ? " (CA key)" :
-						    revoked? " (revoked)" : "");
-					printhost(out, cp, pub, ca, revoked, 0);
-					found_key = 1;
-				}
-				if (delete_host) {
-					if (!c || ca || revoked) {
-						printhost(out, cp, pub,
-						    ca, revoked, 0);
-					} else {
-						printf("# Host %s found: "
-						    "line %d type %s\n", name,
-						    num, sshkey_type(pub));
-					}
-				}
-			} else if (hash_hosts)
-				printhost(out, cp, pub, ca, revoked, 0);
-		} else {
-			if (find_host || delete_host) {
-				c = (match_hostname(name, cp,
-				    strlen(cp)) == 1);
-				if (find_host && c) {
-					if (!quiet)
-						printf("# Host %s found: "
-						    "line %d type %s%s\n", name,
-						    num, sshkey_type(pub),
-						    ca ? " (CA key)" : "");
-					printhost(out, name, pub, ca, revoked,
-					    hash_hosts && !(ca || revoked));
-					found_key = 1;
-				}
-				if (delete_host) {
-					if (!c || ca || revoked) {
-						printhost(out, cp, pub,
-						    ca, revoked, 0);
-					} else {
-						printf("# Host %s found: "
-						    "line %d type %s\n", name,
-						    num, sshkey_type(pub));
-					}
-				}
-			} else if (hash_hosts && (ca || revoked)) {
-				/* Don't hash CA and revoked keys' hostnames */
-				printhost(out, cp, pub, ca, revoked, 0);
-				has_unhashed = 1;
-			} else if (hash_hosts) {
-				/* Hash each hostname separately */
-				for (cp2 = strsep(&cp, ",");
-				    cp2 != NULL && *cp2 != '\0';
-				    cp2 = strsep(&cp, ",")) {
-					if (strcspn(cp2, "*?!") !=
-					    strlen(cp2)) {
-						fprintf(stderr, "Warning: "
-						    "ignoring host name with "
-						    "metacharacters: %.64s\n",
-						    cp2);
-						printhost(out, cp2, pub, ca,
-						    revoked, 0);
-						has_unhashed = 1;
-					} else {
-						printhost(out, cp2, pub, ca,
-						    revoked, 1);
-					}
-				}
-			}
-		}
-		sshkey_free(pub);
-	}
-	fclose(in);
-
-	if (invalid) {
+	if (ctx.invalid) {
 		fprintf(stderr, "%s is not a valid known_hosts file.\n",
 		    identity_file);
 		if (inplace) {
 			fprintf(stderr, "Not replacing existing known_hosts "
 			    "file because of errors\n");
-			fclose(out);
 			unlink(tmp);
 		}
 		exit(1);
-	}
-
-	if (inplace) {
-		fclose(out);
-
+	} else if (delete_host && !ctx.found_key) {
+		fprintf(stderr, "Host %s not found in %s\n",
+		    name, identity_file);
+		unlink(tmp);
+	} else if (inplace) {
 		/* Backup existing file */
 		if (unlink(old) == -1 && errno != ENOENT)
 			fatal("unlink %.100s: %s", old, strerror(errno));
@@ -1270,7 +1192,7 @@ do_known_hosts(struct passwd *pw, const char *name)
 
 		fprintf(stderr, "%s updated.\n", identity_file);
 		fprintf(stderr, "Original contents retained as %s\n", old);
-		if (has_unhashed) {
+		if (ctx.has_unhashed) {
 			fprintf(stderr, "WARNING: %s contains unhashed "
 			    "entries\n", old);
 			fprintf(stderr, "Delete this file to ensure privacy "
@@ -1278,7 +1200,7 @@ do_known_hosts(struct passwd *pw, const char *name)
 		}
 	}
 
-	exit (find_host && !found_key);
+	exit (find_host && !ctx.found_key);
 }
 
 /*
@@ -2649,7 +2571,7 @@ main(int argc, char **argv)
 		key_type_name = "rsa";
 
 	type = sshkey_type_from_name(key_type_name);
-	type_bits_valid(type, &bits);
+	type_bits_valid(type, key_type_name, &bits);
 
 	if (!quiet)
 		printf("Generating public/private %s key pair.\n",

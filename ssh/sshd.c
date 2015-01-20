@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.432 2015/01/14 20:05:27 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.436 2015/01/19 20:20:20 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -814,7 +814,7 @@ list_hostkey_types(void)
 }
 
 static struct sshkey *
-get_hostkey_by_type(int type, int need_private)
+get_hostkey_by_type(int type, int need_private, struct ssh *ssh)
 {
 	int i;
 	struct sshkey *key;
@@ -845,13 +845,13 @@ get_hostkey_by_type(int type, int need_private)
 struct sshkey *
 get_hostkey_public_by_type(int type, struct ssh *ssh)
 {
-	return get_hostkey_by_type(type, 0);
+	return get_hostkey_by_type(type, 0, ssh);
 }
 
 struct sshkey *
 get_hostkey_private_by_type(int type, struct ssh *ssh)
 {
-	return get_hostkey_by_type(type, 1);
+	return get_hostkey_by_type(type, 1, ssh);
 }
 
 struct sshkey *
@@ -1638,7 +1638,11 @@ main(int ac, char **av)
 		if (strcmp(options.host_key_agent, SSH_AUTHSOCKET_ENV_NAME))
 			setenv(SSH_AUTHSOCKET_ENV_NAME,
 			    options.host_key_agent, 1);
-		have_agent = ssh_get_authentication_socket(NULL);
+		if ((r = ssh_get_authentication_socket(NULL)) == 0)
+			have_agent = 1;
+		else
+			error("Could not connect to agent \"%s\": %s",
+			    options.host_key_agent, ssh_err(r));
 	}
 
 	for (i = 0; i < options.num_host_key_files; i++) {
@@ -2014,7 +2018,7 @@ main(int ac, char **av)
 	} else if (compat20 && have_agent) {
 		if ((r = ssh_get_authentication_socket(&auth_sock)) != 0) {
 			error("Unable to get agent socket: %s", ssh_err(r));
-			have_agent = -1;
+			have_agent = 0;
 		}
 	}
 
@@ -2336,6 +2340,7 @@ sshd_hostkey_sign(struct sshkey *privkey, struct sshkey *pubkey,
 		return ssh_agent_sign(auth_sock, pubkey, signature, slen, data,
 		    dlen, compat);
 	}
+	return 0;
 }
 
 /*

@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.200 2015/01/13 19:31:40 markus Exp $ */
+/* $OpenBSD: packet.c,v 1.202 2015/01/19 20:30:23 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -216,52 +216,41 @@ struct ssh *active_state;	/* XXX */
 struct ssh *
 ssh_alloc_session_state(void)
 {
-	struct ssh *ssh;
-	struct session_state *state;
+	struct ssh *ssh = NULL;
+	struct session_state *state = NULL;
 
 	if ((ssh = calloc(1, sizeof(*ssh))) == NULL ||
-	    (ssh->state = state = calloc(1, sizeof(*state))) == NULL) {
-		if (ssh)
-			free(ssh);
-		return NULL;
-	}
+	    (state = calloc(1, sizeof(*state))) == NULL ||
+	    (state->input = sshbuf_new()) == NULL ||
+	    (state->output = sshbuf_new()) == NULL ||
+	    (state->outgoing_packet = sshbuf_new()) == NULL ||
+	    (state->incoming_packet = sshbuf_new()) == NULL)
+		goto fail;
+	TAILQ_INIT(&state->outgoing);
+	TAILQ_INIT(&ssh->private_keys);
+	TAILQ_INIT(&ssh->public_keys);
 	state->connection_in = -1;
 	state->connection_out = -1;
 	state->max_packet_size = 32768;
 	state->packet_timeout_ms = -1;
-	if (!state->initialized) {
-		if ((state->input = sshbuf_new()) == NULL ||
-		    (state->output = sshbuf_new()) == NULL ||
-		    (state->outgoing_packet = sshbuf_new()) == NULL ||
-		    (state->incoming_packet = sshbuf_new()) == NULL)
-			goto fail;
-		TAILQ_INIT(&state->outgoing);
-		TAILQ_INIT(&ssh->private_keys);
-		TAILQ_INIT(&ssh->public_keys);
-		state->p_send.packets = state->p_read.packets = 0;
-		state->initialized = 1;
-	}
+	state->p_send.packets = state->p_read.packets = 0;
+	state->initialized = 1;
 	/*
 	 * ssh_packet_send2() needs to queue packets until
 	 * we've done the initial key exchange.
 	 */
 	state->rekeying = 1;
+	ssh->state = state;
 	return ssh;
  fail:
-	if (state->input)
+	if (state) {
 		sshbuf_free(state->input);
-	if (state->output)
 		sshbuf_free(state->output);
-	if (state->incoming_packet)
 		sshbuf_free(state->incoming_packet);
-	if (state->outgoing_packet)
 		sshbuf_free(state->outgoing_packet);
-	state->input = NULL;
-	state->output = NULL;
-	state->incoming_packet = NULL;
-	state->outgoing_packet = NULL;
+		free(state);
+	}
 	free(ssh);
-	free(state);
 	return NULL;
 }
 
@@ -393,86 +382,6 @@ ssh_packet_get_bytes(struct ssh *ssh, u_int64_t *ibytes, u_int64_t *obytes)
 		*obytes = ssh->state->p_send.bytes;
 }
 
-/* Serialise compression state into a blob for privsep */
-static int
-ssh_packet_get_compress_state(struct sshbuf *m, struct ssh *ssh)
-{
-	struct session_state *state = ssh->state;
-	struct sshbuf *b;
-	int r;
-
-	if ((b = sshbuf_new()) == NULL)
-		return SSH_ERR_ALLOC_FAIL;
-	if (state->compression_in_started) {
-		if ((r = sshbuf_put_string(b, &state->compression_in_stream,
-		    sizeof(state->compression_in_stream))) != 0)
-			goto out;
-	} else if ((r = sshbuf_put_string(b, NULL, 0)) != 0)
-		goto out;
-	if (state->compression_out_started) {
-		if ((r = sshbuf_put_string(b, &state->compression_out_stream,
-		    sizeof(state->compression_out_stream))) != 0)
-			goto out;
-	} else if ((r = sshbuf_put_string(b, NULL, 0)) != 0)
-		goto out;
-	r = sshbuf_put_stringb(m, b);
- out:
-	sshbuf_free(b);
-	return r;
-}
-
-/* Deserialise compression state from a blob for privsep */
-static int
-ssh_packet_set_compress_state(struct ssh *ssh, struct sshbuf *m)
-{
-	struct session_state *state = ssh->state;
-	struct sshbuf *b = NULL;
-	int r;
-	const u_char *inblob, *outblob;
-	size_t inl, outl;
-
-	if ((r = sshbuf_froms(m, &b)) != 0)
-		goto out;
-	if ((r = sshbuf_get_string_direct(b, &inblob, &inl)) != 0 ||
-	    (r = sshbuf_get_string_direct(b, &outblob, &outl)) != 0)
-		goto out;
-	if (inl == 0)
-		state->compression_in_started = 0;
-	else if (inl != sizeof(state->compression_in_stream)) {
-		r = SSH_ERR_INTERNAL_ERROR;
-		goto out;
-	} else {
-		state->compression_in_started = 1;
-		memcpy(&state->compression_in_stream, inblob, inl);
-	}
-	if (outl == 0)
-		state->compression_out_started = 0;
-	else if (outl != sizeof(state->compression_out_stream)) {
-		r = SSH_ERR_INTERNAL_ERROR;
-		goto out;
-	} else {
-		state->compression_out_started = 1;
-		memcpy(&state->compression_out_stream, outblob, outl);
-	}
-	r = 0;
- out:
-	sshbuf_free(b);
-	return r;
-}
-
-void
-ssh_packet_set_compress_hooks(struct ssh *ssh, void *ctx,
-    void *(*allocfunc)(void *, u_int, u_int),
-    void (*freefunc)(void *, void *))
-{
-	ssh->state->compression_out_stream.zalloc = (alloc_func)allocfunc;
-	ssh->state->compression_out_stream.zfree = (free_func)freefunc;
-	ssh->state->compression_out_stream.opaque = ctx;
-	ssh->state->compression_in_stream.zalloc = (alloc_func)allocfunc;
-	ssh->state->compression_in_stream.zfree = (free_func)freefunc;
-	ssh->state->compression_in_stream.opaque = ctx;
-}
-
 int
 ssh_packet_connection_af(struct ssh *ssh)
 {
@@ -563,10 +472,10 @@ ssh_packet_close(struct ssh *ssh)
 			z_streamp stream = &state->compression_out_stream;
 			debug("compress outgoing: "
 			    "raw data %llu, compressed %llu, factor %.2f",
-		    		(unsigned long long)stream->total_in,
-		    		(unsigned long long)stream->total_out,
-		    		stream->total_in == 0 ? 0.0 :
-		    		(double) stream->total_out / stream->total_in);
+				(unsigned long long)stream->total_in,
+				(unsigned long long)stream->total_out,
+				stream->total_in == 0 ? 0.0 :
+				(double) stream->total_out / stream->total_in);
 			if (state->compression_out_failures == 0)
 				deflateEnd(stream);
 		}
@@ -768,6 +677,86 @@ uncompress_buffer(struct ssh *ssh, struct sshbuf *in, struct sshbuf *out)
 		}
 	}
 	/* NOTREACHED */
+}
+
+/* Serialise compression state into a blob for privsep */
+static int
+ssh_packet_get_compress_state(struct sshbuf *m, struct ssh *ssh)
+{
+	struct session_state *state = ssh->state;
+	struct sshbuf *b;
+	int r;
+
+	if ((b = sshbuf_new()) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
+	if (state->compression_in_started) {
+		if ((r = sshbuf_put_string(b, &state->compression_in_stream,
+		    sizeof(state->compression_in_stream))) != 0)
+			goto out;
+	} else if ((r = sshbuf_put_string(b, NULL, 0)) != 0)
+		goto out;
+	if (state->compression_out_started) {
+		if ((r = sshbuf_put_string(b, &state->compression_out_stream,
+		    sizeof(state->compression_out_stream))) != 0)
+			goto out;
+	} else if ((r = sshbuf_put_string(b, NULL, 0)) != 0)
+		goto out;
+	r = sshbuf_put_stringb(m, b);
+ out:
+	sshbuf_free(b);
+	return r;
+}
+
+/* Deserialise compression state from a blob for privsep */
+static int
+ssh_packet_set_compress_state(struct ssh *ssh, struct sshbuf *m)
+{
+	struct session_state *state = ssh->state;
+	struct sshbuf *b = NULL;
+	int r;
+	const u_char *inblob, *outblob;
+	size_t inl, outl;
+
+	if ((r = sshbuf_froms(m, &b)) != 0)
+		goto out;
+	if ((r = sshbuf_get_string_direct(b, &inblob, &inl)) != 0 ||
+	    (r = sshbuf_get_string_direct(b, &outblob, &outl)) != 0)
+		goto out;
+	if (inl == 0)
+		state->compression_in_started = 0;
+	else if (inl != sizeof(state->compression_in_stream)) {
+		r = SSH_ERR_INTERNAL_ERROR;
+		goto out;
+	} else {
+		state->compression_in_started = 1;
+		memcpy(&state->compression_in_stream, inblob, inl);
+	}
+	if (outl == 0)
+		state->compression_out_started = 0;
+	else if (outl != sizeof(state->compression_out_stream)) {
+		r = SSH_ERR_INTERNAL_ERROR;
+		goto out;
+	} else {
+		state->compression_out_started = 1;
+		memcpy(&state->compression_out_stream, outblob, outl);
+	}
+	r = 0;
+ out:
+	sshbuf_free(b);
+	return r;
+}
+
+void
+ssh_packet_set_compress_hooks(struct ssh *ssh, void *ctx,
+    void *(*allocfunc)(void *, u_int, u_int),
+    void (*freefunc)(void *, void *))
+{
+	ssh->state->compression_out_stream.zalloc = (alloc_func)allocfunc;
+	ssh->state->compression_out_stream.zfree = (free_func)freefunc;
+	ssh->state->compression_out_stream.opaque = ctx;
+	ssh->state->compression_in_stream.zalloc = (alloc_func)allocfunc;
+	ssh->state->compression_in_stream.zfree = (free_func)freefunc;
+	ssh->state->compression_in_stream.opaque = ctx;
 }
 
 /*
@@ -2188,7 +2177,7 @@ ssh_packet_get_output(struct ssh *ssh)
 	return (void *)ssh->state->output;
 }
 
-/* XXX FIXME FIXME FIXME */
+/* XXX TODO update roaming to new API (does not work anyway) */
 /*
  * Save the state for the real connection, and use a separate state when
  * resuming a suspended connection.
@@ -2736,11 +2725,10 @@ sshpkt_get_end(struct ssh *ssh)
 const u_char *
 sshpkt_ptr(struct ssh *ssh, size_t *lenp)
 {
-        if (lenp != NULL)
-                *lenp = sshbuf_len(ssh->state->incoming_packet);
-        return sshbuf_ptr(ssh->state->incoming_packet);
+	if (lenp != NULL)
+		*lenp = sshbuf_len(ssh->state->incoming_packet);
+	return sshbuf_ptr(ssh->state->incoming_packet);
 }
-
 
 /* start a new packet */
 

@@ -1,4 +1,4 @@
-/* $OpenBSD: kexc25519s.c,v 1.4 2014/01/12 08:13:13 djm Exp $ */
+/* $OpenBSD: kexc25519s.c,v 1.7 2015/01/20 07:55:33 djm Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2010 Damien Miller.  All rights reserved.
@@ -30,6 +30,7 @@
 
 #include "sshkey.h"
 #include "cipher.h"
+#include "digest.h"
 #include "kex.h"
 #include "log.h"
 #include "packet.h"
@@ -57,7 +58,7 @@ input_kex_c25519_init(int type, u_int32_t seq, struct ssh *ssh)
 	u_char server_key[CURVE25519_SIZE];
 	u_char *client_pubkey = NULL;
 	u_char server_pubkey[CURVE25519_SIZE];
-	u_char *hash;
+	u_char hash[SSH_DIGEST_MAX_LENGTH];
 	size_t slen, pklen, sbloblen, hashlen;
 	int r;
 
@@ -71,10 +72,9 @@ input_kex_c25519_init(int type, u_int32_t seq, struct ssh *ssh)
 		r = SSH_ERR_INVALID_ARGUMENT;
 		goto out;
 	}
-	if ((server_host_public = kex->load_host_public_key(kex->hostkey_type,
-	    ssh)) == NULL ||
-	    (server_host_private = kex->load_host_private_key(kex->hostkey_type,
-	    ssh)) == NULL) {
+	server_host_public = kex->load_host_public_key(kex->hostkey_type, ssh);
+	server_host_private = kex->load_host_private_key(kex->hostkey_type, ssh);
+	if (server_host_public == NULL) {
 		r = SSH_ERR_NO_HOSTKEY_LOADED;
 		goto out;
 	}
@@ -102,6 +102,7 @@ input_kex_c25519_init(int type, u_int32_t seq, struct ssh *ssh)
 	if ((r = sshkey_to_blob(server_host_public, &server_host_key_blob,
 	    &sbloblen)) != 0)
 		goto out;
+	hashlen = sizeof(hash);
 	if ((r = kex_c25519_hash(
 	    kex->hash_alg,
 	    kex->client_version_string,
@@ -112,7 +113,7 @@ input_kex_c25519_init(int type, u_int32_t seq, struct ssh *ssh)
 	    client_pubkey,
 	    server_pubkey,
 	    sshbuf_ptr(shared_secret), sshbuf_len(shared_secret),
-	    &hash, &hashlen)) < 0)
+	    hash, &hashlen)) < 0)
 		goto out;
 
 	/* save session id := H */
@@ -139,12 +140,10 @@ input_kex_c25519_init(int type, u_int32_t seq, struct ssh *ssh)
 	    (r = sshpkt_send(ssh)) != 0)
 		goto out;
 
-	if ((r = kex_derive_keys(ssh, hash, hashlen, sshbuf_ptr(shared_secret),
-	    sshbuf_len(shared_secret))) == 0)
+	if ((r = kex_derive_keys(ssh, hash, hashlen, shared_secret)) == 0)
 		r = kex_send_newkeys(ssh);
-
-	/* have keys, free server key */
 out:
+	explicit_bzero(hash, sizeof(hash));
 	explicit_bzero(server_key, sizeof(server_key));
 	free(server_host_key_blob);
 	free(signature);

@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.80 2015/01/14 15:02:39 djm Exp $
+#	$OpenBSD: Makefile,v 1.82 2015/01/19 20:30:24 markus Exp $
 
 .PATH:		${.CURDIR}/..
 .include "${.CURDIR}/../Makefile.inc"
@@ -7,6 +7,7 @@ LIB=	ssh
 
 # These are files intended for a standalone libopenssh in the future.
 LIB_SRCS= \
+	ssh_api.c \
 	ssherr.c \
 	sshbuf.c \
 	sshbuf-getput-basic.c \
@@ -30,7 +31,9 @@ SRCS=	${LIB_SRCS} \
 	dispatch.c kex.c mac.c uidswap.c uuencode.c misc.c \
 	msg.c progressmeter.c dns.c \
 	monitor_fdpass.c addrmatch.c \
-	smult_curve25519_ref.c kexc25519.c kexc25519c.c \
+	smult_curve25519_ref.c \
+	kexc25519.c kexc25519c.c kexc25519s.c \
+	roaming_dummy.c \
 	chacha.c poly1305.c cipher-chachapoly.c ssh-ed25519.c hmac.c umac.c
 SRCS+=	kexc25519s.c
 SRCS+=	ssh_api.c

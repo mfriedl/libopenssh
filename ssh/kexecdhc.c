@@ -1,4 +1,4 @@
-/* $OpenBSD: kexecdhc.c,v 1.7 2014/02/02 03:44:31 djm Exp $ */
+/* $OpenBSD: kexecdhc.c,v 1.9 2015/01/19 20:16:15 markus Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2010 Damien Miller.  All rights reserved.
@@ -34,6 +34,7 @@
 
 #include "sshkey.h"
 #include "cipher.h"
+#include "digest.h"
 #include "kex.h"
 #include "log.h"
 #include "packet.h"
@@ -99,7 +100,8 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 	BIGNUM *shared_secret = NULL;
 	struct sshkey *server_host_key = NULL;
 	u_char *server_host_key_blob = NULL, *signature = NULL;
-	u_char *kbuf = NULL, *hash;
+	u_char *kbuf = NULL;
+	u_char hash[SSH_DIGEST_MAX_LENGTH];
 	size_t slen, sbloblen;
 	size_t klen = 0, hashlen;
 	int r;
@@ -164,6 +166,7 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 	dump_digest("shared secret", kbuf, klen);
 #endif
 	/* calc and verify H */
+	hashlen = sizeof(hash);
 	if ((r = kex_ecdh_hash(
 	    kex->hash_alg,
 	    group,
@@ -175,7 +178,7 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 	    EC_KEY_get0_public_key(client_key),
 	    server_public,
 	    shared_secret,
-	    &hash, &hashlen)) != 0)
+	    hash, &hashlen)) != 0)
 		goto out;
 
 	if ((r = sshkey_verify(server_host_key, signature, slen, hash,
@@ -196,14 +199,11 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 	if ((r = kex_derive_keys_bn(ssh, hash, hashlen, shared_secret)) == 0)
 		r = kex_send_newkeys(ssh);
  out:
+	explicit_bzero(hash, sizeof(hash));
 	if (kex->ec_client_key) {
 		EC_KEY_free(kex->ec_client_key);
 		kex->ec_client_key = NULL;
 	}
-	if (server_host_key_blob)
-		free(server_host_key_blob);
-	if (server_host_key)
-		sshkey_free(server_host_key);
 	if (server_public)
 		EC_POINT_clear_free(server_public);
 	if (kbuf) {
@@ -212,7 +212,8 @@ input_kex_ecdh_reply(int type, u_int32_t seq, struct ssh *ssh)
 	}
 	if (shared_secret)
 		BN_clear_free(shared_secret);
-	if (signature)
-		free(signature);
+	sshkey_free(server_host_key);
+	free(server_host_key_blob);
+	free(signature);
 	return r;
 }

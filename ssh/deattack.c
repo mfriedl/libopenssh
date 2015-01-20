@@ -1,4 +1,4 @@
-/* $OpenBSD: deattack.c,v 1.30 2006/09/16 19:53:37 djm Exp $ */
+/* $OpenBSD: deattack.c,v 1.31 2015/01/19 19:52:16 markus Exp $ */
 /*
  * Cryptographic attack detector for ssh - source code
  *
@@ -105,6 +105,7 @@ int
 detect_attack(struct deattack_ctx *dctx, const u_char *buf, u_int32_t len)
 {
 	u_int32_t i, j, l, same;
+	u_int16_t *tmp;
 	const u_char *c, *d;
 
 	if (len > (SSH_MAXBLOCKS * SSH_BLOCKSIZE) ||
@@ -119,11 +120,13 @@ detect_attack(struct deattack_ctx *dctx, const u_char *buf, u_int32_t len)
 		dctx->n = l;
 	} else {
 		if (l > dctx->n) {
-			if (reallocn((void **)&dctx->h, l, HASH_ENTRYSIZE) != 0) {
+			if ((tmp = reallocarray(dctx->h, l, HASH_ENTRYSIZE))
+			    == NULL) {
 				free(dctx->h);
 				dctx->h = NULL;
 				return DEATTACK_ERROR;
 			}
+			dctx->h = tmp;
 			dctx->n = l;
 		}
 	}

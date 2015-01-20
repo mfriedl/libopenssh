@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.262 2015/01/14 20:05:27 djm Exp $ */
+/* $OpenBSD: clientloop.c,v 1.265 2015/01/19 20:16:15 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1596,8 +1596,7 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 		if (compat20 && session_closed && !channel_still_open())
 			break;
 
-		rekeying = (ssh->kex != NULL &&
-		    !ssh->kex->done);
+		rekeying = (ssh->kex != NULL && !ssh->kex->done);
 
 		if (rekeying) {
 			debug("rekeying in progress");

@@ -1,4 +1,4 @@
-/* $OpenBSD: kexdhc.c,v 1.15 2014/02/02 03:44:31 djm Exp $ */
+/* $OpenBSD: kexdhc.c,v 1.17 2015/01/19 20:16:15 markus Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  *
@@ -33,6 +33,7 @@
 
 #include "sshkey.h"
 #include "cipher.h"
+#include "digest.h"
 #include "kex.h"
 #include "log.h"
 #include "packet.h"
@@ -93,7 +94,7 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 	BIGNUM *dh_server_pub = NULL, *shared_secret = NULL;
 	struct sshkey *server_host_key = NULL;
 	u_char *kbuf = NULL, *server_host_key_blob = NULL, *signature = NULL;
-	u_char *hash;
+	u_char hash[SSH_DIGEST_MAX_LENGTH];
 	size_t klen = 0, slen, sbloblen, hashlen;
 	int kout, r;
 
@@ -153,6 +154,7 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 #endif
 
 	/* calc and verify H */
+	hashlen = sizeof(hash);
 	if ((r = kex_dh_hash(
 	    kex->client_version_string,
 	    kex->server_version_string,
@@ -162,7 +164,7 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 	    kex->dh->pub_key,
 	    dh_server_pub,
 	    shared_secret,
-	    &hash, &hashlen)) != 0)
+	    hash, &hashlen)) != 0)
 		goto out;
 
 	if ((r = sshkey_verify(server_host_key, signature, slen, hash, hashlen,
@@ -183,12 +185,9 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 	if ((r = kex_derive_keys_bn(ssh, hash, hashlen, shared_secret)) == 0)
 		r = kex_send_newkeys(ssh);
  out:
+	explicit_bzero(hash, sizeof(hash));
 	DH_free(kex->dh);
 	kex->dh = NULL;
-	if (server_host_key_blob)
-		free(server_host_key_blob);
-	if (server_host_key)
-		sshkey_free(server_host_key);
 	if (dh_server_pub)
 		BN_clear_free(dh_server_pub);
 	if (kbuf) {
@@ -197,7 +196,8 @@ input_kex_dh(int type, u_int32_t seq, struct ssh *ssh)
 	}
 	if (shared_secret)
 		BN_clear_free(shared_secret);
-	if (signature)
-		free(signature);
+	sshkey_free(server_host_key);
+	free(server_host_key_blob);
+	free(signature);
 	return r;
 }

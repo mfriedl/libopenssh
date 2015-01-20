@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.c,v 1.338 2014/12/11 08:20:09 djm Exp $ */
+/* $OpenBSD: channels.c,v 1.339 2015/01/19 20:07:45 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -2532,7 +2532,7 @@ channel_input_extended_data(int type, u_int32_t seq, struct ssh *ssh)
 		ssh_packet_disconnect(ssh,
 		    "Received extended_data for bad channel %d.", id);
 	if (c->type != SSH_CHANNEL_OPEN) {
-		logit("channel %u: ext data for non open", id);
+		logit("channel %d: ext data for non open", id);
 		return 0;
 	}
 	if (c->flags & CHAN_EOF_RCVD) {
@@ -2545,7 +2545,7 @@ channel_input_extended_data(int type, u_int32_t seq, struct ssh *ssh)
 	if (c->efd == -1 ||
 	    c->extended_usage != CHAN_EXTENDED_WRITE ||
 	    tcode != SSH2_EXTENDED_DATA_STDERR) {
-		logit("channel %u: bad ext data", c->self);
+		logit("channel %d: bad ext data", c->self);
 		return 0;
 	}
 	if (data_len > c->local_window) {

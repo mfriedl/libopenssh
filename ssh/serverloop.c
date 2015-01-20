@@ -1,4 +1,4 @@
-/* $OpenBSD: serverloop.c,v 1.172 2014/07/15 15:54:14 millert Exp $ */
+/* $OpenBSD: serverloop.c,v 1.175 2015/01/19 20:16:15 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -849,8 +849,7 @@ server_loop2(struct ssh *ssh)
 	for (;;) {
 		process_buffered_input_packets(ssh);
 
-		rekeying = (ssh->kex != NULL &&
-			    !ssh->kex->done);
+		rekeying = (ssh->kex != NULL && !ssh->kex->done);
 
 		if (!rekeying && ssh_packet_not_very_much_data_to_write(ssh))
 			channel_output_poll();

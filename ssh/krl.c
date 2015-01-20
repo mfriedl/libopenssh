@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $OpenBSD: krl.c,v 1.26 2015/01/14 15:02:39 djm Exp $ */
+/* $OpenBSD: krl.c,v 1.28 2015/01/19 17:35:48 djm Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -734,7 +734,7 @@ ssh_krl_to_blob(struct ssh_krl *krl, struct sshbuf *buf,
 	/* Finally, output sections for revocations by public key/hash */
 	sshbuf_reset(sect);
 	RB_FOREACH(rb, revoked_blob_tree, &krl->revoked_keys) {
-		KRL_DBG(("%s: key len %u ", __func__, rb->len));
+		KRL_DBG(("%s: key len %zu ", __func__, rb->len));
 		if ((r = sshbuf_put_string(sect, rb->blob, rb->len)) != 0)
 			goto out;
 	}
@@ -745,7 +745,7 @@ ssh_krl_to_blob(struct ssh_krl *krl, struct sshbuf *buf,
 	}
 	sshbuf_reset(sect);
 	RB_FOREACH(rb, revoked_blob_tree, &krl->revoked_sha1s) {
-		KRL_DBG(("%s: hash len %u ", __func__, rb->len));
+		KRL_DBG(("%s: hash len %zu ", __func__, rb->len));
 		if ((r = sshbuf_put_string(sect, rb->blob, rb->len)) != 0)
 			goto out;
 	}
@@ -770,7 +770,7 @@ ssh_krl_to_blob(struct ssh_krl *krl, struct sshbuf *buf,
 		if ((r = sshkey_sign(sign_keys[i], &sblob, &slen,
 		    sshbuf_ptr(buf), sshbuf_len(buf), 0)) == -1)
 			goto out;
-		KRL_DBG(("%s: signature sig len %u", __func__, slen));
+		KRL_DBG(("%s: signature sig len %zu", __func__, slen));
 		if ((r = sshbuf_put_string(buf, sblob, slen)) != 0)
 			goto out;
 	}
@@ -791,7 +791,7 @@ format_timestamp(u_int64_t timestamp, char *ts, size_t nts)
 	t = timestamp;
 	tm = localtime(&t);
 	if (tm == NULL)
-		strlcpy(ts, "<INVALID>", sizeof(nts));
+		strlcpy(ts, "<INVALID>", nts);
 	else {
 		*ts = '\0';
 		strftime(ts, nts, "%Y%m%dT%H%M%S", tm);

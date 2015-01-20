@@ -1,4 +1,4 @@
-/* $OpenBSD: kexc25519.c,v 1.7 2014/05/02 03:27:54 djm Exp $ */
+/* $OpenBSD: kexc25519.c,v 1.8 2015/01/19 20:16:15 markus Exp $ */
 /*
  * Copyright (c) 2001, 2013 Markus Friedl.  All rights reserved.
  * Copyright (c) 2010 Damien Miller.  All rights reserved.
@@ -85,15 +85,15 @@ kex_c25519_hash(
     const u_char client_dh_pub[CURVE25519_SIZE],
     const u_char server_dh_pub[CURVE25519_SIZE],
     const u_char *shared_secret, size_t secretlen,
-    u_char **hash, size_t *hashlen)
+    u_char *hash, size_t *hashlen)
 {
 	struct sshbuf *b;
-	static u_char digest[SSH_DIGEST_MAX_LENGTH];
 	int r;
 
+	if (*hashlen < ssh_digest_bytes(hash_alg))
+		return SSH_ERR_INVALID_ARGUMENT;
 	if ((b = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
-
 	if ((r = sshbuf_put_cstring(b, client_version_string)) < 0 ||
 	    (r = sshbuf_put_cstring(b, server_version_string)) < 0 ||
 	    /* kexinit messages: fake header: len+SSH2_MSG_KEXINIT */
@@ -110,21 +110,17 @@ kex_c25519_hash(
 		sshbuf_free(b);
 		return r;
 	}
-
 #ifdef DEBUG_KEX
 	sshbuf_dump(b, stderr);
 #endif
-	if (ssh_digest_buffer(hash_alg, b, digest, sizeof(digest)) != 0) {
+	if (ssh_digest_buffer(hash_alg, b, hash, *hashlen) != 0) {
 		sshbuf_free(b);
 		return SSH_ERR_LIBCRYPTO_ERROR;
 	}
-
 	sshbuf_free(b);
-
-	*hash = digest;
 	*hashlen = ssh_digest_bytes(hash_alg);
 #ifdef DEBUG_KEX
-	dump_digest("hash", digest, *hashlen);
+	dump_digest("hash", hash, *hashlen);
 #endif
 	return 0;
 }

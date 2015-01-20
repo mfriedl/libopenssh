@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.h,v 1.61 2014/05/03 17:20:34 markus Exp $ */
+/* $OpenBSD: packet.h,v 1.64 2015/01/19 20:30:23 markus Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
@@ -23,52 +23,50 @@
 #include <sys/signal.h>
 #include <sys/queue.h>
 
-/* XXX fixme */
-#include "dispatch.h"
-#include "ssh.h"
+struct kex;
+struct sshkey;
+struct sshbuf;
+struct session_state;	/* private session data */
+
+#include "dispatch.h"	/* typedef, DISPATCH_MAX */
 
 struct key_entry {
 	TAILQ_ENTRY(key_entry) next;
 	struct sshkey *key;
 };
 
-struct kex;
-struct sshkey;
-struct sshbuf;
-struct session_state;	/* private session data */
-
 struct ssh {
 	/* Session state */
 	struct session_state *state;
 
-	/* Authentication context */
-	void *authctxt;
-
-	/* Application specific data */
-	void *app_data;
-
 	/* Key exchange */
 	struct kex *kex;
 
-	/* Host key verification */
-	char *host;
-	struct sockaddr *hostaddr;
-
-	/* cached remote ip address and port*/
+	/* Cached remote ip address and port*/
 	char *remote_ipaddr;
 	int remote_port;
 
 	/* Dispatcher table */
 	dispatch_fn *dispatch[DISPATCH_MAX];
 	/* number of packets to ignore in the dispatcher */
-	int skip_packets;
+	int dispatch_skip_packets;
 
 	/* datafellows */
 	int compat;
 
+	/* Authentication context */
+	void *authctxt;
+
+	/* Host key verification */
+	char *host;
+	struct sockaddr *hostaddr;
+
 	/* Lists for private and public keys */
 	TAILQ_HEAD(, key_entry) private_keys;
 	TAILQ_HEAD(, key_entry) public_keys;
+
+	/* APP data */
+	void *app_data;
 };
 
 struct ssh *ssh_alloc_session_state(void);
@@ -150,9 +148,6 @@ void	 ssh_packet_restore_state(struct ssh *, struct ssh *);
 void	*ssh_packet_get_input(struct ssh *);
 void	*ssh_packet_get_output(struct ssh *);
 
-/* old API */
-extern struct ssh *active_state;
-
 /* new API */
 int	sshpkt_start(struct ssh *ssh, u_char type);
 int	sshpkt_send(struct ssh *ssh);
@@ -183,5 +178,7 @@ int	sshpkt_get_bignum1(struct ssh *ssh, BIGNUM *v);
 int	sshpkt_get_bignum2(struct ssh *ssh, BIGNUM *v);
 int	sshpkt_get_end(struct ssh *ssh);
 const u_char	*sshpkt_ptr(struct ssh *, size_t *lenp);
+
+extern struct ssh *active_state;
 
 #endif				/* PACKET_H */

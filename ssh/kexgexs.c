@@ -1,4 +1,4 @@
-/* $OpenBSD: kexgexs.c,v 1.19 2014/02/02 03:44:31 djm Exp $ */
+/* $OpenBSD: kexgexs.c,v 1.22 2015/01/20 07:55:33 djm Exp $ */
 /*
  * Copyright (c) 2000 Niels Provos.  All rights reserved.
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
@@ -34,6 +34,7 @@
 
 #include "sshkey.h"
 #include "cipher.h"
+#include "digest.h"
 #include "kex.h"
 #include "log.h"
 #include "packet.h"
@@ -142,7 +143,7 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	BIGNUM *shared_secret = NULL, *dh_client_pub = NULL;
 	struct sshkey *server_host_public, *server_host_private;
 	u_char *kbuf = NULL, *signature = NULL, *server_host_key_blob = NULL;
-	u_char *hash;
+	u_char hash[SSH_DIGEST_MAX_LENGTH];
 	size_t sbloblen, slen;
 	size_t klen = 0, hashlen;
 	int kout, r;
@@ -152,10 +153,9 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 		r = SSH_ERR_INVALID_ARGUMENT;
 		goto out;
 	}
-	if ((server_host_public = kex->load_host_public_key(kex->hostkey_type,
-	    ssh)) == NULL ||
-	    (server_host_private = kex->load_host_private_key(kex->hostkey_type,
-	    ssh)) == NULL) {
+	server_host_public = kex->load_host_public_key(kex->hostkey_type, ssh);
+	server_host_private = kex->load_host_private_key(kex->hostkey_type, ssh);
+	if (server_host_public == NULL) {
 		r = SSH_ERR_NO_HOSTKEY_LOADED;
 		goto out;
 	}
@@ -206,6 +206,7 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	    &sbloblen)) != 0)
 		goto out;
 	/* calc H */
+	hashlen = sizeof(hash);
 	if ((r = kexgex_hash(
 	    kex->hash_alg,
 	    kex->client_version_string,
@@ -218,7 +219,7 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	    dh_client_pub,
 	    kex->dh->pub_key,
 	    shared_secret,
-	    &hash, &hashlen)) != 0)
+	    hash, &hashlen)) != 0)
 		goto out;
 
 	/* save session id := H */
@@ -260,9 +261,7 @@ input_kex_dh_gex_init(int type, u_int32_t seq, struct ssh *ssh)
 	}
 	if (shared_secret)
 		BN_clear_free(shared_secret);
-	if (server_host_key_blob)
-		free(server_host_key_blob);
-	if (signature)
-		free(signature);
+	free(server_host_key_blob);
+	free(signature);
 	return r;
 }
