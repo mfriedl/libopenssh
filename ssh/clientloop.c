@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.265 2015/01/19 20:16:15 markus Exp $ */
+/* $OpenBSD: clientloop.c,v 1.267 2015/01/26 03:04:45 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -60,12 +60,12 @@
  */
 
 
+#include <sys/param.h>	/* MIN MAX */
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#include <sys/param.h>
 #include <sys/queue.h>
 
 #include <ctype.h>
@@ -78,6 +78,7 @@
 #include <termios.h>
 #include <pwd.h>
 #include <unistd.h>
+#include <limits.h>
 
 #include "xmalloc.h"
 #include "ssh.h"
@@ -103,6 +104,7 @@
 #include "msg.h"
 #include "roaming.h"
 #include "ssherr.h"
+#include "hostfile.h"
 
 /* import options */
 extern Options options;
@@ -332,12 +334,12 @@ client_x11_get_proto(const char *display, const char *xauth_path,
 			display = xdisplay;
 		}
 		if (trusted == 0) {
-			xauthdir = xmalloc(MAXPATHLEN);
-			xauthfile = xmalloc(MAXPATHLEN);
-			mktemp_proto(xauthdir, MAXPATHLEN);
+			xauthdir = xmalloc(PATH_MAX);
+			xauthfile = xmalloc(PATH_MAX);
+			mktemp_proto(xauthdir, PATH_MAX);
 			if (mkdtemp(xauthdir) != NULL) {
 				do_unlink = 1;
-				snprintf(xauthfile, MAXPATHLEN, "%s/xauthfile",
+				snprintf(xauthfile, PATH_MAX, "%s/xauthfile",
 				    xauthdir);
 				snprintf(cmd, sizeof(cmd),
 				    "%s -f %s generate %s " SSH_X11_PROTO
@@ -1850,6 +1852,7 @@ client_input_exit_status(int type, u_int32_t seq, struct ssh *ssh)
  out:
 	return r;
 }
+
 static int
 client_input_agent_open(int type, u_int32_t seq, struct ssh *ssh)
 {
@@ -2126,6 +2129,7 @@ client_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 	free(ctype);
 	return r;
 }
+
 static int
 client_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 {
@@ -2181,6 +2185,91 @@ client_input_channel_req(int type, u_int32_t seq, struct ssh *ssh)
 	free(rtype);
 	return r;
 }
+
+/*
+ * Handle hostkeys@openssh.com global request to inform the client of all
+ * the server's hostkeys. The keys are checked against the user's
+ * HostkeyAlgorithms preference before they are accepted.
+ */
+static int
+client_input_hostkeys(void)
+{
+	const u_char *blob = NULL;
+	u_int i, len = 0, nkeys = 0;
+	struct sshbuf *buf = NULL;
+	struct sshkey *key = NULL, **tmp, **keys = NULL;
+	int r, success = 1;
+	char *fp, *host_str = NULL;
+	static int hostkeys_seen = 0; /* XXX use struct ssh */
+
+	/*
+	 * NB. Return success for all cases other than protocol error. The
+	 * server doesn't need to know what the client does with its hosts
+	 * file.
+	 */
+
+	blob = packet_get_string_ptr(&len);
+	packet_check_eom();
+
+	if (hostkeys_seen)
+		fatal("%s: server already sent hostkeys", __func__);
+	if (!options.update_hostkeys || options.num_user_hostfiles <= 0)
+		return 1;
+	if ((buf = sshbuf_from(blob, len)) == NULL)
+		fatal("%s: sshbuf_from failed", __func__);
+	while (sshbuf_len(buf) > 0) {
+		sshkey_free(key);
+		key = NULL;
+		if ((r = sshkey_froms(buf, &key)) != 0)
+			fatal("%s: parse key: %s", __func__, ssh_err(r));
+		fp = sshkey_fingerprint(key, options.fingerprint_hash,
+		    SSH_FP_DEFAULT);
+		debug3("%s: received %s key %s", __func__,
+		    sshkey_type(key), fp);
+		free(fp);
+		/* Check that the key is accepted in HostkeyAlgorithms */
+		if (options.hostkeyalgorithms != NULL &&
+		    match_pattern_list(sshkey_ssh_name(key),
+		    options.hostkeyalgorithms,
+		    strlen(options.hostkeyalgorithms), 0) != 1) {
+			debug3("%s: %s key not permitted by HostkeyAlgorithms",
+			    __func__, sshkey_ssh_name(key));
+			continue;
+		}
+		if ((tmp = reallocarray(keys, nkeys + 1,
+		    sizeof(*keys))) == NULL)
+			fatal("%s: reallocarray failed nkeys = %u",
+			    __func__, nkeys);
+		keys = tmp;
+		keys[nkeys++] = key;
+		key = NULL;
+	}
+
+	debug3("%s: received %u keys from server", __func__, nkeys);
+	if (nkeys == 0) {
+		error("%s: server sent no hostkeys", __func__);
+		goto out;
+	}
+
+	get_hostfile_hostname_ipaddr(host, NULL, options.port, &host_str, NULL);
+
+	if ((r = hostfile_replace_entries(options.user_hostfiles[0], host_str,
+	    keys, nkeys, options.hash_known_hosts, 1)) != 0) {
+		error("%s: hostfile_replace_entries failed: %s",
+		    __func__, ssh_err(r));
+		goto out;
+	}
+
+	/* Success */
+ out:
+	free(host_str);
+	sshkey_free(key);
+	for (i = 0; i < nkeys; i++)
+		sshkey_free(keys[i]);
+	sshbuf_free(buf);
+	return success;
+}
+
 static int
 client_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 {
@@ -2193,6 +2282,8 @@ client_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 		goto out;
 	debug("client_input_global_request: rtype %s want_reply %d",
 	    rtype, want_reply);
+	if (strcmp(rtype, "hostkeys@openssh.com") == 0)
+		success = client_input_hostkeys();
 	if (want_reply) {
 		if ((r = sshpkt_start(ssh, success ? SSH2_MSG_REQUEST_SUCCESS :
 		    SSH2_MSG_REQUEST_FAILURE)) != 0 ||

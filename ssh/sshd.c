@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.436 2015/01/19 20:20:20 markus Exp $ */
+/* $OpenBSD: sshd.c,v 1.440 2015/01/26 06:10:03 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -43,7 +43,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <sys/tree.h>
@@ -62,6 +61,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 
 #ifdef WITH_OPENSSL
 #include <openssl/bn.h>
@@ -210,7 +210,7 @@ u_char *session_id2 = NULL;
 u_int session_id2_len = 0;
 
 /* record remote hostname or ip */
-u_int utmp_len = MAXHOSTNAMELEN;
+u_int utmp_len = HOST_NAME_MAX+1;
 
 /* options.max_startup sized array of fd ints */
 int *startup_pipes = NULL;
@@ -814,7 +814,7 @@ list_hostkey_types(void)
 }
 
 static struct sshkey *
-get_hostkey_by_type(int type, int need_private, struct ssh *ssh)
+get_hostkey_by_type(int type, int nid, int need_private, struct ssh *ssh)
 {
 	int i;
 	struct sshkey *key;
@@ -835,7 +835,8 @@ get_hostkey_by_type(int type, int need_private, struct ssh *ssh)
 				key = sensitive_data.host_pubkeys[i];
 			break;
 		}
-		if (key != NULL && key->type == type)
+		if (key != NULL && key->type == type &&
+		    (key->type != KEY_ECDSA || key->ecdsa_nid == nid))
 			return need_private ?
 			    sensitive_data.host_keys[i] : key;
 	}
@@ -843,15 +844,15 @@ get_hostkey_by_type(int type, int need_private, struct ssh *ssh)
 }
 
 struct sshkey *
-get_hostkey_public_by_type(int type, struct ssh *ssh)
+get_hostkey_public_by_type(int type, int nid, struct ssh *ssh)
 {
-	return get_hostkey_by_type(type, 0, ssh);
+	return get_hostkey_by_type(type, nid, 0, ssh);
 }
 
 struct sshkey *
-get_hostkey_private_by_type(int type, struct ssh *ssh)
+get_hostkey_private_by_type(int type, int nid, struct ssh *ssh)
 {
-	return get_hostkey_by_type(type, 1, ssh);
+	return get_hostkey_by_type(type, nid, 1, ssh);
 }
 
 struct sshkey *
@@ -888,6 +889,42 @@ get_hostkey_index(struct sshkey *key, struct ssh *ssh)
 		}
 	}
 	return (-1);
+}
+
+/* Inform the client of all hostkeys */
+static void
+notify_hostkeys(struct ssh *ssh)
+{
+	struct sshbuf *buf;
+	struct sshkey *key;
+	int i, nkeys, r;
+	char *fp;
+
+	if ((buf = sshbuf_new()) == NULL)
+		fatal("%s: sshbuf_new", __func__);
+	for (i = nkeys = 0; i < options.num_host_key_files; i++) {
+		key = get_hostkey_public_by_index(i, ssh);
+		if (key == NULL || key->type == KEY_UNSPEC ||
+		    key->type == KEY_RSA1 || sshkey_is_cert(key))
+			continue;
+		fp = sshkey_fingerprint(key, options.fingerprint_hash,
+		    SSH_FP_DEFAULT);
+		debug3("%s: key %d: %s %s", __func__, i,
+		    sshkey_ssh_name(key), fp);
+		free(fp);
+		if ((r = sshkey_puts(key, buf)) != 0)
+			fatal("%s: couldn't put hostkey %d: %s",
+			    __func__, i, ssh_err(r));
+		nkeys++;
+	}
+	if (nkeys == 0)
+		fatal("%s: no hostkeys", __func__);
+	debug3("%s: send %d hostkeys", __func__, nkeys);
+	packet_start(SSH2_MSG_GLOBAL_REQUEST);
+	packet_put_cstring("hostkeys@openssh.com");
+	packet_put_char(0); /* want-reply */
+	packet_put_string(sshbuf_ptr(buf), sshbuf_len(buf));
+	packet_send();
 }
 
 /*
@@ -1501,8 +1538,8 @@ main(int ac, char **av)
 				exit(1);
 			break;
 		case 'u':
-			utmp_len = (u_int)strtonum(optarg, 0, MAXHOSTNAMELEN+1, NULL);
-			if (utmp_len > MAXHOSTNAMELEN) {
+			utmp_len = (u_int)strtonum(optarg, 0, HOST_NAME_MAX+1+1, NULL);
+			if (utmp_len > HOST_NAME_MAX+1) {
 				fprintf(stderr, "Invalid utmp length.\n");
 				exit(1);
 			}
@@ -1656,6 +1693,8 @@ main(int ac, char **av)
 		    &pubkey, NULL)) != 0 && r != SSH_ERR_SYSTEM_ERROR)
 			error("Error loading host key \"%s\": %s",
 			    options.host_key_files[i], ssh_err(r));
+		if (pubkey == NULL && key != NULL)
+			pubkey = key_demote(key);
 
 		if (key == NULL && pubkey != NULL && pubkey->type != KEY_RSA1 &&
 		    have_agent) {
@@ -2070,6 +2109,10 @@ main(int ac, char **av)
 
 	ssh_packet_set_timeout(ssh, options.client_alive_interval,
 	    options.client_alive_count_max);
+
+	/* Try to send all our hostkeys to the client */
+	if (compat20)
+		notify_hostkeys(active_state);
 
 	/* Start session. */
 	do_authenticated(ssh);

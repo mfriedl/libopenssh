@@ -1,4 +1,4 @@
-/* $OpenBSD: readconf.c,v 1.228 2015/01/16 06:40:12 deraadt Exp $ */
+/* $OpenBSD: readconf.c,v 1.230 2015/01/30 11:43:14 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -145,7 +145,7 @@ typedef enum {
 	oCanonicalDomains, oCanonicalizeHostname, oCanonicalizeMaxDots,
 	oCanonicalizeFallbackLocal, oCanonicalizePermittedCNAMEs,
 	oStreamLocalBindMask, oStreamLocalBindUnlink, oRevokedHostKeys,
-	oFingerprintHash,
+	oFingerprintHash, oUpdateHostkeys, oHostbasedKeyTypes,
 	oIgnoredUnknownOption, oDeprecated, oUnsupported
 } OpCodes;
 
@@ -262,6 +262,8 @@ static struct {
 	{ "streamlocalbindunlink", oStreamLocalBindUnlink },
 	{ "revokedhostkeys", oRevokedHostKeys },
 	{ "fingerprinthash", oFingerprintHash },
+	{ "updatehostkeys", oUpdateHostkeys },
+	{ "hostbasedkeytypes", oHostbasedKeyTypes },
 	{ "ignoreunknown", oIgnoreUnknown },
 
 	{ NULL, oBadOption }
@@ -1464,6 +1466,23 @@ parse_int:
 			*intptr = value;
 		break;
 
+	case oUpdateHostkeys:
+		intptr = &options->update_hostkeys;
+		goto parse_flag;
+
+	case oHostbasedKeyTypes:
+		charptr = &options->hostbased_key_types;
+		arg = strdelim(&s);
+		if (!arg || *arg == '\0')
+			fatal("%.200s line %d: Missing argument.",
+			    filename, linenum);
+		if (!sshkey_names_valid2(arg, 1))
+			fatal("%s line %d: Bad key types '%s'.",
+				filename, linenum, arg ? arg : "<NONE>");
+		if (*activep && *charptr == NULL)
+			*charptr = xstrdup(arg);
+		break;
+
 	case oDeprecated:
 		debug("%s line %d: Deprecated option \"%s\"",
 		    filename, linenum, keyword);
@@ -1642,6 +1661,8 @@ initialize_options(Options * options)
 	options->canonicalize_hostname = -1;
 	options->revoked_host_keys = NULL;
 	options->fingerprint_hash = -1;
+	options->update_hostkeys = -1;
+	options->hostbased_key_types = NULL;
 }
 
 /*
@@ -1819,6 +1840,10 @@ fill_default_options(Options * options)
 		options->canonicalize_hostname = SSH_CANONICALISE_NO;
 	if (options->fingerprint_hash == -1)
 		options->fingerprint_hash = SSH_FP_HASH_DEFAULT;
+	if (options->update_hostkeys == -1)
+		options->update_hostkeys = 1;
+	if (options->hostbased_key_types == NULL)
+		options->hostbased_key_types = xstrdup("*");
 
 #define CLEAR_ON_NONE(v) \
 	do { \
@@ -2242,6 +2267,7 @@ dump_client_config(Options *o, const char *host)
 	dump_cfg_fmtint(oUsePrivilegedPort, o->use_privileged_port);
 	dump_cfg_fmtint(oVerifyHostKeyDNS, o->verify_host_key_dns);
 	dump_cfg_fmtint(oVisualHostKey, o->visual_host_key);
+	dump_cfg_fmtint(oUpdateHostkeys, o->update_hostkeys);
 
 	/* Integer options */
 	dump_cfg_int(oCanonicalizeMaxDots, o->canonicalize_max_dots);
@@ -2258,6 +2284,7 @@ dump_client_config(Options *o, const char *host)
 	dump_cfg_string(oControlPath, o->control_path);
 	dump_cfg_string(oHostKeyAlgorithms, o->hostkeyalgorithms ? o->hostkeyalgorithms : KEX_DEFAULT_PK_ALG);
 	dump_cfg_string(oHostKeyAlias, o->host_key_alias);
+	dump_cfg_string(oHostbasedKeyTypes, o->hostbased_key_types);
 	dump_cfg_string(oKbdInteractiveDevices, o->kbd_interactive_devices);
 	dump_cfg_string(oKexAlgorithms, o->kex_algorithms ? o->kex_algorithms : KEX_CLIENT_KEX);
 	dump_cfg_string(oLocalCommand, o->local_command);
@@ -2266,9 +2293,10 @@ dump_client_config(Options *o, const char *host)
 	dump_cfg_string(oPKCS11Provider, o->pkcs11_provider);
 	dump_cfg_string(oPreferredAuthentications, o->preferred_authentications);
 	dump_cfg_string(oProxyCommand, o->proxy_command);
-	dump_cfg_string(oXAuthLocation, o->xauth_location);
 	dump_cfg_string(oRevokedHostKeys, o->revoked_host_keys);
+	dump_cfg_string(oXAuthLocation, o->xauth_location);
 
+	/* Forwards */
 	dump_cfg_forwards(oDynamicForward, o->num_local_forwards, o->local_forwards);
 	dump_cfg_forwards(oLocalForward, o->num_local_forwards, o->local_forwards);
 	dump_cfg_forwards(oRemoteForward, o->num_remote_forwards, o->remote_forwards);

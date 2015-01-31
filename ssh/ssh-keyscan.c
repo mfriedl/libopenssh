@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keyscan.c,v 1.95 2015/01/19 20:32:39 markus Exp $ */
+/* $OpenBSD: ssh-keyscan.c,v 1.99 2015/01/30 10:44:49 djm Exp $ */
 /*
  * Copyright 1995, 1996 by David Mazieres <dm@lcs.mit.edu>.
  *
@@ -8,7 +8,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
 #include <sys/time.h>
@@ -302,8 +301,10 @@ tcpconnect(char *host)
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = IPv4or6;
 	hints.ai_socktype = SOCK_STREAM;
-	if ((gaierr = getaddrinfo(host, strport, &hints, &aitop)) != 0)
-		fatal("getaddrinfo %s: %s", host, ssh_gai_strerror(gaierr));
+	if ((gaierr = getaddrinfo(host, strport, &hints, &aitop)) != 0) {
+		error("getaddrinfo %s: %s", host, ssh_gai_strerror(gaierr));
+		return -1;
+	}
 	for (ai = aitop; ai; ai = ai->ai_next) {
 		s = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
 		if (s < 0) {
@@ -447,7 +448,9 @@ congreet(int s)
 		return;
 	}
 	*cp = '\0';
-	c->c_ssh = ssh_packet_set_connection(NULL, s, s);
+	if ((c->c_ssh = ssh_packet_set_connection(NULL, s, s)) == NULL)
+		fatal("ssh_packet_set_connection failed");
+	ssh_packet_set_timeout(c->c_ssh, timeout, 1);
 	ssh_set_app_data(c->c_ssh, c);	/* back link */
 	if (sscanf(buf, "SSH-%d.%d-%[^\n]\n",
 	    &remote_major, &remote_minor, remote_version) == 3)

@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-hostbased.c,v 1.22 2015/01/13 07:39:19 djm Exp $ */
+/* $OpenBSD: auth2-hostbased.c,v 1.24 2015/01/28 22:36:00 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -86,7 +86,6 @@ userauth_hostbased(struct ssh *ssh)
 	sshbuf_dump(b, stderr);
 	sshbuf_free(b);
 #endif
-	/* XXX provide some way to allow admin to specify key types accepted */
 	pktype = sshkey_type_from_name(pkalg);
 	if (pktype == KEY_UNSPEC) {
 		/* this is perfectly legal */
@@ -231,15 +230,17 @@ hostbased_key_allowed(struct passwd *pw, const char *cuser, char *chost,
 
 	if (host_status == HOST_OK) {
 		if (sshkey_is_cert(key)) {
-			fp = sshkey_fingerprint(key->cert->signature_key,
-			    options.fingerprint_hash, SSH_FP_DEFAULT);
+			if ((fp = sshkey_fingerprint(key->cert->signature_key,
+			    options.fingerprint_hash, SSH_FP_DEFAULT)) == NULL)
+				fatal("%s: sshkey_fingerprint fail", __func__);
 			verbose("Accepted certificate ID \"%s\" signed by "
 			    "%s CA %s from %s@%s", key->cert->key_id,
 			    sshkey_type(key->cert->signature_key), fp,
 			    cuser, lookup);
 		} else {
-			fp = sshkey_fingerprint(key, options.fingerprint_hash,
-			    SSH_FP_DEFAULT);
+			if ((fp = sshkey_fingerprint(key,
+			    options.fingerprint_hash, SSH_FP_DEFAULT)) == NULL)
+				fatal("%s: sshkey_fingerprint fail", __func__);
 			verbose("Accepted %s public key %s from %s@%s",
 			    sshkey_type(key), fp, cuser, lookup);
 		}

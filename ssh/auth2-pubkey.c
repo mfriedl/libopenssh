@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-pubkey.c,v 1.45 2015/01/13 07:39:19 djm Exp $ */
+/* $OpenBSD: auth2-pubkey.c,v 1.46 2015/01/28 22:36:00 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -258,13 +258,15 @@ pubkey_auth_info(struct authctxt *authctxt, const struct sshkey *key,
 		auth_info(authctxt, "%s ID %s (serial %llu) CA %s %s%s%s", 
 		    sshkey_type(key), key->cert->key_id,
 		    (unsigned long long)key->cert->serial,
-		    sshkey_type(key->cert->signature_key), fp,
+		    sshkey_type(key->cert->signature_key),
+		    fp == NULL ? "(null)" : "",
 		    extra == NULL ? "" : ", ", extra == NULL ? "" : extra);
 		free(fp);
 	} else {
 		fp = sshkey_fingerprint(key, options.fingerprint_hash,
 		    SSH_FP_DEFAULT);
-		auth_info(authctxt, "%s %s%s%s", sshkey_type(key), fp,
+		auth_info(authctxt, "%s %s%s%s", sshkey_type(key),
+		    fp == NULL ? "(null)" : "",
 		    extra == NULL ? "" : ", ", extra == NULL ? "" : extra);
 		free(fp);
 	}
@@ -408,8 +410,9 @@ check_authkeys_file(FILE *f, char *file, struct sshkey *key, struct passwd *pw)
 				continue;
 			if (!key_is_cert_authority)
 				continue;
-			fp = sshkey_fingerprint(found, options.fingerprint_hash,
-			    SSH_FP_DEFAULT);
+			if ((fp = sshkey_fingerprint(found,
+			    options.fingerprint_hash, SSH_FP_DEFAULT)) == NULL)
+				continue;
 			debug("matching CA found: file %s, line %lu, %s %s",
 			    file, linenum, sshkey_type(found), fp);
 			/*
@@ -448,12 +451,13 @@ check_authkeys_file(FILE *f, char *file, struct sshkey *key, struct passwd *pw)
 				continue;
 			if (key_is_cert_authority)
 				continue;
-			found_key = 1;
-			fp = sshkey_fingerprint(found, options.fingerprint_hash,
-			    SSH_FP_DEFAULT);
+			if ((fp = sshkey_fingerprint(found,
+			    options.fingerprint_hash, SSH_FP_DEFAULT)) == NULL)
+				continue;
 			debug("matching key found: file %s, line %lu %s %s",
 			    file, linenum, sshkey_type(found), fp);
 			free(fp);
+			found_key = 1;
 			break;
 		}
 	}
@@ -476,8 +480,9 @@ user_cert_trusted_ca(struct passwd *pw, struct sshkey *key)
 	if (!sshkey_is_cert(key) || options.trusted_user_ca_keys == NULL)
 		return 0;
 
-	ca_fp = sshkey_fingerprint(key->cert->signature_key,
-	    options.fingerprint_hash, SSH_FP_DEFAULT);
+	if ((ca_fp = sshkey_fingerprint(key->cert->signature_key,
+	    options.fingerprint_hash, SSH_FP_DEFAULT)) == NULL)
+		return 0;
 
 	if ((r = sshkey_in_file(key->cert->signature_key,
 	    options.trusted_user_ca_keys, 1, 0)) != 0) {
