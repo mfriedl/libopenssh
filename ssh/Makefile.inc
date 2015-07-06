@@ -44,7 +44,7 @@ CDIAGFLAGS+=	-Wno-unused-parameter # Not clean for this yet
 
 WARNINGS=yes
 
-SSH1?=		no
+SSH1?=		yes
 OPENSSL?=	yes
 
 .if (${OPENSSL:L} == "yes")

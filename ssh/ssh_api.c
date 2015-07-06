@@ -36,10 +36,10 @@ int	_ssh_send_banner(struct ssh *, char **);
 int	_ssh_read_banner(struct ssh *, char **);
 int	_ssh_order_hostkeyalgs(struct ssh *);
 int	_ssh_verify_host_key(struct sshkey *, struct ssh *);
-struct sshkey *_ssh_host_public_key(int, struct ssh *);
-struct sshkey *_ssh_host_private_key(int, struct ssh *);
+struct sshkey *_ssh_host_public_key(int, int, struct ssh *);
+struct sshkey *_ssh_host_private_key(int, int, struct ssh *);
 int	_ssh_host_key_sign(struct sshkey *, struct sshkey *, u_char **,
-    size_t *, u_char *, size_t, u_int);
+    size_t *, const u_char *, size_t, u_int);
 
 /*
  * stubs for the server side implementation of kex.
@@ -47,7 +47,7 @@ int	_ssh_host_key_sign(struct sshkey *, struct sshkey *, u_char **,
  */
 int	use_privsep = 0;
 int	mm_sshkey_sign(struct sshkey *, u_char **, u_int *,
-    u_char *, u_int, u_int);
+    const u_char *, u_int, u_int);
 DH	*mm_choose_dh(int, int, int);
 
 /* Define these two variables here so that they are part of the library */
@@ -56,7 +56,7 @@ u_int session_id2_len = 0;
 
 int
 mm_sshkey_sign(struct sshkey *key, u_char **sigp, u_int *lenp,
-    u_char *data, u_int datalen, u_int compat)
+    const u_char *data, u_int datalen, u_int compat)
 {
 	return (-1);
 }
@@ -420,11 +420,12 @@ _ssh_exchange_banner(struct ssh *ssh)
 }
 
 struct sshkey *
-_ssh_host_public_key(int type, struct ssh *ssh)
+_ssh_host_public_key(int type, int nid, struct ssh *ssh)
 {
 	struct key_entry *k;
 
 	debug3("%s: need %d", __func__, type);
+	/* XXX check nid */
 	TAILQ_FOREACH(k, &ssh->public_keys, next) {
 		debug3("%s: check %s", __func__, sshkey_type(k->key));
 		if (k->key->type == type)
@@ -434,11 +435,12 @@ _ssh_host_public_key(int type, struct ssh *ssh)
 }
 
 struct sshkey *
-_ssh_host_private_key(int type, struct ssh *ssh)
+_ssh_host_private_key(int type, int nid, struct ssh *ssh)
 {
 	struct key_entry *k;
 
 	debug3("%s: need %d", __func__, type);
+	/* XXX check nid */
 	TAILQ_FOREACH(k, &ssh->private_keys, next) {
 		debug3("%s: check %s", __func__, sshkey_type(k->key));
 		if (k->key->type == type)
@@ -518,7 +520,8 @@ _ssh_order_hostkeyalgs(struct ssh *ssh)
 
 int
 _ssh_host_key_sign(struct sshkey *privkey, struct sshkey *pubkey,
-    u_char **signature, size_t *slen, u_char *data, size_t dlen, u_int compat)
+    u_char **signature, size_t *slen, const u_char *data, size_t dlen,
+    u_int compat)
 {
 	return sshkey_sign(privkey, signature, slen, data, dlen, compat);
 }

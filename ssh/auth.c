@@ -241,19 +241,15 @@ auth_log(struct authctxt *authctxt, int authenticated, int partial,
 void
 auth_maxtries_exceeded(struct ssh *ssh, struct authctxt *authctxt)
 {
-<<<<<<< auth.c
-	sshpkt_disconnect(ssh, "Too many authentication failures");
-	fatal("Too many authentication failures for "
-=======
 	error("maximum authentication attempts exceeded for "
->>>>>>> 1.111
 	    "%s%.100s from %.200s port %d %s",
 	    authctxt->valid ? "" : "invalid user ",
 	    authctxt->user,
 	    ssh_remote_ipaddr(ssh),
 	    ssh_get_remote_port(ssh),
 	    compat20 ? "ssh2" : "ssh1");
-	packet_disconnect("Too many authentication failures");
+	sshpkt_disconnect(ssh, "Too many authentication failures");
+	fatal("Too many authentication failures");	/* XXX */
 	/* NOTREACHED */
 }
 

@@ -61,7 +61,7 @@ kexgex_client(struct ssh *ssh)
 	kex->min = DH_GRP_MIN;
 	kex->max = DH_GRP_MAX;
 	kex->nbits = nbits;
-	if (datafellows & SSH_BUG_DHGEX_LARGE)
+	if (ssh->compat & SSH_BUG_DHGEX_LARGE)
 		kex->nbits = MIN(kex->nbits, 4096);
 	/* New GEX request */
 	if ((r = sshpkt_start(ssh, SSH2_MSG_KEX_DH_GEX_REQUEST)) != 0 ||

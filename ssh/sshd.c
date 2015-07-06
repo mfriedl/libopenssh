@@ -869,25 +869,16 @@ get_hostkey_public_by_index(int ind, struct ssh *ssh)
 }
 
 int
-<<<<<<< sshd.c
-get_hostkey_index(struct sshkey *key, struct ssh *ssh)
-=======
-get_hostkey_index(Key *key, int compare, struct ssh *ssh)
->>>>>>> 1.453
+get_hostkey_index(struct sshkey *key, int compare, struct ssh *ssh)
 {
 	int i;
 
 	for (i = 0; i < options.num_host_key_files; i++) {
-<<<<<<< sshd.c
 		if (sshkey_is_cert(key)) {
-			if (key == sensitive_data.host_certificates[i])
-=======
-		if (key_is_cert(key)) {
 			if (key == sensitive_data.host_certificates[i] ||
 			    (compare && sensitive_data.host_certificates[i] &&
 			    sshkey_equal(key,
 			    sensitive_data.host_certificates[i])))
->>>>>>> 1.453
 				return (i);
 		} else {
 			if (key == sensitive_data.host_keys[i] ||
@@ -913,7 +904,7 @@ notify_hostkeys(struct ssh *ssh)
 	char *fp;
 
 	/* Some clients cannot cope with the hostkeys message, skip those. */
-	if (datafellows & SSH_BUG_HOSTKEYS)
+	if (ssh->compat & SSH_BUG_HOSTKEYS)
 		return;
 
 	if ((buf = sshbuf_new()) == NULL)
@@ -928,22 +919,27 @@ notify_hostkeys(struct ssh *ssh)
 		debug3("%s: key %d: %s %s", __func__, i,
 		    sshkey_ssh_name(key), fp);
 		free(fp);
-		if (nkeys == 0) {
-			packet_start(SSH2_MSG_GLOBAL_REQUEST);
-			packet_put_cstring("hostkeys-00@openssh.com");
-			packet_put_char(0); /* want-reply */
-		}
+		if (nkeys == 0 &&
+		    ((r = sshpkt_start(ssh, SSH2_MSG_GLOBAL_REQUEST)) != 0 ||
+		    (r = sshpkt_put_cstring(ssh, "hostkeys-00@openssh.com"))
+		    != 0 ||
+		    (r = sshpkt_put_u8(ssh, 0)) != 0)) /* want-reply */
+			fatal("%s: couldn't send message %d: %s",
+			    __func__, i, ssh_err(r));
 		sshbuf_reset(buf);
 		if ((r = sshkey_putb(key, buf)) != 0)
 			fatal("%s: couldn't put hostkey %d: %s",
 			    __func__, i, ssh_err(r));
-		packet_put_string(sshbuf_ptr(buf), sshbuf_len(buf));
+		if ((r = sshpkt_putb(ssh, buf)) != 0)
+			fatal("%s: couldn't put encoded hostkey %d: %s",
+			    __func__, i, ssh_err(r));
 		nkeys++;
 	}
 	debug3("%s: sent %d hostkeys", __func__, nkeys);
 	if (nkeys == 0)
 		fatal("%s: no hostkeys", __func__);
-	packet_send();
+	if ((r = sshpkt_send(ssh)) != 0)
+		fatal("%s: couldn't send packet: %s", __func__, ssh_err(r));
 	sshbuf_free(buf);
 }
 
@@ -1081,7 +1077,6 @@ recv_rexec_state(int fd, struct sshbuf *conf)
 	if (key_follows) {
 #ifdef WITH_SSH1
 		if (sensitive_data.server_key != NULL)
-<<<<<<< sshd.c
 			sshkey_free(sensitive_data.server_key);
 		sensitive_data.server_key = sshkey_new_private(KEY_RSA1);
 		if (sensitive_data.server_key == NULL)
@@ -1104,20 +1099,6 @@ recv_rexec_state(int fd, struct sshbuf *conf)
 			fatal("generate RSA parameters failed: %s", ssh_err(r));
 #else
 		fatal("ssh1 not supported");
-=======
-			key_free(sensitive_data.server_key);
-		sensitive_data.server_key = key_new_private(KEY_RSA1);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->e);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->n);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->d);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->iqmp);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->p);
-		buffer_get_bignum(&m, sensitive_data.server_key->rsa->q);
-		if (rsa_generate_additional_parameters(
-		    sensitive_data.server_key->rsa) != 0)
-			fatal("%s: rsa_generate_additional_parameters "
-			    "error", __func__);
->>>>>>> 1.453
 #endif
 	}
 	sshbuf_free(m);
@@ -1643,15 +1624,9 @@ main(int ac, char **av)
 	if ((cfg = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
 	if (rexeced_flag)
-<<<<<<< sshd.c
 		recv_rexec_state(REEXEC_CONFIG_PASS_FD, cfg);
-	else
-		load_server_config(config_file_name, cfg);
-=======
-		recv_rexec_state(REEXEC_CONFIG_PASS_FD, &cfg);
 	else if (strcasecmp(config_file_name, "none") != 0)
-		load_server_config(config_file_name, &cfg);
->>>>>>> 1.453
+		load_server_config(config_file_name, cfg);
 
 	parse_server_config(&options, rexeced_flag ? "rexec" : config_file_name,
 	    cfg, NULL);
@@ -1741,7 +1716,9 @@ main(int ac, char **av)
 			error("Error loading host key \"%s\": %s",
 			    options.host_key_files[i], ssh_err(r));
 		if (pubkey == NULL && key != NULL)
-			pubkey = key_demote(key);
+			if ((r = sshkey_demote(key, &pubkey)) != 0)
+				fatal("Could not demote key: \"%s\": %s",
+				    options.host_key_files[i], ssh_err(r));
 
 		if (key == NULL && pubkey != NULL && pubkey->type != KEY_RSA1 &&
 		    have_agent) {
@@ -1772,10 +1749,6 @@ main(int ac, char **av)
 				sensitive_data.have_ssh2_key = 1;
 			break;
 		}
-<<<<<<< sshd.c
-		debug("private host key: #%d type %d %s", i, keytype,
-		    sshkey_type(key ? key : pubkey));
-=======
 		if ((fp = sshkey_fingerprint(pubkey, options.fingerprint_hash,
 		    SSH_FP_DEFAULT)) == NULL)
 			fatal("sshkey_fingerprint failed");
@@ -1783,7 +1756,6 @@ main(int ac, char **av)
 		    key ? "private" : "agent", i, keytype == KEY_RSA1 ?
 		    sshkey_type(pubkey) : sshkey_ssh_name(pubkey), fp);
 		free(fp);
->>>>>>> 1.453
 	}
 	if ((options.protocol & SSH_PROTO_1) && !sensitive_data.have_ssh1_key) {
 		logit("Disabling protocol version 1. Could not load host key");
@@ -2075,13 +2047,8 @@ main(int ac, char **av)
 	/* Log the connection. */
 	laddr = get_local_ipaddr(sock_in);
 	verbose("Connection from %s port %d on %s port %d",
-<<<<<<< sshd.c
-	    remote_ip, remote_port,
-	    get_local_ipaddr(sock_in), ssh_get_local_port(ssh));
-=======
-	    remote_ip, remote_port, laddr,  get_local_port());
+	    remote_ip, remote_port, laddr, ssh_get_local_port(ssh));
 	free(laddr);
->>>>>>> 1.453
 
 	/*
 	 * We don't want to listen forever unless the other side
@@ -2434,13 +2401,9 @@ do_ssh1_kex(struct ssh *ssh)
 #endif
 
 int
-<<<<<<< sshd.c
 sshd_hostkey_sign(struct sshkey *privkey, struct sshkey *pubkey,
-    u_char **signature, size_t *slen, u_char *data, size_t dlen, u_int compat)
-=======
-sshd_hostkey_sign(Key *privkey, Key *pubkey, u_char **signature, size_t *slen,
-    const u_char *data, size_t dlen, u_int flag)
->>>>>>> 1.453
+    u_char **signature, size_t *slen, const u_char *data, size_t dlen,
+    u_int compat)
 {
 	if (privkey) {
 		return PRIVSEP(sshkey_sign(privkey, signature, slen,

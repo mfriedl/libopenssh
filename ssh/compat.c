@@ -250,17 +250,10 @@ filter_proposal(char *proposal, const char *filter)
 		return NULL;
 	}
 	while ((cp = strsep(&tmp, ",")) != NULL) {
-<<<<<<< compat.c
-		if (match_pattern_list(cp, filter, strlen(cp), 0) != 1) {
+		if (match_pattern_list(cp, filter, 0) != 1) {
 			if (*fix_prop != '\0')
 				strlcat(fix_prop, ",", maxlen);
 			strlcat(fix_prop, cp, maxlen);
-=======
-		if (match_pattern_list(cp, filter, 0) != 1) {
-			if (buffer_len(&b) > 0)
-				buffer_append(&b, ",", 1);
-			buffer_append(&b, cp, strlen(cp));
->>>>>>> 1.94
 		} else
 			debug2("Compat: skipping algorithm \"%s\"", cp);
 	}
@@ -296,33 +289,24 @@ compat_pkalg_proposal(char *pkalg_prop, u_int compat)
 }
 
 char *
-<<<<<<< compat.c
 compat_kex_proposal(char *kex_prop, u_int compat)
-=======
-compat_kex_proposal(char *p)
->>>>>>> 1.94
 {
-<<<<<<< compat.c
-	if (!(compat & SSH_BUG_CURVE25519PAD))
+	if ((compat & (SSH_BUG_CURVE25519PAD|SSH_OLD_DHGEX)) == 0)
 		return kex_prop;
 	debug2("%s: original KEX proposal: %s", __func__, kex_prop);
 	kex_prop = filter_proposal(kex_prop, "curve25519-sha256@libssh.org");
+	if ((compat & SSH_BUG_CURVE25519PAD) != 0)
+		kex_prop = filter_proposal(kex_prop,
+		    "curve25519-sha256@libssh.org");
+	if ((compat & SSH_OLD_DHGEX) != 0) {
+		kex_prop = filter_proposal(kex_prop,
+		    "diffie-hellman-group-exchange-sha256");
+		kex_prop = filter_proposal(kex_prop,
+		    "diffie-hellman-group-exchange-sha1");
+	}
 	debug2("%s: compat KEX proposal: %s", __func__, kex_prop);
 	if (*kex_prop == '\0')
-=======
-	if ((datafellows & (SSH_BUG_CURVE25519PAD|SSH_OLD_DHGEX)) == 0)
-		return p;
-	debug2("%s: original KEX proposal: %s", __func__, p);
-	if ((datafellows & SSH_BUG_CURVE25519PAD) != 0)
-		p = filter_proposal(p, "curve25519-sha256@libssh.org");
-	if ((datafellows & SSH_OLD_DHGEX) != 0) {
-		p = filter_proposal(p, "diffie-hellman-group-exchange-sha256");
-		p = filter_proposal(p, "diffie-hellman-group-exchange-sha1");
-	}
-	debug2("%s: compat KEX proposal: %s", __func__, p);
-	if (*p == '\0')
->>>>>>> 1.94
 		fatal("No supported key exchange algorithms found");
-	return p;
+	return kex_prop;
 }
 

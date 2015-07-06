@@ -125,16 +125,3 @@ ssh_dispatch_run(struct ssh *ssh, int mode, volatile sig_atomic_t *done)
 			return 0;
 	}
 }
-<<<<<<< dispatch.c
-=======
-
-void
-ssh_dispatch_run_fatal(struct ssh *ssh, int mode, volatile sig_atomic_t *done,
-    void *ctxt)
-{
-	int r;
-
-	if ((r = ssh_dispatch_run(ssh, mode, done, ctxt)) != 0)
-		sshpkt_fatal(ssh, __func__, r);
-}
->>>>>>> 1.27

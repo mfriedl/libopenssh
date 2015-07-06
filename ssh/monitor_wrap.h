@@ -40,18 +40,14 @@ struct authctxt;
 void mm_log_handler(LogLevel, const char *, void *);
 int mm_is_monitor(void);
 DH *mm_choose_dh(int, int, int);
-<<<<<<< monitor_wrap.h
-int mm_sshkey_sign(struct sshkey *, u_char **, size_t *, u_char *, size_t, u_int);
-=======
-int mm_key_sign(Key *, u_char **, u_int *, const u_char *, u_int);
->>>>>>> 1.27
+int mm_sshkey_sign(struct sshkey *, u_char **, size_t *, const u_char *, size_t,
+    u_int);
 void mm_inform_authserv(char *, char *);
 struct passwd *mm_getpwnamallow(const char *);
 char *mm_auth2_read_banner(void);
-<<<<<<< monitor_wrap.h
 int mm_auth_password(struct authctxt *, char *);
-int mm_key_allowed(enum mm_keytype, char *, char *, struct sshkey *);
-int mm_user_key_allowed(struct passwd *, struct sshkey *);
+int mm_key_allowed(enum mm_keytype, char *, char *, struct sshkey *, int);
+int mm_user_key_allowed(struct passwd *, struct sshkey *, int);
 int mm_hostbased_key_allowed(struct passwd *, char *, char *, struct sshkey *);
 int mm_auth_rhosts_rsa_key_allowed(struct passwd *, char *, char *,
     struct sshkey *);
@@ -60,17 +56,6 @@ int mm_sshkey_verify(struct sshkey *, u_char *, size_t,
 int mm_auth_rsa_key_allowed(struct passwd *, BIGNUM *, struct sshkey **);
 int mm_auth_rsa_verify_response(struct sshkey *, BIGNUM *, u_char *);
 BIGNUM *mm_auth_rsa_generate_challenge(struct sshkey *);
-=======
-int mm_auth_password(struct Authctxt *, char *);
-int mm_key_allowed(enum mm_keytype, char *, char *, Key *, int);
-int mm_user_key_allowed(struct passwd *, Key *, int);
-int mm_hostbased_key_allowed(struct passwd *, char *, char *, Key *);
-int mm_auth_rhosts_rsa_key_allowed(struct passwd *, char *, char *, Key *);
-int mm_key_verify(Key *, u_char *, u_int, u_char *, u_int);
-int mm_auth_rsa_key_allowed(struct passwd *, BIGNUM *, Key **);
-int mm_auth_rsa_verify_response(Key *, BIGNUM *, u_char *);
-BIGNUM *mm_auth_rsa_generate_challenge(Key *);
->>>>>>> 1.27
 
 #ifdef GSSAPI
 OM_uint32 mm_ssh_gssapi_server_ctx(Gssctxt **, gss_OID);

@@ -1329,13 +1329,10 @@ ssh_login(struct ssh *ssh, Sensitive *sensitive, const char *orighost,
 
 	/* key exchange */
 	/* authenticate user */
-<<<<<<< sshconnect.c
 	ssh->host = host;
 	ssh->hostaddr = hostaddr;
 
-=======
 	debug("Authenticating to %s:%d as '%s'", host, port, server_user);
->>>>>>> 1.262
 	if (compat20) {
 		ssh_kex2(ssh, port);
 		ssh_userauth2(ssh, local_user, server_user, sensitive);

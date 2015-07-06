@@ -217,13 +217,8 @@ mm_choose_dh(int min, int nbits, int max)
 #endif
 
 int
-<<<<<<< monitor_wrap.c
 mm_sshkey_sign(struct sshkey *key, u_char **sigp, size_t *lenp,
-    u_char *data, size_t datalen, u_int compat)
-=======
-mm_key_sign(Key *key, u_char **sigp, u_int *lenp,
-    const u_char *data, u_int datalen)
->>>>>>> 1.85
+    const u_char *data, size_t datalen, u_int compat)
 {
 	struct ssh *ssh = active_state;		/* XXX */
 	struct kex *kex = *pmonitor->m_pkex;
@@ -235,19 +230,12 @@ mm_key_sign(Key *key, u_char **sigp, u_int *lenp,
 		fatal("%s: datalen too large: %zu", __func__, datalen);
 	if ((m = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
-	if ((r = sshbuf_put_u32(m, kex->host_key_index(key, ssh))) != 0 ||
+	if ((r = sshbuf_put_u32(m, kex->host_key_index(key, 1, ssh)))
+	    != 0 ||
 	    (r = sshbuf_put_string(m, data, datalen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
-<<<<<<< monitor_wrap.c
 	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_SIGN, m);
-=======
-	buffer_init(&m);
-	buffer_put_int(&m, kex->host_key_index(key, 0, active_state));
-	buffer_put_string(&m, data, datalen);
-
-	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_SIGN, &m);
->>>>>>> 1.85
 
 	debug3("%s: waiting for MONITOR_ANS_SIGN", __func__);
 	mm_request_receive_expect(pmonitor->m_recvfd, MONITOR_ANS_SIGN, m);
@@ -412,11 +400,8 @@ mm_auth_password(struct authctxt *authctxt, char *password)
 }
 
 int
-<<<<<<< monitor_wrap.c
-mm_user_key_allowed(struct passwd *pw, struct sshkey *key)
-=======
-mm_user_key_allowed(struct passwd *pw, Key *key, int pubkey_auth_attempt)
->>>>>>> 1.85
+mm_user_key_allowed(struct passwd *pw, struct sshkey *key,
+    int pubkey_auth_attempt)
 {
 	return (mm_key_allowed(MM_USERKEY, NULL, NULL, key,
 	    pubkey_auth_attempt));
@@ -442,13 +427,8 @@ mm_auth_rhosts_rsa_key_allowed(struct passwd *pw, char *user,
 }
 
 int
-<<<<<<< monitor_wrap.c
 mm_key_allowed(enum mm_keytype type, char *user, char *host,
-    struct sshkey *key)
-=======
-mm_key_allowed(enum mm_keytype type, char *user, char *host, Key *key,
-    int pubkey_auth_attempt)
->>>>>>> 1.85
+    struct sshkey *key, int pubkey_auth_attempt)
 {
 	struct sshbuf *m;
 	u_char *blob;
@@ -464,22 +444,14 @@ mm_key_allowed(enum mm_keytype type, char *user, char *host, Key *key,
 		return (0);
 	}
 
-<<<<<<< monitor_wrap.c
 	if ((m = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
 	if ((r = sshbuf_put_u32(m, type)) != 0 ||
 	    (r = sshbuf_put_cstring(m, user ? user : "")) != 0 ||
 	    (r = sshbuf_put_cstring(m, host ? host : "")) != 0 ||
-	    (r = sshbuf_put_string(m, blob, len)) != 0)
+	    (r = sshbuf_put_string(m, blob, len)) != 0 ||
+	    (r = sshbuf_put_u32(m, pubkey_auth_attempt)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-=======
-	buffer_init(&m);
-	buffer_put_int(&m, type);
-	buffer_put_cstring(&m, user ? user : "");
-	buffer_put_cstring(&m, host ? host : "");
-	buffer_put_string(&m, blob, len);
-	buffer_put_int(&m, pubkey_auth_attempt);
->>>>>>> 1.85
 	free(blob);
 
 	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_KEYALLOWED, m);

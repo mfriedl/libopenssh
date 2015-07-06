@@ -115,7 +115,7 @@ get_last_login_time(uid_t uid, const char *logname,
 static void
 store_lastlog_message(const char *user, uid_t uid)
 {
-	char *time_string, hostname[HOST_NAME_MAX+1] = "", buf[512];
+	char *time_string, hostname[HOST_NAME_MAX+1] = "";
 	time_t last_login_time;
 	int r;
 

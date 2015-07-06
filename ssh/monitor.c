@@ -601,24 +601,16 @@ mm_answer_moduli(int sock, struct sshbuf *m)
 int
 mm_answer_sign(int sock, struct sshbuf *m)
 {
-<<<<<<< monitor.c
 	struct ssh *ssh = active_state;		/* XXX */
-=======
-	struct ssh *ssh = active_state; 	/* XXX */
->>>>>>> 1.150
 	extern int auth_sock;			/* XXX move to state struct? */
 	struct sshkey *key;
 	struct sshbuf *sigbuf;
 	u_char *p;
 	u_char *signature;
 	size_t datlen, siglen;
-<<<<<<< monitor.c
+	int r, is_proof = 0;
 	u_int keyid;
-	int r;
-=======
-	int r, keyid, is_proof = 0;
 	const char proof_req[] = "hostkeys-prove-00@openssh.com";
->>>>>>> 1.150
 
 	debug3("%s", __func__);
 
@@ -932,29 +924,19 @@ mm_answer_keyallowed(int sock, struct sshbuf *m)
 	struct sshkey *key;
 	char *cuser, *chost;
 	u_char *blob;
-<<<<<<< monitor.c
 	size_t bloblen;
-=======
-	u_int bloblen, pubkey_auth_attempt;
->>>>>>> 1.150
+	u_int pubkey_auth_attempt;
 	enum mm_keytype type = 0;
 	int r, allowed = 0;
 
 	debug3("%s entering", __func__);
 
-<<<<<<< monitor.c
 	if ((r = sshbuf_get_u32(m, &type)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &cuser, NULL)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &chost, NULL)) != 0 ||
-	    (r = sshbuf_get_string(m, &blob, &bloblen)) != 0)
+	    (r = sshbuf_get_string(m, &blob, &bloblen)) != 0 ||
+	    (r = sshbuf_get_u32(m, &pubkey_auth_attempt)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-=======
-	type = buffer_get_int(m);
-	cuser = buffer_get_string(m, NULL);
-	chost = buffer_get_string(m, NULL);
-	blob = buffer_get_string(m, &bloblen);
-	pubkey_auth_attempt = buffer_get_int(m);
->>>>>>> 1.150
 
 	if ((r = sshkey_from_blob(blob, bloblen, &key)) != 0)
 		fatal("%s: cannot parse key: %s", __func__, ssh_err(r));

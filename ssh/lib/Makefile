@@ -44,20 +44,12 @@ SRCS+=	cipher-3des1.c cipher-bf1.c
 .endif
 
 .if (${OPENSSL:L} == "yes")
-<<<<<<< Makefile
-SRCS+=	cipher-3des1.c cipher-bf1.c rsa.c \
-	ssh-dss.c ssh-rsa.c ssh-ecdsa.c dh.c kexdh.c kexgex.c kexecdh.c \
-	kexdhc.c kexgexc.c kexecdhc.c ssh-pkcs11.c \
-	krl.c
-SRCS+=	kexdhs.c kexgexs.c kexecdhs.c
-=======
-SRCS+=	bufec.c bufbn.c rsa.c \
+SRCS+=	rsa.c \
 	ssh-dss.c ssh-rsa.c ssh-ecdsa.c dh.c \
 	kexdh.c kexgex.c kexecdh.c \
 	kexdhc.c kexgexc.c kexecdhc.c \
 	kexdhs.c kexgexs.c kexecdhs.c \
 	ssh-pkcs11.c
->>>>>>> 1.83
 .else
 SRCS+=	rijndael.c cipher-aesctr.c
 .endif

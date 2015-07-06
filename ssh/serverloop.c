@@ -1174,9 +1174,6 @@ server_input_channel_open(int type, u_int32_t seq, struct ssh *ssh)
 }
 
 static int
-<<<<<<< serverloop.c
-server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
-=======
 server_input_hostkeys_prove(struct sshbuf **respp)
 {
 	struct ssh *ssh = active_state; /* XXX */
@@ -1213,7 +1210,7 @@ server_input_hostkeys_prove(struct sshbuf **respp)
 		 * XXX refactor: make kex->sign just use an index rather
 		 * than passing in public and private keys
 		 */
-		if ((key_prv = get_hostkey_by_index(ndx)) == NULL &&
+		if ((key_prv = get_hostkey_by_index(ndx, ssh)) == NULL &&
 		    (key_pub = get_hostkey_public_by_index(ndx, ssh)) == NULL) {
 			error("%s: can't retrieve hostkey %d", __func__, ndx);
 			goto out;
@@ -1247,26 +1244,16 @@ server_input_hostkeys_prove(struct sshbuf **respp)
 }
 
 static int
-server_input_global_request(int type, u_int32_t seq, void *ctxt)
->>>>>>> 1.178
+server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 {
-<<<<<<< serverloop.c
-	char *rtype = NULL, *listen_address = NULL, *cancel_address = NULL;
+	char *rtype = NULL;
 	u_char want_reply;
 	int r, success = 0, allocated_listen_port = 0;
+	struct sshbuf *resp = NULL;
 
 	if ((r = sshpkt_get_cstring(ssh, &rtype, NULL)) != 0 ||
 	    (r = sshpkt_get_u8(ssh, &want_reply)) != 0)
 		goto out;
-=======
-	char *rtype;
-	int want_reply;
-	int r, success = 0, allocated_listen_port = 0;
-	struct sshbuf *resp = NULL;
-
-	rtype = packet_get_string(NULL);
-	want_reply = packet_get_char();
->>>>>>> 1.178
 	debug("server_input_global_request: rtype %s want_reply %d", rtype, want_reply);
 
 	/* -R style forwarding */
@@ -1352,35 +1339,20 @@ server_input_global_request(int type, u_int32_t seq, void *ctxt)
 		success = server_input_hostkeys_prove(&resp);
 	}
 	if (want_reply) {
-<<<<<<< serverloop.c
 		if ((r = sshpkt_start(ssh, success ?
 		    SSH2_MSG_REQUEST_SUCCESS : SSH2_MSG_REQUEST_FAILURE)) != 0 ||
-		    (success && allocated_listen_port > 0 &&
-		    (r = sshpkt_put_u32(ssh, allocated_listen_port)) != 0) ||
+		    (success && resp != NULL &&
+		    (r = sshpkt_put(ssh, sshbuf_ptr(resp), sshbuf_len(resp)))
+		    != 0) ||
 		    (r = sshpkt_send(ssh)) != 0) 
 			goto out;
 		ssh_packet_write_wait(ssh);
-=======
-		packet_start(success ?
-		    SSH2_MSG_REQUEST_SUCCESS : SSH2_MSG_REQUEST_FAILURE);
-		if (success && resp != NULL)
-			ssh_packet_put_raw(active_state, sshbuf_ptr(resp),
-			    sshbuf_len(resp));
-		packet_send();
-		packet_write_wait();
->>>>>>> 1.178
 	}
 	r = 0;
  out:
 	free(rtype);
-<<<<<<< serverloop.c
-	free(listen_address);
-	free(cancel_address);
-	return r;
-=======
 	sshbuf_free(resp);
-	return 0;
->>>>>>> 1.178
+	return r;
 }
 
 static int

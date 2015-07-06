@@ -2347,9 +2347,9 @@ update_known_hosts(struct hostkeys_update_ctx *ctx)
 }
 
 static void
-client_global_hostkeys_private_confirm(int type, u_int32_t seq, void *_ctx)
+client_global_hostkeys_private_confirm(struct ssh *ssh, int type, u_int32_t seq,
+    void *_ctx)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	struct hostkeys_update_ctx *ctx = (struct hostkeys_update_ctx *)_ctx;
 	size_t i, ndone;
 	struct sshbuf *signdata;
@@ -2406,7 +2406,10 @@ client_global_hostkeys_private_confirm(int type, u_int32_t seq, void *_ctx)
 	if (ndone != ctx->nnew)
 		fatal("%s: ndone != ctx->nnew (%zu / %zu)", __func__,
 		    ndone, ctx->nnew);  /* Shouldn't happen */
-	ssh_packet_check_eom(ssh);
+	if ((r = sshpkt_get_end(ssh)) != 0) {
+		error("%s: protocol error", __func__);
+		goto out;
+	}
 
 	/* Make the edits to known_hosts */
 	update_known_hosts(ctx);

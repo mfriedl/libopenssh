@@ -62,13 +62,9 @@
 #include "monitor_wrap.h"
 #include "authfile.h"
 #include "match.h"
-<<<<<<< auth2-pubkey.c
-#include "ssherr.h"
-=======
 #include "ssherr.h"
 #include "channels.h" /* XXX for session.h */
 #include "session.h" /* XXX for child_set_env(); refactor? */
->>>>>>> 1.53
 
 /* import */
 extern ServerOptions options;
@@ -195,15 +191,9 @@ userauth_pubkey(struct ssh *ssh)
 
 		/* test for correct signature */
 		authenticated = 0;
-<<<<<<< auth2-pubkey.c
-		if (PRIVSEP(user_key_allowed(authctxt->pw, key)) &&
+		if (PRIVSEP(user_key_allowed(authctxt->pw, key, 1)) &&
 		    PRIVSEP(sshkey_verify(key, sig, slen, sshbuf_ptr(b),
 		    sshbuf_len(b), ssh->compat)) == 0) {
-=======
-		if (PRIVSEP(user_key_allowed(authctxt->pw, key, 1)) &&
-		    PRIVSEP(key_verify(key, sig, slen, buffer_ptr(&b),
-		    buffer_len(&b))) == 1) {
->>>>>>> 1.53
 			authenticated = 1;
 			/* Record the successful key to prevent reuse */
 			auth2_record_userkey(authctxt, key);
@@ -224,8 +214,7 @@ userauth_pubkey(struct ssh *ssh)
 		 * if a user is not allowed to login. is this an
 		 * issue? -markus
 		 */
-<<<<<<< auth2-pubkey.c
-		if (PRIVSEP(user_key_allowed(authctxt->pw, key))) {
+		if (PRIVSEP(user_key_allowed(authctxt->pw, key, 0))) {
 			if ((r = sshpkt_start(ssh, SSH2_MSG_USERAUTH_PK_OK))
 			    != 0 ||
 			    (r = sshpkt_put_cstring(ssh, pkalg)) != 0 ||
@@ -233,14 +222,6 @@ userauth_pubkey(struct ssh *ssh)
 			    (r = sshpkt_send(ssh)) != 0)
 				fatal("%s: %s", __func__, ssh_err(r));
 			ssh_packet_write_wait(ssh);
-=======
-		if (PRIVSEP(user_key_allowed(authctxt->pw, key, 0))) {
-			packet_start(SSH2_MSG_USERAUTH_PK_OK);
-			packet_put_string(pkalg, alen);
-			packet_put_string(pkblob, blen);
-			packet_send();
-			packet_write_wait();
->>>>>>> 1.53
 			authctxt->postponed = 1;
 		}
 	}
@@ -279,25 +260,15 @@ pubkey_auth_info(struct authctxt *authctxt, const struct sshkey *key,
 		auth_info(authctxt, "%s ID %s (serial %llu) CA %s %s%s%s", 
 		    sshkey_type(key), key->cert->key_id,
 		    (unsigned long long)key->cert->serial,
-<<<<<<< auth2-pubkey.c
 		    sshkey_type(key->cert->signature_key),
-		    fp == NULL ? "(null)" : "",
-=======
-		    key_type(key->cert->signature_key),
 		    fp == NULL ? "(null)" : fp,
->>>>>>> 1.53
 		    extra == NULL ? "" : ", ", extra == NULL ? "" : extra);
 		free(fp);
 	} else {
 		fp = sshkey_fingerprint(key, options.fingerprint_hash,
 		    SSH_FP_DEFAULT);
-<<<<<<< auth2-pubkey.c
 		auth_info(authctxt, "%s %s%s%s", sshkey_type(key),
-		    fp == NULL ? "(null)" : "",
-=======
-		auth_info(authctxt, "%s %s%s%s", key_type(key),
 		    fp == NULL ? "(null)" : fp,
->>>>>>> 1.53
 		    extra == NULL ? "" : ", ", extra == NULL ? "" : extra);
 		free(fp);
 	}
@@ -886,11 +857,7 @@ user_cert_trusted_ca(struct passwd *pw, struct sshkey *key)
 {
 	char *ca_fp, *principals_file = NULL;
 	const char *reason;
-<<<<<<< auth2-pubkey.c
-	int r, ret = 0;
-=======
-	int ret = 0, found_principal = 0, use_authorized_principals;
->>>>>>> 1.53
+	int r, ret = 0, found_principal = 0, use_authorized_principals;
 
 	if (!sshkey_is_cert(key) || options.trusted_user_ca_keys == NULL)
 		return 0;
@@ -928,13 +895,8 @@ user_cert_trusted_ca(struct passwd *pw, struct sshkey *key)
 		auth_debug_add("%s", reason);
 		goto out;
 	}
-<<<<<<< auth2-pubkey.c
 	if (sshkey_cert_check_authority(key, 0, 1,
-	    principals_file == NULL ? pw->pw_name : NULL, &reason) != 0)
-=======
-	if (key_cert_check_authority(key, 0, 1,
 	    use_authorized_principals ? NULL : pw->pw_name, &reason) != 0)
->>>>>>> 1.53
 		goto fail_reason;
 	if (auth_cert_options(key, pw) != 0)
 		goto out;
@@ -1098,11 +1060,7 @@ user_key_command_allowed2(struct passwd *user_pw, struct sshkey *key)
  * Check whether key authenticates and authorises the user.
  */
 int
-<<<<<<< auth2-pubkey.c
-user_key_allowed(struct passwd *pw, struct sshkey *key)
-=======
-user_key_allowed(struct passwd *pw, Key *key, int auth_attempt)
->>>>>>> 1.53
+user_key_allowed(struct passwd *pw, struct sshkey *key, int auth_attempt)
 {
 	u_int success, i;
 	char *file;

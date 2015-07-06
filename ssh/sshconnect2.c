@@ -380,7 +380,7 @@ ssh_userauth2(struct ssh *ssh, const char *local_user, const char *server_user,
 	authctxt->authlist = NULL;
 	authctxt->methoddata = NULL;
 	authctxt->sensitive = sensitive;
-	authctxt->active_ktype = authctxt.oktypes = authctxt.ktypes = NULL;
+	authctxt->active_ktype = authctxt->oktypes = authctxt->ktypes = NULL;
 	authctxt->info_req_seen = 0;
 	authctxt->agent_fd = -1;
 	if (authctxt->method == NULL)
@@ -1577,7 +1577,7 @@ ssh_keysign(struct ssh *ssh, struct sshkey *key, u_char **sigp, size_t *lenp,
 	struct sshbuf *b;
 	struct stat st;
 	pid_t pid;
-	int i, r, to[2], from[2], status, sock = packet_get_connection_in();
+	int i, r, to[2], from[2], status, sock = ssh_packet_get_connection_in(ssh);
 	u_char rversion = 0, version = 2;
 	void (*osigchld)(int);
 
@@ -1688,6 +1688,7 @@ ssh_keysign(struct ssh *ssh, struct sshkey *key, u_char **sigp, size_t *lenp,
 int
 userauth_hostbased(struct ssh *ssh)
 {
+	struct cauthctxt *authctxt = ssh->authctxt;
 	struct sshkey *private = NULL;
 	struct sshbuf *b = NULL;
 	const char *service;
@@ -1753,7 +1754,7 @@ userauth_hostbased(struct ssh *ssh)
 	    __func__, sshkey_ssh_name(private), fp);
 
 	/* figure out a name for the client host */
-	if ((lname = get_local_name(packet_get_connection_in())) == NULL) {
+	if ((lname = get_local_name(ssh_packet_get_connection_in(ssh))) == NULL) {
 		error("%s: cannot get local ipaddr/name", __func__);
 		goto out;
 	}
@@ -1779,7 +1780,7 @@ userauth_hostbased(struct ssh *ssh)
 	    (r = sshbuf_put_cstring(b, authctxt->server_user)) != 0 ||
 	    (r = sshbuf_put_cstring(b, service)) != 0 ||
 	    (r = sshbuf_put_cstring(b, authctxt->method->name)) != 0 ||
-	    (r = sshbuf_put_cstring(b, key_ssh_name(private))) != 0 ||
+	    (r = sshbuf_put_cstring(b, sshkey_ssh_name(private))) != 0 ||
 	    (r = sshbuf_put_string(b, keyblob, keylen)) != 0 ||
 	    (r = sshbuf_put_cstring(b, chost)) != 0 ||
 	    (r = sshbuf_put_cstring(b, authctxt->local_user)) != 0) {
@@ -1791,10 +1792,10 @@ userauth_hostbased(struct ssh *ssh)
 	sshbuf_dump(b, stderr);
 #endif
 	if (authctxt->sensitive->external_keysign)
-		r = ssh_keysign(private, &sig, &siglen,
+		r = ssh_keysign(ssh, private, &sig, &siglen,
 		    sshbuf_ptr(b), sshbuf_len(b));
 	else if ((r = sshkey_sign(private, &sig, &siglen,
-	    sshbuf_ptr(b), sshbuf_len(b), datafellows)) != 0)
+	    sshbuf_ptr(b), sshbuf_len(b), ssh->compat)) != 0)
 		debug("%s: sshkey_sign: %s", __func__, ssh_err(r));
 	if (r != 0) {
 		error("sign using hostkey %s %s failed",
@@ -1805,7 +1806,7 @@ userauth_hostbased(struct ssh *ssh)
 	    (r = sshpkt_put_cstring(ssh, authctxt->server_user)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, authctxt->service)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, authctxt->method->name)) != 0 ||
-	    (r = sshpkt_put_cstring(ssh, key_ssh_name(private))) != 0 ||
+	    (r = sshpkt_put_cstring(ssh, sshkey_ssh_name(private))) != 0 ||
 	    (r = sshpkt_put_string(ssh, keyblob, keylen)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, chost)) != 0 ||
 	    (r = sshpkt_put_cstring(ssh, authctxt->local_user)) != 0 ||

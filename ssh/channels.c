@@ -2366,21 +2366,13 @@ channel_output_poll(void)
 						free(data);
 						continue;
 					}
-<<<<<<< channels.c
 					if ((r = sshpkt_start(ssh,
 					    SSH2_MSG_CHANNEL_DATA)) != 0 ||
 					    (r = sshpkt_put_u32(ssh, c->remote_id)) != 0 ||
 					    (r = sshpkt_put_string(ssh, data, dlen)) != 0 ||
 					    (r = sshpkt_send(ssh)) != 0)
 						CHANNEL_PACKET_ERROR(c, r);
-					c->remote_window -= dlen + 4;
-=======
-					packet_start(SSH2_MSG_CHANNEL_DATA);
-					packet_put_int(c->remote_id);
-					packet_put_string(data, dlen);
-					packet_send();
 					c->remote_window -= dlen;
->>>>>>> 1.347
 					free(data);
 				}
 				continue;
@@ -2799,13 +2791,8 @@ int
 channel_input_window_adjust(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Channel *c;
-<<<<<<< channels.c
 	int r;
-	u_int id, adjust;
-=======
-	int id;
-	u_int adjust, tmp;
->>>>>>> 1.347
+	u_int id, adjust, tmp;
 
 	if (!compat20)
 		return 0;
@@ -2821,18 +2808,11 @@ channel_input_window_adjust(int type, u_int32_t seq, struct ssh *ssh)
 		logit("Received window adjust for non-open channel %d.", id);
 		return 0;
 	}
-<<<<<<< channels.c
-	debug2("channel %u: rcvd adjust %u", id, adjust);
-	c->remote_window += adjust;
-=======
-	adjust = packet_get_int();
-	packet_check_eom();
 	debug2("channel %d: rcvd adjust %u", id, adjust);
 	if ((tmp = c->remote_window + adjust) < c->remote_window)
 		fatal("channel %d: adjust %u overflows remote window %u",
 		    id, adjust, c->remote_window);
 	c->remote_window = tmp;
->>>>>>> 1.347
 	return 0;
 }
 
