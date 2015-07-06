@@ -1,4 +1,4 @@
-/* $OpenBSD: mux.c,v 1.50 2015/01/20 23:14:00 deraadt Exp $ */
+/* $OpenBSD: mux.c,v 1.53 2015/05/01 04:03:20 djm Exp $ */
 /*
  * Copyright (c) 2002-2008 Damien Miller <djm@openbsd.org>
  *
@@ -366,9 +366,14 @@ process_mux_new_session(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *
 			free(cp);
 			continue;
 		}
+<<<<<<< mux.c
 		if ((r = reallocn((void **)&cctx->env, env_len + 2,
 		    sizeof(*cctx->env))) != 0)
 			goto malf;
+=======
+		cctx->env = xreallocarray(cctx->env, env_len + 2,
+		    sizeof(*cctx->env));
+>>>>>>> 1.53
 		cctx->env[env_len++] = cp;
 		cctx->env[env_len] = NULL;
 		if (env_len > MUX_MAX_ENV_VARS) {
@@ -607,9 +612,16 @@ mux_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 		error("%s: unknown channel", __func__);
 		return;
 	}
+<<<<<<< mux.c
 	if ((o = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
 	if (fctx->fid >= options.num_remote_forwards) {
+=======
+	buffer_init(&out);
+	if (fctx->fid >= options.num_remote_forwards ||
+	    (options.remote_forwards[fctx->fid].connect_path == NULL &&
+	    options.remote_forwards[fctx->fid].connect_host == NULL)) {
+>>>>>>> 1.53
 		xasprintf(&failmsg, "unknown forwarding id %d", fctx->fid);
 		goto fail;
 	}
@@ -620,6 +632,7 @@ mux_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 	    rfwd->connect_host, rfwd->connect_port);
 	if (type == SSH2_MSG_REQUEST_SUCCESS) {
 		if (rfwd->listen_port == 0) {
+<<<<<<< mux.c
 			if ((r = sshpkt_get_u32(ssh, &port)) != 0)
 				fatal("%s: packet error: %s",
 				    __func__, ssh_err(r));
@@ -630,6 +643,10 @@ mux_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 			}
 			rfwd->allocated_port = (int)port;
 			logit("Allocated port %u for mux remote forward"
+=======
+			rfwd->allocated_port = packet_get_int();
+			debug("Allocated port %u for mux remote forward"
+>>>>>>> 1.53
 			    " to %s:%d", rfwd->allocated_port,
 			    rfwd->connect_host, rfwd->connect_port);
 			if ((r = sshbuf_put_u32(o, MUX_S_REMOTE_PORT)) != 0 ||
@@ -652,6 +669,17 @@ mux_confirm_remote_forward(struct ssh *ssh, int type, u_int32_t seq, void *ctxt)
 		else
 			xasprintf(&failmsg, "remote port forwarding failed for "
 			    "listen port %d", rfwd->listen_port);
+
+                debug2("%s: clearing registered forwarding for listen %d, "
+		    "connect %s:%d", __func__, rfwd->listen_port,
+		    rfwd->connect_path ? rfwd->connect_path :
+		    rfwd->connect_host, rfwd->connect_port);
+
+		free(rfwd->listen_host);
+		free(rfwd->listen_path);
+		free(rfwd->connect_host);
+		free(rfwd->connect_path);
+		memset(rfwd, 0, sizeof(*rfwd));
 	}
  fail:
 	error("%s: %s", __func__, failmsg);
@@ -1756,6 +1784,7 @@ mux_client_forward(int fd, int cancel_flag, u_int ftype, struct Forward *fwd)
 	case MUX_S_REMOTE_PORT:
 		if (cancel_flag)
 			fatal("%s: got MUX_S_REMOTE_PORT for cancel", __func__);
+<<<<<<< mux.c
 		if ((r = sshbuf_get_u32(m, &port)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		if (port > 65535) {
@@ -1766,6 +1795,10 @@ mux_client_forward(int fd, int cancel_flag, u_int ftype, struct Forward *fwd)
 		}
 		fwd->allocated_port = (int)port;
 		logit("Allocated port %u for remote forward to %s:%d",
+=======
+		fwd->allocated_port = buffer_get_int(&m);
+		verbose("Allocated port %u for remote forward to %s:%d",
+>>>>>>> 1.53
 		    fwd->allocated_port,
 		    fwd->connect_host ? fwd->connect_host : "",
 		    fwd->connect_port);

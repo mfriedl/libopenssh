@@ -1,4 +1,4 @@
-/*	$OpenBSD: sshbuf-misc.c,v 1.2 2014/06/24 01:13:21 djm Exp $	*/
+/*	$OpenBSD: sshbuf-misc.c,v 1.4 2015/03/24 20:03:44 markus Exp $	*/
 /*
  * Copyright (c) 2011 Damien Miller
  *
@@ -20,6 +20,7 @@
 #include <netinet/in.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <limits.h>
 #include <string.h>
@@ -37,7 +38,7 @@ sshbuf_dump_data(const void *s, size_t len, FILE *f)
 	const u_char *p = (const u_char *)s;
 
 	for (i = 0; i < len; i += 16) {
-		fprintf(f, "%.4zd: ", i);
+		fprintf(f, "%.4zu: ", i);
 		for (j = i; j < i + 16; j++) {
 			if (j < len)
 				fprintf(f, "%02x ", p[j]);

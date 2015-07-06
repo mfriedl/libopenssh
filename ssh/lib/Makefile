@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.82 2015/01/19 20:30:24 markus Exp $
+#	$OpenBSD: Makefile,v 1.83 2015/03/03 21:21:13 djm Exp $
 
 .PATH:		${.CURDIR}/..
 .include "${.CURDIR}/../Makefile.inc"
@@ -39,12 +39,25 @@ SRCS+=	kexc25519s.c
 SRCS+=	ssh_api.c
 SRCS+=	roaming_dummy.c
 
+.if (${SSH1:L} == "yes")
+SRCS+=	cipher-3des1.c cipher-bf1.c
+.endif
+
 .if (${OPENSSL:L} == "yes")
+<<<<<<< Makefile
 SRCS+=	cipher-3des1.c cipher-bf1.c rsa.c \
 	ssh-dss.c ssh-rsa.c ssh-ecdsa.c dh.c kexdh.c kexgex.c kexecdh.c \
 	kexdhc.c kexgexc.c kexecdhc.c ssh-pkcs11.c \
 	krl.c
 SRCS+=	kexdhs.c kexgexs.c kexecdhs.c
+=======
+SRCS+=	bufec.c bufbn.c rsa.c \
+	ssh-dss.c ssh-rsa.c ssh-ecdsa.c dh.c \
+	kexdh.c kexgex.c kexecdh.c \
+	kexdhc.c kexgexc.c kexecdhc.c \
+	kexdhs.c kexgexs.c kexecdhs.c \
+	ssh-pkcs11.c
+>>>>>>> 1.83
 .else
 SRCS+=	rijndael.c cipher-aesctr.c
 .endif

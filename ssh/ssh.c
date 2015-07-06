@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh.c,v 1.414 2015/01/20 23:14:00 deraadt Exp $ */
+/* $OpenBSD: ssh.c,v 1.418 2015/05/04 06:10:48 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -337,10 +337,8 @@ check_follow_cname(char **namep, const char *cname)
 	debug3("%s: check \"%s\" CNAME \"%s\"", __func__, *namep, cname);
 	for (i = 0; i < options.num_permitted_cnames; i++) {
 		rule = options.permitted_cnames + i;
-		if (match_pattern_list(*namep, rule->source_list,
-		    strlen(rule->source_list), 1) != 1 ||
-		    match_pattern_list(cname, rule->target_list,
-		    strlen(rule->target_list), 1) != 1)
+		if (match_pattern_list(*namep, rule->source_list, 1) != 1 ||
+		    match_pattern_list(cname, rule->target_list, 1) != 1)
 			continue;
 		verbose("Canonicalized DNS aliased hostname "
 		    "\"%s\" => \"%s\"", *namep, cname);
@@ -669,6 +667,13 @@ main(int ac, char **av)
 				cp = key_alg_list(1, 0);
 			else if (strcmp(optarg, "key-plain") == 0)
 				cp = key_alg_list(0, 1);
+			else if (strcmp(optarg, "protocol-version") == 0) {
+#ifdef WITH_SSH1
+				cp = xstrdup("1\n2");
+#else
+				cp = xstrdup("2");
+#endif
+			}
 			if (cp == NULL)
 				fatal("Unsupported query \"%s\"", optarg);
 			printf("%s\n", cp);
@@ -1065,6 +1070,12 @@ main(int ac, char **av)
 	    strcmp(options.proxy_command, "-") == 0 &&
 	    options.proxy_use_fdpass)
 		fatal("ProxyCommand=- and ProxyUseFDPass are incompatible");
+	if (options.control_persist &&
+	    options.update_hostkeys == SSH_UPDATE_HOSTKEYS_ASK) {
+		debug("UpdateHostKeys=ask is incompatible with ControlPersist; "
+		    "disabling");
+		options.update_hostkeys = 0;
+	}
 	if (original_effective_uid != 0)
 		options.use_privileged_port = 0;
 
@@ -1646,6 +1657,8 @@ ssh_session(struct ssh *ssh)
 	}
 	/* Request X11 forwarding if enabled and DISPLAY is set. */
 	display = getenv("DISPLAY");
+	if (display == NULL && options.forward_x11)
+		debug("X11 forwarding requested but DISPLAY not set");
 	if (options.forward_x11 && display != NULL) {
 		char *proto, *data;
 		/* Get reasonable local authentication information. */
@@ -1752,6 +1765,8 @@ ssh_session2_setup(u_int id, int success, void *arg)
 		return; /* No need for error message, channels code sens one */
 
 	display = getenv("DISPLAY");
+	if (display == NULL && options.forward_x11)
+		debug("X11 forwarding requested but DISPLAY not set");
 	if (options.forward_x11 && display != NULL) {
 		char *proto, *data;
 		/* Get reasonable local authentication information. */

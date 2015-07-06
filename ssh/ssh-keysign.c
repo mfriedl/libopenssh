@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keysign.c,v 1.47 2015/01/28 22:36:00 djm Exp $ */
+/* $OpenBSD: ssh-keysign.c,v 1.49 2015/07/03 03:56:25 djm Exp $ */
 /*
  * Copyright (c) 2002 Markus Friedl.  All rights reserved.
  *
@@ -147,7 +147,7 @@ valid_request(struct passwd *pw, char *host, struct sshkey **ret,
 
 	if (fail && key != NULL)
 		sshkey_free(key);
-	else
+	else if (ret != NULL)
 		*ret = key;
 
 	return (fail ? -1 : 0);
@@ -174,6 +174,7 @@ main(int argc, char **argv)
 		close(fd);
 
 	i = 0;
+	/* XXX This really needs to read sshd_config for the paths */
 	key_fd[i++] = open(_PATH_HOST_DSA_KEY_FILE, O_RDONLY);
 	key_fd[i++] = open(_PATH_HOST_ECDSA_KEY_FILE, O_RDONLY);
 	key_fd[i++] = open(_PATH_HOST_ED25519_KEY_FILE, O_RDONLY);

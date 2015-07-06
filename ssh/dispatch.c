@@ -1,4 +1,4 @@
-/* $OpenBSD: dispatch.c,v 1.25 2015/01/30 01:13:33 djm Exp $ */
+/* $OpenBSD: dispatch.c,v 1.27 2015/05/01 07:10:01 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -125,3 +125,16 @@ ssh_dispatch_run(struct ssh *ssh, int mode, volatile sig_atomic_t *done)
 			return 0;
 	}
 }
+<<<<<<< dispatch.c
+=======
+
+void
+ssh_dispatch_run_fatal(struct ssh *ssh, int mode, volatile sig_atomic_t *done,
+    void *ctxt)
+{
+	int r;
+
+	if ((r = ssh_dispatch_run(ssh, mode, done, ctxt)) != 0)
+		sshpkt_fatal(ssh, __func__, r);
+}
+>>>>>>> 1.27

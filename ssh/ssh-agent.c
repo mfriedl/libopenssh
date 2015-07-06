@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-agent.c,v 1.197 2015/01/28 22:36:00 djm Exp $ */
+/* $OpenBSD: ssh-agent.c,v 1.203 2015/05/15 05:44:21 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -57,6 +57,7 @@
 #include <limits.h>
 #include <time.h>
 #include <unistd.h>
+#include <util.h>
 
 #include "xmalloc.h"
 #include "ssh.h"
@@ -122,8 +123,12 @@ char socket_name[PATH_MAX];
 char socket_dir[PATH_MAX];
 
 /* locking */
+#define LOCK_SIZE	32
+#define LOCK_SALT_SIZE	16
+#define LOCK_ROUNDS	1
 int locked = 0;
-char *lock_passwd = NULL;
+char lock_passwd[LOCK_SIZE];
+char lock_salt[LOCK_SALT_SIZE];
 
 extern char *__progname;
 
@@ -522,6 +527,7 @@ reaper(void)
  * XXX this and the corresponding serialisation function probably belongs
  * in key.c
  */
+#ifdef WITH_SSH1
 static int
 agent_decode_rsa1(struct sshbuf *m, struct sshkey **kp)
 {
@@ -559,6 +565,7 @@ agent_decode_rsa1(struct sshbuf *m, struct sshkey **kp)
 		sshkey_free(k);
 	return r;
 }
+#endif /* WITH_SSH1 */
 
 static void
 process_add_identity(SocketEntry *e, int version)
@@ -640,23 +647,45 @@ send:
 static void
 process_lock_agent(SocketEntry *e, int lock)
 {
-	int r, success = 0;
-	char *passwd;
+	int r, success = 0, delay;
+	char *passwd, passwdhash[LOCK_SIZE];
+	static u_int fail_count = 0;
+	size_t pwlen;
 
-	if ((r = sshbuf_get_cstring(e->request, &passwd, NULL)) != 0)
+	if ((r = sshbuf_get_cstring(e->request, &passwd, &pwlen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	if (locked && !lock && strcmp(passwd, lock_passwd) == 0) {
-		locked = 0;
-		explicit_bzero(lock_passwd, strlen(lock_passwd));
-		free(lock_passwd);
-		lock_passwd = NULL;
-		success = 1;
+	if (pwlen == 0) {
+		debug("empty password not supported");
+	} else if (locked && !lock) {
+		if (bcrypt_pbkdf(passwd, pwlen, lock_salt, sizeof(lock_salt),
+		    passwdhash, sizeof(passwdhash), LOCK_ROUNDS) < 0)
+			fatal("bcrypt_pbkdf");
+		if (timingsafe_bcmp(passwdhash, lock_passwd, LOCK_SIZE) == 0) {
+			debug("agent unlocked");
+			locked = 0;
+			fail_count = 0;
+			explicit_bzero(lock_passwd, sizeof(lock_passwd));
+			success = 1;
+		} else {
+			/* delay in 0.1s increments up to 10s */
+			if (fail_count < 100)
+				fail_count++;
+			delay = 100000 * fail_count;
+			debug("unlock failed, delaying %0.1lf seconds",
+			    (double)delay/1000000);
+			usleep(delay);
+		}
+		explicit_bzero(passwdhash, sizeof(passwdhash));
 	} else if (!locked && lock) {
+		debug("agent locked");
 		locked = 1;
-		lock_passwd = xstrdup(passwd);
+		arc4random_buf(lock_salt, sizeof(lock_salt));
+		if (bcrypt_pbkdf(passwd, pwlen, lock_salt, sizeof(lock_salt),
+		    lock_passwd, sizeof(lock_passwd), LOCK_ROUNDS) < 0)
+			fatal("bcrypt_pbkdf");
 		success = 1;
 	}
-	explicit_bzero(passwd, strlen(passwd));
+	explicit_bzero(passwd, pwlen);
 	free(passwd);
 	send_status(e, success);
 }
@@ -846,10 +875,10 @@ process_message(SocketEntry *e)
 	case SSH_AGENTC_REMOVE_RSA_IDENTITY:
 		process_remove_identity(e, 1);
 		break;
-	case SSH_AGENTC_REMOVE_ALL_RSA_IDENTITIES:
-		process_remove_all_identities(e, 1);
-		break;
 #endif
+	case SSH_AGENTC_REMOVE_ALL_RSA_IDENTITIES:
+		process_remove_all_identities(e, 1); /* safe for !WITH_SSH1 */
+		break;
 	/* ssh2 */
 	case SSH2_AGENTC_SIGN_REQUEST:
 		process_sign_request2(e);
@@ -909,7 +938,7 @@ new_socket(sock_type type, int fd)
 		}
 	old_alloc = sockets_alloc;
 	new_alloc = sockets_alloc + 10;
-	sockets = xrealloc(sockets, new_alloc, sizeof(sockets[0]));
+	sockets = xreallocarray(sockets, new_alloc, sizeof(sockets[0]));
 	for (i = old_alloc; i < new_alloc; i++)
 		sockets[i].type = AUTH_UNUSED;
 	sockets_alloc = new_alloc;
@@ -1115,7 +1144,7 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: ssh-agent [-c | -s] [-d] [-a bind_address] [-E fingerprint_hash]\n"
+	    "usage: ssh-agent [-c | -s] [-Dd] [-a bind_address] [-E fingerprint_hash]\n"
 	    "                 [-t life] [command [arg ...]]\n"
 	    "       ssh-agent [-c | -s] -k\n");
 	exit(1);
@@ -1124,7 +1153,7 @@ usage(void)
 int
 main(int ac, char **av)
 {
-	int c_flag = 0, d_flag = 0, k_flag = 0, s_flag = 0;
+	int c_flag = 0, d_flag = 0, D_flag = 0, k_flag = 0, s_flag = 0;
 	int sock, fd, ch, result, saved_errno;
 	u_int nalloc;
 	char *shell, *format, *pidstr, *agentsocket = NULL;
@@ -1149,7 +1178,7 @@ main(int ac, char **av)
 	OpenSSL_add_all_algorithms();
 #endif
 
-	while ((ch = getopt(ac, av, "cdksE:a:t:")) != -1) {
+	while ((ch = getopt(ac, av, "cDdksE:a:t:")) != -1) {
 		switch (ch) {
 		case 'E':
 			fingerprint_hash = ssh_digest_alg_by_name(optarg);
@@ -1170,9 +1199,14 @@ main(int ac, char **av)
 			s_flag++;
 			break;
 		case 'd':
-			if (d_flag)
+			if (d_flag || D_flag)
 				usage();
 			d_flag++;
+			break;
+		case 'D':
+			if (d_flag || D_flag)
+				usage();
+			D_flag++;
 			break;
 		case 'a':
 			agentsocket = optarg;
@@ -1190,7 +1224,7 @@ main(int ac, char **av)
 	ac -= optind;
 	av += optind;
 
-	if (ac > 0 && (c_flag || k_flag || s_flag || d_flag))
+	if (ac > 0 && (c_flag || k_flag || s_flag || d_flag || D_flag))
 		usage();
 
 	if (ac == 0 && !c_flag && !s_flag) {
@@ -1259,8 +1293,10 @@ main(int ac, char **av)
 	 * Fork, and have the parent execute the command, if any, or present
 	 * the socket data.  The child continues as the authentication agent.
 	 */
-	if (d_flag) {
-		log_init(__progname, SYSLOG_LEVEL_DEBUG1, SYSLOG_FACILITY_AUTH, 1);
+	if (D_flag || d_flag) {
+		log_init(__progname,
+		    d_flag ? SYSLOG_LEVEL_DEBUG3 : SYSLOG_LEVEL_INFO,
+		    SYSLOG_FACILITY_AUTH, 1);
 		format = c_flag ? "setenv %s %s;\n" : "%s=%s; export %s;\n";
 		printf(format, SSH_AUTHSOCKET_ENV_NAME, socket_name,
 		    SSH_AUTHSOCKET_ENV_NAME);
@@ -1330,7 +1366,7 @@ skip:
 		parent_alive_interval = 10;
 	idtab_init();
 	signal(SIGPIPE, SIG_IGN);
-	signal(SIGINT, d_flag ? cleanup_handler : SIG_IGN);
+	signal(SIGINT, (d_flag | D_flag) ? cleanup_handler : SIG_IGN);
 	signal(SIGHUP, cleanup_handler);
 	signal(SIGTERM, cleanup_handler);
 	nalloc = 0;

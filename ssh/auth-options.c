@@ -1,4 +1,4 @@
-/* $OpenBSD: auth-options.c,v 1.65 2015/01/14 10:30:34 markus Exp $ */
+/* $OpenBSD: auth-options.c,v 1.68 2015/07/03 03:43:18 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -206,8 +206,7 @@ auth_parse_options(struct passwd *pw, char *opts, char *file, u_long linenum)
 			goto next_option;
 		}
 		cp = "environment=\"";
-		if (options.permit_user_env &&
-		    strncasecmp(opts, cp, strlen(cp)) == 0) {
+		if (strncasecmp(opts, cp, strlen(cp)) == 0) {
 			char *s;
 			struct envstring *new_envstring;
 
@@ -233,13 +232,19 @@ auth_parse_options(struct passwd *pw, char *opts, char *file, u_long linenum)
 				goto bad_option;
 			}
 			s[i] = '\0';
-			auth_debug_add("Adding to environment: %.900s", s);
-			debug("Adding to environment: %.900s", s);
 			opts++;
-			new_envstring = xcalloc(1, sizeof(struct envstring));
-			new_envstring->s = s;
-			new_envstring->next = custom_environment;
-			custom_environment = new_envstring;
+			if (options.permit_user_env) {
+				auth_debug_add("Adding to environment: "
+				    "%.900s", s);
+				debug("Adding to environment: %.900s", s);
+				new_envstring = xcalloc(1,
+				    sizeof(*new_envstring));
+				new_envstring->s = s;
+				new_envstring->next = custom_environment;
+				custom_environment = new_envstring;
+				s = NULL;
+			}
+			free(s);
 			goto next_option;
 		}
 		cp = "from=\"";
@@ -581,35 +586,21 @@ auth_cert_options(struct sshkey *k, struct passwd *pw)
 	char *cert_forced_command = NULL;
 	int cert_source_address_done = 0;
 
-	if (sshkey_cert_is_legacy(k)) {
-		/* All options are in the one field for v00 certs */
-		if (parse_option_list(k->cert->critical, pw,
-		    OPTIONS_CRITICAL|OPTIONS_EXTENSIONS, 1,
-		    &cert_no_port_forwarding_flag,
-		    &cert_no_agent_forwarding_flag,
-		    &cert_no_x11_forwarding_flag,
-		    &cert_no_pty_flag,
-		    &cert_no_user_rc,
-		    &cert_forced_command,
-		    &cert_source_address_done) == -1)
-			return -1;
-	} else {
-		/* Separate options and extensions for v01 certs */
-		if (parse_option_list(k->cert->critical, pw,
-		    OPTIONS_CRITICAL, 1, NULL, NULL, NULL, NULL, NULL,
-		    &cert_forced_command,
-		    &cert_source_address_done) == -1)
-			return -1;
-		if (parse_option_list(k->cert->extensions, pw,
-		    OPTIONS_EXTENSIONS, 1,
-		    &cert_no_port_forwarding_flag,
-		    &cert_no_agent_forwarding_flag,
-		    &cert_no_x11_forwarding_flag,
-		    &cert_no_pty_flag,
-		    &cert_no_user_rc,
-		    NULL, NULL) == -1)
-			return -1;
-	}
+	/* Separate options and extensions for v01 certs */
+	if (parse_option_list(k->cert->critical, pw,
+	    OPTIONS_CRITICAL, 1, NULL, NULL, NULL, NULL, NULL,
+	    &cert_forced_command,
+	    &cert_source_address_done) == -1)
+		return -1;
+	if (parse_option_list(k->cert->extensions, pw,
+	    OPTIONS_EXTENSIONS, 0,
+	    &cert_no_port_forwarding_flag,
+	    &cert_no_agent_forwarding_flag,
+	    &cert_no_x11_forwarding_flag,
+	    &cert_no_pty_flag,
+	    &cert_no_user_rc,
+	    NULL, NULL) == -1)
+		return -1;
 
 	no_port_forwarding_flag |= cert_no_port_forwarding_flag;
 	no_agent_forwarding_flag |= cert_no_agent_forwarding_flag;

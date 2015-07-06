@@ -1,4 +1,4 @@
-/* $OpenBSD: auth.c,v 1.109 2015/01/20 23:14:00 deraadt Exp $ */
+/* $OpenBSD: auth.c,v 1.111 2015/05/01 04:17:51 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -241,14 +241,19 @@ auth_log(struct authctxt *authctxt, int authenticated, int partial,
 void
 auth_maxtries_exceeded(struct ssh *ssh, struct authctxt *authctxt)
 {
+<<<<<<< auth.c
 	sshpkt_disconnect(ssh, "Too many authentication failures");
 	fatal("Too many authentication failures for "
+=======
+	error("maximum authentication attempts exceeded for "
+>>>>>>> 1.111
 	    "%s%.100s from %.200s port %d %s",
 	    authctxt->valid ? "" : "invalid user ",
 	    authctxt->user,
 	    ssh_remote_ipaddr(ssh),
 	    ssh_get_remote_port(ssh),
 	    compat20 ? "ssh2" : "ssh1");
+	packet_disconnect("Too many authentication failures");
 	/* NOTREACHED */
 }
 
@@ -312,8 +317,7 @@ expand_authorized_keys(const char *filename, struct passwd *pw)
 char *
 authorized_principals_file(struct passwd *pw)
 {
-	if (options.authorized_principals_file == NULL ||
-	    strcasecmp(options.authorized_principals_file, "none") == 0)
+	if (options.authorized_principals_file == NULL)
 		return NULL;
 	return expand_authorized_keys(options.authorized_principals_file, pw);
 }

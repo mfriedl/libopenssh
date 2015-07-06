@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor_wrap.c,v 1.83 2015/01/19 20:16:15 markus Exp $ */
+/* $OpenBSD: monitor_wrap.c,v 1.85 2015/05/01 03:23:51 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -217,8 +217,13 @@ mm_choose_dh(int min, int nbits, int max)
 #endif
 
 int
+<<<<<<< monitor_wrap.c
 mm_sshkey_sign(struct sshkey *key, u_char **sigp, size_t *lenp,
     u_char *data, size_t datalen, u_int compat)
+=======
+mm_key_sign(Key *key, u_char **sigp, u_int *lenp,
+    const u_char *data, u_int datalen)
+>>>>>>> 1.85
 {
 	struct ssh *ssh = active_state;		/* XXX */
 	struct kex *kex = *pmonitor->m_pkex;
@@ -234,7 +239,15 @@ mm_sshkey_sign(struct sshkey *key, u_char **sigp, size_t *lenp,
 	    (r = sshbuf_put_string(m, data, datalen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
+<<<<<<< monitor_wrap.c
 	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_SIGN, m);
+=======
+	buffer_init(&m);
+	buffer_put_int(&m, kex->host_key_index(key, 0, active_state));
+	buffer_put_string(&m, data, datalen);
+
+	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_SIGN, &m);
+>>>>>>> 1.85
 
 	debug3("%s: waiting for MONITOR_ANS_SIGN", __func__);
 	mm_request_receive_expect(pmonitor->m_recvfd, MONITOR_ANS_SIGN, m);
@@ -399,16 +412,21 @@ mm_auth_password(struct authctxt *authctxt, char *password)
 }
 
 int
+<<<<<<< monitor_wrap.c
 mm_user_key_allowed(struct passwd *pw, struct sshkey *key)
+=======
+mm_user_key_allowed(struct passwd *pw, Key *key, int pubkey_auth_attempt)
+>>>>>>> 1.85
 {
-	return (mm_key_allowed(MM_USERKEY, NULL, NULL, key));
+	return (mm_key_allowed(MM_USERKEY, NULL, NULL, key,
+	    pubkey_auth_attempt));
 }
 
 int
 mm_hostbased_key_allowed(struct passwd *pw, char *user, char *host,
     struct sshkey *key)
 {
-	return (mm_key_allowed(MM_HOSTKEY, user, host, key));
+	return (mm_key_allowed(MM_HOSTKEY, user, host, key, 0));
 }
 
 int
@@ -418,14 +436,19 @@ mm_auth_rhosts_rsa_key_allowed(struct passwd *pw, char *user,
 	int ret;
 
 	key->type = KEY_RSA; /* XXX hack for key_to_blob */
-	ret = mm_key_allowed(MM_RSAHOSTKEY, user, host, key);
+	ret = mm_key_allowed(MM_RSAHOSTKEY, user, host, key, 0);
 	key->type = KEY_RSA1;
 	return (ret);
 }
 
 int
+<<<<<<< monitor_wrap.c
 mm_key_allowed(enum mm_keytype type, char *user, char *host,
     struct sshkey *key)
+=======
+mm_key_allowed(enum mm_keytype type, char *user, char *host, Key *key,
+    int pubkey_auth_attempt)
+>>>>>>> 1.85
 {
 	struct sshbuf *m;
 	u_char *blob;
@@ -441,6 +464,7 @@ mm_key_allowed(enum mm_keytype type, char *user, char *host,
 		return (0);
 	}
 
+<<<<<<< monitor_wrap.c
 	if ((m = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
 	if ((r = sshbuf_put_u32(m, type)) != 0 ||
@@ -448,6 +472,14 @@ mm_key_allowed(enum mm_keytype type, char *user, char *host,
 	    (r = sshbuf_put_cstring(m, host ? host : "")) != 0 ||
 	    (r = sshbuf_put_string(m, blob, len)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+=======
+	buffer_init(&m);
+	buffer_put_int(&m, type);
+	buffer_put_cstring(&m, user ? user : "");
+	buffer_put_cstring(&m, host ? host : "");
+	buffer_put_string(&m, blob, len);
+	buffer_put_int(&m, pubkey_auth_attempt);
+>>>>>>> 1.85
 	free(blob);
 
 	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_KEYALLOWED, m);

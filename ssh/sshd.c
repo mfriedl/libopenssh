@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.440 2015/01/26 06:10:03 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.453 2015/07/03 03:49:45 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -791,8 +791,6 @@ list_hostkey_types(void)
 		if (key == NULL)
 			continue;
 		switch (key->type) {
-		case KEY_RSA_CERT_V00:
-		case KEY_DSA_CERT_V00:
 		case KEY_RSA_CERT:
 		case KEY_DSA_CERT:
 		case KEY_ECDSA_CERT:
@@ -821,8 +819,6 @@ get_hostkey_by_type(int type, int nid, int need_private, struct ssh *ssh)
 
 	for (i = 0; i < options.num_host_key_files; i++) {
 		switch (type) {
-		case KEY_RSA_CERT_V00:
-		case KEY_DSA_CERT_V00:
 		case KEY_RSA_CERT:
 		case KEY_DSA_CERT:
 		case KEY_ECDSA_CERT:
@@ -873,18 +869,34 @@ get_hostkey_public_by_index(int ind, struct ssh *ssh)
 }
 
 int
+<<<<<<< sshd.c
 get_hostkey_index(struct sshkey *key, struct ssh *ssh)
+=======
+get_hostkey_index(Key *key, int compare, struct ssh *ssh)
+>>>>>>> 1.453
 {
 	int i;
 
 	for (i = 0; i < options.num_host_key_files; i++) {
+<<<<<<< sshd.c
 		if (sshkey_is_cert(key)) {
 			if (key == sensitive_data.host_certificates[i])
+=======
+		if (key_is_cert(key)) {
+			if (key == sensitive_data.host_certificates[i] ||
+			    (compare && sensitive_data.host_certificates[i] &&
+			    sshkey_equal(key,
+			    sensitive_data.host_certificates[i])))
+>>>>>>> 1.453
 				return (i);
 		} else {
-			if (key == sensitive_data.host_keys[i])
+			if (key == sensitive_data.host_keys[i] ||
+			    (compare && sensitive_data.host_keys[i] &&
+			    sshkey_equal(key, sensitive_data.host_keys[i])))
 				return (i);
-			if (key == sensitive_data.host_pubkeys[i])
+			if (key == sensitive_data.host_pubkeys[i] ||
+			    (compare && sensitive_data.host_pubkeys[i] &&
+			    sshkey_equal(key, sensitive_data.host_pubkeys[i])))
 				return (i);
 		}
 	}
@@ -900,6 +912,10 @@ notify_hostkeys(struct ssh *ssh)
 	int i, nkeys, r;
 	char *fp;
 
+	/* Some clients cannot cope with the hostkeys message, skip those. */
+	if (datafellows & SSH_BUG_HOSTKEYS)
+		return;
+
 	if ((buf = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new", __func__);
 	for (i = nkeys = 0; i < options.num_host_key_files; i++) {
@@ -912,19 +928,23 @@ notify_hostkeys(struct ssh *ssh)
 		debug3("%s: key %d: %s %s", __func__, i,
 		    sshkey_ssh_name(key), fp);
 		free(fp);
-		if ((r = sshkey_puts(key, buf)) != 0)
+		if (nkeys == 0) {
+			packet_start(SSH2_MSG_GLOBAL_REQUEST);
+			packet_put_cstring("hostkeys-00@openssh.com");
+			packet_put_char(0); /* want-reply */
+		}
+		sshbuf_reset(buf);
+		if ((r = sshkey_putb(key, buf)) != 0)
 			fatal("%s: couldn't put hostkey %d: %s",
 			    __func__, i, ssh_err(r));
+		packet_put_string(sshbuf_ptr(buf), sshbuf_len(buf));
 		nkeys++;
 	}
+	debug3("%s: sent %d hostkeys", __func__, nkeys);
 	if (nkeys == 0)
 		fatal("%s: no hostkeys", __func__);
-	debug3("%s: send %d hostkeys", __func__, nkeys);
-	packet_start(SSH2_MSG_GLOBAL_REQUEST);
-	packet_put_cstring("hostkeys@openssh.com");
-	packet_put_char(0); /* want-reply */
-	packet_put_string(sshbuf_ptr(buf), sshbuf_len(buf));
 	packet_send();
+	sshbuf_free(buf);
 }
 
 /*
@@ -1061,6 +1081,7 @@ recv_rexec_state(int fd, struct sshbuf *conf)
 	if (key_follows) {
 #ifdef WITH_SSH1
 		if (sensitive_data.server_key != NULL)
+<<<<<<< sshd.c
 			sshkey_free(sensitive_data.server_key);
 		sensitive_data.server_key = sshkey_new_private(KEY_RSA1);
 		if (sensitive_data.server_key == NULL)
@@ -1083,6 +1104,20 @@ recv_rexec_state(int fd, struct sshbuf *conf)
 			fatal("generate RSA parameters failed: %s", ssh_err(r));
 #else
 		fatal("ssh1 not supported");
+=======
+			key_free(sensitive_data.server_key);
+		sensitive_data.server_key = key_new_private(KEY_RSA1);
+		buffer_get_bignum(&m, sensitive_data.server_key->rsa->e);
+		buffer_get_bignum(&m, sensitive_data.server_key->rsa->n);
+		buffer_get_bignum(&m, sensitive_data.server_key->rsa->d);
+		buffer_get_bignum(&m, sensitive_data.server_key->rsa->iqmp);
+		buffer_get_bignum(&m, sensitive_data.server_key->rsa->p);
+		buffer_get_bignum(&m, sensitive_data.server_key->rsa->q);
+		if (rsa_generate_additional_parameters(
+		    sensitive_data.server_key->rsa) != 0)
+			fatal("%s: rsa_generate_additional_parameters "
+			    "error", __func__);
+>>>>>>> 1.453
 #endif
 	}
 	sshbuf_free(m);
@@ -1418,7 +1453,7 @@ main(int ac, char **av)
 	int sock_in = -1, sock_out = -1, newsock = -1;
 	const char *remote_ip;
 	int remote_port;
-	char *line, *logfile = NULL;
+	char *fp, *line, *laddr, *logfile = NULL;
 	int config_s[2] = { -1 , -1 };
 	u_int n;
 	u_int64_t ibytes, obytes;
@@ -1439,7 +1474,8 @@ main(int ac, char **av)
 	initialize_server_options(&options);
 
 	/* Parse command-line arguments. */
-	while ((opt = getopt(ac, av, "f:p:b:k:h:g:u:o:C:dDeE:iqrtQRT46")) != -1) {
+	while ((opt = getopt(ac, av,
+	    "C:E:b:c:f:g:h:k:o:p:u:46DQRTdeiqrt")) != -1) {
 		switch (opt) {
 		case '4':
 			options.address_family = AF_INET;
@@ -1607,9 +1643,15 @@ main(int ac, char **av)
 	if ((cfg = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
 	if (rexeced_flag)
+<<<<<<< sshd.c
 		recv_rexec_state(REEXEC_CONFIG_PASS_FD, cfg);
 	else
 		load_server_config(config_file_name, cfg);
+=======
+		recv_rexec_state(REEXEC_CONFIG_PASS_FD, &cfg);
+	else if (strcasecmp(config_file_name, "none") != 0)
+		load_server_config(config_file_name, &cfg);
+>>>>>>> 1.453
 
 	parse_server_config(&options, rexeced_flag ? "rexec" : config_file_name,
 	    cfg, NULL);
@@ -1627,6 +1669,11 @@ main(int ac, char **av)
 	    strcasecmp(options.authorized_keys_command, "none") != 0))
 		fatal("AuthorizedKeysCommand set without "
 		    "AuthorizedKeysCommandUser");
+	if (options.authorized_principals_command_user == NULL &&
+	    (options.authorized_principals_command != NULL &&
+	    strcasecmp(options.authorized_principals_command, "none") != 0))
+		fatal("AuthorizedPrincipalsCommand set without "
+		    "AuthorizedPrincipalsCommandUser");
 
 	/*
 	 * Check whether there is any path through configured auth methods.
@@ -1721,11 +1768,22 @@ main(int ac, char **av)
 		case KEY_DSA:
 		case KEY_ECDSA:
 		case KEY_ED25519:
-			sensitive_data.have_ssh2_key = 1;
+			if (have_agent || key != NULL)
+				sensitive_data.have_ssh2_key = 1;
 			break;
 		}
+<<<<<<< sshd.c
 		debug("private host key: #%d type %d %s", i, keytype,
 		    sshkey_type(key ? key : pubkey));
+=======
+		if ((fp = sshkey_fingerprint(pubkey, options.fingerprint_hash,
+		    SSH_FP_DEFAULT)) == NULL)
+			fatal("sshkey_fingerprint failed");
+		debug("%s host key #%d: %s %s",
+		    key ? "private" : "agent", i, keytype == KEY_RSA1 ?
+		    sshkey_type(pubkey) : sshkey_ssh_name(pubkey), fp);
+		free(fp);
+>>>>>>> 1.453
 	}
 	if ((options.protocol & SSH_PROTO_1) && !sensitive_data.have_ssh1_key) {
 		logit("Disabling protocol version 1. Could not load host key");
@@ -1786,8 +1844,8 @@ main(int ac, char **av)
 #ifdef WITH_SSH1
 	/* Check certain values for sanity. */
 	if (options.protocol & SSH_PROTO_1) {
-		if (options.server_key_bits < 512 ||
-		    options.server_key_bits > 32768) {
+		if (options.server_key_bits < SSH_RSA_MINIMUM_MODULUS_SIZE ||
+		    options.server_key_bits > OPENSSL_RSA_MAX_MODULUS_BITS) {
 			fprintf(stderr, "Bad server key size.\n");
 			exit(1);
 		}
@@ -2015,9 +2073,15 @@ main(int ac, char **av)
 	remote_ip = ssh_remote_ipaddr(ssh);
 
 	/* Log the connection. */
+	laddr = get_local_ipaddr(sock_in);
 	verbose("Connection from %s port %d on %s port %d",
+<<<<<<< sshd.c
 	    remote_ip, remote_port,
 	    get_local_ipaddr(sock_in), ssh_get_local_port(ssh));
+=======
+	    remote_ip, remote_port, laddr,  get_local_port());
+	free(laddr);
+>>>>>>> 1.453
 
 	/*
 	 * We don't want to listen forever unless the other side
@@ -2370,8 +2434,13 @@ do_ssh1_kex(struct ssh *ssh)
 #endif
 
 int
+<<<<<<< sshd.c
 sshd_hostkey_sign(struct sshkey *privkey, struct sshkey *pubkey,
     u_char **signature, size_t *slen, u_char *data, size_t dlen, u_int compat)
+=======
+sshd_hostkey_sign(Key *privkey, Key *pubkey, u_char **signature, size_t *slen,
+    const u_char *data, size_t dlen, u_int flag)
+>>>>>>> 1.453
 {
 	if (privkey) {
 		return PRIVSEP(sshkey_sign(privkey, signature, slen,
@@ -2386,9 +2455,7 @@ sshd_hostkey_sign(struct sshkey *privkey, struct sshkey *pubkey,
 	return 0;
 }
 
-/*
- * SSH2 key exchange: diffie-hellman-group1-sha1
- */
+/* SSH2 key exchange */
 static void
 do_ssh2_kex(struct ssh *ssh)
 {

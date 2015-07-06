@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-add.c,v 1.118 2015/01/28 22:36:00 djm Exp $ */
+/* $OpenBSD: ssh-add.c,v 1.123 2015/07/03 03:43:18 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -71,7 +71,9 @@ static char *default_files[] = {
 	_PATH_SSH_CLIENT_ID_DSA,
 	_PATH_SSH_CLIENT_ID_ECDSA,
 	_PATH_SSH_CLIENT_ID_ED25519,
+#ifdef WITH_SSH1
 	_PATH_SSH_CLIENT_IDENTITY,
+#endif
 	NULL
 };
 
@@ -120,18 +122,24 @@ delete_file(int agent_fd, const char *filename, int key_only)
 	free(comment);
 	comment = NULL;
 	xasprintf(&certpath, "%s-cert.pub", filename);
-	if ((r = sshkey_load_public(certpath, &cert, &comment)) == 0)
+	if ((r = sshkey_load_public(certpath, &cert, &comment)) != 0) {
+		if (r != SSH_ERR_SYSTEM_ERROR || errno != ENOENT)
+			error("Failed to load certificate \"%s\": %s",
+			    certpath, ssh_err(r));
 		goto out;
+	}
+
 	if (!sshkey_equal_public(cert, public))
 		fatal("Certificate %s does not match private key %s",
 		    certpath, filename);
 
-	if (ssh_remove_identity(agent_fd, cert)) {
+	if ((r = ssh_remove_identity(agent_fd, cert)) == 0) {
 		fprintf(stderr, "Identity removed: %s (%s)\n", certpath,
 		    comment);
 		ret = 0;
 	} else
-		fprintf(stderr, "Could not remove identity: %s\n", certpath);
+		fprintf(stderr, "Could not remove identity \"%s\": %s\n",
+		    certpath, ssh_err(r));
 
  out:
 	if (cert != NULL)
@@ -150,11 +158,10 @@ delete_all(int agent_fd)
 {
 	int ret = -1;
 
-	if (ssh_remove_all_identities(agent_fd, 1) == 0)
+	if (ssh_remove_all_identities(agent_fd, 2) == 0)
 		ret = 0;
-	/* ignore error-code for ssh2 */
-	/* XXX revisit */
-	ssh_remove_all_identities(agent_fd, 2);
+	/* ignore error-code for ssh1 */
+	ssh_remove_all_identities(agent_fd, 1);
 
 	if (ret == 0)
 		fprintf(stderr, "All identities removed.\n");
@@ -224,8 +231,8 @@ add_file(int agent_fd, const char *filename, int key_only)
 	if (private == NULL) {
 		/* clear passphrase since it did not work */
 		clear_pass();
-		snprintf(msg, sizeof msg, "Enter passphrase for %.200s: ",
-		    comment);
+		snprintf(msg, sizeof msg, "Enter passphrase for %.200s%s: ",
+		    comment, confirm ? " (will confirm each use)" : "");
 		for (;;) {
 			pass = read_passphrase(msg, RP_ALLOW_STDIN);
 			if (strcmp(pass, "") == 0)
@@ -245,7 +252,8 @@ add_file(int agent_fd, const char *filename, int key_only)
 			}
 			clear_pass();
 			snprintf(msg, sizeof msg,
-			    "Bad passphrase, try again for %.200s: ", comment);
+			    "Bad passphrase, try again for %.200s%s: ", comment,
+			    confirm ? " (will confirm each use)" : "");
 		}
 	}
 	sshbuf_free(keyblob);
@@ -286,8 +294,7 @@ add_file(int agent_fd, const char *filename, int key_only)
 	} 
 
 	/* Graft with private bits */
-	if ((r = sshkey_to_certified(private,
-	    sshkey_cert_is_legacy(cert))) != 0) {
+	if ((r = sshkey_to_certified(private)) != 0) {
 		error("%s: sshkey_to_certified: %s", __func__, ssh_err(r));
 		sshkey_free(cert);
 		goto out;
@@ -349,11 +356,16 @@ static int
 list_identities(int agent_fd, int do_fp)
 {
 	char *fp;
-	int version, r, had_identities = 0;
+	int r, had_identities = 0;
 	struct ssh_identitylist *idlist;
 	size_t i;
+#ifdef WITH_SSH1
+	int version = 1;
+#else
+	int version = 2;
+#endif
 
-	for (version = 1; version <= 2; version++) {
+	for (; version <= 2; version++) {
 		if ((r = ssh_fetch_identitylist(agent_fd, version,
 		    &idlist)) != 0) {
 			if (r != SSH_ERR_AGENT_NO_IDENTITIES)

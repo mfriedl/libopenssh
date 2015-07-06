@@ -1,4 +1,4 @@
-/* $OpenBSD: sshkey.h,v 1.5 2015/01/26 02:59:11 djm Exp $ */
+/* $OpenBSD: sshkey.h,v 1.8 2015/07/03 04:05:54 djm Exp $ */
 
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
@@ -40,7 +40,7 @@
 #define EC_POINT	void
 #endif /* WITH_OPENSSL */
 
-#define SSH_RSA_MINIMUM_MODULUS_SIZE	768
+#define SSH_RSA_MINIMUM_MODULUS_SIZE	1024
 #define SSH_KEY_MAX_SIGN_DATA_SIZE	(1 << 20)
 
 struct sshbuf;
@@ -56,8 +56,6 @@ enum sshkey_types {
 	KEY_DSA_CERT,
 	KEY_ECDSA_CERT,
 	KEY_ED25519_CERT,
-	KEY_RSA_CERT_V00,
-	KEY_DSA_CERT_V00,
 	KEY_UNSPEC
 };
 
@@ -131,13 +129,12 @@ int	 sshkey_type_from_name(const char *);
 int	 sshkey_is_cert(const struct sshkey *);
 int	 sshkey_type_is_cert(int);
 int	 sshkey_type_plain(int);
-int	 sshkey_to_certified(struct sshkey *, int);
+int	 sshkey_to_certified(struct sshkey *);
 int	 sshkey_drop_cert(struct sshkey *);
 int	 sshkey_certify(struct sshkey *, struct sshkey *);
 int	 sshkey_cert_copy(const struct sshkey *, struct sshkey *);
 int	 sshkey_cert_check_authority(const struct sshkey *, int, int,
     const char *, const char **);
-int	 sshkey_cert_is_legacy(const struct sshkey *);
 
 int		 sshkey_ecdsa_nid_from_name(const char *);
 int		 sshkey_curve_name_to_nid(const char *);
@@ -157,6 +154,7 @@ int	 sshkey_from_blob(const u_char *, size_t, struct sshkey **);
 int	 sshkey_fromb(struct sshbuf *, struct sshkey **);
 int	 sshkey_froms(struct sshbuf *, struct sshkey **);
 int	 sshkey_to_blob(const struct sshkey *, u_char **, size_t *);
+int	 sshkey_to_base64(const struct sshkey *, char **);
 int	 sshkey_putb(const struct sshkey *, struct sshbuf *);
 int	 sshkey_puts(const struct sshkey *, struct sshbuf *);
 int	 sshkey_plain_to_blob(const struct sshkey *, u_char **, size_t *);

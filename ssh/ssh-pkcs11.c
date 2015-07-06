@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-pkcs11.c,v 1.15 2015/01/15 09:40:00 djm Exp $ */
+/* $OpenBSD: ssh-pkcs11.c,v 1.19 2015/05/27 05:15:02 djm Exp $ */
 /*
  * Copyright (c) 2010 Markus Friedl.  All rights reserved.
  *
@@ -231,7 +231,7 @@ pkcs11_rsa_private_encrypt(int flen, const u_char *from, u_char *to, RSA *rsa,
 		{CKA_ID, NULL, 0},
 		{CKA_SIGN, &true_val, sizeof(true_val) }
 	};
-	char			*pin, prompt[1024];
+	char			*pin = NULL, prompt[1024];
 	int			rval = -1;
 
 	if ((k11 = RSA_get_app_data(rsa)) == NULL) {
@@ -246,21 +246,30 @@ pkcs11_rsa_private_encrypt(int flen, const u_char *from, u_char *to, RSA *rsa,
 	si = &k11->provider->slotinfo[k11->slotidx];
 	if ((si->token.flags & CKF_LOGIN_REQUIRED) && !si->logged_in) {
 		if (!pkcs11_interactive) {
-			error("need pin");
+			error("need pin entry%s", (si->token.flags &
+			    CKF_PROTECTED_AUTHENTICATION_PATH) ?
+			    " on reader keypad" : "");
 			return (-1);
 		}
-		snprintf(prompt, sizeof(prompt), "Enter PIN for '%s': ",
-		    si->token.label);
-		pin = read_passphrase(prompt, RP_ALLOW_EOF);
-		if (pin == NULL)
-			return (-1);	/* bail out */
-		if ((rv = f->C_Login(si->session, CKU_USER,
-		    (u_char *)pin, strlen(pin))) != CKR_OK) {
+		if (si->token.flags & CKF_PROTECTED_AUTHENTICATION_PATH)
+			verbose("Deferring PIN entry to reader keypad.");
+		else {
+			snprintf(prompt, sizeof(prompt),
+			    "Enter PIN for '%s': ", si->token.label);
+			pin = read_passphrase(prompt, RP_ALLOW_EOF);
+			if (pin == NULL)
+				return (-1);	/* bail out */
+		}
+		rv = f->C_Login(si->session, CKU_USER, (u_char *)pin,
+		    (pin != NULL) ? strlen(pin) : 0);
+		if (pin != NULL) {
+			explicit_bzero(pin, strlen(pin));
 			free(pin);
+		}
+		if (rv != CKR_OK && rv != CKR_USER_ALREADY_LOGGED_IN) {
 			error("C_Login failed: %lu", rv);
 			return (-1);
 		}
-		free(pin);
 		si->logged_in = 1;
 	}
 	key_filter[1].pValue = k11->keyid;
@@ -357,8 +366,9 @@ pkcs11_open_session(struct pkcs11_provider *p, CK_ULONG slotidx, char *pin)
 		return (-1);
 	}
 	if (login_required && pin) {
-		if ((rv = f->C_Login(session, CKU_USER,
-		    (u_char *)pin, strlen(pin))) != CKR_OK) {
+		rv = f->C_Login(session, CKU_USER,
+		    (u_char *)pin, strlen(pin));
+		if (rv != CKR_OK && rv != CKR_USER_ALREADY_LOGGED_IN) {
 			error("C_Login failed: %lu", rv);
 			if ((rv = f->C_CloseSession(session)) != CKR_OK)
 				error("C_CloseSession failed: %lu", rv);
@@ -514,7 +524,7 @@ pkcs11_fetch_keys_filter(struct pkcs11_provider *p, CK_ULONG slotidx,
 				sshkey_free(key);
 			} else {
 				/* expand key array and add key */
-				*keysp = xrealloc(*keysp, *nkeys + 1,
+				*keysp = xreallocarray(*keysp, *nkeys + 1,
 				    sizeof(struct sshkey *));
 				(*keysp)[*nkeys] = key;
 				*nkeys = *nkeys + 1;

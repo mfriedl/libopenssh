@@ -1,4 +1,4 @@
-/* $OpenBSD: authfile.c,v 1.110 2015/01/20 23:14:00 deraadt Exp $ */
+/* $OpenBSD: authfile.c,v 1.115 2015/07/03 03:43:18 djm Exp $ */
 /*
  * Copyright (c) 2000, 2013 Markus Friedl.  All rights reserved.
  *
@@ -181,7 +181,7 @@ sshkey_perm_ok(int fd, const char *filename)
 		error("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
 		error("Permissions 0%3.3o for '%s' are too open.",
 		    (u_int)st.st_mode & 0777, filename);
-		error("It is recommended that your private key files are NOT accessible by others.");
+		error("It is required that your private key files are NOT accessible by others.");
 		error("This private key will be ignored.");
 		return SSH_ERR_KEY_BAD_PERMISSIONS;
 	}
@@ -338,6 +338,8 @@ sshkey_load_public(const char *filename, struct sshkey **keyp, char **commentp)
 	if (commentp != NULL)
 		*commentp = NULL;
 
+	/* XXX should load file once and attempt to parse each format */
+
 	if ((fd = open(filename, O_RDONLY)) < 0)
 		goto skip;
 #ifdef WITH_SSH1
@@ -352,6 +354,8 @@ sshkey_load_public(const char *filename, struct sshkey **keyp, char **commentp)
 	case 0:
 		return r;
 	}
+#else /* WITH_SSH1 */
+	close(fd);
 #endif /* WITH_SSH1 */
 
 	/* try ssh2 public key */
@@ -389,6 +393,7 @@ sshkey_load_public(const char *filename, struct sshkey **keyp, char **commentp)
 		return 0;
 	}
 	sshkey_free(pub);
+
 	return r;
 }
 
@@ -457,7 +462,7 @@ sshkey_load_private_cert(int type, const char *filename, const char *passphrase,
 		goto out;
 	}
 
-	if ((r = sshkey_to_certified(key, sshkey_cert_is_legacy(cert))) != 0 ||
+	if ((r = sshkey_to_certified(key)) != 0 ||
 	    (r = sshkey_cert_copy(cert, key)) != 0)
 		goto out;
 	r = 0;
@@ -546,12 +551,10 @@ sshkey_check_revoked(struct sshkey *key, const char *revoked_keys_file)
 {
 	int r;
 
-#ifdef WITH_OPENSSL
 	r = ssh_krl_file_contains_key(revoked_keys_file, key);
 	/* If this was not a KRL to begin with then continue below */
 	if (r != SSH_ERR_KRL_BAD_MAGIC)
 		return r;
-#endif
 
 	/*
 	 * If the file is not a KRL or we can't handle KRLs then attempt to

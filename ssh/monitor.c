@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.141 2015/01/20 23:14:00 deraadt Exp $ */
+/* $OpenBSD: monitor.c,v 1.150 2015/06/22 23:42:16 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -42,10 +42,10 @@
 #include <pwd.h>
 #include <signal.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
 
 #include "atomicio.h"
 #include "xmalloc.h"
@@ -310,7 +310,7 @@ monitor_child_preauth(struct authctxt *_authctxt, struct monitor *pmonitor)
 		if (ent->flags & (MON_AUTHDECIDE|MON_ALOG)) {
 			auth_log(authctxt, authenticated, partial,
 			    auth_method, auth_submethod);
-			if (!authenticated)
+			if (!partial && !authenticated)
 				authctxt->failures++;
 		}
 	}
@@ -393,7 +393,7 @@ mm_zalloc(struct mm_master *mm, u_int ncount, u_int size)
 	size_t len = (size_t) size * ncount;
 	void *address;
 
-	if (len == 0 || ncount > SIZE_T_MAX / size)
+	if (len == 0 || ncount > SIZE_MAX / size)
 		fatal("%s: mm_zalloc(%u, %u)", __func__, ncount, size);
 
 	address = mm_malloc(mm, len);
@@ -601,14 +601,24 @@ mm_answer_moduli(int sock, struct sshbuf *m)
 int
 mm_answer_sign(int sock, struct sshbuf *m)
 {
+<<<<<<< monitor.c
 	struct ssh *ssh = active_state;		/* XXX */
+=======
+	struct ssh *ssh = active_state; 	/* XXX */
+>>>>>>> 1.150
 	extern int auth_sock;			/* XXX move to state struct? */
 	struct sshkey *key;
+	struct sshbuf *sigbuf;
 	u_char *p;
 	u_char *signature;
 	size_t datlen, siglen;
+<<<<<<< monitor.c
 	u_int keyid;
 	int r;
+=======
+	int r, keyid, is_proof = 0;
+	const char proof_req[] = "hostkeys-prove-00@openssh.com";
+>>>>>>> 1.150
 
 	debug3("%s", __func__);
 
@@ -619,9 +629,38 @@ mm_answer_sign(int sock, struct sshbuf *m)
 	/*
 	 * Supported KEX types use SHA1 (20 bytes), SHA256 (32 bytes),
 	 * SHA384 (48 bytes) and SHA512 (64 bytes).
+	 *
+	 * Otherwise, verify the signature request is for a hostkey
+	 * proof.
+	 *
+	 * XXX perform similar check for KEX signature requests too?
+	 * it's not trivial, since what is signed is the hash, rather
+	 * than the full kex structure...
 	 */
-	if (datlen != 20 && datlen != 32 && datlen != 48 && datlen != 64)
-		fatal("%s: data length incorrect: %zu", __func__, datlen);
+	if (datlen != 20 && datlen != 32 && datlen != 48 && datlen != 64) {
+		/*
+		 * Construct expected hostkey proof and compare it to what
+		 * the client sent us.
+		 */
+		if (session_id2_len == 0) /* hostkeys is never first */
+			fatal("%s: bad data length: %zu", __func__, datlen);
+		if ((key = get_hostkey_public_by_index(keyid, ssh)) == NULL)
+			fatal("%s: no hostkey for index %d", __func__, keyid);
+		if ((sigbuf = sshbuf_new()) == NULL)
+			fatal("%s: sshbuf_new", __func__);
+		if ((r = sshbuf_put_cstring(sigbuf, proof_req)) != 0 ||
+		    (r = sshbuf_put_string(sigbuf, session_id2,
+		    session_id2_len) != 0) ||
+		    (r = sshkey_puts(key, sigbuf)) != 0)
+			fatal("%s: couldn't prepare private key "
+			    "proof buffer: %s", __func__, ssh_err(r));
+		if (datlen != sshbuf_len(sigbuf) ||
+		    memcmp(p, sshbuf_ptr(sigbuf), sshbuf_len(sigbuf)) != 0)
+			fatal("%s: bad data length: %zu, hostkey proof len %zu",
+			    __func__, datlen, sshbuf_len(sigbuf));
+		sshbuf_free(sigbuf);
+		is_proof = 1;
+	}
 
 	/* save session id, it will be passed on the first call */
 	if (session_id2_len == 0) {
@@ -645,7 +684,8 @@ mm_answer_sign(int sock, struct sshbuf *m)
 	} else
 		fatal("%s: no hostkey from index %d", __func__, keyid);
 
-	debug3("%s: signature %p(%zu)", __func__, signature, siglen);
+	debug3("%s: %s signature %p(%zu)", __func__,
+	    is_proof ? "KEX" : "hostkey proof", signature, siglen);
 
 	sshbuf_reset(m);
 	if ((r = sshbuf_put_string(m, signature, siglen)) != 0)
@@ -892,17 +932,29 @@ mm_answer_keyallowed(int sock, struct sshbuf *m)
 	struct sshkey *key;
 	char *cuser, *chost;
 	u_char *blob;
+<<<<<<< monitor.c
 	size_t bloblen;
+=======
+	u_int bloblen, pubkey_auth_attempt;
+>>>>>>> 1.150
 	enum mm_keytype type = 0;
 	int r, allowed = 0;
 
 	debug3("%s entering", __func__);
 
+<<<<<<< monitor.c
 	if ((r = sshbuf_get_u32(m, &type)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &cuser, NULL)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &chost, NULL)) != 0 ||
 	    (r = sshbuf_get_string(m, &blob, &bloblen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+=======
+	type = buffer_get_int(m);
+	cuser = buffer_get_string(m, NULL);
+	chost = buffer_get_string(m, NULL);
+	blob = buffer_get_string(m, &bloblen);
+	pubkey_auth_attempt = buffer_get_int(m);
+>>>>>>> 1.150
 
 	if ((r = sshkey_from_blob(blob, bloblen, &key)) != 0)
 		fatal("%s: cannot parse key: %s", __func__, ssh_err(r));
@@ -922,19 +974,19 @@ mm_answer_keyallowed(int sock, struct sshbuf *m)
 			allowed = options.pubkey_authentication &&
 			    !auth2_userkey_already_used(authctxt, key) &&
 			    match_pattern_list(sshkey_ssh_name(key),
-			    options.pubkey_key_types,
-			    strlen(options.pubkey_key_types), 0) == 1 &&
-			    user_key_allowed(authctxt->pw, key);
+			    options.pubkey_key_types, 0) == 1 &&
+			    user_key_allowed(authctxt->pw, key,
+			    pubkey_auth_attempt);
 			pubkey_auth_info(authctxt, key, NULL);
 			auth_method = "publickey";
-			if (options.pubkey_authentication && allowed != 1)
+			if (options.pubkey_authentication &&
+			    (!pubkey_auth_attempt || allowed != 1))
 				auth_clear_options();
 			break;
 		case MM_HOSTKEY:
 			allowed = options.hostbased_authentication &&
 			    match_pattern_list(sshkey_ssh_name(key),
-			    options.hostbased_key_types,
-			    strlen(options.hostbased_key_types), 0) == 1 &&
+			    options.hostbased_key_types, 0) == 1 &&
 			    hostbased_key_allowed(authctxt->pw,
 			    cuser, chost, key);
 			pubkey_auth_info(authctxt, key,
@@ -1208,6 +1260,9 @@ mm_record_login(Session *s, struct passwd *pw)
 	struct ssh *ssh = active_state;			/* XXX */
 	socklen_t fromlen;
 	struct sockaddr_storage from;
+
+	if (options.use_login)
+		return;
 
 	/*
 	 * Get IP address of client. If the connection is not a socket, let
@@ -1556,11 +1611,13 @@ monitor_apply_keystate(struct monitor *pmonitor)
 
 	if ((kex = ssh->kex) != 0) {
 		/* XXX set callbacks */
+#ifdef WITH_OPENSSL
 		kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
 		kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
 		kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
 		kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
 		kex->kex[KEX_ECDH_SHA2] = kexecdh_server;
+#endif
 		kex->kex[KEX_C25519_SHA256] = kexc25519_server;
 		kex->load_host_public_key=&get_hostkey_public_by_type;
 		kex->load_host_private_key=&get_hostkey_private_by_type;
@@ -1574,11 +1631,6 @@ monitor_apply_keystate(struct monitor *pmonitor)
 		    (ssh_packet_comp_alloc_func *)mm_zalloc,
 		    (ssh_packet_comp_free_func *)mm_zfree);
 	}
-
-	if (options.rekey_limit || options.rekey_interval)
-		ssh_packet_set_rekey_limits(ssh,
-		    (u_int32_t)options.rekey_limit,
-		    (time_t)options.rekey_interval);
 }
 
 /* This function requries careful sanity checking */
