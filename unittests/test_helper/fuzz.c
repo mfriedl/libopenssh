@@ -1,4 +1,4 @@
-/*	$OpenBSD: fuzz.c,v 1.5 2015/01/13 14:51:51 djm Exp $	*/
+/*	$OpenBSD: fuzz.c,v 1.8 2015/03/03 20:42:49 djm Exp $	*/
 /*
  * Copyright (c) 2011 Damien Miller <djm@mindrot.org>
  *
@@ -150,19 +150,11 @@ fuzz_fmt(struct fuzz *fuzz, char *s, size_t n)
 	}
 }
 
-void
-fuzz_dump(struct fuzz *fuzz)
+static void
+dump(u_char *p, size_t len)
 {
-	u_char *p = fuzz_ptr(fuzz);
-	size_t i, j, len = fuzz_len(fuzz);
-	char buf[256];
+	size_t i, j;
 
-	if (fuzz_fmt(fuzz, buf, sizeof(buf)) != 0) {
-		fprintf(stderr, "%s: fuzz invalid\n", __func__);
-		abort();
-	}
-	fputs(buf, stderr);
-	fprintf(stderr, "fuzz context %p len = %zu\n", fuzz, len);
 	for (i = 0; i < len; i += 16) {
 		fprintf(stderr, "%.4zd: ", i);
 		for (j = i; j < i + 16; j++) {
@@ -184,11 +176,27 @@ fuzz_dump(struct fuzz *fuzz)
 	}
 }
 
+void
+fuzz_dump(struct fuzz *fuzz)
+{
+	char buf[256];
+
+	if (fuzz_fmt(fuzz, buf, sizeof(buf)) != 0) {
+		fprintf(stderr, "%s: fuzz invalid\n", __func__);
+		abort();
+	}
+	fputs(buf, stderr);
+	fprintf(stderr, "fuzz original %p len = %zu\n", fuzz->seed, fuzz->slen);
+	dump(fuzz->seed, fuzz->slen);
+	fprintf(stderr, "fuzz context %p len = %zu\n", fuzz, fuzz_len(fuzz));
+	dump(fuzz_ptr(fuzz), fuzz_len(fuzz));
+}
+
 #ifdef SIGINFO
 static struct fuzz *last_fuzz;
 
 static void
-siginfo(int unused __unused)
+siginfo(int unused __attribute__((__unused__)))
 {
 	char buf[256];
 
@@ -363,6 +371,14 @@ fuzz_next(struct fuzz *fuzz)
 	FUZZ_DBG(("done, fuzz = %p, strategy = %s, strategies = 0x%lx, "
 	    "o1 = %zu, o2 = %zu, slen = %zu", fuzz, fuzz_ntop(fuzz->strategy),
 	    (u_long)fuzz->strategies, fuzz->o1, fuzz->o2, fuzz->slen));
+}
+
+int
+fuzz_matches_original(struct fuzz *fuzz)
+{
+	if (fuzz_len(fuzz) != fuzz->slen)
+		return 0;
+	return memcmp(fuzz_ptr(fuzz), fuzz->seed, fuzz->slen) == 0;
 }
 
 int

@@ -1,5 +1,5 @@
 #!/bin/sh
-# $OpenBSD: mktestdata.sh,v 1.3 2014/07/22 23:57:40 dtucker Exp $
+# $OpenBSD: mktestdata.sh,v 1.4 2015/01/18 19:54:46 djm Exp $
 
 PW=mekmitasdigoat
 
@@ -94,8 +94,8 @@ rm -f rsa1_1_pw rsa_1_pw dsa_1_pw ecdsa_1_pw ed25519_1_pw
 rm -f rsa_n_pw dsa_n_pw ecdsa_n_pw
 rm -f pw *.pub *.bn.* *.param.* *.fp *.fp.bb
 
-ssh-keygen -t rsa1 -b 768 -C "RSA1 test key #1" -N "" -f rsa1_1
-ssh-keygen -t rsa -b 768 -C "RSA test key #1" -N "" -f rsa_1
+ssh-keygen -t rsa1 -b 1024 -C "RSA1 test key #1" -N "" -f rsa1_1
+ssh-keygen -t rsa -b 1024 -C "RSA test key #1" -N "" -f rsa_1
 ssh-keygen -t dsa -b 1024 -C "DSA test key #1" -N "" -f dsa_1
 ssh-keygen -t ecdsa -b 256 -C "ECDSA test key #1" -N "" -f ecdsa_1
 ssh-keygen -t ed25519 -C "ED25519 test key #1" -N "" -f ed25519_1
@@ -186,5 +186,7 @@ ssh-keygen -Bf rsa_2 | awk '{print $2}' > rsa_2.fp.bb
 ssh-keygen -Bf dsa_2 | awk '{print $2}' > dsa_2.fp.bb
 ssh-keygen -Bf ecdsa_2 | awk '{print $2}' > ecdsa_2.fp.bb
 ssh-keygen -Bf ed25519_2 | awk '{print $2}' > ed25519_2.fp.bb
+
+# XXX Extend ssh-keygen to do detached signatures (better to test/fuzz against)
 
 echo "$PW" > pw

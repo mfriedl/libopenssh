@@ -1,12 +1,23 @@
-#	$OpenBSD: Makefile.inc,v 1.1 2014/04/30 05:32:00 djm Exp $
+#	$OpenBSD: Makefile.inc,v 1.6 2015/07/01 23:11:18 djm Exp $
 
 .include <bsd.own.mk>
 .include <bsd.obj.mk>
 
-# XXX detect from ssh binary? 
+REGRESS_FAIL_EARLY= yes
+
+# XXX detect from ssh binary?
+SSH1?=		yes
 OPENSSL?=	yes
+
 .if (${OPENSSL:L} == "yes")
-CFLAGS+=	-DWITH_OPENSSL -DWITH_SSH1
+CFLAGS+=	-DWITH_OPENSSL
+.else
+# SSH v.1 requires OpenSSL.
+SSH1=		no
+.endif
+
+.if (${SSH1:L} == "yes")
+CFLAGS+=	-DWITH_SSH1
 .endif
 
 # enable warnings
@@ -27,7 +38,6 @@ CDIAGFLAGS+=	-Wmissing-declarations
 CDIAGFLAGS+=	-Wmissing-prototypes
 CDIAGFLAGS+=	-Wparentheses
 CDIAGFLAGS+=	-Wpointer-arith
-CDIAGFLAGS+=	-Wpointer-sign
 CDIAGFLAGS+=	-Wreturn-type
 CDIAGFLAGS+=	-Wshadow
 CDIAGFLAGS+=	-Wsign-compare
@@ -38,6 +48,7 @@ CDIAGFLAGS+=	-Wtrigraphs
 CDIAGFLAGS+=	-Wuninitialized
 CDIAGFLAGS+=	-Wunused
 .if ${COMPILER_VERSION} == "gcc4"
+CDIAGFLAGS+=	-Wpointer-sign
 CDIAGFLAGS+=	-Wold-style-definition
 .endif
 
