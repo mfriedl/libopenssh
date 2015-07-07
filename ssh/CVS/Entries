@@ -171,22 +171,16 @@ D/moduli-gen////
 /PROTOCOL.agent/1.8/Mon Jul  6 14:56:15 2015//
 /auth-options.c/1.68/Result of merge//
 /auth-rsa.c/1.90/Result of merge//
-/auth.c/1.111/Result of merge+Mon Jul  6 14:56:15 2015//
-/auth.h/1.84/Result of merge+Mon Jul  6 14:56:15 2015//
 /auth2-hostbased.c/1.25/Result of merge//
-/auth2-pubkey.c/1.53/Result of merge+Mon Jul  6 14:56:16 2015//
 /authfd.c/1.98/Mon Jul  6 14:56:16 2015//
 /authfile.c/1.115/Result of merge//
 /canohost.c/1.72/Result of merge//
-/channels.c/1.347/Result of merge+Mon Jul  6 14:56:17 2015//
 /channels.h/1.118/Result of merge//
 /clientloop.c/1.274/Result of merge//
-/compat.c/1.94/Result of merge+Mon Jul  6 14:56:18 2015//
 /compat.h/1.48/Result of merge//
 /dh.c/1.57/Mon Jul  6 14:56:18 2015//
 /dh.h/1.13/Mon Jul  6 14:56:18 2015//
 /digest-libc.c/1.5/Mon Jul  6 14:56:18 2015//
-/dispatch.c/1.27/Result of merge+Mon Jul  6 14:56:18 2015//
 /dns.h/1.15/Mon Jul  6 14:56:18 2015//
 /ge25519.h/1.4/Mon Jul  6 14:56:18 2015//
 /groupaccess.c/1.16/Mon Jul  6 14:56:18 2015//
@@ -206,12 +200,8 @@ D/moduli-gen////
 /match.c/1.30/Result of merge//
 /match.h/1.16/Mon Jul  6 14:56:19 2015//
 /misc.c/1.97/Result of merge//
-/monitor.c/1.150/Result of merge+Mon Jul  6 14:56:20 2015//
 /monitor_fdpass.c/1.20/Mon Jul  6 14:56:20 2015//
 /monitor_mm.c/1.21/Mon Jul  6 14:56:20 2015//
-/monitor_wrap.c/1.85/Result of merge+Mon Jul  6 14:56:20 2015//
-/monitor_wrap.h/1.27/Result of merge+Mon Jul  6 14:56:20 2015//
-/mux.c/1.53/Result of merge+Mon Jul  6 14:56:20 2015//
 /myproposal.h/1.46/Mon Jul  6 14:56:20 2015//
 /packet.c/1.212/Result of merge//
 /readconf.c/1.237/Mon Jul  6 14:56:21 2015//
@@ -221,14 +211,12 @@ D/moduli-gen////
 /scp.c/1.182/Mon Jul  6 14:56:21 2015//
 /servconf.c/1.275/Result of merge//
 /servconf.h/1.119/Result of merge//
-/serverloop.c/1.178/Result of merge+Mon Jul  6 14:56:23 2015//
 /session.c/1.278/Result of merge//
 /sftp-client.c/1.120/Mon Jul  6 14:56:23 2015//
 /sftp-client.h/1.27/Mon Jul  6 14:56:23 2015//
 /sftp-server.c/1.106/Mon Jul  6 14:56:23 2015//
 /ssh-add.1/1.62/Mon Jul  6 14:56:24 2015//
 /ssh-add.c/1.123/Mon Jul  6 14:56:24 2015//
-/ssh-agent.1/1.59/Mon Jul  6 14:56:24 2015//
 /ssh-agent.c/1.203/Result of merge//
 /ssh-keygen.1/1.126/Mon Jul  6 14:56:24 2015//
 /ssh-keygen.c/1.276/Mon Jul  6 14:56:24 2015//
@@ -241,10 +229,8 @@ D/moduli-gen////
 /ssh.h/1.80/Mon Jul  6 14:56:26 2015//
 /ssh_config.5/1.212/Mon Jul  6 14:56:26 2015//
 /sshbuf-misc.c/1.4/Mon Jul  6 14:56:26 2015//
-/sshconnect.c/1.262/Result of merge+Mon Jul  6 14:56:27 2015//
 /sshconnect2.c/1.224/Result of merge//
 /sshd.8/1.280/Mon Jul  6 14:56:27 2015//
-/sshd.c/1.453/Result of merge+Mon Jul  6 14:56:27 2015//
 /sshd_config/1.95/Mon Jul  6 14:56:27 2015//
 /sshd_config.5/1.205/Mon Jul  6 14:56:27 2015//
 /ssherr.c/1.4/Mon Jul  6 14:56:27 2015//
@@ -256,3 +242,21 @@ D/moduli-gen////
 /version.h/1.73/Mon Jul  6 14:56:28 2015//
 /xmalloc.c/1.32/Mon Jul  6 14:56:28 2015//
 /xmalloc.h/1.15/Mon Jul  6 14:56:28 2015//
+/auth.c/1.111/Result of merge//
+/auth.h/1.84/Result of merge//
+/auth2-pubkey.c/1.53/Result of merge//
+/channels.c/1.347/Result of merge//
+/compat.c/1.94/Result of merge//
+/dispatch.c/1.27/Result of merge//
+/monitor.c/1.150/Result of merge//
+/monitor_wrap.c/1.85/Result of merge//
+/monitor_wrap.h/1.27/Result of merge//
+/mux.c/1.53/Result of merge//
+/serverloop.c/1.178/Result of merge//
+/ssh-agent.1/1.59/Mon Jul  6 19:15:12 2015//
+/sshconnect.c/1.262/Result of merge//
+/sshd.c/1.453/Result of merge//
+/opacket.c/1.4/Mon Apr 27 01:53:37 2015//
+/opacket.h/1.4/Fri Feb 13 18:57:00 2015//
+/ssh_api.c/1.4/Mon Feb 16 22:13:32 2015//
+/ssh_api.h/1.1/Mon Jan 19 20:30:23 2015//

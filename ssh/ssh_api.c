@@ -1,4 +1,4 @@
-/* $OpenBSD: $ */
+/* $OpenBSD: ssh_api.c,v 1.4 2015/02/16 22:13:32 djm Exp $ */
 /*
  * Copyright (c) 2012 Markus Friedl.  All rights reserved.
  *
@@ -83,7 +83,8 @@ ssh_init(struct ssh **sshp, int is_server, struct kex_params *kex_params)
 		called = 1;
 	}
 
-	ssh = ssh_packet_set_connection(NULL, -1, -1);
+	if ((ssh = ssh_packet_set_connection(NULL, -1, -1)) == NULL)
+		return SSH_ERR_ALLOC_FAIL;
 	if (is_server)
 		ssh_packet_set_server(ssh);
 
@@ -95,21 +96,25 @@ ssh_init(struct ssh **sshp, int is_server, struct kex_params *kex_params)
 	}
 	ssh->kex->server = is_server;
 	if (is_server) {
+#ifdef WITH_OPENSSL
 		ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
 		ssh->kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
 		ssh->kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
 		ssh->kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
 		ssh->kex->kex[KEX_ECDH_SHA2] = kexecdh_server;
+#endif /* WITH_OPENSSL */
 		ssh->kex->kex[KEX_C25519_SHA256] = kexc25519_server;
 		ssh->kex->load_host_public_key=&_ssh_host_public_key;
 		ssh->kex->load_host_private_key=&_ssh_host_private_key;
 		ssh->kex->sign=&_ssh_host_key_sign;
 	} else {
+#ifdef WITH_OPENSSL
 		ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
 		ssh->kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
 		ssh->kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
 		ssh->kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
 		ssh->kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
+#endif /* WITH_OPENSSL */
 		ssh->kex->kex[KEX_C25519_SHA256] = kexc25519_client;
 		ssh->kex->verify_host_key =&_ssh_verify_host_key;
 	}
@@ -167,8 +172,7 @@ ssh_add_hostkey(struct ssh *ssh, struct sshkey *key)
 			return r;
 		if ((k = malloc(sizeof(*k))) == NULL ||
 		    (k_prv = malloc(sizeof(*k_prv))) == NULL) {
-			if (k)
-				free(k);
+			free(k);
 			sshkey_free(pubkey);
 			return SSH_ERR_ALLOC_FAIL;
 		}
@@ -425,10 +429,10 @@ _ssh_host_public_key(int type, int nid, struct ssh *ssh)
 	struct key_entry *k;
 
 	debug3("%s: need %d", __func__, type);
-	/* XXX check nid */
 	TAILQ_FOREACH(k, &ssh->public_keys, next) {
 		debug3("%s: check %s", __func__, sshkey_type(k->key));
-		if (k->key->type == type)
+		if (k->key->type == type &&
+		    (type != KEY_ECDSA || k->key->ecdsa_nid == nid))
 			return (k->key);
 	}
 	return (NULL);
@@ -440,10 +444,10 @@ _ssh_host_private_key(int type, int nid, struct ssh *ssh)
 	struct key_entry *k;
 
 	debug3("%s: need %d", __func__, type);
-	/* XXX check nid */
 	TAILQ_FOREACH(k, &ssh->private_keys, next) {
 		debug3("%s: check %s", __func__, sshkey_type(k->key));
-		if (k->key->type == type)
+		if (k->key->type == type &&
+		    (type != KEY_ECDSA || k->key->ecdsa_nid == nid))
 			return (k->key);
 	}
 	return (NULL);
@@ -510,18 +514,16 @@ _ssh_order_hostkeyalgs(struct ssh *ssh)
 		r = kex_prop2buf(ssh->kex->my, proposal);
 	}
  out:
-	if (oavail)
-		free(oavail);
-	if (replace)
-		free(replace);
+	free(oavail);
+	free(replace);
 	kex_prop_free(proposal);
 	return r;
 }
 
 int
 _ssh_host_key_sign(struct sshkey *privkey, struct sshkey *pubkey,
-    u_char **signature, size_t *slen, const u_char *data, size_t dlen,
-    u_int compat)
+    u_char **signature, size_t *slen,
+    const u_char *data, size_t dlen, u_int compat)
 {
 	return sshkey_sign(privkey, signature, slen, data, dlen, compat);
 }

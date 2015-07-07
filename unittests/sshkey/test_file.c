@@ -1,4 +1,4 @@
-/* 	$OpenBSD: test_file.c,v 1.3 2015/03/04 23:22:35 djm Exp $ */
+/* 	$OpenBSD: test_file.c,v 1.4 2015/07/07 14:53:30 markus Exp $ */
 /*
  * Regress test for sshkey.h key management API
  *
