@@ -129,13 +129,8 @@ kbdint_next_device(struct authctxt *authctxt, struct kbdintctxt *kbdintctxt)
 			    !auth2_method_allowed(authctxt,
 			    "keyboard-interactive", devices[i]->name))
 				continue;
-<<<<<<< auth2-chall.c
-			if (strncmp(kbdintctxt->devices, devices[i]->name,
-			    len) == 0)
-=======
 			if (strncmp(kbdintctxt->devices, devices[i]->name,
 			    len) == 0) {
->>>>>>> 1.43
 				kbdintctxt->device = devices[i];
 				kbdintctxt->devices_done |= 1 << i;
 			}

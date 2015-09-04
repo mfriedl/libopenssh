@@ -774,8 +774,6 @@ list_hostkey_types(void)
 	for (i = 0; i < options.num_host_key_files; i++) {
 		key = sensitive_data.host_keys[i];
 		if (key == NULL)
-<<<<<<< sshd.c
-=======
 			key = sensitive_data.host_pubkeys[i];
 		if (key == NULL || key->type == KEY_RSA1)
 			continue;
@@ -784,7 +782,6 @@ list_hostkey_types(void)
 		    options.hostkeyalgorithms, 0) != 1) {
 			debug3("%s: %s key not permitted by HostkeyAlgorithms",
 			    __func__, sshkey_ssh_name(key));
->>>>>>> 1.459
 			continue;
 		}
 		switch (key->type) {
@@ -2437,36 +2434,15 @@ do_ssh2_kex(struct ssh *ssh)
 	struct kex *kex;
 	int r;
 
-<<<<<<< sshd.c
-	if (options.ciphers != NULL) {
-		myproposal[PROPOSAL_ENC_ALGS_CTOS] =
-		myproposal[PROPOSAL_ENC_ALGS_STOC] = options.ciphers;
-	}
-	myproposal[PROPOSAL_ENC_ALGS_CTOS] =
-	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_CTOS],
-	    ssh->compat);
-	myproposal[PROPOSAL_ENC_ALGS_STOC] =
-	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_STOC],
-	    ssh->compat);
-	if (myproposal[PROPOSAL_ENC_ALGS_CTOS] == NULL ||
-	    myproposal[PROPOSAL_ENC_ALGS_STOC] == NULL)
-		fatal("no compatible ciphers found");
-
-	if (options.macs != NULL) {
-		myproposal[PROPOSAL_MAC_ALGS_CTOS] =
-		myproposal[PROPOSAL_MAC_ALGS_STOC] = options.macs;
-	}
-=======
 	myproposal[PROPOSAL_KEX_ALGS] = compat_kex_proposal(
-	    options.kex_algorithms);
+	    options.kex_algorithms, ssh->compat);
 	myproposal[PROPOSAL_ENC_ALGS_CTOS] = compat_cipher_proposal(
-	    options.ciphers);
+	    options.ciphers, ssh->compat);
 	myproposal[PROPOSAL_ENC_ALGS_STOC] = compat_cipher_proposal(
-	    options.ciphers);
+	    options.ciphers, ssh->compat);
 	myproposal[PROPOSAL_MAC_ALGS_CTOS] =
 	    myproposal[PROPOSAL_MAC_ALGS_STOC] = options.macs;
 
->>>>>>> 1.459
 	if (options.compression == COMP_NONE) {
 		myproposal[PROPOSAL_COMP_ALGS_CTOS] =
 		myproposal[PROPOSAL_COMP_ALGS_STOC] = "none";
@@ -2474,14 +2450,6 @@ do_ssh2_kex(struct ssh *ssh)
 		myproposal[PROPOSAL_COMP_ALGS_CTOS] =
 		myproposal[PROPOSAL_COMP_ALGS_STOC] = "none,zlib@openssh.com";
 	}
-<<<<<<< sshd.c
-	if (options.kex_algorithms != NULL)
-		myproposal[PROPOSAL_KEX_ALGS] = options.kex_algorithms;
-
-	myproposal[PROPOSAL_KEX_ALGS] = compat_kex_proposal(
-	    myproposal[PROPOSAL_KEX_ALGS], ssh->compat);
-=======
->>>>>>> 1.459
 
 	if (options.rekey_limit || options.rekey_interval)
 		ssh_packet_set_rekey_limits(ssh,
