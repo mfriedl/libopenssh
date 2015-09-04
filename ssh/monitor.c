@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.150 2015/06/22 23:42:16 djm Exp $ */
+/* $OpenBSD: monitor.c,v 1.153 2015/09/04 04:44:08 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -390,15 +390,10 @@ monitor_sync(struct monitor *pmonitor)
 static void *
 mm_zalloc(struct mm_master *mm, u_int ncount, u_int size)
 {
-	size_t len = (size_t) size * ncount;
-	void *address;
-
-	if (len == 0 || ncount > SIZE_MAX / size)
+	if (size == 0 || ncount == 0 || ncount > SIZE_MAX / size)
 		fatal("%s: mm_zalloc(%u, %u)", __func__, ncount, size);
 
-	address = mm_malloc(mm, len);
-
-	return (address);
+	return mm_malloc(mm, size * ncount);
 }
 
 static void
@@ -642,7 +637,7 @@ mm_answer_sign(int sock, struct sshbuf *m)
 			fatal("%s: sshbuf_new", __func__);
 		if ((r = sshbuf_put_cstring(sigbuf, proof_req)) != 0 ||
 		    (r = sshbuf_put_string(sigbuf, session_id2,
-		    session_id2_len) != 0) ||
+		    session_id2_len)) != 0 ||
 		    (r = sshkey_puts(key, sigbuf)) != 0)
 			fatal("%s: couldn't prepare private key "
 			    "proof buffer: %s", __func__, ssh_err(r));
@@ -1214,7 +1209,11 @@ mm_answer_keyverify(int sock, struct sshbuf *m)
 	    __func__, key, (r == 0) ? "verified" : "unverified");
 
 	/* If auth was successful then record key to ensure it isn't reused */
+<<<<<<< monitor.c
 	if (ret == 0)
+=======
+	if (verified == 1 && key_blobtype == MM_USERKEY)
+>>>>>>> 1.153
 		auth2_record_userkey(authctxt, key);
 	else
 		sshkey_free(key);

@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-chall.c,v 1.42 2015/01/19 20:07:45 markus Exp $ */
+/* $OpenBSD: auth2-chall.c,v 1.43 2015/07/18 07:57:14 djm Exp $ */
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2001 Per Allansson.  All rights reserved.
@@ -56,6 +56,7 @@ struct kbdintctxt {
 	void *ctxt;
 	struct kbdintdevice *device;
 	u_int nreq;
+	u_int devices_done;
 };
 
 static struct kbdintctxt *
@@ -124,12 +125,20 @@ kbdint_next_device(struct authctxt *authctxt, struct kbdintctxt *kbdintctxt)
 		if (len == 0)
 			break;
 		for (i = 0; devices[i]; i++) {
-			if (!auth2_method_allowed(authctxt,
+			if ((kbdintctxt->devices_done & (1 << i)) != 0 ||
+			    !auth2_method_allowed(authctxt,
 			    "keyboard-interactive", devices[i]->name))
 				continue;
+<<<<<<< auth2-chall.c
 			if (strncmp(kbdintctxt->devices, devices[i]->name,
 			    len) == 0)
+=======
+			if (strncmp(kbdintctxt->devices, devices[i]->name,
+			    len) == 0) {
+>>>>>>> 1.43
 				kbdintctxt->device = devices[i];
+				kbdintctxt->devices_done |= 1 << i;
+			}
 		}
 		t = kbdintctxt->devices;
 		kbdintctxt->devices = t[len] ? xstrdup(t+len+1) : NULL;

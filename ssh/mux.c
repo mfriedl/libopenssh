@@ -1,4 +1,4 @@
-/* $OpenBSD: mux.c,v 1.53 2015/05/01 04:03:20 djm Exp $ */
+/* $OpenBSD: mux.c,v 1.54 2015/08/19 23:18:26 djm Exp $ */
 /*
  * Copyright (c) 2002-2008 Damien Miller <djm@openbsd.org>
  *
@@ -689,6 +689,8 @@ process_mux_open_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 	int r, i, ret = 0, freefwd = 1;
 	u_int32_t lport, cport;
 
+	memset(&fwd, 0, sizeof(fwd));
+
 	/* XXX - lport/cport check redundant */
 	if ((r = sshbuf_get_u32(m, &ftype)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &listen_addr, NULL)) != 0 ||
@@ -854,11 +856,21 @@ process_mux_close_fwd(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *o)
 	int r, i, ret = 0;
 	u_int lport, cport;
 
+<<<<<<< mux.c
 	if ((r = sshbuf_get_u32(m, &ftype)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &listen_addr, NULL)) != 0 ||
 	    (r = sshbuf_get_u32(m, &lport)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &connect_addr, NULL)) != 0 ||
 	    (r = sshbuf_get_u32(m, &cport)) != 0 ||
+=======
+	memset(&fwd, 0, sizeof(fwd));
+
+	if (buffer_get_int_ret(&ftype, m) != 0 ||
+	    (listen_addr = buffer_get_string_ret(m, NULL)) == NULL ||
+	    buffer_get_int_ret(&lport, m) != 0 ||
+	    (connect_addr = buffer_get_string_ret(m, NULL)) == NULL ||
+	    buffer_get_int_ret(&cport, m) != 0 ||
+>>>>>>> 1.54
 	    (lport != (u_int)PORT_STREAMLOCAL && lport > 65535) ||
 	    (cport != (u_int)PORT_STREAMLOCAL && cport > 65535)) {
 		error("%s: malformed message: %s", __func__, ssh_err(r));

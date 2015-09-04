@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh.c,v 1.418 2015/05/04 06:10:48 djm Exp $ */
+/* $OpenBSD: ssh.c,v 1.422 2015/09/04 08:21:47 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -98,6 +98,7 @@
 #include "roaming.h"
 #include "version.h"
 #include "ssherr.h"
+#include "myproposal.h"
 
 #ifdef ENABLE_PKCS11
 #include "ssh-pkcs11.h"
@@ -188,10 +189,10 @@ usage(void)
 "usage: ssh [-1246AaCfGgKkMNnqsTtVvXxYy] [-b bind_address] [-c cipher_spec]\n"
 "           [-D [bind_address:]port] [-E log_file] [-e escape_char]\n"
 "           [-F configfile] [-I pkcs11] [-i identity_file]\n"
-"           [-L [bind_address:]port:host:hostport] [-l login_name] [-m mac_spec]\n"
+"           [-L address] [-l login_name] [-m mac_spec]\n"
 "           [-O ctl_cmd] [-o option] [-p port]\n"
 "           [-Q cipher | cipher-auth | mac | kex | key]\n"
-"           [-R [bind_address:]port:host:hostport] [-S ctl_path] [-W host:port]\n"
+"           [-R address] [-S ctl_path] [-W host:port]\n"
 "           [-w local_tun[:remote_tun]] [user@]hostname [command]\n"
 	);
 	exit(255);
@@ -617,7 +618,7 @@ main(int ac, char **av)
 			use_syslog = 1;
 			break;
 		case 'E':
-			logfile = xstrdup(optarg);
+			logfile = optarg;
 			break;
 		case 'G':
 			config_test = 1;
@@ -704,6 +705,7 @@ main(int ac, char **av)
 			break;
 		case 'I':
 #ifdef ENABLE_PKCS11
+			free(options.pkcs11_provider);
 			options.pkcs11_provider = xstrdup(optarg);
 #else
 			fprintf(stderr, "no support for PKCS#11.\n");
@@ -785,31 +787,33 @@ main(int ac, char **av)
 			}
 			break;
 		case 'c':
-			if (ciphers_valid(optarg)) {
+			if (ciphers_valid(*optarg == '+' ?
+			    optarg + 1 : optarg)) {
 				/* SSH2 only */
+				free(options.ciphers);
 				options.ciphers = xstrdup(optarg);
 				options.cipher = SSH_CIPHER_INVALID;
-			} else {
-				/* SSH1 only */
-				options.cipher = cipher_number(optarg);
-				if (options.cipher == -1) {
-					fprintf(stderr,
-					    "Unknown cipher type '%s'\n",
-					    optarg);
-					exit(255);
-				}
-				if (options.cipher == SSH_CIPHER_3DES)
-					options.ciphers = "3des-cbc";
-				else if (options.cipher == SSH_CIPHER_BLOWFISH)
-					options.ciphers = "blowfish-cbc";
-				else
-					options.ciphers = (char *)-1;
+				break;
 			}
+			/* SSH1 only */
+			options.cipher = cipher_number(optarg);
+			if (options.cipher == -1) {
+				fprintf(stderr, "Unknown cipher type '%s'\n",
+				    optarg);
+				exit(255);
+			}
+			if (options.cipher == SSH_CIPHER_3DES)
+				options.ciphers = xstrdup("3des-cbc");
+			else if (options.cipher == SSH_CIPHER_BLOWFISH)
+				options.ciphers = xstrdup("blowfish-cbc");
+			else
+				options.ciphers = xstrdup(KEX_CLIENT_ENCRYPT);
 			break;
 		case 'm':
-			if (mac_valid(optarg))
+			if (mac_valid(optarg)) {
+				free(options.macs);
 				options.macs = xstrdup(optarg);
-			else {
+			} else {
 				fprintf(stderr, "Unknown mac type '%s'\n",
 				    optarg);
 				exit(255);
@@ -972,10 +976,8 @@ main(int ac, char **av)
 	 */
 	if (use_syslog && logfile != NULL)
 		fatal("Can't specify both -y and -E");
-	if (logfile != NULL) {
+	if (logfile != NULL)
 		log_redirect_stderr_to(logfile);
-		free(logfile);
-	}
 	log_init(argv0,
 	    options.log_level == -1 ? SYSLOG_LEVEL_INFO : options.log_level,
 	    SYSLOG_FACILITY_USER, !use_syslog);
@@ -1172,6 +1174,7 @@ main(int ac, char **av)
 	 * have yet resolved the hostname. Do so now.
 	 */
 	if (addrs == NULL && options.proxy_command == NULL) {
+		debug2("resolving \"%s\" port %d", host, options.port);
 		if ((addrs = resolve_host(host, options.port, 1,
 		    cname, sizeof(cname))) == NULL)
 			cleanup_exit(255); /* resolve_host logs the error */
