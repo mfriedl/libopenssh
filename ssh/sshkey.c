@@ -1,4 +1,4 @@
-/* $OpenBSD: sshkey.c,v 1.20 2015/07/03 03:43:18 djm Exp $ */
+/* $OpenBSD: sshkey.c,v 1.22 2015/09/02 07:51:12 jsg Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Alexander von Gernler.  All rights reserved.
@@ -1529,7 +1529,6 @@ dsa_generate_private_key(u_int bits, DSA **dsap)
 	*dsap = NULL;
 	if (!DSA_generate_parameters_ex(private, bits, NULL, 0, NULL,
 	    NULL, NULL) || !DSA_generate_key(private)) {
-		DSA_free(private);
 		ret = SSH_ERR_LIBCRYPTO_ERROR;
 		goto out;
 	}
@@ -1685,7 +1684,7 @@ sshkey_cert_copy(const struct sshkey *from_key, struct sshkey *to_key)
 
 	if ((ret = sshbuf_putb(to->certblob, from->certblob)) != 0 ||
 	    (ret = sshbuf_putb(to->critical, from->critical)) != 0 ||
-	    (ret = sshbuf_putb(to->extensions, from->extensions) != 0))
+	    (ret = sshbuf_putb(to->extensions, from->extensions)) != 0)
 		return ret;
 
 	to->serial = from->serial;
@@ -2654,7 +2653,7 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 			goto out;
 		}
 		if ((r = sshkey_ec_validate_public(EC_KEY_get0_group(k->ecdsa),
-		    EC_KEY_get0_public_key(k->ecdsa)) != 0) ||
+		    EC_KEY_get0_public_key(k->ecdsa))) != 0 ||
 		    (r = sshkey_ec_validate_private(k->ecdsa)) != 0)
 			goto out;
 		break;
@@ -2672,7 +2671,7 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 			goto out;
 		}
 		if ((r = sshkey_ec_validate_public(EC_KEY_get0_group(k->ecdsa),
-		    EC_KEY_get0_public_key(k->ecdsa)) != 0) ||
+		    EC_KEY_get0_public_key(k->ecdsa))) != 0 ||
 		    (r = sshkey_ec_validate_private(k->ecdsa)) != 0)
 			goto out;
 		break;
@@ -2693,10 +2692,10 @@ sshkey_private_deserialize(struct sshbuf *buf, struct sshkey **kp)
 	case KEY_RSA_CERT:
 		if ((r = sshkey_froms(buf, &k)) != 0 ||
 		    (r = sshkey_add_private(k)) != 0 ||
-		    (r = sshbuf_get_bignum2(buf, k->rsa->d) != 0) ||
-		    (r = sshbuf_get_bignum2(buf, k->rsa->iqmp) != 0) ||
-		    (r = sshbuf_get_bignum2(buf, k->rsa->p) != 0) ||
-		    (r = sshbuf_get_bignum2(buf, k->rsa->q) != 0) ||
+		    (r = sshbuf_get_bignum2(buf, k->rsa->d)) != 0 ||
+		    (r = sshbuf_get_bignum2(buf, k->rsa->iqmp)) != 0 ||
+		    (r = sshbuf_get_bignum2(buf, k->rsa->p)) != 0 ||
+		    (r = sshbuf_get_bignum2(buf, k->rsa->q)) != 0 ||
 		    (r = rsa_generate_additional_parameters(k->rsa)) != 0)
 			goto out;
 		break;
@@ -3383,9 +3382,9 @@ sshkey_private_rsa1_to_blob(struct sshkey *key, struct sshbuf *blob,
 
 	/* Store public key.  This will be in plain text. */
 	if ((r = sshbuf_put_u32(encrypted, BN_num_bits(key->rsa->n))) != 0 ||
-	    (r = sshbuf_put_bignum1(encrypted, key->rsa->n) != 0) ||
-	    (r = sshbuf_put_bignum1(encrypted, key->rsa->e) != 0) ||
-	    (r = sshbuf_put_cstring(encrypted, comment) != 0))
+	    (r = sshbuf_put_bignum1(encrypted, key->rsa->n)) != 0 ||
+	    (r = sshbuf_put_bignum1(encrypted, key->rsa->e)) != 0 ||
+	    (r = sshbuf_put_cstring(encrypted, comment)) != 0)
 		goto out;
 
 	/* Allocate space for the private part of the key in the buffer. */

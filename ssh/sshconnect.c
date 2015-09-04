@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect.c,v 1.262 2015/05/28 05:41:29 dtucker Exp $ */
+/* $OpenBSD: sshconnect.c,v 1.265 2015/09/04 04:55:24 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -347,7 +347,7 @@ timeout_connect(int sockfd, const struct sockaddr *serv_addr,
 		goto done;
 	}
 
-	fdset = (fd_set *)xcalloc(howmany(sockfd + 1, NFDBITS),
+	fdset = xcalloc(howmany(sockfd + 1, NFDBITS),
 	    sizeof(fd_mask));
 	FD_SET(sockfd, fdset);
 	ms_to_timeval(&tv, *timeoutp);
@@ -424,7 +424,7 @@ ssh_connect_direct(const char *host, struct addrinfo *aitop,
 	char ntop[NI_MAXHOST], strport[NI_MAXSERV];
 	struct addrinfo *ai;
 
-	debug2("ssh_connect: needpriv %d", needpriv);
+	debug2("%s: needpriv %d", __func__, needpriv);
 
 	for (attempt = 0; attempt < connection_attempts; attempt++) {
 		if (attempt > 0) {
@@ -443,7 +443,7 @@ ssh_connect_direct(const char *host, struct addrinfo *aitop,
 			if (getnameinfo(ai->ai_addr, ai->ai_addrlen,
 			    ntop, sizeof(ntop), strport, sizeof(strport),
 			    NI_NUMERICHOST|NI_NUMERICSERV) != 0) {
-				error("ssh_connect: getnameinfo failed");
+				error("%s: getnameinfo failed", __func__);
 				continue;
 			}
 			debug("Connecting to %.200s [%.100s] port %s.",
@@ -901,7 +901,7 @@ check_host_key(char *hostname, struct sockaddr *hostaddr, u_short port,
 			    options.fingerprint_hash, SSH_FP_RANDOMART);
 			if (fp == NULL || ra == NULL)
 				fatal("%s: sshkey_fingerprint fail", __func__);
-			logit("Host key fingerprint is %s\n%s\n", fp, ra);
+			logit("Host key fingerprint is %s\n%s", fp, ra);
 			free(ra);
 			free(fp);
 		}

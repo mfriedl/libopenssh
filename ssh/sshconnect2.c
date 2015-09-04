@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.224 2015/05/04 06:10:48 djm Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.226 2015/07/30 00:01:34 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -151,6 +151,7 @@ ssh_kex2(struct ssh *ssh, u_short port)
 	char *myproposal[PROPOSAL_MAX] = { KEX_CLIENT };
 	int r;
 
+<<<<<<< sshconnect2.c
 	if (options.ciphers == (char *)-1) {
 		logit("No valid ciphers for protocol version 2 given, using defaults.");
 		options.ciphers = NULL;
@@ -159,13 +160,28 @@ ssh_kex2(struct ssh *ssh, u_short port)
 		myproposal[PROPOSAL_ENC_ALGS_CTOS] =
 		myproposal[PROPOSAL_ENC_ALGS_STOC] = options.ciphers;
 	}
+=======
+	xxx_host = host;
+	xxx_hostaddr = hostaddr;
+
+	myproposal[PROPOSAL_KEX_ALGS] = compat_kex_proposal(
+	    options.kex_algorithms);
+>>>>>>> 1.226
 	myproposal[PROPOSAL_ENC_ALGS_CTOS] =
+<<<<<<< sshconnect2.c
 	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_CTOS], ssh->compat);
+=======
+	    compat_cipher_proposal(options.ciphers);
+>>>>>>> 1.226
 	myproposal[PROPOSAL_ENC_ALGS_STOC] =
+<<<<<<< sshconnect2.c
 	    compat_cipher_proposal(myproposal[PROPOSAL_ENC_ALGS_STOC], ssh->compat);
 	if (myproposal[PROPOSAL_ENC_ALGS_CTOS] == NULL ||
 	    myproposal[PROPOSAL_ENC_ALGS_STOC] == NULL)
 		fatal("no compatible ciphers found");
+=======
+	    compat_cipher_proposal(options.ciphers);
+>>>>>>> 1.226
 	if (options.compression) {
 		myproposal[PROPOSAL_COMP_ALGS_CTOS] =
 		myproposal[PROPOSAL_COMP_ALGS_STOC] = "zlib@openssh.com,zlib,none";
@@ -173,24 +189,35 @@ ssh_kex2(struct ssh *ssh, u_short port)
 		myproposal[PROPOSAL_COMP_ALGS_CTOS] =
 		myproposal[PROPOSAL_COMP_ALGS_STOC] = "none,zlib@openssh.com,zlib";
 	}
-	if (options.macs != NULL) {
-		myproposal[PROPOSAL_MAC_ALGS_CTOS] =
-		myproposal[PROPOSAL_MAC_ALGS_STOC] = options.macs;
-	}
-	if (options.hostkeyalgorithms != NULL)
+	myproposal[PROPOSAL_MAC_ALGS_CTOS] =
+	    myproposal[PROPOSAL_MAC_ALGS_STOC] = options.macs;
+	if (options.hostkeyalgorithms != NULL) {
+		if (kex_assemble_names(KEX_DEFAULT_PK_ALG,
+		    &options.hostkeyalgorithms) != 0)
+			fatal("%s: kex_assemble_namelist", __func__);
 		myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] =
+<<<<<<< sshconnect2.c
 		    compat_pkalg_proposal(options.hostkeyalgorithms, ssh->compat);
 	else {
+=======
+		    compat_pkalg_proposal(options.hostkeyalgorithms);
+	} else {
+		/* Enforce default */
+		options.hostkeyalgorithms = xstrdup(KEX_DEFAULT_PK_ALG);
+>>>>>>> 1.226
 		/* Prefer algorithms that we already have keys for */
 		myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] =
 		    compat_pkalg_proposal(
 		    order_hostkeyalgs(ssh->host, ssh->hostaddr, port),
 		    ssh->compat);
 	}
+<<<<<<< sshconnect2.c
 	if (options.kex_algorithms != NULL)
 		myproposal[PROPOSAL_KEX_ALGS] = options.kex_algorithms;
 	myproposal[PROPOSAL_KEX_ALGS] = compat_kex_proposal(
 	    myproposal[PROPOSAL_KEX_ALGS], ssh->compat);
+=======
+>>>>>>> 1.226
 
 	if (options.rekey_limit || options.rekey_interval)
 		ssh_packet_set_rekey_limits(ssh,
@@ -1414,6 +1441,26 @@ pubkey_cleanup(struct ssh *ssh)
 	}
 }
 
+static int
+try_identity(Identity *id)
+{
+	if (!id->key)
+		return (0);
+	if (match_pattern_list(sshkey_ssh_name(id->key),
+	    options.pubkey_key_types, 0) != 1) {
+		debug("Skipping %s key %s for not in PubkeyAcceptedKeyTypes",
+		    sshkey_ssh_name(id->key), id->filename);
+		return (0);
+	}
+	if (key_type_plain(id->key->type) == KEY_RSA &&
+	    (datafellows & SSH_BUG_RSASIGMD5) != 0) {
+		debug("Skipped %s key %s for RSA/MD5 server",
+		    key_type(id->key), id->filename);
+		return (0);
+	}
+	return (id->key->type != KEY_RSA1);
+}
+
 int
 userauth_pubkey(struct ssh *ssh)
 {
@@ -1433,11 +1480,15 @@ userauth_pubkey(struct ssh *ssh)
 		 * private key instead
 		 */
 		if (id->key != NULL) {
+<<<<<<< sshconnect2.c
 			if (sshkey_type_plain(id->key->type) == KEY_RSA &&
 			    (ssh->compat & SSH_BUG_RSASIGMD5) != 0) {
 				debug("Skipped %s key %s for RSA/MD5 server",
 				    sshkey_type(id->key), id->filename);
 			} else if (id->key->type != KEY_RSA1) {
+=======
+			if (try_identity(id)) {
+>>>>>>> 1.226
 				debug("Offering %s public key: %s",
 				    sshkey_type(id->key), id->filename);
 				sent = send_pubkey_test(ssh, id);
@@ -1447,6 +1498,7 @@ userauth_pubkey(struct ssh *ssh)
 			id->key = load_identity_file(id->filename,
 			    id->userprovided);
 			if (id->key != NULL) {
+<<<<<<< sshconnect2.c
 				id->isprivate = 1;
 				if (sshkey_type_plain(id->key->type) == KEY_RSA &&
 				    (ssh->compat & SSH_BUG_RSASIGMD5) != 0) {
@@ -1455,6 +1507,12 @@ userauth_pubkey(struct ssh *ssh)
 					    id->filename);
 				} else {
 					sent = sign_and_send_pubkey(ssh, id);
+=======
+				if (try_identity(id)) {
+					id->isprivate = 1;
+					sent = sign_and_send_pubkey(
+					    authctxt, id);
+>>>>>>> 1.226
 				}
 				sshkey_free(id->key);
 				id->key = NULL;
