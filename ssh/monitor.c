@@ -1206,14 +1206,10 @@ mm_answer_keyverify(int sock, struct sshbuf *m)
 	ret = sshkey_verify(key, signature, signaturelen, data, datalen,
 	    active_state->compat);
 	debug3("%s: key %p signature %s",
-	    __func__, key, (r == 0) ? "verified" : "unverified");
+	    __func__, key, (ret == 0) ? "verified" : "unverified");
 
 	/* If auth was successful then record key to ensure it isn't reused */
-<<<<<<< monitor.c
-	if (ret == 0)
-=======
-	if (verified == 1 && key_blobtype == MM_USERKEY)
->>>>>>> 1.153
+	if (ret == 0 && key_blobtype == MM_USERKEY)
 		auth2_record_userkey(authctxt, key);
 	else
 		sshkey_free(key);
