@@ -1,6 +1,10 @@
-#	$OpenBSD: Makefile,v 1.74 2015/01/13 07:49:49 djm Exp $
+#	$OpenBSD: Makefile,v 1.82 2015/09/24 06:16:53 djm Exp $
 
-REGRESS_FAIL_EARLY= yes
+#.ifndef SKIP_UNIT
+#SUBDIR=		unittests
+#.endif
+
+REGRESS_FAIL_EARLY=	yes
 REGRESS_TARGETS=	t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12
 
 CLEANFILES+=	t2.out t6.out1 t6.out2 t7.out t7.out.pub copy.1 copy.2 \
@@ -45,6 +49,7 @@ LTESTS= 	connect \
 		multiplex \
 		reexec \
 		brokenkeys \
+		cfgparse \
 		cfgmatch \
 		addrmatch \
 		localcommand \
@@ -60,7 +65,12 @@ LTESTS= 	connect \
 		integrity \
 		krl \
 		multipubkey \
-		limit-keytype
+		limit-keytype \
+		hostkey-agent \
+		keygen-knownhosts \
+		hostkey-rotate \
+		principals-command \
+		cert-file
 
 # works only with s-bits
 #		agent-ptrace \
@@ -71,7 +81,7 @@ INTEROP_TESTS=	putty-transfer putty-ciphers putty-kex conch-ciphers
 #LTESTS= 	cipher-speed
 
 USER!=		id -un
-CLEANFILES+=	authorized_keys_${USER} known_hosts pidfile \
+CLEANFILES+=	*.core authorized_keys_${USER} known_hosts pidfile \
 		ssh_config sshd_config.orig ssh_proxy sshd_config sshd_proxy \
 		rsa.pub rsa rsa1.pub rsa1 host.rsa host.rsa1 \
 		rsa-agent rsa-agent.pub rsa1-agent rsa1-agent.pub \
@@ -83,7 +93,10 @@ CLEANFILES+=	authorized_keys_${USER} known_hosts pidfile \
 		sshd_proxy.* authorized_keys_${USER}.* revoked-* krl-* \
 		ssh.log failed-ssh.log sshd.log failed-sshd.log \
 		regress.log failed-regress.log ssh-log-wrapper.sh \
-		sftp-server.sh sftp-server.log sftp.log
+		sftp-server.sh sftp-server.log sftp.log kh.* hkr.* \
+		user_key* user_ca* host_* key.* agent-key.* ed25519-agent* \
+		known_hosts.* data modpipe ssh_proxy keys-command-args \
+		scp-ssh-wrapper.scp ssh_proxy_bak
 
 SUDO_CLEAN+=	/var/run/testdata_${USER} /var/run/keycommand_${USER}
 
@@ -106,11 +119,6 @@ TEST_ENV+=	"TEST_SSH_SSHAGENT=${.CURDIR}/../ssh/ssh-agent${ODIR}/ssh-agent"
 TEST_ENV+=	"TEST_SSH_SSHD=${.CURDIR}/../ssh/sshd${ODIR}/sshd"
 TEST_ENV+=	"TEST_SSH_SSHKEYGEN=${.CURDIR}/../ssh/ssh-keygen${ODIR}/ssh-keygen"
 TEST_ENV+=	"TEST_SSH_SSHKEYSCAN=${.CURDIR}/../ssh/ssh-keyscan${ODIR}/ssh-keyscan"
-
-unit:
-	if test -z "${SKIP_UNIT}" ; then \
-		(set -e ; cd ${.CURDIR}/unittests ; make) \
-	fi
 
 t1:
 	ssh-keygen -if ${.CURDIR}/rsa_ssh2.prv | diff - ${.CURDIR}/rsa_openssh.prv
@@ -206,6 +214,5 @@ clean:
 	rm -f ${CLEANFILES}
 	test -z "${SUDO}" || ${SUDO} rm -f ${SUDO_CLEAN}
 	rm -rf .putty
-	#(set -e ; cd ${.CURDIR}/unittests ; make clean)
 
 .include <bsd.regress.mk>
