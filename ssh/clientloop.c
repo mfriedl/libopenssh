@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.275 2015/07/10 06:21:53 markus Exp $ */
+/* $OpenBSD: clientloop.c,v 1.278 2015/12/26 07:46:03 semarie Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -304,11 +304,10 @@ client_x11_get_proto(const char *display, const char *xauth_path,
 	static char proto[512], data[512];
 	FILE *f;
 	int got_data = 0, generated = 0, do_unlink = 0, i;
-	char *xauthdir, *xauthfile;
+	char xauthdir[PATH_MAX] = "", xauthfile[PATH_MAX] = "";
 	struct stat st;
 	u_int now, x11_timeout_real;
 
-	xauthdir = xauthfile = NULL;
 	*_proto = proto;
 	*_data = data;
 	proto[0] = data[0] = '\0';
@@ -336,8 +335,6 @@ client_x11_get_proto(const char *display, const char *xauth_path,
 			display = xdisplay;
 		}
 		if (trusted == 0) {
-			xauthdir = xmalloc(PATH_MAX);
-			xauthfile = xmalloc(PATH_MAX);
 			mktemp_proto(xauthdir, PATH_MAX);
 			/*
 			 * The authentication cookie should briefly outlive
@@ -400,8 +397,6 @@ client_x11_get_proto(const char *display, const char *xauth_path,
 		unlink(xauthfile);
 		rmdir(xauthdir);
 	}
-	free(xauthdir);
-	free(xauthfile);
 
 	/*
 	 * If we didn't get authentication data, just make up some
@@ -1532,6 +1527,36 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 	char buf[100];
 
 	debug("Entering interactive session.");
+
+	if (options.control_master &&
+	    ! option_clear_or_none(options.control_path)) {
+		debug("pledge: id");
+		if (pledge("stdio rpath wpath cpath unix inet dns proc exec id tty",
+		    NULL) == -1)
+			fatal("%s pledge(): %s", __func__, strerror(errno));
+
+	} else if (options.forward_x11 || options.permit_local_command) {
+		debug("pledge: exec");
+		if (pledge("stdio rpath wpath cpath unix inet dns proc exec tty",
+		    NULL) == -1)
+			fatal("%s pledge(): %s", __func__, strerror(errno));
+
+	} else if (options.update_hostkeys) {
+		debug("pledge: filesystem full");
+		if (pledge("stdio rpath wpath cpath unix inet dns proc tty",
+		    NULL) == -1)
+			fatal("%s pledge(): %s", __func__, strerror(errno));
+
+	} else if (! option_clear_or_none(options.proxy_command)) {
+		debug("pledge: proc");
+		if (pledge("stdio cpath unix inet dns proc tty", NULL) == -1)
+			fatal("%s pledge(): %s", __func__, strerror(errno));
+
+	} else {
+		debug("pledge: network");
+		if (pledge("stdio unix inet dns tty", NULL) == -1)
+			fatal("%s pledge(): %s", __func__, strerror(errno));
+	}
 
 	start_time = get_current_time();
 

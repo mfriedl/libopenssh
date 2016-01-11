@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.459 2015/09/04 08:21:47 dtucker Exp $ */
+/* $OpenBSD: sshd.c,v 1.462 2015/12/10 17:08:40 mmcc Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -612,31 +612,32 @@ privsep_preauth_child(void)
 	/* Demote the private keys to public keys. */
 	demote_sensitive_data();
 
-	if ((pw = getpwnam(SSH_PRIVSEP_USER)) == NULL)
-		fatal("Privilege separation user %s does not exist",
-		    SSH_PRIVSEP_USER);
-	explicit_bzero(pw->pw_passwd, strlen(pw->pw_passwd));
-	endpwent();
+	/* Demote the child */
+	if (getuid() == 0 || geteuid() == 0) {
+		if ((pw = getpwnam(SSH_PRIVSEP_USER)) == NULL)
+			fatal("Privilege separation user %s does not exist",
+			    SSH_PRIVSEP_USER);
+		explicit_bzero(pw->pw_passwd, strlen(pw->pw_passwd));
+		endpwent();
 
-	/* Change our root directory */
-	if (chroot(_PATH_PRIVSEP_CHROOT_DIR) == -1)
-		fatal("chroot(\"%s\"): %s", _PATH_PRIVSEP_CHROOT_DIR,
-		    strerror(errno));
-	if (chdir("/") == -1)
-		fatal("chdir(\"/\"): %s", strerror(errno));
+		/* Change our root directory */
+		if (chroot(_PATH_PRIVSEP_CHROOT_DIR) == -1)
+			fatal("chroot(\"%s\"): %s", _PATH_PRIVSEP_CHROOT_DIR,
+			    strerror(errno));
+		if (chdir("/") == -1)
+			fatal("chdir(\"/\"): %s", strerror(errno));
 
-	/* Drop our privileges */
-	debug3("privsep user:group %u:%u", (u_int)pw->pw_uid,
-	    (u_int)pw->pw_gid);
-#if 0
-	/* XXX not ready, too heavy after chroot */
-	do_setusercontext(pw);
-#else
-	gidset[0] = pw->pw_gid;
-	if (setgroups(1, gidset) < 0)
-		fatal("setgroups: %.100s", strerror(errno));
-	permanently_set_uid(pw);
-#endif
+		/*
+		 * Drop our privileges
+		 * NB. Can't use setusercontext() after chroot.
+		 */
+		debug3("privsep user:group %u:%u", (u_int)pw->pw_uid,
+		    (u_int)pw->pw_gid);
+		gidset[0] = pw->pw_gid;
+		if (setgroups(1, gidset) < 0)
+			fatal("setgroups: %.100s", strerror(errno));
+		permanently_set_uid(pw);
+	}
 }
 
 static int
@@ -702,9 +703,7 @@ privsep_preauth(struct authctxt *authctxt)
 		/* Arrange for logging to be sent to the monitor */
 		set_log_handler(mm_log_handler, pmonitor);
 
-		/* Demote the child */
-		if (getuid() == 0 || geteuid() == 0)
-			privsep_preauth_child();
+		privsep_preauth_child();
 		setproctitle("%s", "[net]");
 		if (box != NULL)
 			ssh_sandbox_child(box);
@@ -789,11 +788,24 @@ list_hostkey_types(void)
 		case KEY_DSA:
 		case KEY_ECDSA:
 		case KEY_ED25519:
+<<<<<<< sshd.c
 			if ((r = sshbuf_putf(b, "%s%s",
 			    sshbuf_len(b) > 0 ? "," : "",
 			    sshkey_ssh_name(key))) != 0)
 				fatal("%s: buffer error: %s",
 				    __func__, ssh_err(r));
+=======
+			if (buffer_len(&b) > 0)
+				buffer_append(&b, ",", 1);
+			p = key_ssh_name(key);
+			buffer_append(&b, p, strlen(p));
+
+			/* for RSA we also support SHA2 signatures */
+			if (key->type == KEY_RSA) {
+				p = ",rsa-sha2-512,rsa-sha2-256";
+				buffer_append(&b, p, strlen(p));
+			}
+>>>>>>> 1.462
 			break;
 		}
 		/* If the private key has a cert peer, then list that too */
@@ -1250,8 +1262,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 	for (;;) {
 		if (received_sighup)
 			sighup_restart();
-		if (fdset != NULL)
-			free(fdset);
+		free(fdset);
 		fdset = xcalloc(howmany(maxfd + 1, NFDBITS),
 		    sizeof(fd_mask));
 
@@ -2409,19 +2420,47 @@ do_ssh1_kex(struct ssh *ssh)
 #endif
 
 int
+<<<<<<< sshd.c
 sshd_hostkey_sign(struct sshkey *privkey, struct sshkey *pubkey,
     u_char **signature, size_t *slen, const u_char *data, size_t dlen,
     u_int compat)
+=======
+sshd_hostkey_sign(Key *privkey, Key *pubkey, u_char **signature, size_t *slen,
+    const u_char *data, size_t dlen, const char *alg, u_int flag)
+>>>>>>> 1.462
 {
 	if (privkey) {
+<<<<<<< sshd.c
 		return PRIVSEP(sshkey_sign(privkey, signature, slen,
 		    data, dlen, compat));
+=======
+		if (PRIVSEP(key_sign(privkey, signature, &xxx_slen, data, xxx_dlen,
+		    alg) < 0))
+			fatal("%s: key_sign failed", __func__);
+		if (slen)
+			*slen = xxx_slen;
+>>>>>>> 1.462
 	} else if (use_privsep) {
+<<<<<<< sshd.c
 		return mm_sshkey_sign(pubkey, signature, slen, data, dlen,
 		    compat);
+=======
+		if (mm_key_sign(pubkey, signature, &xxx_slen, data, xxx_dlen,
+		    alg) < 0)
+			fatal("%s: pubkey_sign failed", __func__);
+		if (slen)
+			*slen = xxx_slen;
+>>>>>>> 1.462
 	} else {
+<<<<<<< sshd.c
 		return ssh_agent_sign(auth_sock, pubkey, signature, slen, data,
 		    dlen, compat);
+=======
+		if ((r = ssh_agent_sign(auth_sock, pubkey, signature, slen,
+		    data, dlen, alg, datafellows)) != 0)
+			fatal("%s: ssh_agent_sign failed: %s",
+			    __func__, ssh_err(r));
+>>>>>>> 1.462
 	}
 	return 0;
 }

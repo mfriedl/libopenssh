@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor_wrap.c,v 1.85 2015/05/01 03:23:51 djm Exp $ */
+/* $OpenBSD: monitor_wrap.c,v 1.86 2015/12/04 16:41:28 markus Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -217,8 +217,13 @@ mm_choose_dh(int min, int nbits, int max)
 #endif
 
 int
+<<<<<<< monitor_wrap.c
 mm_sshkey_sign(struct sshkey *key, u_char **sigp, size_t *lenp,
     const u_char *data, size_t datalen, u_int compat)
+=======
+mm_key_sign(Key *key, u_char **sigp, u_int *lenp,
+    const u_char *data, u_int datalen, const char *hostkey_alg)
+>>>>>>> 1.86
 {
 	struct ssh *ssh = active_state;		/* XXX */
 	struct kex *kex = *pmonitor->m_pkex;
@@ -235,7 +240,16 @@ mm_sshkey_sign(struct sshkey *key, u_char **sigp, size_t *lenp,
 	    (r = sshbuf_put_string(m, data, datalen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
+<<<<<<< monitor_wrap.c
 	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_SIGN, m);
+=======
+	buffer_init(&m);
+	buffer_put_int(&m, kex->host_key_index(key, 0, active_state));
+	buffer_put_string(&m, data, datalen);
+	buffer_put_cstring(&m, hostkey_alg);
+
+	mm_request_send(pmonitor->m_recvfd, MONITOR_REQ_SIGN, &m);
+>>>>>>> 1.86
 
 	debug3("%s: waiting for MONITOR_ANS_SIGN", __func__);
 	mm_request_receive_expect(pmonitor->m_recvfd, MONITOR_ANS_SIGN, m);

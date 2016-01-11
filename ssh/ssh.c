@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh.c,v 1.422 2015/09/04 08:21:47 dtucker Exp $ */
+/* $OpenBSD: ssh.c,v 1.432 2015/12/11 03:20:09 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -188,11 +188,9 @@ usage(void)
 	fprintf(stderr,
 "usage: ssh [-1246AaCfGgKkMNnqsTtVvXxYy] [-b bind_address] [-c cipher_spec]\n"
 "           [-D [bind_address:]port] [-E log_file] [-e escape_char]\n"
-"           [-F configfile] [-I pkcs11] [-i identity_file]\n"
-"           [-L address] [-l login_name] [-m mac_spec]\n"
-"           [-O ctl_cmd] [-o option] [-p port]\n"
-"           [-Q cipher | cipher-auth | mac | kex | key]\n"
-"           [-R address] [-S ctl_path] [-W host:port]\n"
+"           [-F configfile] [-I pkcs11] [-i identity_file] [-L address]\n"
+"           [-l login_name] [-m mac_spec] [-O ctl_cmd] [-o option] [-p port]\n"
+"           [-Q query_option] [-R address] [-S ctl_path] [-W host:port]\n"
 "           [-w local_tun[:remote_tun]] [user@]hostname [command]\n"
 	);
 	exit(255);
@@ -233,7 +231,7 @@ resolve_host(const char *name, int port, int logerr, char *cname, size_t clen)
 	if (port <= 0)
 		port = default_ssh_port();
 
-	snprintf(strport, sizeof strport, "%u", port);
+	snprintf(strport, sizeof strport, "%d", port);
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = options.address_family == -1 ?
 	    AF_UNSPEC : options.address_family;
@@ -387,6 +385,17 @@ resolve_canonicalize(char **hostp, int port)
 		return addrs;
 	}
 
+	/* If domain name is anchored, then resolve it now */
+	if ((*hostp)[strlen(*hostp) - 1] == '.') {
+		debug3("%s: name is fully qualified", __func__);
+		fullhost = xstrdup(*hostp);
+		if ((addrs = resolve_host(fullhost, port, 0,
+		    newname, sizeof(newname))) != NULL)
+			goto found;
+		free(fullhost);
+		goto notfound;
+	}
+
 	/* Don't apply canonicalization to sufficiently-qualified hostnames */
 	ndots = 0;
 	for (cp = *hostp; *cp != '\0'; cp++) {
@@ -410,6 +419,7 @@ resolve_canonicalize(char **hostp, int port)
 			free(fullhost);
 			continue;
 		}
+ found:
 		/* Remove trailing '.' */
 		fullhost[strlen(fullhost) - 1] = '\0';
 		/* Follow CNAME if requested */
@@ -421,6 +431,7 @@ resolve_canonicalize(char **hostp, int port)
 		*hostp = fullhost;
 		return addrs;
 	}
+ notfound:
 	if (!options.canonicalize_fallback_local)
 		fatal("%s: Could not resolve host \"%s\"", __progname, *hostp);
 	debug2("%s: host %s not found in any suffix", __func__, *hostp);
@@ -512,7 +523,7 @@ main(int ac, char **av)
 	int i, r, opt, exit_status, use_syslog, config_test = 0;
 	char *p, *cp, *line, *argv0, buf[PATH_MAX], *host_arg, *logfile;
 	char thishost[NI_MAXHOST], shorthost[NI_MAXHOST], portstr[NI_MAXSERV];
-	char cname[NI_MAXHOST];
+	char cname[NI_MAXHOST], uidstr[32], *conn_hash_hex;
 	struct stat st;
 	struct passwd *pw;
 	int timeout_ms;
@@ -522,7 +533,6 @@ main(int ac, char **av)
 	struct addrinfo *addrs = NULL;
 	struct ssh_digest_ctx *md;
 	u_char conn_hash[SSH_DIGEST_MAX_LENGTH];
-	char *conn_hash_hex;
 
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
@@ -695,13 +705,14 @@ main(int ac, char **av)
 			options.gss_deleg_creds = 1;
 			break;
 		case 'i':
-			if (stat(optarg, &st) < 0) {
+			p = tilde_expand_filename(optarg, original_real_uid);
+			if (stat(p, &st) < 0)
 				fprintf(stderr, "Warning: Identity file %s "
-				    "not accessible: %s.\n", optarg,
+				    "not accessible: %s.\n", p,
 				    strerror(errno));
-				break;
-			}
-			add_identity_file(&options, NULL, optarg, 1);
+			else
+				add_identity_file(&options, NULL, p, 1);
+			free(p);
 			break;
 		case 'I':
 #ifdef ENABLE_PKCS11
@@ -891,8 +902,7 @@ main(int ac, char **av)
 			subsystem_flag = 1;
 			break;
 		case 'S':
-			if (options.control_path != NULL)
-				free(options.control_path);
+			free(options.control_path);
 			options.control_path = xstrdup(optarg);
 			break;
 		case 'b':
@@ -1078,6 +1088,9 @@ main(int ac, char **av)
 		    "disabling");
 		options.update_hostkeys = 0;
 	}
+	if (options.connection_attempts <= 0)
+		fatal("Invalid number of ConnectionAttempts");
+
 	if (original_effective_uid != 0)
 		options.use_privileged_port = 0;
 
@@ -1112,6 +1125,7 @@ main(int ac, char **av)
 	strlcpy(shorthost, thishost, sizeof(shorthost));
 	shorthost[strcspn(thishost, ".")] = '\0';
 	snprintf(portstr, sizeof(portstr), "%d", options.port);
+	snprintf(uidstr, sizeof(uidstr), "%d", pw->pw_uid);
 
 	if ((md = ssh_digest_start(SSH_DIGEST_SHA1)) == NULL ||
 	    ssh_digest_update(md, thishost, strlen(thishost)) < 0 ||
@@ -1154,6 +1168,7 @@ main(int ac, char **av)
 		    "p", portstr,
 		    "r", options.user,
 		    "u", pw->pw_name,
+		    "i", uidstr,
 		    (char *)NULL);
 		free(cp);
 	}
@@ -1216,6 +1231,7 @@ main(int ac, char **av)
 		    sizeof(struct sshkey));
 
 		PRIV_START;
+<<<<<<< ssh.c
 
 		/* XXX check errors? */
 #define L_KEY(t,p,o) \
@@ -1239,6 +1255,28 @@ main(int ac, char **av)
 		L_KEY(KEY_ED25519, _PATH_HOST_ED25519_KEY_FILE, 6);
 		L_KEY(KEY_RSA, _PATH_HOST_RSA_KEY_FILE, 7);
 		L_KEY(KEY_DSA, _PATH_HOST_DSA_KEY_FILE, 8);
+=======
+#if WITH_SSH1
+		sensitive_data.keys[0] = key_load_private_type(KEY_RSA1,
+		    _PATH_HOST_KEY_FILE, "", NULL, NULL);
+#endif
+		sensitive_data.keys[1] = key_load_private_cert(KEY_ECDSA,
+		    _PATH_HOST_ECDSA_KEY_FILE, "", NULL);
+		sensitive_data.keys[2] = key_load_private_cert(KEY_ED25519,
+		    _PATH_HOST_ED25519_KEY_FILE, "", NULL);
+		sensitive_data.keys[3] = key_load_private_cert(KEY_RSA,
+		    _PATH_HOST_RSA_KEY_FILE, "", NULL);
+		sensitive_data.keys[4] = key_load_private_cert(KEY_DSA,
+		    _PATH_HOST_DSA_KEY_FILE, "", NULL);
+		sensitive_data.keys[5] = key_load_private_type(KEY_ECDSA,
+		    _PATH_HOST_ECDSA_KEY_FILE, "", NULL, NULL);
+		sensitive_data.keys[6] = key_load_private_type(KEY_ED25519,
+		    _PATH_HOST_ED25519_KEY_FILE, "", NULL, NULL);
+		sensitive_data.keys[7] = key_load_private_type(KEY_RSA,
+		    _PATH_HOST_RSA_KEY_FILE, "", NULL, NULL);
+		sensitive_data.keys[8] = key_load_private_type(KEY_DSA,
+		    _PATH_HOST_DSA_KEY_FILE, "", NULL, NULL);
+>>>>>>> 1.432
 		PRIV_END;
 
 		if (options.hostbased_authentication == 1 &&
@@ -1324,6 +1362,10 @@ main(int ac, char **av)
 			sshkey_free(options.identity_keys[i]);
 			options.identity_keys[i] = NULL;
 		}
+	}
+	for (i = 0; i < options.num_certificate_files; i++) {
+		free(options.certificate_files[i]);
+		options.certificate_files[i] = NULL;
 	}
 
 	exit_status = compat20 ? ssh_session2(ssh) : ssh_session(ssh);
@@ -1935,25 +1977,39 @@ ssh_session2(struct ssh *ssh)
 	    options.escape_char : SSH_ESCAPECHAR_NONE, id);
 }
 
+/* Loads all IdentityFile and CertificateFile keys */
 static void
 load_public_identity_files(void)
 {
 	char *filename, *cp, thishost[NI_MAXHOST];
 	char *pwdir = NULL, *pwname = NULL;
+<<<<<<< ssh.c
 	int i = 0;
 	struct sshkey *public;
+=======
+	Key *public;
+>>>>>>> 1.432
 	struct passwd *pw;
-	u_int n_ids;
+	int i;
+	u_int n_ids, n_certs;
 	char *identity_files[SSH_MAX_IDENTITY_FILES];
+<<<<<<< ssh.c
 	struct sshkey *identity_keys[SSH_MAX_IDENTITY_FILES];
+=======
+	Key *identity_keys[SSH_MAX_IDENTITY_FILES];
+	char *certificate_files[SSH_MAX_CERTIFICATE_FILES];
+	struct sshkey *certificates[SSH_MAX_CERTIFICATE_FILES];
+>>>>>>> 1.432
 #ifdef ENABLE_PKCS11
 	struct sshkey **keys;
 	int nkeys;
 #endif /* PKCS11 */
 
-	n_ids = 0;
+	n_ids = n_certs = 0;
 	memset(identity_files, 0, sizeof(identity_files));
 	memset(identity_keys, 0, sizeof(identity_keys));
+	memset(certificate_files, 0, sizeof(certificate_files));
+	memset(certificates, 0, sizeof(certificates));
 
 #ifdef ENABLE_PKCS11
 	if (options.pkcs11_provider != NULL &&
@@ -1985,6 +2041,7 @@ load_public_identity_files(void)
 		if (n_ids >= SSH_MAX_IDENTITY_FILES ||
 		    strcasecmp(options.identity_files[i], "none") == 0) {
 			free(options.identity_files[i]);
+			options.identity_files[i] = NULL;
 			continue;
 		}
 		cp = tilde_expand_filename(options.identity_files[i],
@@ -2004,8 +2061,17 @@ load_public_identity_files(void)
 		if (++n_ids >= SSH_MAX_IDENTITY_FILES)
 			continue;
 
+<<<<<<< ssh.c
 		/* Try to add the certificate variant too */
 		/* XXX sshkey_load_cert()? */
+=======
+		/*
+		 * If no certificates have been explicitly listed then try
+		 * to add the default certificate variant too.
+		 */
+		if (options.num_certificate_files != 0)
+			continue;
+>>>>>>> 1.432
 		xasprintf(&cp, "%s-cert", filename);
 		check_load(sshkey_load_public(cp, &public, NULL),
 		    filename, "pubkey");
@@ -2023,13 +2089,49 @@ load_public_identity_files(void)
 			continue;
 		}
 		identity_keys[n_ids] = public;
-		/* point to the original path, most likely the private key */
-		identity_files[n_ids] = xstrdup(filename);
+		identity_files[n_ids] = cp;
 		n_ids++;
 	}
+
+	if (options.num_certificate_files > SSH_MAX_CERTIFICATE_FILES)
+		fatal("%s: too many certificates", __func__);
+	for (i = 0; i < options.num_certificate_files; i++) {
+		cp = tilde_expand_filename(options.certificate_files[i],
+		    original_real_uid);
+		filename = percent_expand(cp, "d", pwdir,
+		    "u", pwname, "l", thishost, "h", host,
+		    "r", options.user, (char *)NULL);
+		free(cp);
+
+		public = key_load_public(filename, NULL);
+		debug("certificate file %s type %d", filename,
+		    public ? public->type : -1);
+		free(options.certificate_files[i]);
+		options.certificate_files[i] = NULL;
+		if (public == NULL) {
+			free(filename);
+			continue;
+		}
+		if (!key_is_cert(public)) {
+			debug("%s: key %s type %s is not a certificate",
+			    __func__, filename, key_type(public));
+			key_free(public);
+			free(filename);
+			continue;
+		}
+		certificate_files[n_certs] = filename;
+		certificates[n_certs] = public;
+		++n_certs;
+	}
+
 	options.num_identity_files = n_ids;
 	memcpy(options.identity_files, identity_files, sizeof(identity_files));
 	memcpy(options.identity_keys, identity_keys, sizeof(identity_keys));
+
+	options.num_certificate_files = n_certs;
+	memcpy(options.certificate_files,
+	    certificate_files, sizeof(certificate_files));
+	memcpy(options.certificates, certificates, sizeof(certificates));
 
 	explicit_bzero(pwname, strlen(pwname));
 	free(pwname);

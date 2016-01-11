@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-pubkey.c,v 1.53 2015/06/15 18:44:22 jsing Exp $ */
+/* $OpenBSD: auth2-pubkey.c,v 1.54 2015/10/27 01:44:45 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -821,9 +821,14 @@ check_authkeys_file(FILE *f, char *file, struct sshkey *key, struct passwd *pw)
 				free(fp);
 				continue;
 			}
-			verbose("Accepted certificate ID \"%s\" "
+			verbose("Accepted certificate ID \"%s\" (serial %llu) "
 			    "signed by %s CA %s via %s", key->cert->key_id,
+<<<<<<< auth2-pubkey.c
 			    sshkey_type(found), fp, file);
+=======
+			    (unsigned long long)key->cert->serial,
+			    key_type(found), fp, file);
+>>>>>>> 1.54
 			free(fp);
 			found_key = 1;
 			break;
@@ -901,8 +906,15 @@ user_cert_trusted_ca(struct passwd *pw, struct sshkey *key)
 	if (auth_cert_options(key, pw) != 0)
 		goto out;
 
+<<<<<<< auth2-pubkey.c
 	verbose("Accepted certificate ID \"%s\" signed by %s CA %s via %s",
 	    key->cert->key_id, sshkey_type(key->cert->signature_key), ca_fp,
+=======
+	verbose("Accepted certificate ID \"%s\" (serial %llu) signed by "
+	    "%s CA %s via %s", key->cert->key_id,
+	    (unsigned long long)key->cert->serial,
+	    key_type(key->cert->signature_key), ca_fp,
+>>>>>>> 1.54
 	    options.trusted_user_ca_keys);
 	ret = 1;
 

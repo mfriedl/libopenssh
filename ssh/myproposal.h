@@ -1,4 +1,4 @@
-/* $OpenBSD: myproposal.h,v 1.47 2015/07/10 06:21:53 markus Exp $ */
+/* $OpenBSD: myproposal.h,v 1.49 2015/12/05 20:53:21 markus Exp $ */
 
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
@@ -50,6 +50,8 @@
 	"ecdsa-sha2-nistp384," \
 	"ecdsa-sha2-nistp521," \
 	"ssh-ed25519," \
+	"rsa-sha2-512," \
+	"rsa-sha2-256," \
 	"ssh-rsa"
 
 #define	KEX_SERVER_ENCRYPT \

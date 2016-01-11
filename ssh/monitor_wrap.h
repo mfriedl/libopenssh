@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor_wrap.h,v 1.27 2015/05/01 03:23:51 djm Exp $ */
+/* $OpenBSD: monitor_wrap.h,v 1.29 2015/12/04 16:41:28 markus Exp $ */
 
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
@@ -40,8 +40,12 @@ struct authctxt;
 void mm_log_handler(LogLevel, const char *, void *);
 int mm_is_monitor(void);
 DH *mm_choose_dh(int, int, int);
+<<<<<<< monitor_wrap.h
 int mm_sshkey_sign(struct sshkey *, u_char **, size_t *, const u_char *, size_t,
     u_int);
+=======
+int mm_key_sign(Key *, u_char **, u_int *, const u_char *, u_int, const char *);
+>>>>>>> 1.29
 void mm_inform_authserv(char *, char *);
 struct passwd *mm_getpwnamallow(const char *);
 char *mm_auth2_read_banner(void);
@@ -81,10 +85,6 @@ void mm_send_keystate(struct monitor*);
 /* bsdauth */
 int mm_bsdauth_query(void *, char **, char **, u_int *, char ***, u_int **);
 int mm_bsdauth_respond(void *, u_int, char **);
-
-/* skey */
-int mm_skey_query(void *, char **, char **, u_int *, char ***, u_int **);
-int mm_skey_respond(void *, u_int, char **);
 
 /* zlib allocation hooks */
 void mm_init_compression(struct mm_master *);

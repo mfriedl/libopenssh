@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect.c,v 1.265 2015/09/04 04:55:24 djm Exp $ */
+/* $OpenBSD: sshconnect.c,v 1.269 2015/11/20 01:45:29 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -55,6 +55,7 @@
 #include "version.h"
 #include "authfile.h"
 #include "ssherr.h"
+#include "authfd.h"
 
 char *client_version_string = NULL;
 char *server_version_string = NULL;
@@ -425,6 +426,8 @@ ssh_connect_direct(const char *host, struct addrinfo *aitop,
 	struct addrinfo *ai;
 
 	debug2("%s: needpriv %d", __func__, needpriv);
+	memset(ntop, 0, sizeof(ntop));
+	memset(strport, 0, sizeof(strport));
 
 	for (attempt = 0; attempt < connection_attempts; attempt++) {
 		if (attempt > 0) {
@@ -1215,8 +1218,9 @@ fail:
 int
 verify_host_key(char *host, struct sockaddr *hostaddr, struct sshkey *host_key)
 {
+	u_int i;
 	int r = -1, flags = 0;
-	char *fp = NULL;
+	char valid[64], *fp = NULL, *cafp = NULL;
 	struct sshkey *plain = NULL;
 
 	if ((fp = sshkey_fingerprint(host_key,
@@ -1226,8 +1230,31 @@ verify_host_key(char *host, struct sockaddr *hostaddr, struct sshkey *host_key)
 		goto out;
 	}
 
-	debug("Server host key: %s %s",
-	    compat20 ? sshkey_ssh_name(host_key) : sshkey_type(host_key), fp);
+	if (sshkey_is_cert(host_key)) {
+		if ((cafp = sshkey_fingerprint(host_key->cert->signature_key,
+		    options.fingerprint_hash, SSH_FP_DEFAULT)) == NULL) {
+			error("%s: fingerprint CA key: %s",
+			    __func__, ssh_err(r));
+			r = -1;
+			goto out;
+		}
+		sshkey_format_cert_validity(host_key->cert,
+		    valid, sizeof(valid));
+		debug("Server host certificate: %s %s, serial %llu "
+		    "ID \"%s\" CA %s %s valid %s",
+		    sshkey_ssh_name(host_key), fp,
+		    (unsigned long long)host_key->cert->serial,
+		    host_key->cert->key_id,
+		    sshkey_ssh_name(host_key->cert->signature_key), cafp,
+		    valid);
+		for (i = 0; i < host_key->cert->nprincipals; i++) {
+			debug2("Server host certificate hostname: %s",
+			    host_key->cert->principals[i]);
+		}
+	} else {
+		debug("Server host key: %s %s", compat20 ?
+		    sshkey_ssh_name(host_key) : sshkey_type(host_key), fp);
+	}
 
 	if (sshkey_equal(previous_host_key, host_key)) {
 		debug2("%s: server host key %s %s matches cached key",
@@ -1292,6 +1319,7 @@ verify_host_key(char *host, struct sockaddr *hostaddr, struct sshkey *host_key)
 out:
 	sshkey_free(plain);
 	free(fp);
+	free(cafp);
 	if (r == 0 && host_key != NULL) {
 		sshkey_free(previous_host_key);
 		r = sshkey_from_private(host_key, &previous_host_key);
@@ -1468,4 +1496,31 @@ ssh_local_cmd(const char *args)
 		return (1);
 
 	return (WEXITSTATUS(status));
+}
+
+void
+maybe_add_key_to_agent(char *authfile, Key *private, char *comment,
+    char *passphrase)
+{
+	int auth_sock = -1, r;
+
+	if (options.add_keys_to_agent == 0)
+		return;
+
+	if ((r = ssh_get_authentication_socket(&auth_sock)) != 0) {
+		debug3("no authentication agent, not adding key");
+		return;
+	}
+
+	if (options.add_keys_to_agent == 2 &&
+	    !ask_permission("Add key %s (%s) to agent?", authfile, comment)) {
+		debug3("user denied adding this key");
+		return;
+	}
+
+	if ((r = ssh_add_identity_constrained(auth_sock, private, comment, 0,
+	    (options.add_keys_to_agent == 3))) == 0)
+		debug("identity added to agent: %s", authfile);
+	else
+		debug("could not add identity to agent: %s (%d)", authfile, r);
 }
