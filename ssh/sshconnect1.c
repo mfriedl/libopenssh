@@ -220,15 +220,9 @@ static int
 try_rsa_authentication(struct ssh *ssh, int idx)
 {
 	BIGNUM *challenge;
-<<<<<<< sshconnect1.c
 	struct sshkey *public, *private;
-	char buf[300], *passphrase, *comment, *authfile;
-	int r, i, perm_ok = 1, type, quit;
-=======
-	Key *public, *private;
 	char buf[300], *passphrase = NULL, *comment, *authfile;
-	int i, perm_ok = 1, type, quit;
->>>>>>> 1.78
+	int r, i, perm_ok = 1, type, quit;
 
 	public = options.identity_keys[idx];
 	authfile = options.identity_files[idx];

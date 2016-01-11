@@ -602,15 +602,10 @@ mm_answer_sign(int sock, struct sshbuf *m)
 	struct sshbuf *sigbuf;
 	u_char *p;
 	u_char *signature;
-<<<<<<< monitor.c
-	size_t datlen, siglen;
-	int r, is_proof = 0;
-	u_int keyid;
-=======
 	char *alg;
 	size_t datlen, siglen, alglen;
-	int r, keyid, is_proof = 0;
->>>>>>> 1.155
+	int r, is_proof = 0;
+	u_int keyid;
 	const char proof_req[] = "hostkeys-prove-00@openssh.com";
 
 	debug3("%s", __func__);
@@ -663,25 +658,15 @@ mm_answer_sign(int sock, struct sshbuf *m)
 		memcpy(session_id2, p, session_id2_len);
 	}
 
-<<<<<<< monitor.c
 	if ((key = get_hostkey_by_index(keyid, ssh)) != NULL) {
-		if ((r = sshkey_sign(key, &signature, &siglen, p, datlen,
-		    ssh->compat)) != 0)
-=======
-	if ((key = get_hostkey_by_index(keyid)) != NULL) {
 		if ((r = sshkey_sign(key, &signature, &siglen, p, datlen, alg,
-		    datafellows)) != 0)
->>>>>>> 1.155
+		    ssh->compat)) != 0)
 			fatal("%s: sshkey_sign failed: %s",
 			    __func__, ssh_err(r));
 	} else if ((key = get_hostkey_public_by_index(keyid, ssh)) != NULL &&
 	    auth_sock > 0) {
 		if ((r = ssh_agent_sign(auth_sock, key, &signature, &siglen,
-<<<<<<< monitor.c
-		    p, datlen, ssh->compat)) != 0) {
-=======
-		    p, datlen, alg, datafellows)) != 0) {
->>>>>>> 1.155
+		    p, datlen, alg, ssh->compat)) != 0) {
 			fatal("%s: ssh_agent_sign failed: %s",
 			    __func__, ssh_err(r));
 		}

@@ -164,12 +164,8 @@ int	 kex_prop2buf(struct sshbuf *, char *proposal[PROPOSAL_MAX]);
 void	 kex_prop_free(char **);
 
 int	 kex_send_kexinit(struct ssh *);
-<<<<<<< kex.h
 int	 kex_input_kexinit(int, u_int32_t, struct ssh *);
-=======
-int	 kex_input_kexinit(int, u_int32_t, void *);
-int	 kex_input_ext_info(int, u_int32_t, void *);
->>>>>>> 1.74
+int	 kex_input_ext_info(int, u_int32_t, struct ssh *);
 int	 kex_derive_keys(struct ssh *, u_char *, u_int, const struct sshbuf *);
 int	 kex_derive_keys_bn(struct ssh *, u_char *, u_int, const BIGNUM *);
 int	 kex_send_newkeys(struct ssh *);

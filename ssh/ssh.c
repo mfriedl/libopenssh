@@ -1230,9 +1230,6 @@ main(int ac, char **av)
 		sensitive_data.keys = xcalloc(sensitive_data.nkeys,
 		    sizeof(struct sshkey));
 
-		PRIV_START;
-<<<<<<< ssh.c
-
 		/* XXX check errors? */
 #define L_KEY(t,p,o) \
 	check_load(sshkey_load_private_type(t, p, "", \
@@ -1246,7 +1243,10 @@ main(int ac, char **av)
 #define L_CERT(p,o) \
 	check_load(sshkey_load_cert(p, &(sensitive_data.keys[o])), p, "cert")
 
+		PRIV_START;
+#if WITH_SSH1
 		L_KEY(KEY_RSA1, _PATH_HOST_KEY_FILE, 0);
+#endif
 		L_KEYCERT(KEY_ECDSA, _PATH_HOST_ECDSA_KEY_FILE, 1);
 		L_KEYCERT(KEY_ED25519, _PATH_HOST_ED25519_KEY_FILE, 2);
 		L_KEYCERT(KEY_RSA, _PATH_HOST_RSA_KEY_FILE, 3);
@@ -1255,28 +1255,6 @@ main(int ac, char **av)
 		L_KEY(KEY_ED25519, _PATH_HOST_ED25519_KEY_FILE, 6);
 		L_KEY(KEY_RSA, _PATH_HOST_RSA_KEY_FILE, 7);
 		L_KEY(KEY_DSA, _PATH_HOST_DSA_KEY_FILE, 8);
-=======
-#if WITH_SSH1
-		sensitive_data.keys[0] = key_load_private_type(KEY_RSA1,
-		    _PATH_HOST_KEY_FILE, "", NULL, NULL);
-#endif
-		sensitive_data.keys[1] = key_load_private_cert(KEY_ECDSA,
-		    _PATH_HOST_ECDSA_KEY_FILE, "", NULL);
-		sensitive_data.keys[2] = key_load_private_cert(KEY_ED25519,
-		    _PATH_HOST_ED25519_KEY_FILE, "", NULL);
-		sensitive_data.keys[3] = key_load_private_cert(KEY_RSA,
-		    _PATH_HOST_RSA_KEY_FILE, "", NULL);
-		sensitive_data.keys[4] = key_load_private_cert(KEY_DSA,
-		    _PATH_HOST_DSA_KEY_FILE, "", NULL);
-		sensitive_data.keys[5] = key_load_private_type(KEY_ECDSA,
-		    _PATH_HOST_ECDSA_KEY_FILE, "", NULL, NULL);
-		sensitive_data.keys[6] = key_load_private_type(KEY_ED25519,
-		    _PATH_HOST_ED25519_KEY_FILE, "", NULL, NULL);
-		sensitive_data.keys[7] = key_load_private_type(KEY_RSA,
-		    _PATH_HOST_RSA_KEY_FILE, "", NULL, NULL);
-		sensitive_data.keys[8] = key_load_private_type(KEY_DSA,
-		    _PATH_HOST_DSA_KEY_FILE, "", NULL, NULL);
->>>>>>> 1.432
 		PRIV_END;
 
 		if (options.hostbased_authentication == 1 &&
@@ -1983,23 +1961,14 @@ load_public_identity_files(void)
 {
 	char *filename, *cp, thishost[NI_MAXHOST];
 	char *pwdir = NULL, *pwname = NULL;
-<<<<<<< ssh.c
 	int i = 0;
 	struct sshkey *public;
-=======
-	Key *public;
->>>>>>> 1.432
 	struct passwd *pw;
-	int i;
 	u_int n_ids, n_certs;
 	char *identity_files[SSH_MAX_IDENTITY_FILES];
-<<<<<<< ssh.c
 	struct sshkey *identity_keys[SSH_MAX_IDENTITY_FILES];
-=======
-	Key *identity_keys[SSH_MAX_IDENTITY_FILES];
 	char *certificate_files[SSH_MAX_CERTIFICATE_FILES];
 	struct sshkey *certificates[SSH_MAX_CERTIFICATE_FILES];
->>>>>>> 1.432
 #ifdef ENABLE_PKCS11
 	struct sshkey **keys;
 	int nkeys;
@@ -2061,17 +2030,12 @@ load_public_identity_files(void)
 		if (++n_ids >= SSH_MAX_IDENTITY_FILES)
 			continue;
 
-<<<<<<< ssh.c
-		/* Try to add the certificate variant too */
-		/* XXX sshkey_load_cert()? */
-=======
 		/*
 		 * If no certificates have been explicitly listed then try
 		 * to add the default certificate variant too.
 		 */
 		if (options.num_certificate_files != 0)
 			continue;
->>>>>>> 1.432
 		xasprintf(&cp, "%s-cert", filename);
 		check_load(sshkey_load_public(cp, &public, NULL),
 		    filename, "pubkey");
@@ -2103,7 +2067,8 @@ load_public_identity_files(void)
 		    "r", options.user, (char *)NULL);
 		free(cp);
 
-		public = key_load_public(filename, NULL);
+		check_load(sshkey_load_public(filename, &public, NULL),
+		    filename, "certificate");
 		debug("certificate file %s type %d", filename,
 		    public ? public->type : -1);
 		free(options.certificate_files[i]);
@@ -2112,10 +2077,10 @@ load_public_identity_files(void)
 			free(filename);
 			continue;
 		}
-		if (!key_is_cert(public)) {
+		if (!sshkey_is_cert(public)) {
 			debug("%s: key %s type %s is not a certificate",
-			    __func__, filename, key_type(public));
-			key_free(public);
+			    __func__, filename, sshkey_type(public));
+			sshkey_free(public);
 			free(filename);
 			continue;
 		}

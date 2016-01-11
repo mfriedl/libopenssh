@@ -631,42 +631,26 @@ read_keyfile_line(FILE *f, const char *filename, char *buf, size_t bufsz,
 }
 
 int
-tun_open(u_int tun, int mode)
+tun_open(int tun, int mode)
 {
 	struct ifreq ifr;
 	char name[100];
-<<<<<<< misc.c
-	int i, fd = -1, sock;
-=======
 	int fd = -1, sock;
 	const char *tunbase = "tun";
 
 	if (mode == SSH_TUNMODE_ETHERNET)
 		tunbase = "tap";
->>>>>>> 1.100
 
 	/* Open the tunnel device */
 	if (tun <= SSH_TUNID_MAX) {
-<<<<<<< misc.c
-		snprintf(name, sizeof(name), "/dev/tun%u", tun);
-=======
 		snprintf(name, sizeof(name), "/dev/%s%d", tunbase, tun);
->>>>>>> 1.100
 		fd = open(name, O_RDWR);
 	} else if (tun == SSH_TUNID_ANY) {
-<<<<<<< misc.c
-		for (i = 100; i >= 0; i--) {
-			snprintf(name, sizeof(name), "/dev/tun%u", i);
-			if ((fd = open(name, O_RDWR)) >= 0) {
-				tun = i;
-=======
 		for (tun = 100; tun >= 0; tun--) {
 			snprintf(name, sizeof(name), "/dev/%s%d",
 			    tunbase, tun);
 			if ((fd = open(name, O_RDWR)) >= 0)
->>>>>>> 1.100
 				break;
-			}
 		}
 	} else {
 		debug("%s: invalid tunnel %u", __func__, tun);
@@ -674,25 +658,14 @@ tun_open(u_int tun, int mode)
 	}
 
 	if (fd < 0) {
-<<<<<<< misc.c
-		debug("%s: %s open failed: %s", __func__,
-		    name, strerror(errno));
-		return (-1);
-=======
 		debug("%s: %s open: %s", __func__, name, strerror(errno));
 		return -1;
->>>>>>> 1.100
 	}
 
 	debug("%s: %s mode %d fd %d", __func__, name, mode, fd);
 
-<<<<<<< misc.c
-	/* Set the tunnel device operation mode */
-	snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "tun%u", tun);
-=======
 	/* Bring interface up if it is not already */
 	snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s%d", tunbase, tun);
->>>>>>> 1.100
 	if ((sock = socket(PF_UNIX, SOCK_STREAM, 0)) == -1)
 		goto failed;
 

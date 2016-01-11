@@ -40,12 +40,8 @@ struct authctxt;
 void mm_log_handler(LogLevel, const char *, void *);
 int mm_is_monitor(void);
 DH *mm_choose_dh(int, int, int);
-<<<<<<< monitor_wrap.h
 int mm_sshkey_sign(struct sshkey *, u_char **, size_t *, const u_char *, size_t,
-    u_int);
-=======
-int mm_key_sign(Key *, u_char **, u_int *, const u_char *, u_int, const char *);
->>>>>>> 1.29
+    const char *, u_int);
 void mm_inform_authserv(char *, char *);
 struct passwd *mm_getpwnamallow(const char *);
 char *mm_auth2_read_banner(void);

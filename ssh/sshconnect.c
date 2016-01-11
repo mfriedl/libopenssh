@@ -1499,7 +1499,7 @@ ssh_local_cmd(const char *args)
 }
 
 void
-maybe_add_key_to_agent(char *authfile, Key *private, char *comment,
+maybe_add_key_to_agent(char *authfile, struct sshkey *private, char *comment,
     char *passphrase)
 {
 	int auth_sock = -1, r;

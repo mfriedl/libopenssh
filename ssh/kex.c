@@ -296,7 +296,6 @@ kex_prop_free(char **proposal)
 static int
 kex_protocol_error(int type, u_int32_t seq, struct ssh *ssh)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	int r;
 
 	error("kex protocol error: type %d seq %u", type, seq);
@@ -348,9 +347,8 @@ kex_send_newkeys(struct ssh *ssh)
 }
 
 int
-kex_input_ext_info(int type, u_int32_t seq, void *ctxt)
+kex_input_ext_info(int type, u_int32_t seq, struct ssh *ssh)
 {
-	struct ssh *ssh = ctxt;
 	struct kex *kex = ssh->kex;
 	u_int32_t i, ninfo;
 	char *name, *val, *found;

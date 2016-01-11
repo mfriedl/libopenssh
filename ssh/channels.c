@@ -665,13 +665,8 @@ channel_open_message(void)
 		case SSH_CHANNEL_X11_OPEN:
 		case SSH_CHANNEL_INPUT_DRAINING:
 		case SSH_CHANNEL_OUTPUT_DRAINING:
-<<<<<<< channels.c
 			if ((r = sshbuf_putf(msg,
-			    "  #%u %.300s (t%d r%d i%d/%zu o%d/%zu fd %d/%d cc %d)\r\n",
-=======
-			snprintf(buf, sizeof buf,
-			    "  #%d %.300s (t%d r%d i%u/%d o%u/%d fd %d/%d cc %d)\r\n",
->>>>>>> 1.348
+			    "  #%d %.300s (t%d r%d i%u/%zu o%u/%zu fd %d/%d cc %d)\r\n",
 			    c->self, c->remote_name,
 			    c->type, c->remote_id,
 			    c->istate, sshbuf_len(c->input),

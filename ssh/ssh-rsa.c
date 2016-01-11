@@ -206,12 +206,8 @@ ssh_rsa_verify(const struct sshkey *key,
 		explicit_bzero(sigblob, diff);
 		len = modlen;
 	}
-<<<<<<< ssh-rsa.c
 
 	/* hash the data */
-	hash_alg = SSH_DIGEST_SHA1;
-=======
->>>>>>> 1.58
 	if ((dlen = ssh_digest_bytes(hash_alg)) == 0) {
 		ret = SSH_ERR_INTERNAL_ERROR;
 		goto out;

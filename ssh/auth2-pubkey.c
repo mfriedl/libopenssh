@@ -823,12 +823,8 @@ check_authkeys_file(FILE *f, char *file, struct sshkey *key, struct passwd *pw)
 			}
 			verbose("Accepted certificate ID \"%s\" (serial %llu) "
 			    "signed by %s CA %s via %s", key->cert->key_id,
-<<<<<<< auth2-pubkey.c
-			    sshkey_type(found), fp, file);
-=======
 			    (unsigned long long)key->cert->serial,
-			    key_type(found), fp, file);
->>>>>>> 1.54
+			    sshkey_type(found), fp, file);
 			free(fp);
 			found_key = 1;
 			break;
@@ -906,15 +902,10 @@ user_cert_trusted_ca(struct passwd *pw, struct sshkey *key)
 	if (auth_cert_options(key, pw) != 0)
 		goto out;
 
-<<<<<<< auth2-pubkey.c
-	verbose("Accepted certificate ID \"%s\" signed by %s CA %s via %s",
-	    key->cert->key_id, sshkey_type(key->cert->signature_key), ca_fp,
-=======
 	verbose("Accepted certificate ID \"%s\" (serial %llu) signed by "
 	    "%s CA %s via %s", key->cert->key_id,
 	    (unsigned long long)key->cert->serial,
-	    key_type(key->cert->signature_key), ca_fp,
->>>>>>> 1.54
+	    sshkey_type(key->cert->signature_key), ca_fp,
 	    options.trusted_user_ca_keys);
 	ret = 1;
 

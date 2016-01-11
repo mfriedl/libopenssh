@@ -183,13 +183,8 @@ struct sshkey	*get_hostkey_public_by_type(int, int, struct ssh *);
 struct sshkey	*get_hostkey_private_by_type(int, int, struct ssh *);
 int		 get_hostkey_index(struct sshkey *, int, struct ssh *);
 int	 ssh1_session_key(BIGNUM *);
-<<<<<<< auth.h
 int	 sshd_hostkey_sign(struct sshkey *, struct sshkey *,
-    u_char **, size_t *, const u_char *, size_t, u_int);
-=======
-int	 sshd_hostkey_sign(Key *, Key *, u_char **, size_t *,
-	     const u_char *, size_t, const char *, u_int);
->>>>>>> 1.86
+    u_char **, size_t *, const u_char *, size_t, const char *, u_int);
 
 /* debug messages during authentication */
 void	 auth_debug_add(const char *fmt,...) __attribute__((format(printf, 1, 2)));
