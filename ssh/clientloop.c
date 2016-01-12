@@ -2423,9 +2423,8 @@ client_global_hostkeys_private_confirm(struct ssh *ssh, int type, u_int32_t seq,
  * HostkeyAlgorithms preference before they are accepted.
  */
 static int
-client_input_hostkeys(void)
+client_input_hostkeys(struct ssh *ssh)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	const u_char *blob = NULL;
 	size_t i, len = 0;
 	struct sshbuf *buf = NULL;
@@ -2587,7 +2586,7 @@ client_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 	debug("client_input_global_request: rtype %s want_reply %d",
 	    rtype, want_reply);
 	if (strcmp(rtype, "hostkeys-00@openssh.com") == 0)
-		success = client_input_hostkeys();
+		success = client_input_hostkeys(ssh);
 	if (want_reply) {
 		if ((r = sshpkt_start(ssh, success ? SSH2_MSG_REQUEST_SUCCESS :
 		    SSH2_MSG_REQUEST_FAILURE)) != 0 ||

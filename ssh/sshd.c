@@ -930,7 +930,7 @@ notify_hostkeys(struct ssh *ssh)
 		if ((r = sshkey_putb(key, buf)) != 0)
 			fatal("%s: couldn't put hostkey %d: %s",
 			    __func__, i, ssh_err(r));
-		if ((r = sshpkt_putb(ssh, buf)) != 0)
+		if ((r = sshpkt_put_stringb(ssh, buf)) != 0)
 			fatal("%s: couldn't put encoded hostkey %d: %s",
 			    __func__, i, ssh_err(r));
 		nkeys++;
