@@ -145,22 +145,6 @@ sshbuf_fromb(struct sshbuf *buf)
 }
 
 void
-<<<<<<< sshbuf.c
-=======
-sshbuf_init(struct sshbuf *ret)
-{
-	explicit_bzero(ret, sizeof(*ret));
-	ret->alloc = SSHBUF_SIZE_INIT;
-	ret->max_size = SSHBUF_SIZE_MAX;
-	ret->readonly = 0;
-	ret->dont_free = 1;
-	ret->refcount = 1;
-	if ((ret->cd = ret->d = calloc(1, ret->alloc)) == NULL)
-		ret->alloc = 0;
-}
-
-void
->>>>>>> 1.6
 sshbuf_free(struct sshbuf *buf)
 {
 	if (buf == NULL)
@@ -191,14 +175,8 @@ sshbuf_free(struct sshbuf *buf)
 		explicit_bzero(buf->d, buf->alloc);
 		free(buf->d);
 	}
-<<<<<<< sshbuf.c
-	bzero(buf, sizeof(*buf));
-	free(buf);
-=======
 	explicit_bzero(buf, sizeof(*buf));
-	if (!dont_free)
-		free(buf);
->>>>>>> 1.6
+	free(buf);
 }
 
 void

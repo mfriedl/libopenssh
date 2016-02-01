@@ -1778,12 +1778,8 @@ ssh_session2_setup(u_int id, int success, void *arg)
 	struct ssh *ssh = arg;
 	extern char **environ;
 	const char *display;
-<<<<<<< ssh.c
 	int r, interactive = tty_flag;
-=======
-	int interactive = tty_flag;
 	char *proto = NULL, *data = NULL;
->>>>>>> 1.435
 
 	if (!success)
 		return; /* No need for error message, channels code sens one */
@@ -1946,14 +1942,7 @@ ssh_session2(struct ssh *ssh)
 			fork_postauth();
 	}
 
-<<<<<<< ssh.c
-	if (options.use_roaming)
-		request_roaming(ssh);
-
 	return client_loop(ssh, tty_flag, tty_flag ?
-=======
-	return client_loop(tty_flag, tty_flag ?
->>>>>>> 1.435
 	    options.escape_char : SSH_ESCAPECHAR_NONE, id);
 }
 

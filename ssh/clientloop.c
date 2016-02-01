@@ -762,11 +762,7 @@ client_suspend_self(struct sshbuf **bin, struct sshbuf **bout,
 static void
 client_process_net_input(struct ssh *ssh, fd_set *readset)
 {
-<<<<<<< clientloop.c
-	int r, len, cont = 0;
-=======
-	int len;
->>>>>>> 1.282
+	int r, len;
 	char buf[8192];
 
 	/*
@@ -1733,17 +1729,6 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 			client_process_output(ssh, writeset);
 		}
 
-<<<<<<< clientloop.c
-		if (session_resumed) {
-			connection_in = ssh_packet_get_connection_in(ssh);
-			connection_out = ssh_packet_get_connection_out(ssh);
-			max_fd = MAX(max_fd, connection_out);
-			max_fd = MAX(max_fd, connection_in);
-			session_resumed = 0;
-		}
-
-=======
->>>>>>> 1.282
 		/*
 		 * Send as much buffered packet data as possible to the
 		 * sender.
@@ -1840,17 +1825,10 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 	}
 
 	/* Clear and free any buffers. */
-<<<<<<< clientloop.c
-	memset(buf, 0, sizeof(buf));
+	explicit_bzero(buf, sizeof(buf));
 	sshbuf_free(stdin_buffer);
 	sshbuf_free(stdout_buffer);
 	sshbuf_free(stderr_buffer);
-=======
-	explicit_bzero(buf, sizeof(buf));
-	buffer_free(&stdin_buffer);
-	buffer_free(&stdout_buffer);
-	buffer_free(&stderr_buffer);
->>>>>>> 1.282
 
 	/* Report bytes transferred, and transfer rates. */
 	total_time = get_current_time() - start_time;

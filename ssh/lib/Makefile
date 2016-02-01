@@ -36,7 +36,6 @@ SRCS=	${LIB_SRCS} \
 	chacha.c poly1305.c cipher-chachapoly.c ssh-ed25519.c hmac.c umac.c
 SRCS+=	kexc25519s.c
 SRCS+=	ssh_api.c
-SRCS+=	roaming_dummy.c
 
 .if (${SSH1:L} == "yes")
 SRCS+=	cipher-3des1.c cipher-bf1.c

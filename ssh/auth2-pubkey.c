@@ -74,42 +74,28 @@ extern u_int session_id2_len;
 static int
 userauth_pubkey(struct ssh *ssh)
 {
-<<<<<<< auth2-pubkey.c
 	struct authctxt *authctxt = ssh->authctxt;
 	struct sshbuf *b;
 	struct sshkey *key = NULL;
-	char *pkalg, *userstyle = NULL;
+	char *pkalg, *userstyle = NULL, *fp = NULL;
 	u_char *pkblob, *sig, have_sig;
 	size_t blen, slen;
 	int r, pktype;
-=======
-	Buffer b;
-	Key *key = NULL;
-	char *pkalg, *userstyle, *fp = NULL;
-	u_char *pkblob, *sig;
-	u_int alen, blen, slen;
-	int have_sig, pktype;
->>>>>>> 1.55
 	int authenticated = 0;
 
 	if (!authctxt->valid) {
 		debug2("%s: disabled because of invalid user", __func__);
 		return 0;
 	}
-<<<<<<< auth2-pubkey.c
 	if ((r = sshpkt_get_u8(ssh, &have_sig)) != 0)
 		fatal("%s: sshpkt_get_u8 failed: %s", __func__, ssh_err(r));
 	if (ssh->compat & SSH_BUG_PKAUTH) {
 		debug2("%s: SSH_BUG_PKAUTH", __func__);
 		if ((b = sshbuf_new()) == NULL)
 			fatal("%s: sshbuf_new failed", __func__);
-=======
-	have_sig = packet_get_char();
-	if (datafellows & SSH_BUG_PKAUTH) {
-		debug2("%s: SSH_BUG_PKAUTH", __func__);
->>>>>>> 1.55
 		/* no explicit pkalg given */
 		/* so we have to extract the pkalg from the pkblob */
+		/* XXX use sshbuf_from() */
 		if ((r = sshpkt_get_string(ssh, &pkblob, &blen)) != 0 ||
 		    (r = sshbuf_put(b, pkblob, blen)) != 0 ||
 		    (r = sshbuf_get_cstring(b, &pkalg, NULL)) != 0)
@@ -123,14 +109,8 @@ userauth_pubkey(struct ssh *ssh)
 	}
 	pktype = sshkey_type_from_name(pkalg);
 	if (pktype == KEY_UNSPEC) {
-		/* this is perfectly legal */
-<<<<<<< auth2-pubkey.c
-		logit("%s: unsupported public key algorithm: %s", __func__,
-		    pkalg);
-=======
 		logit("%s: unsupported public key algorithm: %s",
 		    __func__, pkalg);
->>>>>>> 1.55
 		goto done;
 	}
 	if ((r = sshkey_from_blob(pkblob, blen, &key)) != 0) {
@@ -165,7 +145,8 @@ userauth_pubkey(struct ssh *ssh)
 	}
 
 	if (have_sig) {
-<<<<<<< auth2-pubkey.c
+		debug3("%s: have signature for %s %s",
+		    __func__, sshkey_type(key), fp);
 		if ((r = sshpkt_get_string(ssh, &sig, &slen)) != 0 ||
 		    (r = sshpkt_get_end(ssh)) != 0)
 			fatal("%s: %s", __func__, ssh_err(r));
@@ -176,15 +157,6 @@ userauth_pubkey(struct ssh *ssh)
 			    session_id2_len)) != 0)
 				fatal("%s: sshbuf_put session id: %s",
 				    __func__, ssh_err(r));
-=======
-		debug3("%s: have signature for %s %s",
-		    __func__, sshkey_type(key), fp);
-		sig = packet_get_string(&slen);
-		packet_check_eom();
-		buffer_init(&b);
-		if (datafellows & SSH_OLD_SESSIONID) {
-			buffer_append(&b, session_id2, session_id2_len);
->>>>>>> 1.55
 		} else {
 			if ((r = sshbuf_put_string(b, session_id2,
 			    session_id2_len)) != 0)
@@ -233,15 +205,10 @@ userauth_pubkey(struct ssh *ssh)
 		sshbuf_free(b);
 		free(sig);
 	} else {
-<<<<<<< auth2-pubkey.c
-		debug("test whether pkalg/pkblob are acceptable");
-		if ((r = sshpkt_get_end(ssh)) != 0)
-			fatal("%s: %s", __func__, ssh_err(r));
-=======
 		debug("%s: test whether pkalg/pkblob are acceptable for %s %s",
 		    __func__, sshkey_type(key), fp);
-		packet_check_eom();
->>>>>>> 1.55
+		if ((r = sshpkt_get_end(ssh)) != 0)
+			fatal("%s: %s", __func__, ssh_err(r));
 
 		/* XXX fake reply and always send PK_OK ? */
 		/*

@@ -70,11 +70,6 @@
 #include "channels.h"
 #include "session.h"
 #include "servconf.h"
-<<<<<<< monitor_wrap.c
-#include "roaming.h"
-=======
-
->>>>>>> 1.87
 #include "ssherr.h"
 
 /* Imports */

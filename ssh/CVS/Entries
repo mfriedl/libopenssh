@@ -12,7 +12,6 @@ D/ssh-pkcs11-helper////
 D/sshd////
 D/moduli-gen////
 /nchan.c/1.63/Fri Jan  6 10:00:48 2012//
-/roaming.h/1.6/Mon Mar 19 16:04:54 2012//
 /serverloop.h/1.6/Mon Mar 19 16:04:54 2012//
 /session.h/1.31/Result of merge//
 /ssh-gss.h/1.11/Result of merge//
@@ -39,8 +38,6 @@ D/moduli-gen////
 /kexc25519c.c/1.7/Result of merge//
 /kexdhc.c/1.18/Result of merge//
 /kexecdhc.c/1.10/Result of merge//
-/roaming_client.c/1.9/Result of merge//
-/roaming_common.c/1.13/Result of merge//
 /Makefile.inc/1.50/Result of merge//
 /auth-rsa.c/1.90/Result of merge//
 /auth2-hostbased.c/1.25/Result of merge//
@@ -170,8 +167,6 @@ D/moduli-gen////
 /myproposal.h/1.49/Mon Feb  1 06:34:45 2016//
 /nchan.ms/1.8/Mon Feb  1 06:34:45 2016//
 /nchan2.ms/1.4/Mon Feb  1 06:34:45 2016//
-/opacket.c/1.5/Result of merge//
-/opacket.h/1.5/Result of merge//
 /packet.c/1.226/Result of merge//
 /packet.h/1.69/Result of merge//
 /pathnames.h/1.24/Mon Feb  1 06:34:45 2016//
@@ -259,3 +254,5 @@ D/moduli-gen////
 /version.h/1.75/Mon Feb  1 06:34:46 2016//
 /xmalloc.c/1.32/Mon Feb  1 06:34:46 2016//
 /xmalloc.h/1.15/Mon Feb  1 06:34:46 2016//
+/opacket.c/1.5/Mon Feb  1 06:34:59 2016//
+/opacket.h/1.5/Mon Feb  1 06:34:59 2016//

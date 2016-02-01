@@ -186,7 +186,7 @@ ssh_kex2(struct ssh *ssh, u_short port)
 
 	if (options.rekey_limit || options.rekey_interval)
 		ssh_packet_set_rekey_limits(ssh,
-		    (u_int32_t)options.rekey_limit,
+		    options.rekey_limit,
 		    (time_t)options.rekey_interval);
 
 	/* start key exchange */
@@ -207,13 +207,6 @@ ssh_kex2(struct ssh *ssh, u_short port)
 	if ((r = ssh_dispatch_run(ssh, DISPATCH_BLOCK, &ssh->kex->done)) != 0)
 		fatal("%s: ssh_dispatch_run failed: %s", __func__, ssh_err(r));
 
-<<<<<<< sshconnect2.c
-	if (options.use_roaming && !ssh->kex->roaming) {
-		debug("Roaming not allowed by server");
-		options.use_roaming = 0;
-	}
-=======
->>>>>>> 1.237
 	/* remove ext-info from the KEX proposals for rekeying */
 	myproposal[PROPOSAL_KEX_ALGS] =
 	    compat_kex_proposal(options.kex_algorithms, ssh->compat);

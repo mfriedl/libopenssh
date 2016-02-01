@@ -77,11 +77,6 @@
 #include "monitor_fdpass.h"
 #include "compat.h"
 #include "ssh2.h"
-<<<<<<< monitor.c
-#include "roaming.h"
-#include "ssherr.h"
-=======
->>>>>>> 1.156
 #include "authfd.h"
 #include "match.h"
 #include "ssherr.h"

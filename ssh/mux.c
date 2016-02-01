@@ -1341,6 +1341,7 @@ mux_session_confirm(u_int id, int success, void *arg)
 	Channel *c, *cc;
 	int i, r;
 	struct sshbuf *reply;
+	char *proto, *data;
 
 	if (cctx == NULL)
 		fatal("%s: cctx == NULL", __func__);
@@ -1362,32 +1363,19 @@ mux_session_confirm(u_int id, int success, void *arg)
 
 	display = getenv("DISPLAY");
 	if (cctx->want_x_fwd && options.forward_x11 && display != NULL) {
-		char *proto, *data;
-
 		/* Get reasonable local authentication information. */
 		if (client_x11_get_proto(display, options.xauth_location,
 		    options.forward_x11_trusted, options.forward_x11_timeout,
-<<<<<<< mux.c
-		    &proto, &data);
-		/* Request forwarding with authentication spoofing. */
-		debug("Requesting X11 forwarding with authentication "
-		    "spoofing.");
-		x11_request_forwarding_with_spoofing(c->ssh, id, display, proto,
-		    data, 1);
-		client_expect_confirm(id, "X11 forwarding", CONFIRM_WARN);
-		/* XXX exit_on_forward_failure */
-=======
 		    &proto, &data) == 0) {
 			/* Request forwarding with authentication spoofing. */
 			debug("Requesting X11 forwarding with authentication "
 			    "spoofing.");
-			x11_request_forwarding_with_spoofing(id, display, proto,
-			    data, 1);
+			x11_request_forwarding_with_spoofing(c->ssh, id,
+			    display, proto, data, 1);
 			/* XXX exit_on_forward_failure */
 			client_expect_confirm(id, "X11 forwarding",
 			    CONFIRM_WARN);
 		}
->>>>>>> 1.58
 	}
 
 	if (cctx->want_agent_fwd && options.forward_agent) {

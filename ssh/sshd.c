@@ -2456,12 +2456,8 @@ do_ssh2_kex(struct ssh *ssh)
 	}
 
 	if (options.rekey_limit || options.rekey_interval)
-<<<<<<< sshd.c
 		ssh_packet_set_rekey_limits(ssh,
-		    (u_int32_t)options.rekey_limit,
-=======
-		packet_set_rekey_limits(options.rekey_limit,
->>>>>>> 1.464
+		    options.rekey_limit,
 		    (time_t)options.rekey_interval);
 
 	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = compat_pkalg_proposal(
