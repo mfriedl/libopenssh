@@ -307,7 +307,6 @@ compat_kex_proposal(char *kex_prop, u_int compat)
 	if ((compat & (SSH_BUG_CURVE25519PAD|SSH_OLD_DHGEX)) == 0)
 		return kex_prop;
 	debug2("%s: original KEX proposal: %s", __func__, kex_prop);
-	kex_prop = filter_proposal(kex_prop, "curve25519-sha256@libssh.org");
 	if ((compat & SSH_BUG_CURVE25519PAD) != 0)
 		kex_prop = filter_proposal(kex_prop,
 		    "curve25519-sha256@libssh.org");
