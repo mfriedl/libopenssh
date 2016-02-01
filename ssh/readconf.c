@@ -1,4 +1,4 @@
-/* $OpenBSD: readconf.c,v 1.246 2015/11/15 22:26:49 jcs Exp $ */
+/* $OpenBSD: readconf.c,v 1.249 2016/01/29 02:54:45 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -141,7 +141,7 @@ typedef enum {
 	oSendEnv, oControlPath, oControlMaster, oControlPersist,
 	oHashKnownHosts,
 	oTunnel, oTunnelDevice, oLocalCommand, oPermitLocalCommand,
-	oVisualHostKey, oUseRoaming,
+	oVisualHostKey,
 	oKexAlgorithms, oIPQoS, oRequestTTY, oIgnoreUnknown, oProxyUseFdpass,
 	oCanonicalDomains, oCanonicalizeHostname, oCanonicalizeMaxDots,
 	oCanonicalizeFallbackLocal, oCanonicalizePermittedCNAMEs,
@@ -252,7 +252,7 @@ static struct {
 	{ "localcommand", oLocalCommand },
 	{ "permitlocalcommand", oPermitLocalCommand },
 	{ "visualhostkey", oVisualHostKey },
-	{ "useroaming", oUseRoaming },
+	{ "useroaming", oDeprecated },
 	{ "kexalgorithms", oKexAlgorithms },
 	{ "ipqos", oIPQoS },
 	{ "requesttty", oRequestTTY },
@@ -964,16 +964,12 @@ parse_time:
 			if (scan_scaled(arg, &val64) == -1)
 				fatal("%.200s line %d: Bad number '%s': %s",
 				    filename, linenum, arg, strerror(errno));
-			/* check for too-large or too-small limits */
-			if (val64 > UINT_MAX)
-				fatal("%.200s line %d: RekeyLimit too large",
-				    filename, linenum);
 			if (val64 != 0 && val64 < 16)
 				fatal("%.200s line %d: RekeyLimit too small",
 				    filename, linenum);
 		}
 		if (*activep && options->rekey_limit == -1)
-			options->rekey_limit = (u_int32_t)val64;
+			options->rekey_limit = val64;
 		if (s != NULL) { /* optional rekey interval present */
 			if (strcmp(s, "none") == 0) {
 				(void)strdelim(&s);	/* discard */
@@ -1413,10 +1409,6 @@ parse_keytypes:
 		}
 		break;
 
-	case oUseRoaming:
-		intptr = &options->use_roaming;
-		goto parse_flag;
-
 	case oRequestTTY:
 		intptr = &options->request_tty;
 		multistate_ptr = multistate_requesttty;
@@ -1701,7 +1693,6 @@ initialize_options(Options * options)
 	options->tun_remote = -1;
 	options->local_command = NULL;
 	options->permit_local_command = -1;
-	options->use_roaming = -1;
 	options->add_keys_to_agent = -1;
 	options->visual_host_key = -1;
 	options->ip_qos_interactive = -1;
@@ -1875,8 +1866,6 @@ fill_default_options(Options * options)
 		options->tun_remote = SSH_TUNID_ANY;
 	if (options->permit_local_command == -1)
 		options->permit_local_command = 0;
-	if (options->use_roaming == -1)
-		options->use_roaming = 1;
 	if (options->visual_host_key == -1)
 		options->visual_host_key = 0;
 	if (options->ip_qos_interactive == -1)
@@ -2429,8 +2418,8 @@ dump_client_config(Options *o, const char *host)
 	printf("%s\n", iptos2str(o->ip_qos_bulk));
 
 	/* oRekeyLimit */
-	printf("rekeylimit %lld %d\n",
-	    (long long)o->rekey_limit, o->rekey_interval);
+	printf("rekeylimit %llu %d\n",
+	    (unsigned long long)o->rekey_limit, o->rekey_interval);
 
 	/* oStreamLocalBindMask */
 	printf("streamlocalbindmask 0%o\n",

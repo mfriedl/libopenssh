@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh.c,v 1.432 2015/12/11 03:20:09 djm Exp $ */
+/* $OpenBSD: ssh.c,v 1.435 2016/01/14 16:17:40 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -95,7 +95,6 @@
 #include "match.h"
 #include "msg.h"
 #include "uidswap.h"
-#include "roaming.h"
 #include "version.h"
 #include "ssherr.h"
 #include "myproposal.h"
@@ -1607,6 +1606,7 @@ ssh_session(struct ssh *ssh)
 	struct winsize ws;
 	char *cp;
 	const char *display;
+	char *proto = NULL, *data = NULL;
 
 	/* Enable compression if requested. */
 	if (options.compression) {
@@ -1682,13 +1682,9 @@ ssh_session(struct ssh *ssh)
 	display = getenv("DISPLAY");
 	if (display == NULL && options.forward_x11)
 		debug("X11 forwarding requested but DISPLAY not set");
-	if (options.forward_x11 && display != NULL) {
-		char *proto, *data;
-		/* Get reasonable local authentication information. */
-		client_x11_get_proto(display, options.xauth_location,
-		    options.forward_x11_trusted,
-		    options.forward_x11_timeout,
-		    &proto, &data);
+	if (options.forward_x11 && client_x11_get_proto(display,
+	    options.xauth_location, options.forward_x11_trusted,
+	    options.forward_x11_timeout, &proto, &data) == 0) {
 		/* Request forwarding with authentication spoofing. */
 		debug("Requesting X11 forwarding with authentication "
 		    "spoofing.");
@@ -1782,7 +1778,12 @@ ssh_session2_setup(u_int id, int success, void *arg)
 	struct ssh *ssh = arg;
 	extern char **environ;
 	const char *display;
+<<<<<<< ssh.c
 	int r, interactive = tty_flag;
+=======
+	int interactive = tty_flag;
+	char *proto = NULL, *data = NULL;
+>>>>>>> 1.435
 
 	if (!success)
 		return; /* No need for error message, channels code sens one */
@@ -1790,12 +1791,9 @@ ssh_session2_setup(u_int id, int success, void *arg)
 	display = getenv("DISPLAY");
 	if (display == NULL && options.forward_x11)
 		debug("X11 forwarding requested but DISPLAY not set");
-	if (options.forward_x11 && display != NULL) {
-		char *proto, *data;
-		/* Get reasonable local authentication information. */
-		client_x11_get_proto(display, options.xauth_location,
-		    options.forward_x11_trusted,
-		    options.forward_x11_timeout, &proto, &data);
+	if (options.forward_x11 && client_x11_get_proto(display,
+	    options.xauth_location, options.forward_x11_trusted,
+	    options.forward_x11_timeout, &proto, &data) == 0) {
 		/* Request forwarding with authentication spoofing. */
 		debug("Requesting X11 forwarding with authentication "
 		    "spoofing.");
@@ -1948,10 +1946,14 @@ ssh_session2(struct ssh *ssh)
 			fork_postauth();
 	}
 
+<<<<<<< ssh.c
 	if (options.use_roaming)
 		request_roaming(ssh);
 
 	return client_loop(ssh, tty_flag, tty_flag ?
+=======
+	return client_loop(tty_flag, tty_flag ?
+>>>>>>> 1.435
 	    options.escape_char : SSH_ESCAPECHAR_NONE, id);
 }
 

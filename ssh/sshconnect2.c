@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.235 2015/12/11 02:31:47 mmcc Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.237 2016/01/14 22:56:56 markus Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -207,10 +207,13 @@ ssh_kex2(struct ssh *ssh, u_short port)
 	if ((r = ssh_dispatch_run(ssh, DISPATCH_BLOCK, &ssh->kex->done)) != 0)
 		fatal("%s: ssh_dispatch_run failed: %s", __func__, ssh_err(r));
 
+<<<<<<< sshconnect2.c
 	if (options.use_roaming && !ssh->kex->roaming) {
 		debug("Roaming not allowed by server");
 		options.use_roaming = 0;
 	}
+=======
+>>>>>>> 1.237
 	/* remove ext-info from the KEX proposals for rekeying */
 	myproposal[PROPOSAL_KEX_ALGS] =
 	    compat_kex_proposal(options.kex_algorithms, ssh->compat);
@@ -1424,6 +1427,7 @@ pubkey_prepare(struct ssh *ssh)
 		if (r != SSH_ERR_AGENT_NO_IDENTITIES)
 			debug("%s: ssh_fetch_identitylist: %s",
 			    __func__, ssh_err(r));
+		close(agent_fd);
 	} else {
 		for (j = 0; j < idlist->nkeys; j++) {
 			found = 0;

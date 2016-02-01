@@ -1,4 +1,4 @@
-/* $OpenBSD: serverloop.c,v 1.180 2015/12/04 16:41:28 markus Exp $ */
+/* $OpenBSD: serverloop.c,v 1.181 2016/01/14 16:17:40 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -73,7 +73,6 @@
 #include "dispatch.h"
 #include "auth-options.h"
 #include "serverloop.h"
-#include "roaming.h"
 #include "ssherr.h"
 
 extern ServerOptions options;
@@ -392,11 +391,8 @@ process_input(struct ssh *ssh, fd_set *readset)
 
 	/* Read and buffer any input data from the client. */
 	if (FD_ISSET(connection_in, readset)) {
-		int cont = 0;
-		len = roaming_read(connection_in, buf, sizeof(buf), &cont);
+		len = read(connection_in, buf, sizeof(buf));
 		if (len == 0) {
-			if (cont)
-				return;
 			verbose("Connection closed by %.100s",
 			    ssh_remote_ipaddr(ssh));
 			connection_closed = 1;

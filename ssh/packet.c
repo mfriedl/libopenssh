@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.221 2015/12/11 04:21:12 mmcc Exp $ */
+/* $OpenBSD: packet.c,v 1.226 2016/01/29 05:46:01 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -74,7 +74,6 @@
 #include "channels.h"
 #include "ssh.h"
 #include "packet.h"
-#include "roaming.h"
 #include "ssherr.h"
 #include "sshbuf.h"
 
@@ -172,8 +171,7 @@ struct session_state {
 	struct packet_state p_read, p_send;
 
 	/* Volume-based rekeying */
-	u_int64_t max_blocks_in, max_blocks_out;
-	u_int32_t rekey_limit;
+	u_int64_t max_blocks_in, max_blocks_out, rekey_limit;
 
 	/* Time-based rekeying */
 	u_int32_t rekey_interval;	/* how often in seconds */
@@ -942,7 +940,10 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 		max_blocks = &state->max_blocks_in;
 	}
 	if (state->newkeys[mode] != NULL) {
-		debug("set_newkeys: rekeying");
+		debug("set_newkeys: rekeying, input %llu bytes %llu blocks, "
+		   "output %llu bytes %llu blocks",
+		   state->p_read.bytes, state->p_read.blocks,
+		   state->p_send.bytes, state->p_send.blocks);
 		if ((r = cipher_cleanup(cc)) != 0)
 			return r;
 		enc  = &state->newkeys[mode]->enc;
@@ -1010,6 +1011,7 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	if (state->rekey_limit)
 		*max_blocks = MIN(*max_blocks,
 		    state->rekey_limit / enc->block_size);
+	debug("rekey after %llu blocks", *max_blocks);
 	return 0;
 }
 
@@ -1051,6 +1053,20 @@ ssh_packet_enable_delayed_compress(struct ssh *ssh)
 	return 0;
 }
 
+/* Used to mute debug logging for noisy packet types */
+static int
+ssh_packet_log_type(u_char type)
+{
+	switch (type) {
+	case SSH2_MSG_CHANNEL_DATA:
+	case SSH2_MSG_CHANNEL_EXTENDED_DATA:
+	case SSH2_MSG_CHANNEL_WINDOW_ADJUST:
+		return 0;
+	default:
+		return 1;
+	}
+}
+
 /*
  * Finalize packet in SSH2 format (compress, mac, encrypt, enqueue)
  */
@@ -1079,7 +1095,8 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	aadlen = (mac && mac->enabled && mac->etm) || authlen ? 4 : 0;
 
 	type = (sshbuf_ptr(state->outgoing_packet))[5];
-
+	if (ssh_packet_log_type(type))
+		debug3("send packet: type %u", type);
 #ifdef PACKET_DEBUG
 	fprintf(stderr, "plain:     ");
 	sshbuf_dump(state->outgoing_packet, stderr);
@@ -1267,7 +1284,7 @@ int
 ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 {
 	struct session_state *state = ssh->state;
-	int len, r, ms_remain, cont;
+	int len, r, ms_remain;
 	fd_set *setp;
 	char buf[8192];
 	struct timeval timeout, start, *timeoutp = NULL;
@@ -1336,11 +1353,7 @@ ssh_packet_read_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 		if (r == 0)
 			return SSH_ERR_CONN_TIMEOUT;
 		/* Read data from the socket. */
-		do {
-			cont = 0;
-			len = roaming_read(state->connection_in, buf,
-			    sizeof(buf), &cont);
-		} while (len == 0 && cont);
+		len = read(state->connection_in, buf, sizeof(buf));
 		if (len == 0) {
 			r = SSH_ERR_CONN_CLOSED;
 			goto out;
@@ -1735,6 +1748,8 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 	 */
 	if ((r = sshbuf_get_u8(state->incoming_packet, typep)) != 0)
 		goto out;
+	if (ssh_packet_log_type(*typep))
+		debug3("receive packet: type %u", *typep);
 	if (*typep < SSH2_MSG_MIN || *typep >= SSH2_MSG_LOCAL_MIN) {
 		if ((r = sshpkt_disconnect(ssh,
 		    "Invalid ssh2 packet type: %d", *typep)) != 0 ||
@@ -2012,18 +2027,17 @@ ssh_packet_write_poll(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
 	int len = sshbuf_len(state->output);
-	int cont, r;
+	int r;
 
 	if (len > 0) {
-		cont = 0;
-		len = roaming_write(state->connection_out,
-		    sshbuf_ptr(state->output), len, &cont);
+		len = write(state->connection_out,
+		    sshbuf_ptr(state->output), len);
 		if (len == -1) {
 			if (errno == EINTR || errno == EAGAIN)
 				return 0;
 			return SSH_ERR_SYSTEM_ERROR;
 		}
-		if (len == 0 && !cont)
+		if (len == 0)
 			return SSH_ERR_CONN_CLOSED;
 		if ((r = sshbuf_consume(state->output, len)) != 0)
 			return r;
@@ -2251,9 +2265,9 @@ ssh_packet_need_rekeying(struct ssh *ssh)
 }
 
 void
-ssh_packet_set_rekey_limits(struct ssh *ssh, u_int32_t bytes, time_t seconds)
+ssh_packet_set_rekey_limits(struct ssh *ssh, u_int64_t bytes, time_t seconds)
 {
-	debug3("rekey after %lld bytes, %d seconds", (long long)bytes,
+	debug3("rekey after %llu bytes, %d seconds", (unsigned long long)bytes,
 	    (int)seconds);
 	ssh->state->rekey_limit = bytes;
 	ssh->state->rekey_interval = seconds;
@@ -2291,58 +2305,6 @@ void *
 ssh_packet_get_output(struct ssh *ssh)
 {
 	return (void *)ssh->state->output;
-}
-
-/* XXX TODO update roaming to new API (does not work anyway) */
-/*
- * Save the state for the real connection, and use a separate state when
- * resuming a suspended connection.
- */
-void
-ssh_packet_backup_state(struct ssh *ssh,
-    struct ssh *backup_state)
-{
-	struct ssh *tmp;
-
-	close(ssh->state->connection_in);
-	ssh->state->connection_in = -1;
-	close(ssh->state->connection_out);
-	ssh->state->connection_out = -1;
-	if (backup_state)
-		tmp = backup_state;
-	else
-		tmp = ssh_alloc_session_state();
-	backup_state = ssh;
-	ssh = tmp;
-}
-
-/* XXX FIXME FIXME FIXME */
-/*
- * Swap in the old state when resuming a connecion.
- */
-void
-ssh_packet_restore_state(struct ssh *ssh,
-    struct ssh *backup_state)
-{
-	struct ssh *tmp;
-	u_int len;
-	int r;
-
-	tmp = backup_state;
-	backup_state = ssh;
-	ssh = tmp;
-	ssh->state->connection_in = backup_state->state->connection_in;
-	backup_state->state->connection_in = -1;
-	ssh->state->connection_out = backup_state->state->connection_out;
-	backup_state->state->connection_out = -1;
-	len = sshbuf_len(backup_state->state->input);
-	if (len > 0) {
-		if ((r = sshbuf_putb(ssh->state->input,
-		    backup_state->state->input)) != 0)
-			fatal("%s: %s", __func__, ssh_err(r));
-		sshbuf_reset(backup_state->state->input);
-		add_recv_bytes(len);
-	}
 }
 
 /* Reset after_authentication and reset compression in post-auth privsep */
@@ -2463,7 +2425,7 @@ ssh_packet_get_state(struct ssh *ssh, struct sshbuf *m)
 		if ((r = kex_to_blob(m, ssh->kex)) != 0 ||
 		    (r = newkeys_to_blob(m, ssh, MODE_OUT)) != 0 ||
 		    (r = newkeys_to_blob(m, ssh, MODE_IN)) != 0 ||
-		    (r = sshbuf_put_u32(m, state->rekey_limit)) != 0 ||
+		    (r = sshbuf_put_u64(m, state->rekey_limit)) != 0 ||
 		    (r = sshbuf_put_u32(m, state->rekey_interval)) != 0 ||
 		    (r = sshbuf_put_u32(m, state->p_send.seqnr)) != 0 ||
 		    (r = sshbuf_put_u64(m, state->p_send.blocks)) != 0 ||
@@ -2494,11 +2456,6 @@ ssh_packet_get_state(struct ssh *ssh, struct sshbuf *m)
 	    (r = sshbuf_put_stringb(m, state->output)) != 0)
 		return r;
 
-	if (compat20) {
-		if ((r = sshbuf_put_u64(m, get_sent_bytes())) != 0 ||
-		    (r = sshbuf_put_u64(m, get_recv_bytes())) != 0)
-			return r;
-	}
 	return 0;
 }
 
@@ -2625,7 +2582,6 @@ ssh_packet_set_state(struct ssh *ssh, struct sshbuf *m)
 	size_t ssh1keylen, rlen, slen, ilen, olen;
 	int r;
 	u_int ssh1cipher = 0;
-	u_int64_t sent_bytes = 0, recv_bytes = 0;
 
 	if (!compat20) {
 		if ((r = sshbuf_get_u32(m, &state->remote_protocol_flags)) != 0 ||
@@ -2648,7 +2604,7 @@ ssh_packet_set_state(struct ssh *ssh, struct sshbuf *m)
 		if ((r = kex_from_blob(m, &ssh->kex)) != 0 ||
 		    (r = newkeys_from_blob(m, ssh, MODE_OUT)) != 0 ||
 		    (r = newkeys_from_blob(m, ssh, MODE_IN)) != 0 ||
-		    (r = sshbuf_get_u32(m, &state->rekey_limit)) != 0 ||
+		    (r = sshbuf_get_u64(m, &state->rekey_limit)) != 0 ||
 		    (r = sshbuf_get_u32(m, &state->rekey_interval)) != 0 ||
 		    (r = sshbuf_get_u32(m, &state->p_send.seqnr)) != 0 ||
 		    (r = sshbuf_get_u64(m, &state->p_send.blocks)) != 0 ||
@@ -2690,12 +2646,6 @@ ssh_packet_set_state(struct ssh *ssh, struct sshbuf *m)
 	    (r = sshbuf_put(state->output, output, olen)) != 0)
 		return r;
 
-	if (compat20) {
-		if ((r = sshbuf_get_u64(m, &sent_bytes)) != 0 ||
-		    (r = sshbuf_get_u64(m, &recv_bytes)) != 0)
-			return r;
-		roam_set_bytes(sent_bytes, recv_bytes);
-	}
 	if (sshbuf_len(m))
 		return SSH_ERR_INVALID_FORMAT;
 	debug3("%s: done", __func__);
