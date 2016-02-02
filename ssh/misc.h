@@ -54,7 +54,6 @@ char	*tohex(const void *, size_t);
 void	 sanitise_stdfd(void);
 void	 ms_subtract_diff(struct timeval *, int *);
 void	 ms_to_timeval(struct timeval *, int);
-int	 reallocn(void **ptr, size_t nmemb, size_t size);
 time_t	 monotime(void);
 void	 lowercase(char *s);
 int	 unix_listener(const char *, int, int);

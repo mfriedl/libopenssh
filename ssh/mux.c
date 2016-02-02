@@ -366,9 +366,8 @@ process_mux_new_session(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *
 			free(cp);
 			continue;
 		}
-		if ((r = reallocn((void **)&cctx->env, env_len + 2,
-		    sizeof(*cctx->env))) != 0)
-			goto malf;
+		cctx->env = xreallocarray(cctx->env, env_len + 2,
+		    sizeof(*cctx->env));
 		cctx->env[env_len++] = cp;
 		cctx->env[env_len] = NULL;
 		if (env_len > MUX_MAX_ENV_VARS) {
