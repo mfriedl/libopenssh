@@ -1,4 +1,4 @@
-/* $OpenBSD: serverloop.c,v 1.181 2016/01/14 16:17:40 markus Exp $ */
+/* $OpenBSD: serverloop.c,v 1.184 2016/03/07 19:02:43 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -278,8 +278,13 @@ client_alive_check(struct ssh *ssh)
  * for the duration of the wait (0 = infinite).
  */
 static void
+<<<<<<< serverloop.c
 wait_until_can_do_something(struct ssh *ssh, fd_set **readsetp, fd_set **writesetp,
     int *maxfdp, u_int *nallocp, u_int64_t max_time_milliseconds)
+=======
+wait_until_can_do_something(fd_set **readsetp, fd_set **writesetp, int *maxfdp,
+    u_int *nallocp, u_int64_t max_time_ms)
+>>>>>>> 1.184
 {
 	struct timeval tv, *tvp;
 	int ret;
@@ -290,9 +295,9 @@ wait_until_can_do_something(struct ssh *ssh, fd_set **readsetp, fd_set **writese
 	channel_prepare_select(readsetp, writesetp, maxfdp, nallocp,
 	    &minwait_secs, 0);
 
+	/* XXX need proper deadline system for rekey/client alive */
 	if (minwait_secs != 0)
-		max_time_milliseconds = MIN(max_time_milliseconds,
-		    (u_int)minwait_secs * 1000);
+		max_time_ms = MIN(max_time_ms, (u_int)minwait_secs * 1000);
 
 	/*
 	 * if using client_alive, set the max timeout accordingly,
@@ -302,11 +307,13 @@ wait_until_can_do_something(struct ssh *ssh, fd_set **readsetp, fd_set **writese
 	 * this could be randomized somewhat to make traffic
 	 * analysis more difficult, but we're not doing it yet.
 	 */
-	if (compat20 &&
-	    max_time_milliseconds == 0 && options.client_alive_interval) {
+	if (compat20 && options.client_alive_interval) {
+		uint64_t keepalive_ms =
+		    (uint64_t)options.client_alive_interval * 1000;
+
 		client_alive_scheduled = 1;
-		max_time_milliseconds =
-		    (u_int64_t)options.client_alive_interval * 1000;
+		if (max_time_ms == 0 || max_time_ms > keepalive_ms)
+			max_time_ms = keepalive_ms;
 	}
 
 	if (compat20) {
@@ -353,15 +360,21 @@ wait_until_can_do_something(struct ssh *ssh, fd_set **readsetp, fd_set **writese
 	 * If child has terminated and there is enough buffer space to read
 	 * from it, then read as much as is available and exit.
 	 */
+<<<<<<< serverloop.c
 	if (child_terminated && ssh_packet_not_very_much_data_to_write(ssh))
 		if (max_time_milliseconds == 0 || client_alive_scheduled)
 			max_time_milliseconds = 100;
+=======
+	if (child_terminated && packet_not_very_much_data_to_write())
+		if (max_time_ms == 0 || client_alive_scheduled)
+			max_time_ms = 100;
+>>>>>>> 1.184
 
-	if (max_time_milliseconds == 0)
+	if (max_time_ms == 0)
 		tvp = NULL;
 	else {
-		tv.tv_sec = max_time_milliseconds / 1000;
-		tv.tv_usec = 1000 * (max_time_milliseconds % 1000);
+		tv.tv_sec = max_time_ms / 1000;
+		tv.tv_usec = 1000 * (max_time_ms % 1000);
 		tvp = &tv;
 	}
 
@@ -386,15 +399,25 @@ wait_until_can_do_something(struct ssh *ssh, fd_set **readsetp, fd_set **writese
 static void
 process_input(struct ssh *ssh, fd_set *readset)
 {
+<<<<<<< serverloop.c
 	int len, r;
+=======
+	struct ssh *ssh = active_state; /* XXX */
+	int len;
+>>>>>>> 1.184
 	char buf[16384];
 
 	/* Read and buffer any input data from the client. */
 	if (FD_ISSET(connection_in, readset)) {
 		len = read(connection_in, buf, sizeof(buf));
 		if (len == 0) {
+<<<<<<< serverloop.c
 			verbose("Connection closed by %.100s",
 			    ssh_remote_ipaddr(ssh));
+=======
+			verbose("Connection closed by %.100s port %d",
+			    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh));
+>>>>>>> 1.184
 			connection_closed = 1;
 			if (compat20)
 				return;
@@ -402,8 +425,14 @@ process_input(struct ssh *ssh, fd_set *readset)
 		} else if (len < 0) {
 			if (errno != EINTR && errno != EAGAIN) {
 				verbose("Read error from remote host "
+<<<<<<< serverloop.c
 				    "%.100s: %.100s",
 				    ssh_remote_ipaddr(ssh), strerror(errno));
+=======
+				    "%.100s port %d: %.100s",
+				    ssh_remote_ipaddr(ssh),
+				    ssh_remote_port(ssh), strerror(errno));
+>>>>>>> 1.184
 				cleanup_exit(255);
 			}
 		} else {
@@ -818,7 +847,11 @@ void
 server_loop2(struct ssh *ssh)
 {
 	fd_set *readset = NULL, *writeset = NULL;
+<<<<<<< serverloop.c
 	int r, rekeying = 0, max_fd;
+=======
+	int max_fd;
+>>>>>>> 1.184
 	u_int nalloc = 0;
 	u_int64_t rekey_timeout_ms = 0;
 
@@ -845,13 +878,24 @@ server_loop2(struct ssh *ssh)
 	for (;;) {
 		process_buffered_input_packets(ssh);
 
+<<<<<<< serverloop.c
 		rekeying = (ssh->kex != NULL && !ssh->kex->done);
 
 		if (!rekeying && ssh_packet_not_very_much_data_to_write(ssh))
+=======
+		if (!ssh_packet_is_rekeying(active_state) &&
+		    packet_not_very_much_data_to_write())
+>>>>>>> 1.184
 			channel_output_poll();
+<<<<<<< serverloop.c
 		if (options.rekey_interval > 0 && compat20 && !rekeying)
 			rekey_timeout_ms =
 			    ssh_packet_get_rekey_timeout(ssh) * 1000;
+=======
+		if (options.rekey_interval > 0 && compat20 &&
+		    !ssh_packet_is_rekeying(active_state))
+			rekey_timeout_ms = packet_get_rekey_timeout() * 1000;
+>>>>>>> 1.184
 		else
 			rekey_timeout_ms = 0;
 		wait_until_can_do_something(ssh, &readset, &writeset, &max_fd,
@@ -864,8 +908,9 @@ server_loop2(struct ssh *ssh)
 		}
 
 		collect_children();
-		if (!rekeying) {
+		if (!ssh_packet_is_rekeying(active_state))
 			channel_after_select(readset, writeset);
+<<<<<<< serverloop.c
 			if (ssh_packet_need_rekeying(ssh)) {
 				debug("need rekeying");
 				ssh->kex->done = 0;
@@ -876,6 +921,9 @@ server_loop2(struct ssh *ssh)
 			}
 		}
 		process_input(ssh, readset);
+=======
+		process_input(readset);
+>>>>>>> 1.184
 		if (connection_closed)
 			break;
 		process_output(ssh, writeset);

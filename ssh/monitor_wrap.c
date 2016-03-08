@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor_wrap.c,v 1.87 2016/01/14 16:17:40 markus Exp $ */
+/* $OpenBSD: monitor_wrap.c,v 1.88 2016/03/07 19:02:43 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -408,15 +408,25 @@ mm_user_key_allowed(struct passwd *pw, struct sshkey *key,
 }
 
 int
+<<<<<<< monitor_wrap.c
 mm_hostbased_key_allowed(struct passwd *pw, char *user, char *host,
     struct sshkey *key)
+=======
+mm_hostbased_key_allowed(struct passwd *pw, const char *user, const char *host,
+    Key *key)
+>>>>>>> 1.88
 {
 	return (mm_key_allowed(MM_HOSTKEY, user, host, key, 0));
 }
 
 int
+<<<<<<< monitor_wrap.c
 mm_auth_rhosts_rsa_key_allowed(struct passwd *pw, char *user,
     char *host, struct sshkey *key)
+=======
+mm_auth_rhosts_rsa_key_allowed(struct passwd *pw, const char *user,
+    const char *host, Key *key)
+>>>>>>> 1.88
 {
 	int ret;
 
@@ -427,8 +437,13 @@ mm_auth_rhosts_rsa_key_allowed(struct passwd *pw, char *user,
 }
 
 int
+<<<<<<< monitor_wrap.c
 mm_key_allowed(enum mm_keytype type, char *user, char *host,
     struct sshkey *key, int pubkey_auth_attempt)
+=======
+mm_key_allowed(enum mm_keytype type, const char *user, const char *host,
+    Key *key, int pubkey_auth_attempt)
+>>>>>>> 1.88
 {
 	struct sshbuf *m;
 	u_char *blob;

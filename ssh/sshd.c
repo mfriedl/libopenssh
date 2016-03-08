@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.464 2016/01/29 02:54:45 dtucker Exp $ */
+/* $OpenBSD: sshd.c,v 1.466 2016/03/07 19:02:43 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -348,8 +348,13 @@ grace_alarm_handler(int sig)
 	}
 
 	/* Log error and exit. */
+<<<<<<< sshd.c
 	sigdie("Timeout before authentication for %s",
 	    ssh_remote_ipaddr(active_state));
+=======
+	sigdie("Timeout before authentication for %s port %d",
+	    ssh_remote_ipaddr(active_state), ssh_remote_port(active_state));
+>>>>>>> 1.466
 }
 
 /*
@@ -421,8 +426,13 @@ sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 	if (atomicio(vwrite, sock_out, server_version_string,
 	    strlen(server_version_string))
 	    != strlen(server_version_string)) {
+<<<<<<< sshd.c
 		logit("Could not write ident string to %s",
 		    ssh_remote_ipaddr(ssh));
+=======
+		logit("Could not write ident string to %s port %d",
+		    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh));
+>>>>>>> 1.466
 		cleanup_exit(255);
 	}
 
@@ -430,8 +440,14 @@ sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 	memset(buf, 0, sizeof(buf));
 	for (i = 0; i < sizeof(buf) - 1; i++) {
 		if (atomicio(read, sock_in, &buf[i], 1) != 1) {
+<<<<<<< sshd.c
 			logit("Did not receive identification string from %s",
 			    ssh_remote_ipaddr(ssh));
+=======
+			logit("Did not receive identification string "
+			    "from %s port %d",
+			    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh));
+>>>>>>> 1.466
 			cleanup_exit(255);
 		}
 		if (buf[i] == '\r') {
@@ -460,7 +476,11 @@ sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 		(void) atomicio(vwrite, sock_out, s, strlen(s));
 		logit("Bad protocol version identification '%.100s' "
 		    "from %s port %d", client_version_string,
+<<<<<<< sshd.c
 		    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh));
+=======
+		    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh));
+>>>>>>> 1.466
 		close(sock_in);
 		close(sock_out);
 		cleanup_exit(255);
@@ -470,15 +490,29 @@ sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 
 	ssh->compat = compat_datafellows(remote_version);
 
+<<<<<<< sshd.c
 	if ((ssh->compat & SSH_BUG_PROBE) != 0) {
 		logit("probed from %s with %s.  Don't panic.",
 		    ssh_remote_ipaddr(ssh), client_version_string);
+=======
+	if ((ssh->compat & SSH_BUG_PROBE) != 0) {
+		logit("probed from %s port %d with %s.  Don't panic.",
+		    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
+		    client_version_string);
+>>>>>>> 1.466
 		cleanup_exit(255);
 	}
+<<<<<<< sshd.c
 
 	if ((ssh->compat & SSH_BUG_SCANNER) != 0) {
 		logit("scanned from %s with %s.  Don't panic.",
 		    ssh_remote_ipaddr(ssh), client_version_string);
+=======
+	if ((ssh->compat & SSH_BUG_SCANNER) != 0) {
+		logit("scanned from %s port %d with %s.  Don't panic.",
+		    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
+		    client_version_string);
+>>>>>>> 1.466
 		cleanup_exit(255);
 	}
 	if ((ssh->compat & SSH_BUG_RSASIGMD5) != 0) {
@@ -530,8 +564,14 @@ sshd_exchange_identification(struct ssh *ssh, int sock_in, int sock_out)
 		(void) atomicio(vwrite, sock_out, s, strlen(s));
 		close(sock_in);
 		close(sock_out);
+<<<<<<< sshd.c
 		logit("Protocol major versions differ for %s: %.200s vs. %.200s",
 		    ssh_remote_ipaddr(ssh),
+=======
+		logit("Protocol major versions differ for %s port %d: "
+		    "%.200s vs. %.200s",
+		    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
+>>>>>>> 1.466
 		    server_version_string, client_version_string);
 		cleanup_exit(255);
 	}
@@ -1434,6 +1474,45 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 	}
 }
 
+/*
+ * If IP options are supported, make sure there are none (log and
+ * return an error if any are found).  Basically we are worried about
+ * source routing; it can be used to pretend you are somebody
+ * (ip-address) you are not. That itself may be "almost acceptable"
+ * under certain circumstances, but rhosts autentication is useless
+ * if source routing is accepted. Notice also that if we just dropped
+ * source routing here, the other side could use IP spoofing to do
+ * rest of the interaction and could still bypass security.  So we
+ * exit here if we detect any IP options.
+ */
+static void
+check_ip_options(struct ssh *ssh)
+{
+	int sock_in = ssh_packet_get_connection_in(ssh);
+	struct sockaddr_storage from;
+	socklen_t option_size, i, fromlen = sizeof(from);
+	u_char opts[200];
+	char text[sizeof(opts) * 3 + 1];
+
+	memset(&from, 0, sizeof(from));
+	if (getpeername(sock_in, (struct sockaddr *)&from,
+	    &fromlen) < 0)
+		return;
+	if (from.ss_family != AF_INET)
+		return;
+	/* XXX IPv6 options? */
+
+	if (getsockopt(sock_in, IPPROTO_IP, IP_OPTIONS, opts,
+	    &option_size) >= 0 && option_size != 0) {
+		text[0] = '\0';
+		for (i = 0; i < option_size; i++)
+			snprintf(text + i*3, sizeof(text) - i*3,
+			    " %2.2x", opts[i]);
+		fatal("Connection from %.100s port %d with IP opts: %.800s",
+		    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh), text);
+	}
+	return;
+}
 
 /*
  * Main program for the daemon.
@@ -1441,7 +1520,11 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 int
 main(int ac, char **av)
 {
+<<<<<<< sshd.c
 	struct ssh *ssh;
+=======
+	struct ssh *ssh = NULL;
+>>>>>>> 1.466
 	extern char *optarg;
 	extern int optind;
 	int r, opt, i, j, on = 1;
@@ -1458,6 +1541,7 @@ main(int ac, char **av)
 	int keytype;
 	struct connection_info *connection_info = get_connection_info(0, 0);
 
+	ssh_malloc_init();	/* must be called before any mallocs */
 	/* Save argv. */
 	saved_argv = av;
 	rexec_argc = ac;
@@ -2030,28 +2114,35 @@ main(int ac, char **av)
 	 * Register our connection.  This turns encryption off because we do
 	 * not have a key.
 	 */
+<<<<<<< sshd.c
 	ssh = ssh_packet_set_connection(NULL, sock_in, sock_out);
 	ssh_packet_set_server(ssh);
 	active_state = ssh; /* XXX */
+=======
+	packet_set_connection(sock_in, sock_out);
+	packet_set_server();
+	ssh = active_state; /* XXX */
+	check_ip_options(ssh);
+>>>>>>> 1.466
 
 	/* Set SO_KEEPALIVE if requested. */
 	if (options.tcp_keep_alive && ssh_packet_connection_is_on_socket(ssh) &&
 	    setsockopt(sock_in, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof(on)) < 0)
 		error("setsockopt SO_KEEPALIVE: %.100s", strerror(errno));
 
+<<<<<<< sshd.c
 	if ((remote_port = ssh_get_remote_port(ssh)) < 0) {
 		debug("get_remote_port failed");
+=======
+	if ((remote_port = ssh_remote_port(ssh)) < 0) {
+		debug("ssh_remote_port failed");
+>>>>>>> 1.466
 		cleanup_exit(255);
 	}
 
 	/*
-	 * We use get_canonical_hostname with usedns = 0 instead of
-	 * get_remote_ipaddr here so IP options will be checked.
-	 */
-	(void) get_canonical_hostname(0);
-	/*
 	 * The rest of the code depends on the fact that
-	 * get_remote_ipaddr() caches the remote ip, even if
+	 * ssh_remote_ipaddr() caches the remote ip, even if
 	 * the socket goes away.
 	 */
 	remote_ip = ssh_remote_ipaddr(ssh);
@@ -2059,7 +2150,11 @@ main(int ac, char **av)
 	/* Log the connection. */
 	laddr = get_local_ipaddr(sock_in);
 	verbose("Connection from %s port %d on %s port %d",
+<<<<<<< sshd.c
 	    remote_ip, remote_port, laddr, ssh_get_local_port(ssh));
+=======
+	    remote_ip, remote_port, laddr,  ssh_local_port(ssh));
+>>>>>>> 1.466
 	free(laddr);
 
 	/*
@@ -2182,8 +2277,13 @@ main(int ac, char **av)
 int
 ssh1_session_key(BIGNUM *session_key_int)
 {
+<<<<<<< sshd.c
 	int r, rsafail = 0;
 	struct ssh *ssh = active_state; /* XXX */
+=======
+	struct ssh *ssh = active_state; /* XXX */
+	int rsafail = 0;
+>>>>>>> 1.466
 
 	if (BN_cmp(sensitive_data.server_key->rsa->n,
 	    sensitive_data.ssh1_host_key->rsa->n) > 0) {
@@ -2191,9 +2291,13 @@ ssh1_session_key(BIGNUM *session_key_int)
 		if (BN_num_bits(sensitive_data.server_key->rsa->n) <
 		    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n) +
 		    SSH_KEY_BITS_RESERVED) {
-			fatal("do_connection: %s: "
+			fatal("do_connection: %s port %d: "
 			    "server_key %d < host_key %d + SSH_KEY_BITS_RESERVED %d",
+<<<<<<< sshd.c
 			    ssh_remote_ipaddr(ssh),
+=======
+			    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
+>>>>>>> 1.466
 			    BN_num_bits(sensitive_data.server_key->rsa->n),
 			    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n),
 			    SSH_KEY_BITS_RESERVED);
@@ -2215,9 +2319,13 @@ ssh1_session_key(BIGNUM *session_key_int)
 		if (BN_num_bits(sensitive_data.ssh1_host_key->rsa->n) <
 		    BN_num_bits(sensitive_data.server_key->rsa->n) +
 		    SSH_KEY_BITS_RESERVED) {
-			fatal("do_connection: %s: "
+			fatal("do_connection: %s port %d: "
 			    "host_key %d < server_key %d + SSH_KEY_BITS_RESERVED %d",
+<<<<<<< sshd.c
 			    ssh_remote_ipaddr(ssh),
+=======
+			    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
+>>>>>>> 1.466
 			    BN_num_bits(sensitive_data.ssh1_host_key->rsa->n),
 			    BN_num_bits(sensitive_data.server_key->rsa->n),
 			    SSH_KEY_BITS_RESERVED);
@@ -2244,7 +2352,13 @@ ssh1_session_key(BIGNUM *session_key_int)
 static void
 do_ssh1_kex(struct ssh *ssh)
 {
+<<<<<<< sshd.c
 	int i, len, r, rsafail = 0;
+=======
+	struct ssh *ssh = active_state; /* XXX */
+	int i, len;
+	int rsafail = 0;
+>>>>>>> 1.466
 	BIGNUM *session_key_int, *fake_key_int, *real_key_int;
 	u_char session_key[SSH_SESSION_KEY_LENGTH];
 	u_char fake_key_bytes[4096 / 8];
@@ -2364,9 +2478,16 @@ do_ssh1_kex(struct ssh *ssh)
 	(void) BN_mask_bits(session_key_int, sizeof(session_key) * 8);
 	len = BN_num_bytes(session_key_int);
 	if (len < 0 || (u_int)len > sizeof(session_key)) {
+<<<<<<< sshd.c
 		error("do_ssh1_kex: bad session key len from %s: "
 		    "session_key_int %d > sizeof(session_key) %lu",
 		    ssh_remote_ipaddr(ssh), len, (u_long)sizeof(session_key));
+=======
+		error("%s: bad session key len from %s port %d: "
+		    "session_key_int %d > sizeof(session_key) %lu", __func__,
+		    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
+		    len, (u_long)sizeof(session_key));
+>>>>>>> 1.466
 		rsafail++;
 	} else {
 		explicit_bzero(session_key, sizeof(session_key));

@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.237 2016/01/14 22:56:56 markus Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.239 2016/02/23 01:34:14 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -1094,8 +1094,13 @@ identity_sign(struct ssh *ssh, struct identity *id, u_char **sigp, size_t *lenp,
 		    ssh->compat));
 	/* load the private key from the file */
 	if ((prv = load_identity_file(id)) == NULL)
+<<<<<<< sshconnect2.c
 		return (-1); /* XXX return decent error code */
 	ret = sshkey_sign(prv, sigp, lenp, data, datalen, alg, ssh->compat);
+=======
+		return SSH_ERR_KEY_NOT_FOUND;
+	ret = sshkey_sign(prv, sigp, lenp, data, datalen, alg, compat);
+>>>>>>> 1.239
 	sshkey_free(prv);
 	return (ret);
 }
@@ -1184,9 +1189,17 @@ sign_and_send_pubkey(struct ssh *ssh, struct identity *id)
 	}
 
 	/* generate signature */
+<<<<<<< sshconnect2.c
 	if ((ret = identity_sign(ssh, id, &signature, &slen,
 	    sshbuf_ptr(b), sshbuf_len(b))) != 0) {
 		error("%s: signing failed: %s", __func__, ssh_err(ret));
+=======
+	ret = identity_sign(id, &signature, &slen,
+	    buffer_ptr(&b), buffer_len(&b), datafellows);
+	if (ret != 0) {
+		if (ret != SSH_ERR_KEY_NOT_FOUND)
+			error("%s: signing failed: %s", __func__, ssh_err(ret));
+>>>>>>> 1.239
 		free(blob);
 		sshbuf_free(b);
 		return 0;
@@ -1273,7 +1286,11 @@ send_pubkey_test(struct ssh *ssh, struct identity *id)
 static struct sshkey *
 load_identity_file(struct identity *id)
 {
+<<<<<<< sshconnect2.c
 	struct sshkey *private = NULL;
+=======
+	Key *private = NULL;
+>>>>>>> 1.239
 	char prompt[300], *passphrase, *comment;
 	int r, perm_ok = 0, quit = 0, i;
 	struct stat st;

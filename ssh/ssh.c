@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh.c,v 1.435 2016/01/14 16:17:40 markus Exp $ */
+/* $OpenBSD: ssh.c,v 1.437 2016/03/07 19:02:43 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -518,7 +518,11 @@ set_addrinfo_port(struct addrinfo *addrs, int port)
 int
 main(int ac, char **av)
 {
+<<<<<<< ssh.c
 	struct ssh *ssh;
+=======
+	struct ssh *ssh = NULL;
+>>>>>>> 1.437
 	int i, r, opt, exit_status, use_syslog, config_test = 0;
 	char *p, *cp, *line, *argv0, buf[PATH_MAX], *host_arg, *logfile;
 	char thishost[NI_MAXHOST], shorthost[NI_MAXHOST], portstr[NI_MAXSERV];
@@ -533,6 +537,7 @@ main(int ac, char **av)
 	struct ssh_digest_ctx *md;
 	u_char conn_hash[SSH_DIGEST_MAX_LENGTH];
 
+	ssh_malloc_init();	/* must be called before any mallocs */
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
 
@@ -1209,6 +1214,8 @@ main(int ac, char **av)
 	ssh_packet_set_timeout(ssh, options.server_alive_interval,
 	    options.server_alive_count_max);
 
+	ssh = active_state; /* XXX */
+
 	if (timeout_ms > 0)
 		debug3("timeout: %d ms remain after connect", timeout_ms);
 
@@ -1315,7 +1322,11 @@ main(int ac, char **av)
 
 	if (ssh_packet_connection_is_on_socket(ssh)) {
 		verbose("Authenticated to %s ([%s]:%d).", host,
+<<<<<<< ssh.c
 		    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh));
+=======
+		    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh));
+>>>>>>> 1.437
 	} else {
 		verbose("Authenticated to %s (via proxy).", host);
 	}

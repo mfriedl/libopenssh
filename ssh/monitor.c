@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.156 2016/01/14 16:17:39 markus Exp $ */
+/* $OpenBSD: monitor.c,v 1.158 2016/03/07 19:02:43 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -597,10 +597,9 @@ mm_answer_sign(int sock, struct sshbuf *m)
 	struct ssh *ssh = active_state;		/* XXX */
 	extern int auth_sock;			/* XXX move to state struct? */
 	struct sshkey *key;
-	struct sshbuf *sigbuf;
-	u_char *p;
-	u_char *signature;
-	char *alg;
+	struct sshbuf *sigbuf = NULL;
+	u_char *p = NULL, *signature = NULL;
+	char *alg = NULL;
 	size_t datlen, siglen, alglen;
 	int r, is_proof = 0;
 	u_int keyid;
@@ -678,6 +677,7 @@ mm_answer_sign(int sock, struct sshbuf *m)
 	if ((r = sshbuf_put_string(m, signature, siglen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
+	free(alg);
 	free(p);
 	free(signature);
 
@@ -1234,7 +1234,11 @@ mm_answer_keyverify(int sock, struct sshbuf *m)
 static void
 mm_record_login(Session *s, struct passwd *pw)
 {
+<<<<<<< monitor.c
 	struct ssh *ssh = active_state;			/* XXX */
+=======
+	struct ssh *ssh = active_state;	/* XXX */
+>>>>>>> 1.158
 	socklen_t fromlen;
 	struct sockaddr_storage from;
 
@@ -1256,7 +1260,7 @@ mm_record_login(Session *s, struct passwd *pw)
 	}
 	/* Record that there was a login on that tty from the remote host. */
 	record_login(s->pid, s->tty, pw->pw_name, pw->pw_uid,
-	    get_remote_name_or_ip(utmp_len, options.use_dns),
+	    session_get_remote_name_or_ip(ssh, utmp_len, options.use_dns),
 	    (struct sockaddr *)&from, fromlen);
 }
 

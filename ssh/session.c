@@ -1,4 +1,4 @@
-/* $OpenBSD: session.c,v 1.279 2015/10/24 22:52:22 djm Exp $ */
+/* $OpenBSD: session.c,v 1.281 2016/03/07 19:02:43 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -716,10 +716,16 @@ do_exec_pty(Session *s, const char *command)
 int
 do_exec(Session *s, const char *command)
 {
+	struct ssh *ssh = active_state; /* XXX */
 	int ret;
+<<<<<<< session.c
 	const char *forced = NULL;
 	char session_type[1024], *tty = NULL;
 	struct ssh *ssh = s->ssh;
+=======
+	const char *forced = NULL, *tty = NULL;
+	char session_type[1024];
+>>>>>>> 1.281
 
 	if (options.adm_forced_command) {
 		original_command = command;
@@ -754,13 +760,19 @@ do_exec(Session *s, const char *command)
 			tty += 5;
 	}
 
-	verbose("Starting session: %s%s%s for %s from %.200s port %d",
+	verbose("Starting session: %s%s%s for %s from %.200s port %d id %d",
 	    session_type,
 	    tty == NULL ? "" : " on ",
 	    tty == NULL ? "" : tty,
 	    s->pw->pw_name,
+<<<<<<< session.c
 	    get_peer_ipaddr(ssh_packet_get_connection_in(ssh)),
 	    ssh_get_remote_port(ssh));
+=======
+	    ssh_remote_ipaddr(ssh),
+	    ssh_remote_port(ssh),
+	    s->self);
+>>>>>>> 1.281
 
 #ifdef GSSAPI
 	if (options.gss_authentication) {
@@ -791,6 +803,7 @@ do_exec(Session *s, const char *command)
 void
 do_login(Session *s, const char *command)
 {
+	struct ssh *ssh = active_state;	/* XXX */
 	socklen_t fromlen;
 	struct sockaddr_storage from;
 	struct passwd *pw = s->pw;
@@ -814,7 +827,7 @@ do_login(Session *s, const char *command)
 	/* Record that there was a login on that tty from the remote host. */
 	if (!use_privsep)
 		record_login(pid, s->tty, pw->pw_name, pw->pw_uid,
-		    get_remote_name_or_ip(utmp_len,
+		    session_get_remote_name_or_ip(ssh, utmp_len,
 		    options.use_dns),
 		    (struct sockaddr *)&from, fromlen);
 
@@ -964,6 +977,7 @@ read_environment_file(char ***env, u_int *envsize,
 static char **
 do_setup_env(Session *s, const char *shell)
 {
+	struct ssh *ssh = active_state; /* XXX */
 	char buf[256];
 	u_int i, envsize;
 	char **env, *laddr;
@@ -1026,14 +1040,24 @@ do_setup_env(Session *s, const char *shell)
 
 	/* SSH_CLIENT deprecated */
 	snprintf(buf, sizeof buf, "%.50s %d %d",
+<<<<<<< session.c
 	    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh),
 	    ssh_get_local_port(ssh));
+=======
+	    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
+	    ssh_local_port(ssh));
+>>>>>>> 1.281
 	child_set_env(&env, &envsize, "SSH_CLIENT", buf);
 
 	laddr = get_local_ipaddr(ssh_packet_get_connection_in(ssh));
 	snprintf(buf, sizeof buf, "%.50s %d %.50s %d",
+<<<<<<< session.c
 	    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh), laddr,
 	    ssh_get_local_port(ssh));
+=======
+	    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
+	    laddr, ssh_local_port(ssh));
+>>>>>>> 1.281
 	free(laddr);
 	child_set_env(&env, &envsize, "SSH_CONNECTION", buf);
 
@@ -1347,6 +1371,7 @@ child_close_fds(struct ssh *ssh)
 void
 do_child(Session *s, const char *command)
 {
+	struct ssh *ssh = active_state;	/* XXX */
 	extern char **environ;
 	char **env;
 	char *argv[ARGV_MAX];
@@ -1394,14 +1419,14 @@ do_child(Session *s, const char *command)
 
 	/* we have to stash the hostname before we close our socket. */
 	if (options.use_login)
-		hostname = get_remote_name_or_ip(utmp_len,
+		hostname = session_get_remote_name_or_ip(ssh, utmp_len,
 		    options.use_dns);
 	/*
 	 * Close the connection descriptors; note that this is the child, and
 	 * the server will still have the socket open, and it is important
 	 * that we do not shutdown it.  Note that the descriptors cannot be
 	 * closed before building the environment, as we call
-	 * get_remote_ipaddr there.
+	 * ssh_remote_ipaddr there.
 	 */
 	child_close_fds(s->ssh);
 
@@ -2173,9 +2198,15 @@ session_exit_message(Session *s, int status)
 void
 session_close(Session *s)
 {
+	struct ssh *ssh = active_state; /* XXX */
 	u_int i;
 
-	debug("session_close: session %d pid %ld", s->self, (long)s->pid);
+	verbose("Close session: user %s from %.200s port %d id %d",
+	    s->pw->pw_name,
+	    ssh_remote_ipaddr(ssh),
+	    ssh_remote_port(ssh),
+	    s->self);
+
 	if (s->ttyfd != -1)
 		session_pty_cleanup(s);
 	free(s->term);
@@ -2410,3 +2441,18 @@ do_cleanup(struct authctxt *authctxt)
 	if (!use_privsep || mm_is_monitor())
 		session_destroy_all(session_pty_cleanup2);
 }
+
+/* Return a name for the remote host that fits inside utmp_size */
+
+const char *
+session_get_remote_name_or_ip(struct ssh *ssh, u_int utmp_size, int use_dns)
+{
+	const char *remote = "";
+
+	if (utmp_size > 0)
+		remote = auth_get_canonical_hostname(ssh, use_dns);
+	if (utmp_size == 0 || strlen(remote) > utmp_size)
+		remote = ssh_remote_ipaddr(ssh);
+	return remote;
+}
+

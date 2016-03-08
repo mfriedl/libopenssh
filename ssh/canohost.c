@@ -1,4 +1,4 @@
-/* $OpenBSD: canohost.c,v 1.72 2015/03/01 15:44:40 millert Exp $ */
+/* $OpenBSD: canohost.c,v 1.73 2016/03/07 19:02:43 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -32,6 +32,7 @@
 #include "canohost.h"
 #include "misc.h"
 
+<<<<<<< canohost.c
 static void check_ip_options(int, char *);
 
 /*
@@ -198,6 +199,8 @@ get_canonical_hostname(int use_dns)
 	return host;
 }
 
+=======
+>>>>>>> 1.73
 /*
  * Returns the local/remote IP-address/hostname of socket as a string.
  * The returned string must be freed.
@@ -215,12 +218,10 @@ get_socket_address(int sock, int remote, int flags)
 	memset(&addr, 0, sizeof(addr));
 
 	if (remote) {
-		if (getpeername(sock, (struct sockaddr *)&addr, &addrlen)
-		    < 0)
+		if (getpeername(sock, (struct sockaddr *)&addr, &addrlen) != 0)
 			return NULL;
 	} else {
-		if (getsockname(sock, (struct sockaddr *)&addr, &addrlen)
-		    < 0)
+		if (getsockname(sock, (struct sockaddr *)&addr, &addrlen) != 0)
 			return NULL;
 	}
 
@@ -230,7 +231,7 @@ get_socket_address(int sock, int remote, int flags)
 		/* Get the address in ascii. */
 		if ((r = getnameinfo((struct sockaddr *)&addr, addrlen, ntop,
 		    sizeof(ntop), NULL, 0, flags)) != 0) {
-			error("get_socket_address: getnameinfo %d failed: %s",
+			error("%s: getnameinfo %d failed: %s", __func__,
 			    flags, ssh_gai_strerror(r));
 			return NULL;
 		}
@@ -275,7 +276,8 @@ get_local_name(int fd)
 
 	/* Handle the case where we were passed a pipe */
 	if (gethostname(myname, sizeof(myname)) == -1) {
-		verbose("get_local_name: gethostname: %s", strerror(errno));
+		verbose("%s: gethostname: %s", __func__, strerror(errno));
+		host = xstrdup("UNKNOWN");
 	} else {
 		host = xstrdup(myname);
 	}
@@ -283,6 +285,7 @@ get_local_name(int fd)
 	return host;
 }
 
+<<<<<<< canohost.c
 const char *
 get_remote_name_or_ip(u_int utmp_len, int use_dns)
 {
@@ -296,9 +299,11 @@ get_remote_name_or_ip(u_int utmp_len, int use_dns)
 	return remote;
 }
 
+=======
+>>>>>>> 1.73
 /* Returns the local/remote port for the socket. */
 
-int
+static int
 get_sock_port(int sock, int local)
 {
 	struct sockaddr_storage from;
@@ -328,11 +333,12 @@ get_sock_port(int sock, int local)
 	/* Return port number. */
 	if ((r = getnameinfo((struct sockaddr *)&from, fromlen, NULL, 0,
 	    strport, sizeof(strport), NI_NUMERICSERV)) != 0)
-		fatal("get_sock_port: getnameinfo NI_NUMERICSERV failed: %s",
+		fatal("%s: getnameinfo NI_NUMERICSERV failed: %s", __func__,
 		    ssh_gai_strerror(r));
 	return atoi(strport);
 }
 
+<<<<<<< canohost.c
 /* Returns remote/local port number for the current connection. */
 
 static int
@@ -349,6 +355,8 @@ ssh_get_port(struct ssh *ssh, int local)
 	return get_sock_port(ssh_packet_get_connection_in(ssh), local);
 }
 
+=======
+>>>>>>> 1.73
 int
 get_peer_port(int sock)
 {
@@ -356,6 +364,7 @@ get_peer_port(int sock)
 }
 
 int
+<<<<<<< canohost.c
 ssh_get_remote_port(struct ssh *ssh)
 {
 	/* Cache to avoid getpeername() on a dead connection */
@@ -366,6 +375,13 @@ ssh_get_remote_port(struct ssh *ssh)
 
 int
 ssh_get_local_port(struct ssh *ssh)
+=======
+get_local_port(int sock)
+>>>>>>> 1.73
 {
+<<<<<<< canohost.c
 	return ssh_get_port(ssh, 1);
+=======
+	return get_sock_port(sock, 1);
+>>>>>>> 1.73
 }

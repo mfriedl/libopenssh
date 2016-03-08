@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.282 2016/01/29 23:04:46 dtucker Exp $ */
+/* $OpenBSD: clientloop.c,v 1.284 2016/02/08 10:57:07 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -311,8 +311,9 @@ client_x11_get_proto(const char *display, const char *xauth_path,
 	proto[0] = data[0] = xauthfile[0] = xauthdir[0] = '\0';
 
 	if (!client_x11_display_valid(display)) {
-		logit("DISPLAY \"%s\" invalid; disabling X11 forwarding",
-		    display);
+		if (display != NULL)
+			logit("DISPLAY \"%s\" invalid; disabling X11 forwarding",
+			    display);
 		return -1;
 	}
 	if (xauth_path != NULL && stat(xauth_path, &st) == -1) {
@@ -1544,7 +1545,7 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 {
 	fd_set *readset = NULL, *writeset = NULL;
 	double start_time, total_time;
-	int r, max_fd = 0, max_fd2 = 0, len, rekeying = 0;
+	int r, max_fd = 0, max_fd2 = 0, len;
 	u_int64_t ibytes, obytes;
 	u_int nalloc = 0;
 	char buf[100];
@@ -1660,10 +1661,21 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 		if (compat20 && session_closed && !channel_still_open())
 			break;
 
+<<<<<<< clientloop.c
 		rekeying = (ssh->kex != NULL && !ssh->kex->done);
 
 		if (rekeying) {
+=======
+		if (ssh_packet_is_rekeying(active_state)) {
+>>>>>>> 1.284
 			debug("rekeying in progress");
+		} else if (need_rekeying) {
+			/* manual rekey request */
+			debug("need rekeying");
+			if ((r = kex_start_rekex(active_state)) != 0)
+				fatal("%s: kex_start_rekex: %s", __func__,
+				    ssh_err(r));
+			need_rekeying = 0;
 		} else {
 			/*
 			 * Make packets of buffered stdin data, and buffer
@@ -1693,15 +1705,21 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 		 * available on one of the descriptors).
 		 */
 		max_fd2 = max_fd;
+<<<<<<< clientloop.c
 		client_wait_until_can_do_something(ssh, &readset, &writeset,
 		    &max_fd2, &nalloc, rekeying);
+=======
+		client_wait_until_can_do_something(&readset, &writeset,
+		    &max_fd2, &nalloc, ssh_packet_is_rekeying(active_state));
+>>>>>>> 1.284
 
 		if (quit_pending)
 			break;
 
 		/* Do channel operations unless rekeying in progress. */
-		if (!rekeying) {
+		if (!ssh_packet_is_rekeying(active_state))
 			channel_after_select(readset, writeset);
+<<<<<<< clientloop.c
 			if (need_rekeying || ssh_packet_need_rekeying(ssh)) {
 				debug("need rekeying");
 				ssh->kex->done = 0;
@@ -1712,6 +1730,8 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 				need_rekeying = 0;
 			}
 		}
+=======
+>>>>>>> 1.284
 
 		/* Buffer input from the connection.  */
 		client_process_net_input(ssh, readset);

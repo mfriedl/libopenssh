@@ -1,4 +1,4 @@
-/* $OpenBSD: auth-rhosts.c,v 1.46 2014/12/23 22:42:48 djm Exp $ */
+/* $OpenBSD: auth-rhosts.c,v 1.47 2016/03/07 19:02:43 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -30,6 +30,8 @@
 #include "pathnames.h"
 #include "log.h"
 #include "misc.h"
+#include "buffer.h" /* XXX */
+#include "key.h" /* XXX */
 #include "servconf.h"
 #include "canohost.h"
 #include "sshkey.h"
@@ -187,8 +189,13 @@ auth_rhosts(struct passwd *pw, const char *client_user)
 	struct ssh *ssh = active_state;	/* XXX */
 	const char *hostname, *ipaddr;
 
+<<<<<<< auth-rhosts.c
 	hostname = get_canonical_hostname(options.use_dns);
 	ipaddr = ssh_remote_ipaddr(ssh);
+=======
+	hostname = auth_get_canonical_hostname(ssh, options.use_dns);
+	ipaddr = ssh_remote_ipaddr(ssh);
+>>>>>>> 1.47
 	return auth_rhosts2(pw, client_user, hostname, ipaddr);
 }
 

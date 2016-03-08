@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2-hostbased.c,v 1.25 2015/05/04 06:10:48 djm Exp $ */
+/* $OpenBSD: auth2-hostbased.c,v 1.26 2016/03/07 19:02:43 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -166,6 +166,7 @@ int
 hostbased_key_allowed(struct passwd *pw, const char *cuser, char *chost,
     struct sshkey *key)
 {
+	struct ssh *ssh = active_state; /* XXX */
 	const char *resolvedname, *ipaddr, *lookup, *reason;
 	HostStatus host_status;
 	int len;
@@ -174,8 +175,13 @@ hostbased_key_allowed(struct passwd *pw, const char *cuser, char *chost,
 	if (auth_key_is_revoked(key))
 		return 0;
 
+<<<<<<< auth2-hostbased.c
 	resolvedname = get_canonical_hostname(options.use_dns);
 	ipaddr = ssh_remote_ipaddr(active_state); /* XXX */
+=======
+	resolvedname = auth_get_canonical_hostname(ssh, options.use_dns);
+	ipaddr = ssh_remote_ipaddr(ssh);
+>>>>>>> 1.26
 
 	debug2("%s: chost %s resolvedname %s ipaddr %s", __func__,
 	    chost, resolvedname, ipaddr);

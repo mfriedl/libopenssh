@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.c,v 1.348 2015/10/15 23:51:40 djm Exp $ */
+/* $OpenBSD: channels.c,v 1.350 2016/03/07 19:02:43 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1468,7 +1468,7 @@ port_open_helper(Channel *c, char *rtype)
 	int r;
 	char buf[1024];
 	char *local_ipaddr = get_local_ipaddr(c->sock);
-	int local_port = c->sock == -1 ? 65536 : get_sock_port(c->sock, 1);
+	int local_port = c->sock == -1 ? 65536 : get_local_port(c->sock);
 	char *remote_ipaddr = get_peer_ipaddr(c->sock);
 	int remote_port = get_peer_port(c->sock);
 
@@ -1974,7 +1974,10 @@ read_mux(Channel *c, u_int need)
 	if (sshbuf_len(c->input) < need) {
 		rlen = need - sshbuf_len(c->input);
 		len = read(c->rfd, buf, MIN(rlen, CHAN_RBUF));
+		if (len < 0 && (errno == EINTR || errno == EAGAIN))
+			return buffer_len(&c->input);
 		if (len <= 0) {
+<<<<<<< channels.c
 			if (errno != EINTR && errno != EAGAIN) {
 				debug2("channel %u: ctl read<=0 rfd %d len %d",
 				    c->self, c->rfd, len);
@@ -1983,6 +1986,14 @@ read_mux(Channel *c, u_int need)
 			}
 		} else if ((r = sshbuf_put(c->input, buf, len)) != 0)
 			CHANNEL_BUFFER_ERROR(c, r);
+=======
+			debug2("channel %d: ctl read<=0 rfd %d len %d",
+			    c->self, c->rfd, len);
+			chan_read_failed(c);
+			return 0;
+		} else
+			buffer_append(&c->input, buf, len);
+>>>>>>> 1.350
 	}
 	return sshbuf_len(c->input);
 }
@@ -3074,7 +3085,7 @@ channel_setup_fwd_listener_tcpip(struct ssh *ssh, int type, struct Forward *fwd,
 		if (type == SSH_CHANNEL_RPORT_LISTENER && fwd->listen_port == 0 &&
 		    allocated_listen_port != NULL &&
 		    *allocated_listen_port == 0) {
-			*allocated_listen_port = get_sock_port(sock, 1);
+			*allocated_listen_port = get_local_port(sock);
 			debug("Allocated listen port %d",
 			    *allocated_listen_port);
 		}
