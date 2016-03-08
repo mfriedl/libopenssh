@@ -1210,8 +1210,6 @@ main(int ac, char **av)
 	ssh_packet_set_timeout(ssh, options.server_alive_interval,
 	    options.server_alive_count_max);
 
-	ssh = active_state; /* XXX */
-
 	if (timeout_ms > 0)
 		debug3("timeout: %d ms remain after connect", timeout_ms);
 
