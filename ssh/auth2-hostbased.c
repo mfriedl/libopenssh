@@ -175,13 +175,8 @@ hostbased_key_allowed(struct passwd *pw, const char *cuser, char *chost,
 	if (auth_key_is_revoked(key))
 		return 0;
 
-<<<<<<< auth2-hostbased.c
-	resolvedname = get_canonical_hostname(options.use_dns);
-	ipaddr = ssh_remote_ipaddr(active_state); /* XXX */
-=======
 	resolvedname = auth_get_canonical_hostname(ssh, options.use_dns);
 	ipaddr = ssh_remote_ipaddr(ssh);
->>>>>>> 1.26
 
 	debug2("%s: chost %s resolvedname %s ipaddr %s", __func__,
 	    chost, resolvedname, ipaddr);

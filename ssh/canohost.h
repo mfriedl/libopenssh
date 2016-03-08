@@ -12,14 +12,8 @@
  * called by a name other than "ssh" or "Secure Shell".
  */
 
-<<<<<<< canohost.h
-struct ssh;
-const char	*get_canonical_hostname(int);
-const char	*get_remote_name_or_ip(u_int, int);
-=======
 #ifndef _CANOHOST_H
 #define _CANOHOST_H
->>>>>>> 1.12
 
 char		*get_peer_ipaddr(int);
 int		 get_peer_port(int);
@@ -27,10 +21,4 @@ char		*get_local_ipaddr(int);
 char		*get_local_name(int);
 int		get_local_port(int);
 
-<<<<<<< canohost.h
-int		 ssh_get_remote_port(struct ssh *);
-int		 ssh_get_local_port(struct ssh *);
-int		 get_sock_port(int, int);
-=======
 #endif /* _CANOHOST_H */
->>>>>>> 1.12

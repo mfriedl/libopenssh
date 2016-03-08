@@ -83,11 +83,7 @@ static struct sshbuf *auth_debug;
 int
 allowed_user(struct passwd * pw)
 {
-<<<<<<< auth.c
-	struct ssh *ssh = active_state;		/* XXX */
-=======
 	struct ssh *ssh = active_state; /* XXX */
->>>>>>> 1.114
 	struct stat st;
 	const char *hostname = NULL, *ipaddr = NULL;
 	u_int i;
@@ -123,13 +119,8 @@ allowed_user(struct passwd * pw)
 
 	if (options.num_deny_users > 0 || options.num_allow_users > 0 ||
 	    options.num_deny_groups > 0 || options.num_allow_groups > 0) {
-<<<<<<< auth.c
-		hostname = get_canonical_hostname(options.use_dns);
-		ipaddr = ssh_remote_ipaddr(ssh);
-=======
 		hostname = auth_get_canonical_hostname(ssh, options.use_dns);
 		ipaddr = ssh_remote_ipaddr(ssh);
->>>>>>> 1.114
 	}
 
 	/* Return false if user is listed in DenyUsers */
@@ -241,13 +232,8 @@ auth_log(struct authctxt *authctxt, int authenticated, int partial,
 	    submethod != NULL ? "/" : "", submethod == NULL ? "" : submethod,
 	    authctxt->valid ? "" : "invalid user ",
 	    authctxt->user,
-<<<<<<< auth.c
-	    ssh_remote_ipaddr(active_state),	/* XXX */
-	    ssh_get_remote_port(active_state),
-=======
 	    ssh_remote_ipaddr(ssh),
 	    ssh_remote_port(ssh),
->>>>>>> 1.114
 	    compat20 ? "ssh2" : "ssh1",
 	    authctxt->info != NULL ? ": " : "",
 	    authctxt->info != NULL ? authctxt->info : "");
@@ -258,19 +244,12 @@ auth_log(struct authctxt *authctxt, int authenticated, int partial,
 void
 auth_maxtries_exceeded(struct ssh *ssh, struct authctxt *authctxt)
 {
-	struct ssh *ssh = active_state; /* XXX */
-
 	error("maximum authentication attempts exceeded for "
 	    "%s%.100s from %.200s port %d %s",
 	    authctxt->valid ? "" : "invalid user ",
 	    authctxt->user,
-<<<<<<< auth.c
-	    ssh_remote_ipaddr(ssh),
-	    ssh_get_remote_port(ssh),
-=======
 	    ssh_remote_ipaddr(ssh),
 	    ssh_remote_port(ssh),
->>>>>>> 1.114
 	    compat20 ? "ssh2" : "ssh1");
 	sshpkt_disconnect(ssh, "Too many authentication failures");
 	fatal("Too many authentication failures");	/* XXX */
@@ -283,13 +262,8 @@ auth_maxtries_exceeded(struct ssh *ssh, struct authctxt *authctxt)
 int
 auth_root_allowed(const char *method)
 {
-<<<<<<< auth.c
-	struct ssh *ssh = active_state;		/* XXX */
-
-=======
 	struct ssh *ssh = active_state; /* XXX */
 
->>>>>>> 1.114
 	switch (options.permit_root_login) {
 	case PERMIT_YES:
 		return 1;
@@ -306,12 +280,8 @@ auth_root_allowed(const char *method)
 		}
 		break;
 	}
-<<<<<<< auth.c
-	logit("ROOT LOGIN REFUSED FROM %.200s", ssh_remote_ipaddr(ssh));
-=======
 	logit("ROOT LOGIN REFUSED FROM %.200s port %d",
 	    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh));
->>>>>>> 1.114
 	return 0;
 }
 
@@ -551,11 +521,7 @@ auth_openprincipals(const char *file, struct passwd *pw, int strict_modes)
 struct passwd *
 getpwnamallow(const char *user)
 {
-<<<<<<< auth.c
-	struct ssh *ssh = active_state;		/* XXX */
-=======
 	struct ssh *ssh = active_state; /* XXX */
->>>>>>> 1.114
 	extern login_cap_t *lc;
 	auth_session_t *as;
 	struct passwd *pw;
@@ -566,13 +532,8 @@ getpwnamallow(const char *user)
 
 	pw = getpwnam(user);
 	if (pw == NULL) {
-<<<<<<< auth.c
-		logit("Invalid user %.100s from %.100s",
-		    user, ssh_remote_ipaddr(ssh));
-=======
 		logit("Invalid user %.100s from %.100s port %d",
 		    user, ssh_remote_ipaddr(ssh), ssh_remote_port(ssh));
->>>>>>> 1.114
 		return (NULL);
 	}
 	if (!allowed_user(pw))

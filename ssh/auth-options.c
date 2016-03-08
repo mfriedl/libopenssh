@@ -270,15 +270,9 @@ auth_parse_options(struct passwd *pw, char *opts, char *file, u_long linenum)
 		}
 		cp = "from=\"";
 		if (strncasecmp(opts, cp, strlen(cp)) == 0) {
-<<<<<<< auth-options.c
-			const char *remote_ip = ssh_remote_ipaddr(ssh);
-			const char *remote_host = get_canonical_hostname(
-			    options.use_dns);
-=======
 			const char *remote_ip = ssh_remote_ipaddr(ssh);
 			const char *remote_host = auth_get_canonical_hostname(
 			    ssh, options.use_dns);
->>>>>>> 1.71
 			char *patterns = xmalloc(strlen(opts) + 1);
 
 			opts += strlen(cp);

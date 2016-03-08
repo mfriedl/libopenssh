@@ -618,7 +618,7 @@ server_alive_check(struct ssh *ssh)
 static void
 client_wait_until_can_do_something(struct ssh *ssh,
     fd_set **readsetp, fd_set **writesetp,
-    int *maxfdp, u_int *nallocp, int rekeying)
+    int *maxfdp, u_int *nallocp)
 {
 	struct timeval tv, *tvp;
 	int timeout_secs;
@@ -627,7 +627,7 @@ client_wait_until_can_do_something(struct ssh *ssh,
 
 	/* Add any selections by the channel mechanism. */
 	channel_prepare_select(readsetp, writesetp, maxfdp, nallocp,
-	    &minwait_secs, rekeying);
+	    &minwait_secs, ssh_packet_is_rekeying(ssh));
 
 	if (!compat20) {
 		/* Read from the connection, unless our buffers are full. */
@@ -675,7 +675,8 @@ client_wait_until_can_do_something(struct ssh *ssh,
 		timeout_secs = options.server_alive_interval;
 		server_alive_time = now + options.server_alive_interval;
 	}
-	if (options.rekey_interval > 0 && compat20 && !rekeying)
+	if (options.rekey_interval > 0 && compat20 &&
+	    !ssh_packet_is_rekeying(ssh))
 		timeout_secs = MIN(timeout_secs,
 		    ssh_packet_get_rekey_timeout(ssh));
 	set_control_persist_exit_time();
@@ -1661,13 +1662,7 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 		if (compat20 && session_closed && !channel_still_open())
 			break;
 
-<<<<<<< clientloop.c
-		rekeying = (ssh->kex != NULL && !ssh->kex->done);
-
-		if (rekeying) {
-=======
-		if (ssh_packet_is_rekeying(active_state)) {
->>>>>>> 1.284
+		if (ssh_packet_is_rekeying(ssh)) {
 			debug("rekeying in progress");
 		} else if (need_rekeying) {
 			/* manual rekey request */
@@ -1705,13 +1700,8 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 		 * available on one of the descriptors).
 		 */
 		max_fd2 = max_fd;
-<<<<<<< clientloop.c
 		client_wait_until_can_do_something(ssh, &readset, &writeset,
-		    &max_fd2, &nalloc, rekeying);
-=======
-		client_wait_until_can_do_something(&readset, &writeset,
-		    &max_fd2, &nalloc, ssh_packet_is_rekeying(active_state));
->>>>>>> 1.284
+		    &max_fd2, &nalloc);
 
 		if (quit_pending)
 			break;
@@ -1719,19 +1709,6 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 		/* Do channel operations unless rekeying in progress. */
 		if (!ssh_packet_is_rekeying(active_state))
 			channel_after_select(readset, writeset);
-<<<<<<< clientloop.c
-			if (need_rekeying || ssh_packet_need_rekeying(ssh)) {
-				debug("need rekeying");
-				ssh->kex->done = 0;
-				if ((r = kex_send_kexinit(ssh)) != 0) {
-					fatal("%s: kex_send_kexinit: %s",
-					    __func__, ssh_err(r));
-				}
-				need_rekeying = 0;
-			}
-		}
-=======
->>>>>>> 1.284
 
 		/* Buffer input from the connection.  */
 		client_process_net_input(ssh, readset);

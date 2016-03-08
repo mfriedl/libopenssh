@@ -37,13 +37,8 @@
 extern ServerOptions options;
 
 int
-<<<<<<< auth-rh-rsa.c
-auth_rhosts_rsa_key_allowed(struct passwd *pw, char *cuser, char *chost,
-    struct sshkey *client_host_key)
-=======
 auth_rhosts_rsa_key_allowed(struct passwd *pw, const char *cuser,
-    const char *chost, Key *client_host_key)
->>>>>>> 1.45
+    const char *chost, struct sshkey *client_host_key)
 {
 	HostStatus host_status;
 
@@ -69,13 +64,8 @@ int
 auth_rhosts_rsa(struct authctxt *authctxt, char *cuser,
     struct sshkey *client_host_key)
 {
-<<<<<<< auth-rh-rsa.c
-	struct ssh *ssh = active_state;		/* XXX */
-	char *chost;
-=======
 	struct ssh *ssh = active_state; /* XXX */
 	const char *chost;
->>>>>>> 1.45
 	struct passwd *pw = authctxt->pw;
 
 	debug("Trying rhosts with RSA host authentication for client user %.100s",

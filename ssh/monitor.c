@@ -1234,11 +1234,7 @@ mm_answer_keyverify(int sock, struct sshbuf *m)
 static void
 mm_record_login(Session *s, struct passwd *pw)
 {
-<<<<<<< monitor.c
-	struct ssh *ssh = active_state;			/* XXX */
-=======
 	struct ssh *ssh = active_state;	/* XXX */
->>>>>>> 1.158
 	socklen_t fromlen;
 	struct sockaddr_storage from;
 

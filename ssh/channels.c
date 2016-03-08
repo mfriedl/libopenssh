@@ -1975,25 +1975,14 @@ read_mux(Channel *c, u_int need)
 		rlen = need - sshbuf_len(c->input);
 		len = read(c->rfd, buf, MIN(rlen, CHAN_RBUF));
 		if (len < 0 && (errno == EINTR || errno == EAGAIN))
-			return buffer_len(&c->input);
+			return sshbuf_len(c->input);
 		if (len <= 0) {
-<<<<<<< channels.c
-			if (errno != EINTR && errno != EAGAIN) {
-				debug2("channel %u: ctl read<=0 rfd %d len %d",
-				    c->self, c->rfd, len);
-				chan_read_failed(c);
-				return 0;
-			}
-		} else if ((r = sshbuf_put(c->input, buf, len)) != 0)
-			CHANNEL_BUFFER_ERROR(c, r);
-=======
 			debug2("channel %d: ctl read<=0 rfd %d len %d",
 			    c->self, c->rfd, len);
 			chan_read_failed(c);
 			return 0;
-		} else
-			buffer_append(&c->input, buf, len);
->>>>>>> 1.350
+		} else if ((r = sshbuf_put(c->input, buf, len)) != 0)
+			CHANNEL_BUFFER_ERROR(c, r);
 	}
 	return sshbuf_len(c->input);
 }

@@ -32,175 +32,6 @@
 #include "canohost.h"
 #include "misc.h"
 
-<<<<<<< canohost.c
-static void check_ip_options(int, char *);
-
-/*
- * Return the canonical name of the host at the other end of the socket. The
- * caller should free the returned string.
- */
-
-static char *
-get_remote_hostname(int sock, int use_dns)
-{
-	struct sockaddr_storage from;
-	socklen_t fromlen;
-	struct addrinfo hints, *ai, *aitop;
-	char name[NI_MAXHOST], ntop[NI_MAXHOST], ntop2[NI_MAXHOST];
-
-	/* Get IP address of client. */
-	fromlen = sizeof(from);
-	memset(&from, 0, sizeof(from));
-	if (getpeername(sock, (struct sockaddr *)&from, &fromlen) < 0) {
-		debug("getpeername failed: %.100s", strerror(errno));
-		cleanup_exit(255);
-	}
-
-	if (getnameinfo((struct sockaddr *)&from, fromlen, ntop, sizeof(ntop),
-	    NULL, 0, NI_NUMERICHOST) != 0)
-		fatal("get_remote_hostname: getnameinfo NI_NUMERICHOST failed");
-
-	if (from.ss_family == AF_INET)
-		check_ip_options(sock, ntop);
-
-	if (!use_dns)
-		return xstrdup(ntop);
-
-	debug3("Trying to reverse map address %.100s.", ntop);
-	/* Map the IP address to a host name. */
-	if (getnameinfo((struct sockaddr *)&from, fromlen, name, sizeof(name),
-	    NULL, 0, NI_NAMEREQD) != 0) {
-		/* Host name not found.  Use ip address. */
-		return xstrdup(ntop);
-	}
-
-	/*
-	 * if reverse lookup result looks like a numeric hostname,
-	 * someone is trying to trick us by PTR record like following:
-	 *	1.1.1.10.in-addr.arpa.	IN PTR	2.3.4.5
-	 */
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_socktype = SOCK_DGRAM;	/*dummy*/
-	hints.ai_flags = AI_NUMERICHOST;
-	if (getaddrinfo(name, NULL, &hints, &ai) == 0) {
-		logit("Nasty PTR record \"%s\" is set up for %s, ignoring",
-		    name, ntop);
-		freeaddrinfo(ai);
-		return xstrdup(ntop);
-	}
-
-	/* Names are stores in lowercase. */
-	lowercase(name);
-
-	/*
-	 * Map it back to an IP address and check that the given
-	 * address actually is an address of this host.  This is
-	 * necessary because anyone with access to a name server can
-	 * define arbitrary names for an IP address. Mapping from
-	 * name to IP address can be trusted better (but can still be
-	 * fooled if the intruder has access to the name server of
-	 * the domain).
-	 */
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = from.ss_family;
-	hints.ai_socktype = SOCK_STREAM;
-	if (getaddrinfo(name, NULL, &hints, &aitop) != 0) {
-		logit("reverse mapping checking getaddrinfo for %.700s "
-		    "[%s] failed - POSSIBLE BREAK-IN ATTEMPT!", name, ntop);
-		return xstrdup(ntop);
-	}
-	/* Look for the address from the list of addresses. */
-	for (ai = aitop; ai; ai = ai->ai_next) {
-		if (getnameinfo(ai->ai_addr, ai->ai_addrlen, ntop2,
-		    sizeof(ntop2), NULL, 0, NI_NUMERICHOST) == 0 &&
-		    (strcmp(ntop, ntop2) == 0))
-				break;
-	}
-	freeaddrinfo(aitop);
-	/* If we reached the end of the list, the address was not there. */
-	if (!ai) {
-		/* Address not found for the host name. */
-		logit("Address %.100s maps to %.600s, but this does not "
-		    "map back to the address - POSSIBLE BREAK-IN ATTEMPT!",
-		    ntop, name);
-		return xstrdup(ntop);
-	}
-	return xstrdup(name);
-}
-
-/*
- * If IP options are supported, make sure there are none (log and
- * disconnect them if any are found).  Basically we are worried about
- * source routing; it can be used to pretend you are somebody
- * (ip-address) you are not. That itself may be "almost acceptable"
- * under certain circumstances, but rhosts autentication is useless
- * if source routing is accepted. Notice also that if we just dropped
- * source routing here, the other side could use IP spoofing to do
- * rest of the interaction and could still bypass security.  So we
- * exit here if we detect any IP options.
- */
-/* IPv4 only */
-static void
-check_ip_options(int sock, char *ipaddr)
-{
-	u_char options[200];
-	char text[sizeof(options) * 3 + 1];
-	socklen_t option_size, i;
-	int ipproto;
-	struct protoent *ip;
-
-	if ((ip = getprotobyname("ip")) != NULL)
-		ipproto = ip->p_proto;
-	else
-		ipproto = IPPROTO_IP;
-	option_size = sizeof(options);
-	if (getsockopt(sock, ipproto, IP_OPTIONS, options,
-	    &option_size) >= 0 && option_size != 0) {
-		text[0] = '\0';
-		for (i = 0; i < option_size; i++)
-			snprintf(text + i*3, sizeof(text) - i*3,
-			    " %2.2x", options[i]);
-		fatal("Connection from %.100s with IP options:%.800s",
-		    ipaddr, text);
-	}
-}
-
-/*
- * Return the canonical name of the host in the other side of the current
- * connection.  The host name is cached, so it is efficient to call this
- * several times.
- */
-
-const char *
-get_canonical_hostname(int use_dns)
-{
-	struct ssh *ssh = active_state;	/* XXX */
-	char *host;
-	static char *canonical_host_name = NULL;
-	static char *remote_ip = NULL;
-
-	/* Check if we have previously retrieved name with same option. */
-	if (use_dns && canonical_host_name != NULL)
-		return canonical_host_name;
-	if (!use_dns && remote_ip != NULL)
-		return remote_ip;
-
-	/* Get the real hostname if socket; otherwise return UNKNOWN. */
-	if (ssh_packet_connection_is_on_socket(ssh))
-		host = get_remote_hostname(
-		   ssh_packet_get_connection_in(ssh), use_dns);
-	else
-		host = "UNKNOWN";
-
-	if (use_dns)
-		canonical_host_name = host;
-	else
-		remote_ip = host;
-	return host;
-}
-
-=======
->>>>>>> 1.73
 /*
  * Returns the local/remote IP-address/hostname of socket as a string.
  * The returned string must be freed.
@@ -285,22 +116,6 @@ get_local_name(int fd)
 	return host;
 }
 
-<<<<<<< canohost.c
-const char *
-get_remote_name_or_ip(u_int utmp_len, int use_dns)
-{
-	struct ssh *ssh = active_state;	/* XXX */
-	static const char *remote = "";
-
-	if (utmp_len > 0)
-		remote = get_canonical_hostname(use_dns);
-	if (utmp_len == 0 || strlen(remote) > utmp_len)
-		remote = ssh_remote_ipaddr(ssh);
-	return remote;
-}
-
-=======
->>>>>>> 1.73
 /* Returns the local/remote port for the socket. */
 
 static int
@@ -338,25 +153,6 @@ get_sock_port(int sock, int local)
 	return atoi(strport);
 }
 
-<<<<<<< canohost.c
-/* Returns remote/local port number for the current connection. */
-
-static int
-ssh_get_port(struct ssh *ssh, int local)
-{
-	/*
-	 * If the connection is not a socket, return 65535.  This is
-	 * intentionally chosen to be an unprivileged port number.
-	 */
-	if (!ssh_packet_connection_is_on_socket(ssh))
-		return 65535;
-
-	/* Get socket and return the port number. */
-	return get_sock_port(ssh_packet_get_connection_in(ssh), local);
-}
-
-=======
->>>>>>> 1.73
 int
 get_peer_port(int sock)
 {
@@ -364,24 +160,7 @@ get_peer_port(int sock)
 }
 
 int
-<<<<<<< canohost.c
-ssh_get_remote_port(struct ssh *ssh)
-{
-	/* Cache to avoid getpeername() on a dead connection */
-	if (!ssh->remote_port)
-		ssh->remote_port = ssh_get_port(ssh, 0);
-	return ssh->remote_port;
-}
-
-int
-ssh_get_local_port(struct ssh *ssh)
-=======
 get_local_port(int sock)
->>>>>>> 1.73
 {
-<<<<<<< canohost.c
-	return ssh_get_port(ssh, 1);
-=======
 	return get_sock_port(sock, 1);
->>>>>>> 1.73
 }

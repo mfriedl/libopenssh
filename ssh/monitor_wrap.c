@@ -408,25 +408,15 @@ mm_user_key_allowed(struct passwd *pw, struct sshkey *key,
 }
 
 int
-<<<<<<< monitor_wrap.c
-mm_hostbased_key_allowed(struct passwd *pw, char *user, char *host,
-    struct sshkey *key)
-=======
 mm_hostbased_key_allowed(struct passwd *pw, const char *user, const char *host,
-    Key *key)
->>>>>>> 1.88
+    struct sshkey *key)
 {
 	return (mm_key_allowed(MM_HOSTKEY, user, host, key, 0));
 }
 
 int
-<<<<<<< monitor_wrap.c
-mm_auth_rhosts_rsa_key_allowed(struct passwd *pw, char *user,
-    char *host, struct sshkey *key)
-=======
 mm_auth_rhosts_rsa_key_allowed(struct passwd *pw, const char *user,
-    const char *host, Key *key)
->>>>>>> 1.88
+    const char *host, struct sshkey *key)
 {
 	int ret;
 
@@ -437,13 +427,8 @@ mm_auth_rhosts_rsa_key_allowed(struct passwd *pw, const char *user,
 }
 
 int
-<<<<<<< monitor_wrap.c
-mm_key_allowed(enum mm_keytype type, char *user, char *host,
-    struct sshkey *key, int pubkey_auth_attempt)
-=======
 mm_key_allowed(enum mm_keytype type, const char *user, const char *host,
-    Key *key, int pubkey_auth_attempt)
->>>>>>> 1.88
+    struct sshkey *key, int pubkey_auth_attempt)
 {
 	struct sshbuf *m;
 	u_char *blob;

@@ -661,26 +661,15 @@ process_queued_listen_addrs(ServerOptions *options)
 struct connection_info *
 get_connection_info(int populate, int use_dns)
 {
-<<<<<<< servconf.c
-	struct ssh *ssh = active_state;		/* XXX */
-=======
 	struct ssh *ssh = active_state; /* XXX */
->>>>>>> 1.286
 	static struct connection_info ci;
 
 	if (!populate)
 		return &ci;
-<<<<<<< servconf.c
-	ci.host = get_canonical_hostname(use_dns);
-	ci.address = ssh_remote_ipaddr(ssh);
-	ci.laddress = get_local_ipaddr(ssh_packet_get_connection_in(ssh));
-	ci.lport = ssh_get_local_port(ssh);
-=======
 	ci.host = auth_get_canonical_hostname(ssh, use_dns);
 	ci.address = ssh_remote_ipaddr(ssh);
 	ci.laddress = ssh_local_ipaddr(ssh);
 	ci.lport = ssh_local_port(ssh);
->>>>>>> 1.286
 	return &ci;
 }
 

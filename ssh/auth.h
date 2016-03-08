@@ -110,8 +110,8 @@ BIGNUM	*auth_rsa_generate_challenge(struct sshkey *);
 int	 auth_rsa_verify_response(struct sshkey *, BIGNUM *, u_char[]);
 int	 auth_rsa_key_allowed(struct passwd *, BIGNUM *, struct sshkey **);
 
-int	 auth_rhosts_rsa_key_allowed(struct passwd *, char *, char *,
-    struct sshkey *);
+int	 auth_rhosts_rsa_key_allowed(struct passwd *, const char *,
+    const char *, struct sshkey *);
 int	 hostbased_key_allowed(struct passwd *, const char *, char *,
     struct sshkey *);
 int	 user_key_allowed(struct passwd *, struct sshkey *, int);

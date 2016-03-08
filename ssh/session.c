@@ -716,16 +716,10 @@ do_exec_pty(Session *s, const char *command)
 int
 do_exec(Session *s, const char *command)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	int ret;
-<<<<<<< session.c
-	const char *forced = NULL;
-	char session_type[1024], *tty = NULL;
-	struct ssh *ssh = s->ssh;
-=======
 	const char *forced = NULL, *tty = NULL;
 	char session_type[1024];
->>>>>>> 1.281
+	struct ssh *ssh = s->ssh;
 
 	if (options.adm_forced_command) {
 		original_command = command;
@@ -765,14 +759,9 @@ do_exec(Session *s, const char *command)
 	    tty == NULL ? "" : " on ",
 	    tty == NULL ? "" : tty,
 	    s->pw->pw_name,
-<<<<<<< session.c
-	    get_peer_ipaddr(ssh_packet_get_connection_in(ssh)),
-	    ssh_get_remote_port(ssh));
-=======
 	    ssh_remote_ipaddr(ssh),
 	    ssh_remote_port(ssh),
 	    s->self);
->>>>>>> 1.281
 
 #ifdef GSSAPI
 	if (options.gss_authentication) {
@@ -803,7 +792,6 @@ do_exec(Session *s, const char *command)
 void
 do_login(Session *s, const char *command)
 {
-	struct ssh *ssh = active_state;	/* XXX */
 	socklen_t fromlen;
 	struct sockaddr_storage from;
 	struct passwd *pw = s->pw;
@@ -977,7 +965,6 @@ read_environment_file(char ***env, u_int *envsize,
 static char **
 do_setup_env(Session *s, const char *shell)
 {
-	struct ssh *ssh = active_state; /* XXX */
 	char buf[256];
 	u_int i, envsize;
 	char **env, *laddr;
@@ -1040,24 +1027,14 @@ do_setup_env(Session *s, const char *shell)
 
 	/* SSH_CLIENT deprecated */
 	snprintf(buf, sizeof buf, "%.50s %d %d",
-<<<<<<< session.c
-	    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh),
-	    ssh_get_local_port(ssh));
-=======
 	    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
 	    ssh_local_port(ssh));
->>>>>>> 1.281
 	child_set_env(&env, &envsize, "SSH_CLIENT", buf);
 
 	laddr = get_local_ipaddr(ssh_packet_get_connection_in(ssh));
 	snprintf(buf, sizeof buf, "%.50s %d %.50s %d",
-<<<<<<< session.c
-	    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh), laddr,
-	    ssh_get_local_port(ssh));
-=======
 	    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
 	    laddr, ssh_local_port(ssh));
->>>>>>> 1.281
 	free(laddr);
 	child_set_env(&env, &envsize, "SSH_CONNECTION", buf);
 

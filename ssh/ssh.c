@@ -518,11 +518,7 @@ set_addrinfo_port(struct addrinfo *addrs, int port)
 int
 main(int ac, char **av)
 {
-<<<<<<< ssh.c
-	struct ssh *ssh;
-=======
 	struct ssh *ssh = NULL;
->>>>>>> 1.437
 	int i, r, opt, exit_status, use_syslog, config_test = 0;
 	char *p, *cp, *line, *argv0, buf[PATH_MAX], *host_arg, *logfile;
 	char thishost[NI_MAXHOST], shorthost[NI_MAXHOST], portstr[NI_MAXSERV];
@@ -1322,11 +1318,7 @@ main(int ac, char **av)
 
 	if (ssh_packet_connection_is_on_socket(ssh)) {
 		verbose("Authenticated to %s ([%s]:%d).", host,
-<<<<<<< ssh.c
-		    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh));
-=======
 		    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh));
->>>>>>> 1.437
 	} else {
 		verbose("Authenticated to %s (via proxy).", host);
 	}

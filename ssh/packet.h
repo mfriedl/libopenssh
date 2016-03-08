@@ -42,11 +42,7 @@ struct ssh {
 	/* Key exchange */
 	struct kex *kex;
 
-<<<<<<< packet.h
-	/* Cached remote ip address and port*/
-=======
 	/* cached local and remote ip addresses and ports */
->>>>>>> 1.71
 	char *remote_ipaddr;
 	int remote_port;
 	char *local_ipaddr;
