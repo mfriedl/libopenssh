@@ -1667,7 +1667,7 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 		} else if (need_rekeying) {
 			/* manual rekey request */
 			debug("need rekeying");
-			if ((r = kex_start_rekex(active_state)) != 0)
+			if ((r = kex_start_rekex(ssh)) != 0)
 				fatal("%s: kex_start_rekex: %s", __func__,
 				    ssh_err(r));
 			need_rekeying = 0;
@@ -1707,7 +1707,7 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 			break;
 
 		/* Do channel operations unless rekeying in progress. */
-		if (!ssh_packet_is_rekeying(active_state))
+		if (!ssh_packet_is_rekeying(ssh))
 			channel_after_select(readset, writeset);
 
 		/* Buffer input from the connection.  */
