@@ -354,20 +354,13 @@ do_authenticated1(struct ssh *ssh)
 			} else {
 				s->screen = 0;
 			}
-<<<<<<< session.c
 			if ((r = sshpkt_get_end(ssh)) != 0)
-				fatal("%s: %s", __func__, ssh_err(r));
-			success = session_setup_x11fwd(s);
-=======
-			packet_check_eom();
-			if (xauth_valid_string(s->auth_proto) &&
+				error("%s: X11 %s", __func__, ssh_err(r));
+			else if (xauth_valid_string(s->auth_proto) &&
 			    xauth_valid_string(s->auth_data))
 				success = session_setup_x11fwd(s);
-			else {
-				success = 0;
+			else
 				error("Invalid X11 forwarding data");
-			}
->>>>>>> 1.282
 			if (!success) {
 				free(s->auth_proto);
 				free(s->auth_data);

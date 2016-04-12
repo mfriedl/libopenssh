@@ -1176,12 +1176,6 @@ sign_and_send_pubkey(struct ssh *ssh, struct identity *id)
 		} else {
 			debug("%s: no separate private key for certificate "
 			    "\"%s\"", __func__, id->filename);
-<<<<<<< sshconnect2.c
-			free(blob);
-			sshbuf_free(b);
-			return 0;
-=======
->>>>>>> 1.240
 		}
 	}
 
