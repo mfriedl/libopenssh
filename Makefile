@@ -1,9 +1,9 @@
 #	$OpenBSD:$
 
 .if defined(LEAKMALLOC)
-SUBDIR=	leakmalloc ssh unittests
+SUBDIR=	leakmalloc sshunittests
 .else
-SUBDIR=	ssh unittests regress
+SUBDIR=	ssh regress
 .endif
 
 .include <bsd.subdir.mk>
