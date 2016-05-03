@@ -2009,12 +2009,8 @@ parse_server_config(ServerOptions *options, const char *filename,
 
 	debug2("%s: config %s len %zu", __func__, filename, sshbuf_len(conf));
 
-<<<<<<< servconf.c
-	obuf = cbuf = xstrdup((const char *)sshbuf_ptr(conf));
-=======
 	if ((obuf = cbuf = sshbuf_dup_string(conf)) == NULL)
 		fatal("%s: sshbuf_dup_string failed", __func__);
->>>>>>> 1.287
 	active = connectinfo ? 0 : 1;
 	linenum = 1;
 	while ((cp = strsep(&cbuf, "\n")) != NULL) {

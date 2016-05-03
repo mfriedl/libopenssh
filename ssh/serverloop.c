@@ -1251,16 +1251,21 @@ server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 	if (strcmp(rtype, "tcpip-forward") == 0) {
 		struct authctxt *authctxt = ssh->authctxt;
 		struct Forward fwd;
+		u_int listen_port;
 
 		if (authctxt->pw == NULL || !authctxt->valid)
 			fatal("server_input_global_request: no/invalid user");
 		memset(&fwd, 0, sizeof(fwd));
 		if ((r = sshpkt_get_cstring(ssh, &fwd.listen_host, NULL)) != 0 ||
-		    (r = sshpkt_get_u32(ssh, &fwd.listen_port)) != 0)
+		    (r = sshpkt_get_u32(ssh, &listen_port)) != 0)
 			goto out;
 		debug("server_input_global_request: tcpip-forward listen %s port %d",
-		    fwd.listen_host, fwd.listen_port);
-
+		    fwd.listen_host, listen_port);
+		if (listen_port > INT_MAX) {
+			r = SSH_ERR_INVALID_FORMAT;
+			goto out;
+		}
+		fwd.listen_port = (int)listen_port;
 		/* check permissions */
 		if ((options.allow_tcp_forwarding & FORWARD_REMOTE) == 0 ||
 		    no_port_forwarding_flag ||
@@ -1283,14 +1288,19 @@ server_input_global_request(int type, u_int32_t seq, struct ssh *ssh)
 			fatal("%s: sshbuf_put_u32: %s", __func__, ssh_err(r));
 	} else if (strcmp(rtype, "cancel-tcpip-forward") == 0) {
 		struct Forward fwd;
+		u_int listen_port;
 
 		memset(&fwd, 0, sizeof(fwd));
 		if ((r = sshpkt_get_cstring(ssh, &fwd.listen_host, NULL)) != 0 ||
-		    (r = sshpkt_get_u32(ssh, &fwd.listen_port)) != 0)
+		    (r = sshpkt_get_u32(ssh, &listen_port)) != 0)
 			goto out;
 		debug("%s: cancel-tcpip-forward addr %s port %d", __func__,
 		    fwd.listen_host, fwd.listen_port);
-
+		if (listen_port > INT_MAX) {
+			r = SSH_ERR_INVALID_FORMAT;
+			goto out;
+		}
+		fwd.listen_port = (int)listen_port;
 		success = channel_cancel_rport_listener(&fwd);
 		free(fwd.listen_host);
 	} else if (strcmp(rtype, "streamlocal-forward@openssh.com") == 0) {

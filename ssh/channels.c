@@ -3606,14 +3606,20 @@ channel_input_port_forward_request(struct ssh *ssh, int is_root,
 {
 	int r, success = 0;
 	struct Forward fwd;
+	u_int listen_port, connect_port;
 
 	/* Get arguments from the packet. */
 	memset(&fwd, 0, sizeof(fwd));
-	if ((r = sshpkt_get_u32(ssh, &fwd.listen_port)) != 0 ||
+	if ((r = sshpkt_get_u32(ssh, &listen_port)) != 0 ||
 	    (r = sshpkt_get_cstring(ssh, &fwd.connect_host, NULL)) != 0 ||
-	    (r = sshpkt_get_u32(ssh, &fwd.connect_port)) != 0)
+	    (r = sshpkt_get_u32(ssh, &connect_port)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
-
+	if (listen_port > INT_MAX || connect_port > INT_MAX) {
+		ssh_packet_disconnect(ssh,
+		    "Invalid port number in forward request");
+	}
+	fwd.listen_port = (int)listen_port;
+	fwd.connect_port = (int)connect_port;
 	/*
 	 * Check that an unprivileged user is not trying to forward a
 	 * privileged port.

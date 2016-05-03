@@ -39,7 +39,7 @@ CDIAGFLAGS+=	-Wno-unused-parameter # Not clean for this yet
 #CDIAGFLAGS+=	-Wcast-qual # XXX not clean
 #CDIAGFLAGS+=	-Wcast-align # XXX can't be clean with sockaddr casts?
 
-#CDIAGFLAGS+=	-Werror
+CDIAGFLAGS+=	-Werror
 #DEBUG=-g
 
 WARNINGS=yes

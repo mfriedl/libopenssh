@@ -1030,7 +1030,6 @@ mm_answer_keyallowed(int sock, struct sshbuf *m)
 static int
 monitor_valid_userblob(u_char *data, u_int datalen)
 {
-<<<<<<< monitor.c
 	struct sshbuf *b;
 	u_char *p, c;
 	const u_char *cp;
@@ -1044,20 +1043,6 @@ monitor_valid_userblob(u_char *data, u_int datalen)
 	if (active_state->compat & SSH_OLD_SESSIONID) {
 		cp = sshbuf_ptr(b);
 		len = sshbuf_len(b);
-=======
-	Buffer b;
-	u_char *p;
-	char *userstyle, *cp;
-	u_int len;
-	int fail = 0;
-
-	buffer_init(&b);
-	buffer_append(&b, data, datalen);
-
-	if (datafellows & SSH_OLD_SESSIONID) {
-		p = buffer_ptr(&b);
-		len = buffer_len(&b);
->>>>>>> 1.160
 		if ((session_id2 == NULL) ||
 		    (len < session_id2_len) ||
 		    (timingsafe_bcmp(cp, session_id2, session_id2_len) != 0))
@@ -1077,61 +1062,34 @@ monitor_valid_userblob(u_char *data, u_int datalen)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (c != SSH2_MSG_USERAUTH_REQUEST)
 		fail++;
-<<<<<<< monitor.c
-=======
-	cp = buffer_get_cstring(&b, NULL);
->>>>>>> 1.160
 	xasprintf(&userstyle, "%s%s%s", authctxt->user,
 	    authctxt->style ? ":" : "",
 	    authctxt->style ? authctxt->style : "");
-<<<<<<< monitor.c
 	if ((r = sshbuf_get_cstring(b, &username, NULL)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (strcmp(userstyle, username) != 0) {
 		logit("wrong user name sent to monitor: expected %s != %.100s",
 		    userstyle, username);
-=======
-	if (strcmp(userstyle, cp) != 0) {
-		logit("wrong user name passed to monitor: "
-		    "expected %s != %.100s", userstyle, cp);
->>>>>>> 1.160
 		fail++;
 	}
 	free(username);
 	free(userstyle);
-<<<<<<< monitor.c
 	if ((r = sshbuf_skip_string(b)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (active_state->compat & SSH_BUG_PKAUTH) {
 		if ((r = sshbuf_get_u8(b, &c)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		if (!c)
-=======
-	free(cp);
-	buffer_skip_string(&b);
-	if (datafellows & SSH_BUG_PKAUTH) {
-		if (!buffer_get_char(&b))
->>>>>>> 1.160
 			fail++;
 	} else {
-<<<<<<< monitor.c
 		if ((r = sshbuf_get_cstring(b, &methodname, NULL)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		if (strcmp("publickey", methodname) != 0)
-=======
-		cp = buffer_get_cstring(&b, NULL);
-		if (strcmp("publickey", cp) != 0)
->>>>>>> 1.160
 			fail++;
-<<<<<<< monitor.c
 		free(methodname);
 		if ((r = sshbuf_get_u8(b, &c)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		if (!c)
-=======
-		free(cp);
-		if (!buffer_get_char(&b))
->>>>>>> 1.160
 			fail++;
 		if ((r = sshbuf_skip_string(b)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));

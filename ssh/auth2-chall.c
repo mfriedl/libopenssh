@@ -76,16 +76,10 @@ kbdint_alloc(const char *devs)
 				fatal("%s: buffer error: %s",
 				    __func__, ssh_err(r));
 		}
-<<<<<<< auth2-chall.c
-		if ((r = sshbuf_put_u8(b, 0)) != 0)
-			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 		kbdintctxt->devices = xstrdup((const char *)sshbuf_ptr(b));
-		sshbuf_free(b);
-=======
-		if ((kbdintctxt->devices = sshbuf_dup_string(&b)) == NULL)
+		if ((kbdintctxt->devices = sshbuf_dup_string(b)) == NULL)
 			fatal("%s: sshbuf_dup_string failed", __func__);
-		buffer_free(&b);
->>>>>>> 1.44
+		sshbuf_free(b);
 	} else {
 		kbdintctxt->devices = xstrdup(devs);
 	}

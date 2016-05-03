@@ -389,25 +389,13 @@ authmethods_get(struct authctxt *authctxt)
 		if (!auth2_method_allowed(authctxt, authmethods[i]->name,
 		    NULL))
 			continue;
-<<<<<<< auth2.c
 		if ((r = sshbuf_putf(b, "%s%s", sshbuf_len(b) ? "," : "",
 		    authmethods[i]->name)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
-	if ((r = sshbuf_put_u8(b, 0)) != 0)
-		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	list = xstrdup((const char *)sshbuf_ptr(b));
-	sshbuf_free(b);
-=======
-		if (buffer_len(&b) > 0)
-			buffer_append(&b, ",", 1);
-		buffer_append(&b, authmethods[i]->name,
-		    strlen(authmethods[i]->name));
-	}
-	if ((list = sshbuf_dup_string(&b)) == NULL)
+	if ((list = sshbuf_dup_string(b)) == NULL)
 		fatal("%s: sshbuf_dup_string failed", __func__);
-	buffer_free(&b);
->>>>>>> 1.136
+	sshbuf_free(b);
 	return list;
 }
 

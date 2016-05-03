@@ -821,16 +821,9 @@ list_hostkey_types(void)
 			break;
 		}
 	}
-<<<<<<< sshd.c
-	if ((r = sshbuf_put_u8(b, 0)) != 0)
-		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	ret = xstrdup((const char *)sshbuf_ptr(b));
-	sshbuf_free(b);
-=======
-	if ((ret = sshbuf_dup_string(&b)) == NULL)
+	if ((ret = sshbuf_dup_string(b)) == NULL)
 		fatal("%s: sshbuf_dup_string failed", __func__);
-	buffer_free(&b);
->>>>>>> 1.469
+	sshbuf_free(b);
 	debug("list_hostkey_types: %s", ret);
 	return ret;
 }
@@ -1035,18 +1028,10 @@ send_rexec_state(int fd, struct sshbuf *conf)
 	 *	bignum	p			"
 	 *	bignum	q			"
 	 */
-<<<<<<< sshd.c
-	if ((m = sshbuf_new()) == NULL)
-		fatal("%s: sshbuf_new failed", __func__);
-	/* servconf.c:load_server_config() ensures a \0 at the end of cfg */
-	if ((r = sshbuf_put_cstring(m, (const char *)sshbuf_ptr(conf))) != 0)
-		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-=======
 	if ((m = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
 	if ((r = sshbuf_put_stringb(m, conf)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
->>>>>>> 1.469
 
 #ifdef WITH_SSH1
 	if (sensitive_data.server_key != NULL &&
@@ -1067,13 +1052,8 @@ send_rexec_state(int fd, struct sshbuf *conf)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	} else
 #endif
-<<<<<<< sshd.c
-	if ((r = sshbuf_put_u32(m, 0)) != 0)
-		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-=======
 		if ((r = sshbuf_put_u32(m, 1)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
->>>>>>> 1.469
 
 	if (ssh_msg_send(fd, 0, m) == -1)
 		fatal("%s: ssh_msg_send failed", __func__);
@@ -1104,17 +1084,10 @@ recv_rexec_state(int fd, struct sshbuf *conf)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (ver != 0)
 		fatal("%s: rexec version mismatch", __func__);
-<<<<<<< sshd.c
 	if ((r = sshbuf_get_cstring(m, &cp, &len)) != 0 ||
-	    (conf != NULL && (r = sshbuf_put(conf, cp, len + 1)) != 0) ||
+	    (conf != NULL && (r = sshbuf_put(conf, cp, len)) != 0) ||
 	    (r = sshbuf_get_u32(m, &key_follows)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-=======
-
-	cp = buffer_get_string(&m, &len);
-	if (conf != NULL)
-		buffer_append(conf, cp, len);
->>>>>>> 1.469
 	free(cp);
 
 	if (key_follows) {

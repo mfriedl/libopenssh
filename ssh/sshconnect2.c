@@ -193,22 +193,14 @@ ssh_kex2(struct ssh *ssh, u_short port)
 	if ((r = kex_setup(ssh, myproposal)) != 0)
 		fatal("kex_setup: %s", ssh_err(r));
 #ifdef WITH_OPENSSL
-<<<<<<< sshconnect2.c
 	ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
 	ssh->kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
+	ssh->kex->kex[KEX_DH_GRP14_SHA256] = kexdh_client;
+	ssh->kex->kex[KEX_DH_GRP16_SHA512] = kexdh_client;
+	ssh->kex->kex[KEX_DH_GRP18_SHA512] = kexdh_client;
 	ssh->kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
 	ssh->kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
 	ssh->kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
-=======
-	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
-	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
-	kex->kex[KEX_DH_GRP14_SHA256] = kexdh_client;
-	kex->kex[KEX_DH_GRP16_SHA512] = kexdh_client;
-	kex->kex[KEX_DH_GRP18_SHA512] = kexdh_client;
-	kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
-	kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
-	kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
->>>>>>> 1.243
 #endif
 	ssh->kex->kex[KEX_C25519_SHA256] = kexc25519_client;
 	ssh->kex->client_version_string=client_version_string;
@@ -2030,15 +2022,8 @@ authmethods_get(void)
 				    __func__, ssh_err(r));
 		}
 	}
-<<<<<<< sshconnect2.c
-	if ((r = sshbuf_put_u8(b, 0)) != 0)
-		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	list = xstrdup((const char *)sshbuf_ptr(b));
-	sshbuf_free(b);
-=======
-	if ((list = sshbuf_dup_string(&b)) == NULL)
+	if ((list = sshbuf_dup_string(b)) == NULL)
 		fatal("%s: sshbuf_dup_string failed", __func__);
-	buffer_free(&b);
->>>>>>> 1.243
+	sshbuf_free(b);
 	return list;
 }
