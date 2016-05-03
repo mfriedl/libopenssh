@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.240 2016/03/14 16:20:54 djm Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.243 2016/05/02 10:26:04 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -193,11 +193,22 @@ ssh_kex2(struct ssh *ssh, u_short port)
 	if ((r = kex_setup(ssh, myproposal)) != 0)
 		fatal("kex_setup: %s", ssh_err(r));
 #ifdef WITH_OPENSSL
+<<<<<<< sshconnect2.c
 	ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
 	ssh->kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
 	ssh->kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
 	ssh->kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
 	ssh->kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
+=======
+	kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
+	kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
+	kex->kex[KEX_DH_GRP14_SHA256] = kexdh_client;
+	kex->kex[KEX_DH_GRP16_SHA512] = kexdh_client;
+	kex->kex[KEX_DH_GRP18_SHA512] = kexdh_client;
+	kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
+	kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
+	kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
+>>>>>>> 1.243
 #endif
 	ssh->kex->kex[KEX_C25519_SHA256] = kexc25519_client;
 	ssh->kex->client_version_string=client_version_string;
@@ -1156,8 +1167,8 @@ sign_and_send_pubkey(struct ssh *ssh, struct identity *id)
 	/*
 	 * If the key is an certificate, try to find a matching private key
 	 * and use it to complete the signature.
-	 * If no such private key exists, return failure and continue with
-	 * other methods of authentication.
+	 * If no such private key exists, fall back to trying the certificate
+	 * key itself in case it has a private half already loaded.
 	 */
 	if (sshkey_is_cert(id->key)) {
 		matched = 0;
@@ -2019,9 +2030,15 @@ authmethods_get(void)
 				    __func__, ssh_err(r));
 		}
 	}
+<<<<<<< sshconnect2.c
 	if ((r = sshbuf_put_u8(b, 0)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	list = xstrdup((const char *)sshbuf_ptr(b));
 	sshbuf_free(b);
+=======
+	if ((list = sshbuf_dup_string(&b)) == NULL)
+		fatal("%s: sshbuf_dup_string failed", __func__);
+	buffer_free(&b);
+>>>>>>> 1.243
 	return list;
 }

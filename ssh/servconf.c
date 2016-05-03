@@ -1,5 +1,5 @@
 
-/* $OpenBSD: servconf.c,v 1.286 2016/03/07 19:02:43 djm Exp $ */
+/* $OpenBSD: servconf.c,v 1.287 2016/05/02 08:49:03 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -2009,7 +2009,12 @@ parse_server_config(ServerOptions *options, const char *filename,
 
 	debug2("%s: config %s len %zu", __func__, filename, sshbuf_len(conf));
 
+<<<<<<< servconf.c
 	obuf = cbuf = xstrdup((const char *)sshbuf_ptr(conf));
+=======
+	if ((obuf = cbuf = sshbuf_dup_string(conf)) == NULL)
+		fatal("%s: sshbuf_dup_string failed", __func__);
+>>>>>>> 1.287
 	active = connectinfo ? 0 : 1;
 	linenum = 1;
 	while ((cp = strsep(&cbuf, "\n")) != NULL) {
