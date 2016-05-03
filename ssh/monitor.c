@@ -1,4 +1,4 @@
-/* $OpenBSD: monitor.c,v 1.156 2016/01/14 16:17:39 markus Exp $ */
+/* $OpenBSD: monitor.c,v 1.160 2016/05/02 10:26:04 djm Exp $ */
 /*
  * Copyright 2002 Niels Provos <provos@citi.umich.edu>
  * Copyright 2002 Markus Friedl <markus@openbsd.org>
@@ -37,6 +37,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <paths.h>
 #include <poll.h>
 #include <pwd.h>
@@ -597,10 +598,9 @@ mm_answer_sign(int sock, struct sshbuf *m)
 	struct ssh *ssh = active_state;		/* XXX */
 	extern int auth_sock;			/* XXX move to state struct? */
 	struct sshkey *key;
-	struct sshbuf *sigbuf;
-	u_char *p;
-	u_char *signature;
-	char *alg;
+	struct sshbuf *sigbuf = NULL;
+	u_char *p = NULL, *signature = NULL;
+	char *alg = NULL;
 	size_t datlen, siglen, alglen;
 	int r, is_proof = 0;
 	u_int keyid;
@@ -612,6 +612,8 @@ mm_answer_sign(int sock, struct sshbuf *m)
 	    (r = sshbuf_get_string(m, &p, &datlen)) != 0 ||
 	    (r = sshbuf_get_cstring(m, &alg, &alglen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
+	if (keyid > INT_MAX)
+		fatal("%s: invalid key ID", __func__);
 
 	/*
 	 * Supported KEX types use SHA1 (20 bytes), SHA256 (32 bytes),
@@ -678,6 +680,7 @@ mm_answer_sign(int sock, struct sshbuf *m)
 	if ((r = sshbuf_put_string(m, signature, siglen)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 
+	free(alg);
 	free(p);
 	free(signature);
 
@@ -1234,7 +1237,7 @@ mm_answer_keyverify(int sock, struct sshbuf *m)
 static void
 mm_record_login(Session *s, struct passwd *pw)
 {
-	struct ssh *ssh = active_state;			/* XXX */
+	struct ssh *ssh = active_state;	/* XXX */
 	socklen_t fromlen;
 	struct sockaddr_storage from;
 
@@ -1256,7 +1259,7 @@ mm_record_login(Session *s, struct passwd *pw)
 	}
 	/* Record that there was a login on that tty from the remote host. */
 	record_login(s->pid, s->tty, pw->pw_name, pw->pw_uid,
-	    get_remote_name_or_ip(utmp_len, options.use_dns),
+	    session_get_remote_name_or_ip(ssh, utmp_len, options.use_dns),
 	    (struct sockaddr *)&from, fromlen);
 }
 
@@ -1591,6 +1594,9 @@ monitor_apply_keystate(struct monitor *pmonitor)
 #ifdef WITH_OPENSSL
 		kex->kex[KEX_DH_GRP1_SHA1] = kexdh_server;
 		kex->kex[KEX_DH_GRP14_SHA1] = kexdh_server;
+		kex->kex[KEX_DH_GRP14_SHA256] = kexdh_server;
+		kex->kex[KEX_DH_GRP16_SHA512] = kexdh_server;
+		kex->kex[KEX_DH_GRP18_SHA512] = kexdh_server;
 		kex->kex[KEX_DH_GEX_SHA1] = kexgex_server;
 		kex->kex[KEX_DH_GEX_SHA256] = kexgex_server;
 		kex->kex[KEX_ECDH_SHA2] = kexecdh_server;

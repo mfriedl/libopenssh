@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keyscan.c,v 1.104 2015/11/08 23:24:03 jmc Exp $ */
+/* $OpenBSD: ssh-keyscan.c,v 1.106 2016/05/02 10:26:04 djm Exp $ */
 /*
  * Copyright 1995, 1996 by David Mazieres <dm@lcs.mit.edu>.
  *
@@ -284,6 +284,9 @@ keygrab_ssh2(con *c)
 #ifdef WITH_OPENSSL
 	c->c_ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
 	c->c_ssh->kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
+	c->c_ssh->kex->kex[KEX_DH_GRP14_SHA256] = kexdh_client;
+	c->c_ssh->kex->kex[KEX_DH_GRP16_SHA512] = kexdh_client;
+	c->c_ssh->kex->kex[KEX_DH_GRP18_SHA512] = kexdh_client;
 	c->c_ssh->kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
 	c->c_ssh->kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
 	c->c_ssh->kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
@@ -676,6 +679,7 @@ main(int argc, char **argv)
 	extern int optind;
 	extern char *optarg;
 
+	ssh_malloc_init();	/* must be called before any mallocs */
 	TAILQ_INIT(&tq);
 
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */

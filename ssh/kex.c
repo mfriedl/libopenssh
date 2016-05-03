@@ -1,4 +1,4 @@
-/* $OpenBSD: kex.c,v 1.116 2016/01/14 16:17:39 markus Exp $ */
+/* $OpenBSD: kex.c,v 1.118 2016/05/02 10:26:04 djm Exp $ */
 /*
  * Copyright (c) 2000, 2001 Markus Friedl.  All rights reserved.
  *
@@ -77,7 +77,10 @@ struct kexalg {
 static const struct kexalg kexalgs[] = {
 #ifdef WITH_OPENSSL
 	{ KEX_DH1, KEX_DH_GRP1_SHA1, 0, SSH_DIGEST_SHA1 },
-	{ KEX_DH14, KEX_DH_GRP14_SHA1, 0, SSH_DIGEST_SHA1 },
+	{ KEX_DH14_SHA1, KEX_DH_GRP14_SHA1, 0, SSH_DIGEST_SHA1 },
+	{ KEX_DH14_SHA256, KEX_DH_GRP14_SHA256, 0, SSH_DIGEST_SHA256 },
+	{ KEX_DH16_SHA512, KEX_DH_GRP16_SHA512, 0, SSH_DIGEST_SHA512 },
+	{ KEX_DH18_SHA512, KEX_DH_GRP18_SHA512, 0, SSH_DIGEST_SHA512 },
 	{ KEX_DHGEX_SHA1, KEX_DH_GEX_SHA1, 0, SSH_DIGEST_SHA1 },
 	{ KEX_DHGEX_SHA256, KEX_DH_GEX_SHA256, 0, SSH_DIGEST_SHA256 },
 	{ KEX_ECDH_SHA2_NISTP256, KEX_ECDH_SHA2,
@@ -579,6 +582,25 @@ kex_setup(struct ssh *ssh, char *proposal[PROPOSAL_MAX])
 		return r;
 	}
 	return 0;
+}
+
+/*
+ * Request key re-exchange, returns 0 on success or a ssherr.h error
+ * code otherwise. Must not be called if KEX is incomplete or in-progress.
+ */
+int
+kex_start_rekex(struct ssh *ssh)
+{
+	if (ssh->kex == NULL) {
+		error("%s: no kex", __func__);
+		return SSH_ERR_INTERNAL_ERROR;
+	}
+	if (ssh->kex->done == 0) {
+		error("%s: requested twice", __func__);
+		return SSH_ERR_INTERNAL_ERROR;
+	}
+	ssh->kex->done = 0;
+	return kex_send_kexinit(ssh);
 }
 
 static int

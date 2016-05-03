@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.237 2016/01/14 22:56:56 markus Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.243 2016/05/02 10:26:04 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -195,6 +195,9 @@ ssh_kex2(struct ssh *ssh, u_short port)
 #ifdef WITH_OPENSSL
 	ssh->kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
 	ssh->kex->kex[KEX_DH_GRP14_SHA1] = kexdh_client;
+	ssh->kex->kex[KEX_DH_GRP14_SHA256] = kexdh_client;
+	ssh->kex->kex[KEX_DH_GRP16_SHA512] = kexdh_client;
+	ssh->kex->kex[KEX_DH_GRP18_SHA512] = kexdh_client;
 	ssh->kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;
 	ssh->kex->kex[KEX_DH_GEX_SHA256] = kexgex_client;
 	ssh->kex->kex[KEX_ECDH_SHA2] = kexecdh_client;
@@ -1094,7 +1097,7 @@ identity_sign(struct ssh *ssh, struct identity *id, u_char **sigp, size_t *lenp,
 		    ssh->compat));
 	/* load the private key from the file */
 	if ((prv = load_identity_file(id)) == NULL)
-		return (-1); /* XXX return decent error code */
+		return SSH_ERR_KEY_NOT_FOUND;
 	ret = sshkey_sign(prv, sigp, lenp, data, datalen, alg, ssh->compat);
 	sshkey_free(prv);
 	return (ret);
@@ -1156,8 +1159,8 @@ sign_and_send_pubkey(struct ssh *ssh, struct identity *id)
 	/*
 	 * If the key is an certificate, try to find a matching private key
 	 * and use it to complete the signature.
-	 * If no such private key exists, return failure and continue with
-	 * other methods of authentication.
+	 * If no such private key exists, fall back to trying the certificate
+	 * key itself in case it has a private half already loaded.
 	 */
 	if (sshkey_is_cert(id->key)) {
 		matched = 0;
@@ -1174,19 +1177,17 @@ sign_and_send_pubkey(struct ssh *ssh, struct identity *id)
 			    "certificate", __func__, id->filename,
 			    id->agent_fd != -1 ? " from agent" : "");
 		} else {
-			/* XXX maybe verbose/error? */
-			debug("%s: no private key for certificate "
+			debug("%s: no separate private key for certificate "
 			    "\"%s\"", __func__, id->filename);
-			free(blob);
-			sshbuf_free(b);
-			return 0;
 		}
 	}
 
 	/* generate signature */
-	if ((ret = identity_sign(ssh, id, &signature, &slen,
-	    sshbuf_ptr(b), sshbuf_len(b))) != 0) {
-		error("%s: signing failed: %s", __func__, ssh_err(ret));
+	ret = identity_sign(ssh, id, &signature, &slen,
+	    sshbuf_ptr(b), sshbuf_len(b));
+	if (ret != 0) {
+		if (ret != SSH_ERR_KEY_NOT_FOUND)
+			error("%s: signing failed: %s", __func__, ssh_err(ret));
 		free(blob);
 		sshbuf_free(b);
 		return 0;
@@ -2021,9 +2022,8 @@ authmethods_get(void)
 				    __func__, ssh_err(r));
 		}
 	}
-	if ((r = sshbuf_put_u8(b, 0)) != 0)
-		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	list = xstrdup((const char *)sshbuf_ptr(b));
+	if ((list = sshbuf_dup_string(b)) == NULL)
+		fatal("%s: sshbuf_dup_string failed", __func__);
 	sshbuf_free(b);
 	return list;
 }

@@ -1,5 +1,5 @@
 
-/* $OpenBSD: servconf.c,v 1.284 2016/01/29 02:54:45 dtucker Exp $ */
+/* $OpenBSD: servconf.c,v 1.287 2016/05/02 08:49:03 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -340,9 +340,9 @@ fill_default_server_options(ServerOptions *options)
 
 	assemble_algorithms(options);
 
-	/* Turn privilege separation on by default */
+	/* Turn privilege separation and sandboxing on by default */
 	if (use_privsep == -1)
-		use_privsep = PRIVSEP_NOSANDBOX;
+		use_privsep = PRIVSEP_ON;
 
 #define CLEAR_ON_NONE(v) \
 	do { \
@@ -661,15 +661,15 @@ process_queued_listen_addrs(ServerOptions *options)
 struct connection_info *
 get_connection_info(int populate, int use_dns)
 {
-	struct ssh *ssh = active_state;		/* XXX */
+	struct ssh *ssh = active_state; /* XXX */
 	static struct connection_info ci;
 
 	if (!populate)
 		return &ci;
-	ci.host = get_canonical_hostname(use_dns);
+	ci.host = auth_get_canonical_hostname(ssh, use_dns);
 	ci.address = ssh_remote_ipaddr(ssh);
-	ci.laddress = get_local_ipaddr(ssh_packet_get_connection_in(ssh));
-	ci.lport = ssh_get_local_port(ssh);
+	ci.laddress = ssh_local_ipaddr(ssh);
+	ci.lport = ssh_local_port(ssh);
 	return &ci;
 }
 
@@ -2009,7 +2009,8 @@ parse_server_config(ServerOptions *options, const char *filename,
 
 	debug2("%s: config %s len %zu", __func__, filename, sshbuf_len(conf));
 
-	obuf = cbuf = xstrdup((const char *)sshbuf_ptr(conf));
+	if ((obuf = cbuf = sshbuf_dup_string(conf)) == NULL)
+		fatal("%s: sshbuf_dup_string failed", __func__);
 	active = connectinfo ? 0 : 1;
 	linenum = 1;
 	while ((cp = strsep(&cbuf, "\n")) != NULL) {

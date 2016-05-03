@@ -1,4 +1,4 @@
-/* $OpenBSD: channels.c,v 1.348 2015/10/15 23:51:40 djm Exp $ */
+/* $OpenBSD: channels.c,v 1.350 2016/03/07 19:02:43 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1468,7 +1468,7 @@ port_open_helper(Channel *c, char *rtype)
 	int r;
 	char buf[1024];
 	char *local_ipaddr = get_local_ipaddr(c->sock);
-	int local_port = c->sock == -1 ? 65536 : get_sock_port(c->sock, 1);
+	int local_port = c->sock == -1 ? 65536 : get_local_port(c->sock);
 	char *remote_ipaddr = get_peer_ipaddr(c->sock);
 	int remote_port = get_peer_port(c->sock);
 
@@ -1974,13 +1974,13 @@ read_mux(Channel *c, u_int need)
 	if (sshbuf_len(c->input) < need) {
 		rlen = need - sshbuf_len(c->input);
 		len = read(c->rfd, buf, MIN(rlen, CHAN_RBUF));
+		if (len < 0 && (errno == EINTR || errno == EAGAIN))
+			return sshbuf_len(c->input);
 		if (len <= 0) {
-			if (errno != EINTR && errno != EAGAIN) {
-				debug2("channel %u: ctl read<=0 rfd %d len %d",
-				    c->self, c->rfd, len);
-				chan_read_failed(c);
-				return 0;
-			}
+			debug2("channel %d: ctl read<=0 rfd %d len %d",
+			    c->self, c->rfd, len);
+			chan_read_failed(c);
+			return 0;
 		} else if ((r = sshbuf_put(c->input, buf, len)) != 0)
 			CHANNEL_BUFFER_ERROR(c, r);
 	}
@@ -3074,7 +3074,7 @@ channel_setup_fwd_listener_tcpip(struct ssh *ssh, int type, struct Forward *fwd,
 		if (type == SSH_CHANNEL_RPORT_LISTENER && fwd->listen_port == 0 &&
 		    allocated_listen_port != NULL &&
 		    *allocated_listen_port == 0) {
-			*allocated_listen_port = get_sock_port(sock, 1);
+			*allocated_listen_port = get_local_port(sock);
 			debug("Allocated listen port %d",
 			    *allocated_listen_port);
 		}
@@ -3606,14 +3606,20 @@ channel_input_port_forward_request(struct ssh *ssh, int is_root,
 {
 	int r, success = 0;
 	struct Forward fwd;
+	u_int listen_port, connect_port;
 
 	/* Get arguments from the packet. */
 	memset(&fwd, 0, sizeof(fwd));
-	if ((r = sshpkt_get_u32(ssh, &fwd.listen_port)) != 0 ||
+	if ((r = sshpkt_get_u32(ssh, &listen_port)) != 0 ||
 	    (r = sshpkt_get_cstring(ssh, &fwd.connect_host, NULL)) != 0 ||
-	    (r = sshpkt_get_u32(ssh, &fwd.connect_port)) != 0)
+	    (r = sshpkt_get_u32(ssh, &connect_port)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
-
+	if (listen_port > INT_MAX || connect_port > INT_MAX) {
+		ssh_packet_disconnect(ssh,
+		    "Invalid port number in forward request");
+	}
+	fwd.listen_port = (int)listen_port;
+	fwd.connect_port = (int)connect_port;
 	/*
 	 * Check that an unprivileged user is not trying to forward a
 	 * privileged port.

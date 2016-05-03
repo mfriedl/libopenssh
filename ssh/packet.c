@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.226 2016/01/29 05:46:01 djm Exp $ */
+/* $OpenBSD: packet.c,v 1.230 2016/03/07 19:02:43 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -46,6 +46,7 @@
 #include <netinet/ip.h>
 
 #include <errno.h>
+#include <netdb.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -252,6 +253,14 @@ ssh_alloc_session_state(void)
 	return NULL;
 }
 
+/* Returns nonzero if rekeying is in progress */
+int
+ssh_packet_is_rekeying(struct ssh *ssh)
+{
+	return compat20 &&
+	    (ssh->state->rekeying || (ssh->kex != NULL && ssh->kex->done == 0));
+}
+
 /*
  * Sets the descriptors used for communication.  Disables encryption until
  * packet_set_encryption_key is called.
@@ -281,7 +290,7 @@ ssh_packet_set_connection(struct ssh *ssh, int fd_in, int fd_out)
 	    (r = cipher_init(&state->receive_context, none,
 	    (const u_char *)"", 0, NULL, 0, CIPHER_DECRYPT)) != 0) {
 		error("%s: cipher_init failed: %s", __func__, ssh_err(r));
-		free(ssh);
+		free(ssh); /* XXX need ssh_free_session_state? */
 		return NULL;
 	}
 	state->newkeys[MODE_IN] = state->newkeys[MODE_OUT] = NULL;
@@ -363,6 +372,9 @@ ssh_packet_connection_is_on_socket(struct ssh *ssh)
 	struct session_state *state = ssh->state;
 	struct sockaddr_storage from, to;
 	socklen_t fromlen, tolen;
+
+	if (state->connection_in == -1 || state->connection_out == -1)
+		return 0;
 
 	/* filedescriptors in and out are the same, so it's a socket */
 	if (state->connection_in == state->connection_out)
@@ -448,10 +460,14 @@ ssh_remote_ipaddr(struct ssh *ssh)
 	if (ssh->remote_ipaddr == NULL) {
 		if (ssh_packet_connection_is_on_socket(ssh)) {
 			ssh->remote_ipaddr = get_peer_ipaddr(sock);
-			ssh->remote_port = get_sock_port(sock, 0);
+			ssh->remote_port = get_peer_port(sock);
+			ssh->local_ipaddr = get_local_ipaddr(sock);
+			ssh->local_port = get_local_port(sock);
 		} else {
 			ssh->remote_ipaddr = strdup("UNKNOWN");
-			ssh->remote_port = 0;
+			ssh->remote_port = 65535;
+			ssh->local_ipaddr = strdup("UNKNOWN");
+			ssh->local_port = 65535;
 		}
 	}
 	return ssh->remote_ipaddr;
@@ -464,6 +480,27 @@ ssh_remote_port(struct ssh *ssh)
 {
 	(void)ssh_remote_ipaddr(ssh); /* Will lookup and cache. */
 	return ssh->remote_port;
+}
+
+/*
+ * Returns the IP-address of the local host as a string.  The returned
+ * string must not be freed.
+ */
+
+const char *
+ssh_local_ipaddr(struct ssh *ssh)
+{
+	(void)ssh_remote_ipaddr(ssh); /* Will lookup and cache. */
+	return ssh->local_ipaddr;
+}
+
+/* Returns the port number of the local host. */
+
+int
+ssh_local_port(struct ssh *ssh)
+{
+	(void)ssh_remote_ipaddr(ssh); /* Will lookup and cache. */
+	return ssh->local_port;
 }
 
 /* Closes the connection and clears and frees internal data structures. */
@@ -942,8 +979,10 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	if (state->newkeys[mode] != NULL) {
 		debug("set_newkeys: rekeying, input %llu bytes %llu blocks, "
 		   "output %llu bytes %llu blocks",
-		   state->p_read.bytes, state->p_read.blocks,
-		   state->p_send.bytes, state->p_send.blocks);
+		   (unsigned long long)state->p_read.bytes,
+		   (unsigned long long)state->p_read.blocks,
+		   (unsigned long long)state->p_send.bytes,
+		   (unsigned long long)state->p_send.blocks);
 		if ((r = cipher_cleanup(cc)) != 0)
 			return r;
 		enc  = &state->newkeys[mode]->enc;
@@ -1011,8 +1050,53 @@ ssh_set_newkeys(struct ssh *ssh, int mode)
 	if (state->rekey_limit)
 		*max_blocks = MIN(*max_blocks,
 		    state->rekey_limit / enc->block_size);
-	debug("rekey after %llu blocks", *max_blocks);
+	debug("rekey after %llu blocks", (unsigned long long)*max_blocks);
 	return 0;
+}
+
+#define MAX_PACKETS	(1U<<31)
+static int
+ssh_packet_need_rekeying(struct ssh *ssh, u_int outbound_packet_len)
+{
+	struct session_state *state = ssh->state;
+	u_int32_t out_blocks;
+
+	/* XXX client can't cope with rekeying pre-auth */
+	if (!state->after_authentication)
+		return 0;
+
+	/* Haven't keyed yet or KEX in progress. */
+	if (ssh->kex == NULL || ssh_packet_is_rekeying(ssh))
+		return 0;
+
+	/* Peer can't rekey */
+	if (ssh->compat & SSH_BUG_NOREKEY)
+		return 0;
+
+	/*
+	 * Permit one packet in or out per rekey - this allows us to
+	 * make progress when rekey limits are very small.
+	 */
+	if (state->p_send.packets == 0 && state->p_read.packets == 0)
+		return 0;
+
+	/* Time-based rekeying */
+	if (state->rekey_interval != 0 &&
+	    state->rekey_time + state->rekey_interval <= monotime())
+		return 1;
+
+	/* Always rekey when MAX_PACKETS sent in either direction */
+	if (state->p_send.packets > MAX_PACKETS ||
+	    state->p_read.packets > MAX_PACKETS)
+		return 1;
+
+	/* Rekey after (cipher-specific) maxiumum blocks */
+	out_blocks = roundup(outbound_packet_len,
+	    state->newkeys[MODE_OUT]->enc.block_size);
+	return (state->max_blocks_out &&
+	    (state->p_send.blocks + out_blocks > state->max_blocks_out)) ||
+	    (state->max_blocks_in &&
+	    (state->p_read.blocks > state->max_blocks_in));
 }
 
 /*
@@ -1218,35 +1302,58 @@ ssh_packet_send2_wrapped(struct ssh *ssh)
 	return r;
 }
 
+/* returns non-zero if the specified packet type is usec by KEX */
+static int
+ssh_packet_type_is_kex(u_char type)
+{
+	return
+	    type >= SSH2_MSG_TRANSPORT_MIN &&
+	    type <= SSH2_MSG_TRANSPORT_MAX &&
+	    type != SSH2_MSG_SERVICE_REQUEST &&
+	    type != SSH2_MSG_SERVICE_ACCEPT &&
+	    type != SSH2_MSG_EXT_INFO;
+}
+
 int
 ssh_packet_send2(struct ssh *ssh)
 {
 	struct session_state *state = ssh->state;
 	struct packet *p;
 	u_char type;
-	int r;
+	int r, need_rekey;
 
+	if (sshbuf_len(state->outgoing_packet) < 6)
+		return SSH_ERR_INTERNAL_ERROR;
 	type = sshbuf_ptr(state->outgoing_packet)[5];
+	need_rekey = !ssh_packet_type_is_kex(type) &&
+	    ssh_packet_need_rekeying(ssh, sshbuf_len(state->outgoing_packet));
 
-	/* during rekeying we can only send key exchange messages */
-	if (state->rekeying) {
-		if ((type < SSH2_MSG_TRANSPORT_MIN) ||
-		    (type > SSH2_MSG_TRANSPORT_MAX) ||
-		    (type == SSH2_MSG_SERVICE_REQUEST) ||
-		    (type == SSH2_MSG_SERVICE_ACCEPT) ||
-		    (type == SSH2_MSG_EXT_INFO)) {
-			debug("enqueue packet: %u", type);
-			p = calloc(1, sizeof(*p));
-			if (p == NULL)
-				return SSH_ERR_ALLOC_FAIL;
-			p->type = type;
-			p->payload = state->outgoing_packet;
-			TAILQ_INSERT_TAIL(&state->outgoing, p, next);
-			state->outgoing_packet = sshbuf_new();
-			if (state->outgoing_packet == NULL)
-				return SSH_ERR_ALLOC_FAIL;
-			return 0;
+	/*
+	 * During rekeying we can only send key exchange messages.
+	 * Queue everything else.
+	 */
+	if ((need_rekey || state->rekeying) && !ssh_packet_type_is_kex(type)) {
+		if (need_rekey)
+			debug3("%s: rekex triggered", __func__);
+		debug("enqueue packet: %u", type);
+		p = calloc(1, sizeof(*p));
+		if (p == NULL)
+			return SSH_ERR_ALLOC_FAIL;
+		p->type = type;
+		p->payload = state->outgoing_packet;
+		TAILQ_INSERT_TAIL(&state->outgoing, p, next);
+		state->outgoing_packet = sshbuf_new();
+		if (state->outgoing_packet == NULL)
+			return SSH_ERR_ALLOC_FAIL;
+		if (need_rekey) {
+			/*
+			 * This packet triggered a rekey, so send the
+			 * KEXINIT now.
+			 * NB. reenters this function via kex_start_rekex().
+			 */
+			return kex_start_rekex(ssh);
 		}
+		return 0;
 	}
 
 	/* rekeying starts with sending KEXINIT */
@@ -1262,10 +1369,22 @@ ssh_packet_send2(struct ssh *ssh)
 		state->rekey_time = monotime();
 		while ((p = TAILQ_FIRST(&state->outgoing))) {
 			type = p->type;
+			/*
+			 * If this packet triggers a rekex, then skip the
+			 * remaining packets in the queue for now.
+			 * NB. re-enters this function via kex_start_rekex.
+			 */
+			if (ssh_packet_need_rekeying(ssh,
+			    sshbuf_len(p->payload))) {
+				debug3("%s: queued packet triggered rekex",
+				    __func__);
+				return kex_start_rekex(ssh);
+			}
 			debug("dequeue packet: %u", type);
 			sshbuf_free(state->outgoing_packet);
 			state->outgoing_packet = p->payload;
 			TAILQ_REMOVE(&state->outgoing, p, next);
+			memset(p, 0, sizeof(*p));
 			free(p);
 			if ((r = ssh_packet_send2_wrapped(ssh)) != 0)
 				return r;
@@ -1769,6 +1888,13 @@ ssh_packet_read_poll2(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 #endif
 	/* reset for next packet */
 	state->packlen = 0;
+
+	/* do we need to rekey? */
+	if (ssh_packet_need_rekeying(ssh, 0)) {
+		debug3("%s: rekex triggered", __func__);
+		if ((r = kex_start_rekex(ssh)) != 0)
+			return r;
+	}
  out:
 	return r;
 }
@@ -2243,25 +2369,6 @@ ssh_packet_send_ignore(struct ssh *ssh, int nbytes)
 			fatal("%s: %s", __func__, ssh_err(r));
 		rnd >>= 8;
 	}
-}
-
-#define MAX_PACKETS	(1U<<31)
-int
-ssh_packet_need_rekeying(struct ssh *ssh)
-{
-	struct session_state *state = ssh->state;
-
-	if (ssh->compat & SSH_BUG_NOREKEY)
-		return 0;
-	return
-	    (state->p_send.packets > MAX_PACKETS) ||
-	    (state->p_read.packets > MAX_PACKETS) ||
-	    (state->max_blocks_out &&
-	        (state->p_send.blocks > state->max_blocks_out)) ||
-	    (state->max_blocks_in &&
-	        (state->p_read.blocks > state->max_blocks_in)) ||
-	    (state->rekey_interval != 0 && state->rekey_time +
-		 state->rekey_interval <= monotime());
 }
 
 void

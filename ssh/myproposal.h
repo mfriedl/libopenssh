@@ -1,4 +1,4 @@
-/* $OpenBSD: myproposal.h,v 1.49 2015/12/05 20:53:21 markus Exp $ */
+/* $OpenBSD: myproposal.h,v 1.51 2016/05/02 10:26:04 djm Exp $ */
 
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
@@ -31,13 +31,17 @@
 	"ecdh-sha2-nistp256," \
 	"ecdh-sha2-nistp384," \
 	"ecdh-sha2-nistp521," \
-	"diffie-hellman-group-exchange-sha256"
+	"diffie-hellman-group-exchange-sha256," \
+	"diffie-hellman-group16-sha512," \
+	"diffie-hellman-group18-sha512" \
 
 #define KEX_SERVER_KEX KEX_COMMON_KEX "," \
+	"diffie-hellman-group14-sha256," \
 	"diffie-hellman-group14-sha1"
 
 #define KEX_CLIENT_KEX KEX_COMMON_KEX "," \
 	"diffie-hellman-group-exchange-sha1," \
+	"diffie-hellman-group14-sha256," \
 	"diffie-hellman-group14-sha1"
 
 #define	KEX_DEFAULT_PK_ALG	\
@@ -60,9 +64,7 @@
 	"aes128-gcm@openssh.com,aes256-gcm@openssh.com"
 
 #define KEX_CLIENT_ENCRYPT KEX_SERVER_ENCRYPT "," \
-	"arcfour256,arcfour128," \
-	"aes128-cbc,3des-cbc,blowfish-cbc,cast128-cbc," \
-	"aes192-cbc,aes256-cbc,arcfour,rijndael-cbc@lysator.liu.se"
+	"aes128-cbc,aes192-cbc,aes256-cbc,3des-cbc"
 
 #define	KEX_SERVER_MAC \
 	"umac-64-etm@openssh.com," \
@@ -76,18 +78,9 @@
 	"hmac-sha2-512," \
 	"hmac-sha1"
 
-#define KEX_CLIENT_MAC KEX_SERVER_MAC "," \
-	"hmac-md5-etm@openssh.com," \
-	"hmac-ripemd160-etm@openssh.com," \
-	"hmac-sha1-96-etm@openssh.com," \
-	"hmac-md5-96-etm@openssh.com," \
-	"hmac-md5," \
-	"hmac-ripemd160," \
-	"hmac-ripemd160@openssh.com," \
-	"hmac-sha1-96," \
-	"hmac-md5-96"
+#define KEX_CLIENT_MAC KEX_SERVER_MAC
 
-#else
+#else /* WITH_OPENSSL */
 
 #define KEX_SERVER_KEX		\
 	"curve25519-sha256@libssh.org"

@@ -1,4 +1,4 @@
-/* $OpenBSD: session.c,v 1.279 2015/10/24 22:52:22 djm Exp $ */
+/* $OpenBSD: session.c,v 1.282 2016/03/10 11:47:57 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -40,6 +40,7 @@
 #include <sys/socket.h>
 #include <sys/queue.h>
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <grp.h>
@@ -262,6 +263,21 @@ do_authenticated(struct ssh *ssh)
 	do_cleanup(authctxt);
 }
 
+/* Check untrusted xauth strings for metacharacters */
+static int
+xauth_valid_string(const char *s)
+{
+	size_t i;
+
+	for (i = 0; s[i] != '\0'; i++) {
+		if (!isalnum((u_char)s[i]) &&
+		    s[i] != '.' && s[i] != ':' && s[i] != '/' &&
+		    s[i] != '-' && s[i] != '_')
+		return 0;
+	}
+	return 1;
+}
+
 /*
  * Prepares for an interactive session.  This is called after the user has
  * been successfully authenticated.  During this message exchange, pseudo
@@ -339,8 +355,12 @@ do_authenticated1(struct ssh *ssh)
 				s->screen = 0;
 			}
 			if ((r = sshpkt_get_end(ssh)) != 0)
-				fatal("%s: %s", __func__, ssh_err(r));
-			success = session_setup_x11fwd(s);
+				error("%s: X11 %s", __func__, ssh_err(r));
+			else if (xauth_valid_string(s->auth_proto) &&
+			    xauth_valid_string(s->auth_data))
+				success = session_setup_x11fwd(s);
+			else
+				error("Invalid X11 forwarding data");
 			if (!success) {
 				free(s->auth_proto);
 				free(s->auth_data);
@@ -717,8 +737,8 @@ int
 do_exec(Session *s, const char *command)
 {
 	int ret;
-	const char *forced = NULL;
-	char session_type[1024], *tty = NULL;
+	const char *forced = NULL, *tty = NULL;
+	char session_type[1024];
 	struct ssh *ssh = s->ssh;
 
 	if (options.adm_forced_command) {
@@ -754,13 +774,14 @@ do_exec(Session *s, const char *command)
 			tty += 5;
 	}
 
-	verbose("Starting session: %s%s%s for %s from %.200s port %d",
+	verbose("Starting session: %s%s%s for %s from %.200s port %d id %d",
 	    session_type,
 	    tty == NULL ? "" : " on ",
 	    tty == NULL ? "" : tty,
 	    s->pw->pw_name,
-	    get_peer_ipaddr(ssh_packet_get_connection_in(ssh)),
-	    ssh_get_remote_port(ssh));
+	    ssh_remote_ipaddr(ssh),
+	    ssh_remote_port(ssh),
+	    s->self);
 
 #ifdef GSSAPI
 	if (options.gss_authentication) {
@@ -814,7 +835,7 @@ do_login(Session *s, const char *command)
 	/* Record that there was a login on that tty from the remote host. */
 	if (!use_privsep)
 		record_login(pid, s->tty, pw->pw_name, pw->pw_uid,
-		    get_remote_name_or_ip(utmp_len,
+		    session_get_remote_name_or_ip(ssh, utmp_len,
 		    options.use_dns),
 		    (struct sockaddr *)&from, fromlen);
 
@@ -1026,14 +1047,14 @@ do_setup_env(Session *s, const char *shell)
 
 	/* SSH_CLIENT deprecated */
 	snprintf(buf, sizeof buf, "%.50s %d %d",
-	    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh),
-	    ssh_get_local_port(ssh));
+	    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
+	    ssh_local_port(ssh));
 	child_set_env(&env, &envsize, "SSH_CLIENT", buf);
 
 	laddr = get_local_ipaddr(ssh_packet_get_connection_in(ssh));
 	snprintf(buf, sizeof buf, "%.50s %d %.50s %d",
-	    ssh_remote_ipaddr(ssh), ssh_get_remote_port(ssh), laddr,
-	    ssh_get_local_port(ssh));
+	    ssh_remote_ipaddr(ssh), ssh_remote_port(ssh),
+	    laddr, ssh_local_port(ssh));
 	free(laddr);
 	child_set_env(&env, &envsize, "SSH_CONNECTION", buf);
 
@@ -1347,6 +1368,7 @@ child_close_fds(struct ssh *ssh)
 void
 do_child(Session *s, const char *command)
 {
+	struct ssh *ssh = active_state;	/* XXX */
 	extern char **environ;
 	char **env;
 	char *argv[ARGV_MAX];
@@ -1394,14 +1416,14 @@ do_child(Session *s, const char *command)
 
 	/* we have to stash the hostname before we close our socket. */
 	if (options.use_login)
-		hostname = get_remote_name_or_ip(utmp_len,
+		hostname = session_get_remote_name_or_ip(ssh, utmp_len,
 		    options.use_dns);
 	/*
 	 * Close the connection descriptors; note that this is the child, and
 	 * the server will still have the socket open, and it is important
 	 * that we do not shutdown it.  Note that the descriptors cannot be
 	 * closed before building the environment, as we call
-	 * get_remote_ipaddr there.
+	 * ssh_remote_ipaddr there.
 	 */
 	child_close_fds(s->ssh);
 
@@ -1839,7 +1861,13 @@ session_x11_req(Session *s)
 	    (r = sshpkt_get_end(ssh)) != 0)
 		fatal("%s: %s", __func__, ssh_err(r));
 
-	success = session_setup_x11fwd(s);
+	if (xauth_valid_string(s->auth_proto) &&
+	    xauth_valid_string(s->auth_data))
+		success = session_setup_x11fwd(s);
+	else {
+		success = 0;
+		error("Invalid X11 forwarding data");
+	}
 	if (!success) {
 		free(s->auth_proto);
 		free(s->auth_data);
@@ -2173,9 +2201,15 @@ session_exit_message(Session *s, int status)
 void
 session_close(Session *s)
 {
+	struct ssh *ssh = active_state; /* XXX */
 	u_int i;
 
-	debug("session_close: session %d pid %ld", s->self, (long)s->pid);
+	verbose("Close session: user %s from %.200s port %d id %d",
+	    s->pw->pw_name,
+	    ssh_remote_ipaddr(ssh),
+	    ssh_remote_port(ssh),
+	    s->self);
+
 	if (s->ttyfd != -1)
 		session_pty_cleanup(s);
 	free(s->term);
@@ -2410,3 +2444,18 @@ do_cleanup(struct authctxt *authctxt)
 	if (!use_privsep || mm_is_monitor())
 		session_destroy_all(session_pty_cleanup2);
 }
+
+/* Return a name for the remote host that fits inside utmp_size */
+
+const char *
+session_get_remote_name_or_ip(struct ssh *ssh, u_int utmp_size, int use_dns)
+{
+	const char *remote = "";
+
+	if (utmp_size > 0)
+		remote = auth_get_canonical_hostname(ssh, use_dns);
+	if (utmp_size == 0 || strlen(remote) > utmp_size)
+		remote = ssh_remote_ipaddr(ssh);
+	return remote;
+}
+

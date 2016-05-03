@@ -1,4 +1,4 @@
-/* $OpenBSD: mux.c,v 1.58 2016/01/13 23:04:47 djm Exp $ */
+/* $OpenBSD: mux.c,v 1.59 2016/04/01 02:34:10 djm Exp $ */
 /*
  * Copyright (c) 2002-2008 Damien Miller <djm@openbsd.org>
  *
@@ -366,9 +366,8 @@ process_mux_new_session(u_int rid, Channel *c, struct sshbuf *m, struct sshbuf *
 			free(cp);
 			continue;
 		}
-		if ((r = reallocn((void **)&cctx->env, env_len + 2,
-		    sizeof(*cctx->env))) != 0)
-			goto malf;
+		cctx->env = xreallocarray(cctx->env, env_len + 2,
+		    sizeof(*cctx->env));
 		cctx->env[env_len++] = cp;
 		cctx->env[env_len] = NULL;
 		if (env_len > MUX_MAX_ENV_VARS) {
@@ -1308,7 +1307,7 @@ muxserver_listen(struct ssh *ssh)
 	/* Now atomically "move" the mux socket into position */
 	if (link(options.control_path, orig_control_path) != 0) {
 		if (errno != EEXIST) {
-			fatal("%s: link mux listener %s => %s: %s", __func__, 
+			fatal("%s: link mux listener %s => %s: %s", __func__,
 			    options.control_path, orig_control_path,
 			    strerror(errno));
 		}

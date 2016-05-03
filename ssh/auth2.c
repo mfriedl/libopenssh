@@ -1,4 +1,4 @@
-/* $OpenBSD: auth2.c,v 1.135 2015/01/19 20:07:45 markus Exp $ */
+/* $OpenBSD: auth2.c,v 1.136 2016/05/02 08:49:03 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  *
@@ -393,9 +393,8 @@ authmethods_get(struct authctxt *authctxt)
 		    authmethods[i]->name)) != 0)
 			fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	}
-	if ((r = sshbuf_put_u8(b, 0)) != 0)
-		fatal("%s: buffer error: %s", __func__, ssh_err(r));
-	list = xstrdup((const char *)sshbuf_ptr(b));
+	if ((list = sshbuf_dup_string(b)) == NULL)
+		fatal("%s: sshbuf_dup_string failed", __func__);
 	sshbuf_free(b);
 	return list;
 }

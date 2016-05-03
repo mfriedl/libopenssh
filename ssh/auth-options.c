@@ -1,4 +1,4 @@
-/* $OpenBSD: auth-options.c,v 1.70 2015/12/10 17:08:40 mmcc Exp $ */
+/* $OpenBSD: auth-options.c,v 1.71 2016/03/07 19:02:43 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -271,8 +271,8 @@ auth_parse_options(struct passwd *pw, char *opts, char *file, u_long linenum)
 		cp = "from=\"";
 		if (strncasecmp(opts, cp, strlen(cp)) == 0) {
 			const char *remote_ip = ssh_remote_ipaddr(ssh);
-			const char *remote_host = get_canonical_hostname(
-			    options.use_dns);
+			const char *remote_host = auth_get_canonical_hostname(
+			    ssh, options.use_dns);
 			char *patterns = xmalloc(strlen(opts) + 1);
 
 			opts += strlen(cp);
